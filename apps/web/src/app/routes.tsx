@@ -2,11 +2,9 @@ import { Route, Routes } from 'react-router'
 
 import { AppShell } from '../shell/AppShell.js'
 import { NotFound } from '../shell/NotFound.js'
-import { Agenda } from './destinations/Agenda.js'
-import { Discover } from './destinations/Discover.js'
 import { Home } from './destinations/Home.js'
-import { Messages } from './destinations/Messages.js'
-import { Network } from './destinations/Network.js'
+import { DestinationPlaceholder } from './destinations/Placeholder.js'
+import { DESTINATIONS, HOME } from './navigation.js'
 import { RequireAuth } from './RequireAuth.js'
 
 /**
@@ -20,10 +18,16 @@ import { RequireAuth } from './RequireAuth.js'
  * file is that decision; it was not inferred (Principle I).
  * ─────────────────────────────────────────────────────────────────────────────────────────
  *
+ * **The routes are generated from `DESTINATIONS`, not written again here.** They used to be
+ * literal `path` props, with each destination module looking its own address up a third time
+ * through `destinationFor('/agenda')!`. Changing an address in one place type-checked cleanly
+ * and turned that non-null assertion into a runtime crash inside the shell — the blank page
+ * FR-061 exists to prevent. One list, one source.
+ *
  * Nesting is what makes FR-014 fall out rather than needing to be implemented: a direct load of
- * `/discover` matches the index-less child directly, so the destination renders active on first
- * paint without passing through Home. There is no redirect and no "default then correct" step
- * that a shared link could be seen flickering through.
+ * `/discover` matches the child directly, so the destination renders active on first paint
+ * without passing through Home. There is no redirect and no "default then correct" step that a
+ * shared link could be seen flickering through.
  *
  * The guard wraps the shell rather than each destination, so `*` is guarded too — an
  * unauthenticated visitor at a nonsense address is asked to sign in rather than being told what
@@ -33,11 +37,19 @@ export const AppRoutes = () => (
   <Routes>
     <Route element={<RequireAuth />}>
       <Route element={<AppShell />}>
-        <Route index element={<Home />} />
-        <Route path="agenda" element={<Agenda />} />
-        <Route path="discover" element={<Discover />} />
-        <Route path="messages" element={<Messages />} />
-        <Route path="network" element={<Network />} />
+        {DESTINATIONS.map((destination) =>
+          destination.path === HOME.path ? (
+            // Home is the only destination with content in this slice, and the only one whose
+            // address is the index rather than a segment.
+            <Route key={destination.path} index element={<Home />} />
+          ) : (
+            <Route
+              key={destination.path}
+              path={destination.path.slice(1)}
+              element={<DestinationPlaceholder destination={destination} />}
+            />
+          ),
+        )}
 
         {/* FR-015 — inside the shell, so the navigation stays available. Never a blank screen. */}
         <Route path="*" element={<NotFound />} />

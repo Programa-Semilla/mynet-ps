@@ -78,6 +78,29 @@ export class OfflineError extends Error {
   }
 }
 
+/**
+ * Raised when the server refused a request and explained why (FR-059).
+ *
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ * Lives here, with the interfaces, rather than in the HTTP implementation — because
+ * presentation code needs to recognise a refusal and show the server's message, and it must be
+ * able to do that without importing the transport (FR-045).
+ *
+ * Carries a `code` and an attendee-facing `message` and nothing else. No status, no headers, no
+ * response object: those are HTTP's vocabulary, and a component that could see them would be
+ * coupled to the fact that HTTP is what happens to be underneath.
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ */
+export class RequestRefusedError extends Error {
+  readonly code: string
+
+  constructor(code: string, message: string) {
+    super(message)
+    this.name = 'RequestRefusedError'
+    this.code = code
+  }
+}
+
 /** Raised when the sign-in session expired through inactivity (FR-028c). */
 export class SessionExpiredError extends Error {
   constructor() {

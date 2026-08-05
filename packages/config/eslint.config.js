@@ -122,7 +122,7 @@ export default tseslint.config(
      * requests, renders nothing, and is the only import of `@mynet/platform/web` in the client.
      */
     name: 'mynet/composition-root',
-    files: ['apps/web/src/app/services.ts'],
+    files: ['apps/web/src/app/services.ts', 'apps/web/src/main.tsx'],
     rules: {
       'mynet/no-direct-platform-access': 'off',
     },

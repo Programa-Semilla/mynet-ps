@@ -238,10 +238,19 @@ describe('the web implementations honour their contracts (FR-046, T105, T107)', 
     expect(await devices.notifications.requestPermission()).toBe('unsupported')
   })
 
-  it('stores nothing in secure storage, because nothing in this slice may', () => {
+  it('stores nothing in secure storage, because nothing in this slice may', async () => {
     // The sign-in token lives in an HttpOnly cookie precisely so that no client code — including
     // this interface — can reach it. A `set` that actually persisted would be the first step
     // toward a token the client can read.
-    expect(devices.secureStorage).toBeDefined()
+    //
+    // This assertion used to be `expect(devices.secureStorage).toBeDefined()`, which could not
+    // fail for the reason it names: an implementation backed by `localStorage` would have passed
+    // it. Writing and reading back is what actually holds the line.
+    await devices.secureStorage.set('token', 'a-secret-value')
+    await expect(devices.secureStorage.get('token')).resolves.toBeNull()
+
+    // And nothing reached a browser store on the way past.
+    expect(Object.keys(globalThis.localStorage ?? {})).toEqual([])
+    expect(Object.keys(globalThis.sessionStorage ?? {})).toEqual([])
   })
 })

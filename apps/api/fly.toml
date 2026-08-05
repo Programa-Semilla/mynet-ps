@@ -11,6 +11,21 @@ primary_region = "fra"
 [build]
   dockerfile = "Dockerfile"
 
+# ─────────────────────────────────────────────────────────────────────────────────────────
+# Migrations run as part of the deployment, not beside it.
+#
+# Without this, the schema was applied only by a separate CI job coupled to the deploy by a
+# `needs:` edge. Any `flyctl deploy` outside that workflow — a rollback, a redeploy of an
+# existing app, or the production path that does not exist yet — would ship new code against an
+# unmigrated schema and return "column does not exist" on every request. The migrations already
+# ship inside the image; this is what makes shipping them mean something.
+#
+# Fly runs this to completion before routing traffic, and aborts the release if it fails.
+# ─────────────────────────────────────────────────────────────────────────────────────────
+[deploy]
+  release_command = "node dist/db/migrate.js"
+  strategy = "rolling"
+
 [env]
   API_HOST = "0.0.0.0"
   API_PORT = "3000"

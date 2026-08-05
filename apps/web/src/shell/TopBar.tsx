@@ -1,5 +1,7 @@
+import { OfflineError } from '@mynet/data'
 import { useAuthGateway } from '@mynet/platform'
 import { LogOut } from 'lucide-react'
+import { useState } from 'react'
 import { useLocation } from 'react-router'
 
 import { PRODUCT_NAME } from '../app/branding.js'
@@ -29,43 +31,81 @@ export const TopBar = () => {
 
   const current = destinationFor(pathname)
 
+  const [signOutFailure, setSignOutFailure] = useState<string | null>(null)
+
   const onSignOut = async () => {
+    setSignOutFailure(null)
+
     try {
       await auth.signOut()
-    } finally {
-      // Clear local state even if the request failed. The server may already have revoked the
-      // session; leaving the UI claiming "signed in" would be the worse of the two errors.
+      markSignedOut()
+    } catch (error) {
+      // ─────────────────────────────────────────────────────────────────────────────────────
+      // **Offline is not a sign-out.** Clearing local state regardless used to be the whole of
+      // this handler, and it did the one thing FR-053 names outright: an action requiring the
+      // server, attempted offline, appeared to have succeeded. The attendee was returned to the
+      // sign-in screen while `revoked_at` was still null and the cookie was still live on the
+      // device — the opposite of FR-027, which exists precisely because forgetting a token is
+      // not the same as revoking it.
+      //
+      // Someone signing out on a shared or borrowed device is exactly the person who must not
+      // be told it worked when it did not.
+      // ─────────────────────────────────────────────────────────────────────────────────────
+      if (error instanceof OfflineError) {
+        setSignOutFailure(
+          'Signing out needs a connection. You are still signed in on this device — try again once you reconnect.',
+        )
+        return
+      }
+
+      // The server refused, which means it answered — the session is already unusable, or soon
+      // will be. Leaving the interface claiming "signed in" would be the worse of the two errors.
       markSignedOut()
     }
   }
 
   return (
-    <header className="flex items-center justify-between gap-3 border-b border-border-subtle bg-surface-raised px-4 py-3 tablet:px-6">
-      {/*
+    <>
+      <header className="flex items-center justify-between gap-3 border-b border-border-subtle bg-surface-raised px-4 py-3 tablet:px-6">
+        {/*
         Two labels, one visible at a time — the same CSS-only band selection the navigation uses,
         so neither is announced twice.
       */}
-      <span className="font-display text-lg font-semibold text-text-primary tablet:hidden">
-        {PRODUCT_NAME}
-      </span>
-      <span className="hidden font-display text-lg font-semibold text-text-primary tablet:inline">
-        {current?.label ?? 'Not found'}
-      </span>
+        <span className="font-display text-lg font-semibold text-text-primary tablet:hidden">
+          {PRODUCT_NAME}
+        </span>
+        <span className="hidden font-display text-lg font-semibold text-text-primary tablet:inline">
+          {current?.label ?? 'Not found'}
+        </span>
 
-      {attendee && (
-        <div className="flex min-w-0 items-center gap-3">
-          {/* Truncates rather than wrapping or pushing the button off-screen at 320px (FR-020). */}
-          <span className="truncate text-sm text-text-body">{attendee.displayName}</span>
-          <button
-            type="button"
-            onClick={() => void onSignOut()}
-            className="inline-flex shrink-0 items-center gap-2 rounded-sm border border-border-subtle px-3 py-1 text-sm font-medium text-text-primary"
-          >
-            <LogOut aria-hidden="true" size={14} strokeWidth={1.75} />
-            Sign out
-          </button>
-        </div>
+        {attendee && (
+          <div className="flex min-w-0 items-center gap-3">
+            {/* Truncates rather than wrapping or pushing the button off-screen at 320px (FR-020). */}
+            <span className="truncate text-sm text-text-body">{attendee.displayName}</span>
+            <button
+              type="button"
+              onClick={() => void onSignOut()}
+              className="inline-flex shrink-0 items-center gap-2 rounded-sm border border-border-subtle px-3 py-1 text-sm font-medium text-text-primary"
+            >
+              <LogOut aria-hidden="true" size={14} strokeWidth={1.75} />
+              Sign out
+            </button>
+          </div>
+        )}
+      </header>
+
+      {/*
+        Announced, and placed where the attendee is already looking after pressing Sign out.
+        FR-053 requires the refusal to be explained rather than silent.
+      */}
+      {signOutFailure && (
+        <p
+          role="alert"
+          className="border-b border-warning-500 bg-warning-100 px-4 py-2 text-sm text-text-body tablet:px-6"
+        >
+          {signOutFailure}
+        </p>
       )}
-    </header>
+    </>
   )
 }

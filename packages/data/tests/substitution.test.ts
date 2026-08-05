@@ -93,20 +93,53 @@ describe('repository substitution', () => {
 
 describe('no repository method accepts an attendee identifier (FR-036, FR-044)', () => {
   /**
-   * Every repository method, checked by arity.
+   * Derived from the prototypes rather than listed.
    *
-   * A method that takes no arguments cannot be handed somebody else's identifier. This is a
-   * blunt instrument on purpose: it fails on *any* new parameter, which forces whoever adds one
-   * to come here and explain themselves rather than slipping an `attendeeId` past review.
+   * A hand-maintained list silently narrows: a repository method added tomorrow is simply not
+   * checked, and the guard reports green while covering less than it did. Deriving it means a
+   * new method is covered the moment it exists.
    */
-  const methods = [
-    ['AttendeeRepository.getCurrent', httpRepositories().attendee.getCurrent],
-    ['EventsRepository.listRegistered', httpRepositories().events.listRegistered],
-  ] as const
+  const everyRepositoryMethod = (): Array<[string, (...args: never[]) => unknown]> => {
+    const entries: Array<[string, (...args: never[]) => unknown]> = []
 
-  it.each(methods)('%s takes no parameters', (_name, method) => {
+    for (const [name, repository] of Object.entries(httpRepositories())) {
+      const prototype = Object.getPrototypeOf(repository) as object
+      for (const method of Object.getOwnPropertyNames(prototype)) {
+        if (method === 'constructor') continue
+        const value = (repository as unknown as Record<string, unknown>)[method]
+        if (typeof value === 'function') {
+          entries.push([`${name}.${method}`, value as (...args: never[]) => unknown])
+        }
+      }
+    }
+
+    return entries
+  }
+
+  it('derives a non-empty method list, so the loop below cannot pass by checking nothing', () => {
+    expect(everyRepositoryMethod().length).toBeGreaterThan(0)
+  })
+
+  it.each(everyRepositoryMethod())('%s takes no parameters', (_name, method) => {
     expect(method.length).toBe(0)
   })
+
+  it.each(everyRepositoryMethod())(
+    '%s names no attendee identifier in its signature',
+    (name, method) => {
+      // Arity alone is not sufficient. `Function.length` counts only the parameters before the
+      // first optional or defaulted one and ignores rest parameters, so `getCurrent(id?: string)`,
+      // `getCurrent(id = '')`, and `getCurrent(...args: string[])` all report zero and would all
+      // slip past — and each is the idiomatic way somebody would add the very parameter this
+      // guard exists to forbid.
+      const source = method.toString()
+      const signature = source.slice(0, source.indexOf(')') + 1)
+
+      expect(signature, `${name} must not accept a caller-supplied identity`).not.toMatch(
+        /attendee|user|person|owner|account/i,
+      )
+    },
+  )
 
   it('holds for test doubles too, since they implement the same interface', () => {
     const attendee: AttendeeRepository = { getCurrent: async () => ADA }

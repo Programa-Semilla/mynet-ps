@@ -4,6 +4,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import {
   ADA,
   clearThrottle,
+  SOURCE_FREE_ATTEMPTS,
   resetDatabase,
   SEED_PASSWORD,
   setupTestApp,
@@ -25,8 +26,13 @@ import {
 describe('sign-in throttling', () => {
   let app: FastifyInstance
 
-  const attempt = (email: string, password: string) =>
-    app.inject({ method: 'POST', url: '/auth/sign-in', payload: { email, password } })
+  const attempt = (email: string, password: string, source = '203.0.113.1') =>
+    app.inject({
+      method: 'POST',
+      url: '/auth/sign-in',
+      payload: { email, password },
+      remoteAddress: source,
+    })
 
   beforeAll(async () => {
     app = await setupTestApp()
@@ -103,21 +109,25 @@ describe('sign-in throttling', () => {
 
   /**
    * FR-031b, SC-003a — the assertion this file exists for.
+   *
+   * ───────────────────────────────────────────────────────────────────────────────────────
+   * **A correct credential is never throttled.** Not after any number of failures, and — the
+   * case that matters — not while an attacker is still failing.
+   *
+   * The earlier arrangement consulted the throttle *before* verifying the password, and the
+   * outstanding delay was measured from the newest failure. An attacker who kept failing
+   * therefore held the account shut indefinitely: the owner's correct password was refused
+   * before it was looked at, and only a success could clear the streak, which the refusal
+   * prevented. A closed loop. Verification now happens first, which is what makes SC-003a's
+   * "accounts an attacker can render permanently inaccessible is zero" true by construction.
+   * ───────────────────────────────────────────────────────────────────────────────────────
    */
-  it('NEVER permanently locks the account — the correct credential still works (FR-031b)', async () => {
-    // Well past any threshold. If a lockout existed, this would trip it.
-    for (let i = 0; i < 25; i += 1) {
+  it('NEVER locks the account — the correct credential works after any number of failures', async () => {
+    for (let i = 0; i < 12; i += 1) {
       await attempt(ADA, 'wrong')
     }
 
-    // Clearing the window stands in for the failures ageing out of it. What matters is that
-    // there is no state which permanently denies access.
-    //
-    // **This is necessary but not sufficient**, and on its own it hid a real lockout: deleting
-    // the rows proves the window eventually clears, not that an attendee can wait out the
-    // delay. The test below is the one that catches that, and it is the one that failed.
-    await clearThrottle()
-
+    // No clearing, no waiting. The streak is live and well past every threshold.
     const response = await attempt(ADA, SEED_PASSWORD)
     expect(
       response.statusCode,
@@ -125,39 +135,89 @@ describe('sign-in throttling', () => {
     ).toBe(204)
   })
 
-  /**
-   * FR-031a, FR-031b, SC-003a — **the delay must actually be servable.**
-   *
-   * This is the regression that was live. `nextDelayMs` returned the delay a failure count
-   * earns, and the sign-in route refused on any non-zero value — but nothing ever subtracted
-   * the time already waited. The delay could therefore never be served: once past the free
-   * attempts, every request was refused for the remaining hour of the rolling window.
-   *
-   * Because email is the identifier and anyone can type anyone's address, that let an attacker
-   * hold any account they could name shut indefinitely by failing four times an hour. SC-003a
-   * requires the number of accounts that can be rendered permanently inaccessible to be zero.
-   *
-   * Nothing above caught it: the "never locks" test deletes the attempt rows, which is a
-   * different thing from waiting.
-   */
-  it('lets the attendee wait out the delay and sign in, without clearing anything', async () => {
-    // Four consecutive failures — one past the free allowance — which earns a 1 second delay.
-    for (let i = 0; i < 4; i += 1) {
-      await attempt(ADA, 'wrong')
+  it('NEVER locks the account while an attacker is actively still failing (SC-003a)', async () => {
+    // The attacker, from their own address, past the escalation ceiling.
+    for (let i = 0; i < 15; i += 1) {
+      await attempt(ADA, 'wrong', '198.51.100.7')
     }
 
-    const throttled = await attempt(ADA, SEED_PASSWORD)
-    expect(throttled.statusCode, 'the fifth attempt is throttled, as designed').toBe(429)
+    // They keep going — this is the case a "wait out the delay" test cannot model, because the
+    // victim never gets a quiet moment to wait through.
+    await attempt(ADA, 'wrong', '198.51.100.7')
 
-    // Wait longer than the earned delay. No rows are deleted and the window has not moved on;
-    // the only thing that has changed is that time has passed, which is the entire point of
-    // calling it a delay.
-    await new Promise((resolve) => setTimeout(resolve, 1_400))
-
-    const afterWaiting = await attempt(ADA, SEED_PASSWORD)
+    // The owner, from their own address, immediately.
+    const owner = await attempt(ADA, SEED_PASSWORD, '203.0.113.9')
     expect(
-      afterWaiting.statusCode,
-      'having served the delay, the correct credential must sign in (FR-031b, SC-003a)',
+      owner.statusCode,
+      'an attacker who keeps failing must not be able to deny the owner access (FR-031b, SC-003a)',
+    ).toBe(204)
+  })
+
+  it('escalates the delay on repeated failures (FR-031a)', async () => {
+    for (let i = 0; i < 3; i += 1) {
+      expect((await attempt(ADA, 'wrong')).statusCode).toBe(401)
+    }
+
+    // Past the free allowance the failure is held, and beyond the served bound it is reported
+    // as retry-after guidance instead. Either way the *failure* is what pays.
+    const throttled = []
+    for (let i = 0; i < 6; i += 1) {
+      throttled.push((await attempt(ADA, 'wrong')).statusCode)
+    }
+    expect(throttled, 'repeated failures must eventually be throttled').toContain(429)
+  })
+
+  /**
+   * FR-031a — the source dimension, which had no coverage at all.
+   *
+   * Identifier throttling gives every address three free attempts of its own, so a spray across
+   * thousands of identifiers is bounded by nothing else. Deleting the source half of the
+   * throttle entirely used to leave this whole file green.
+   */
+  it('throttles a spray across many identifiers from one source', async () => {
+    const source = '198.51.100.20'
+
+    for (let i = 0; i < SOURCE_FREE_ATTEMPTS + 4; i += 1) {
+      await attempt(`nobody-${i}@example.com`, 'wrong', source)
+    }
+
+    const next = await attempt('nobody-final@example.com', 'wrong', source)
+    expect(next.statusCode, 'a distributed spray from one source must be throttled').toBe(429)
+  })
+
+  it('does not let an attacker clear the source counter by signing in to their own account', async () => {
+    const source = '198.51.100.30'
+
+    for (let i = 0; i < SOURCE_FREE_ATTEMPTS + 4; i += 1) {
+      await attempt(`nobody-${i}@example.com`, 'wrong', source)
+    }
+
+    // A success from the same source. If the source counter were a streak ended by any success,
+    // this would reset it and the spray could continue indefinitely.
+    expect((await attempt(ADA, SEED_PASSWORD, source)).statusCode).toBe(204)
+
+    const resumed = await attempt('nobody-after@example.com', 'wrong', source)
+    expect(
+      resumed.statusCode,
+      'a success must not reset the source counter — that would make the bound optional',
+    ).toBe(429)
+  })
+
+  /**
+   * The spec's named edge case: a conference venue puts hundreds of attendees behind one public
+   * address. Treating that address like a single guesser would lock out the whole hall.
+   */
+  it("lets attendees behind a shared address sign in despite each other's typos", async () => {
+    const venue = '198.51.100.40'
+
+    for (let i = 0; i < 10; i += 1) {
+      await attempt(`attendee-${i}@example.com`, 'wrong', venue)
+    }
+
+    const legitimate = await attempt(ADA, SEED_PASSWORD, venue)
+    expect(
+      legitimate.statusCode,
+      'a legitimate attendee sharing an address with many others must still sign in (SC-003a)',
     ).toBe(204)
   })
 

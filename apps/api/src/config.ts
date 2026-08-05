@@ -40,6 +40,18 @@ const positiveInt = (name: string, fallback: number): number => {
   return parsed
 }
 
+const nonNegativeInt = (name: string, fallback: number): number => {
+  const raw = process.env[name]
+  if (raw === undefined || raw.trim() === '') return fallback
+  const parsed = Number(raw)
+  if (!Number.isInteger(parsed) || parsed < 0) {
+    throw new Error(
+      `Environment variable ${name} must be a non-negative integer, received "${raw}".`,
+    )
+  }
+  return parsed
+}
+
 export interface AppConfig {
   readonly nodeEnv: 'development' | 'test' | 'production'
   readonly isProduction: boolean
@@ -47,11 +59,27 @@ export interface AppConfig {
   readonly port: number
   readonly webOrigin: string
   readonly databaseUrl: string
+  /**
+   * How many reverse proxies sit in front of this service (FR-031a).
+   *
+   * Used as Fastify's `trustProxy` hop count so that `request.ip` is the address the outermost
+   * *trusted* proxy observed, rather than whatever the client wrote in `X-Forwarded-For`. One
+   * matches a single Fly.io edge. Zero means no proxy — use the socket address.
+   */
+  readonly trustedProxyHops: number
   readonly auth: {
     readonly passwordPepper: string
     readonly attemptHashKey: string
     /** Sliding idle window in milliseconds (FR-028a, research.md D17 — 14 days). */
     readonly sessionIdleMs: number
+    /**
+     * The longest a failed sign-in is held open while its escalating delay is served
+     * (FR-031a). Anything beyond becomes retry-after guidance.
+     *
+     * Configurable so the integration suite can shrink it. Without that the suite would spend
+     * minutes asleep proving properties that do not depend on the wall-clock magnitude.
+     */
+    readonly maxServedDelayMs: number
   }
 }
 
@@ -72,10 +100,15 @@ export const loadConfig = (): AppConfig => {
     port: positiveInt('API_PORT', 3000),
     webOrigin: optional('WEB_ORIGIN', 'http://localhost:5173'),
     databaseUrl: required('DATABASE_URL'),
+    // Defaults to 1 — the deployed topology. A local run has no proxy, but trusting one hop
+    // that does not exist is harmless there, whereas defaulting to 0 and forgetting to set it
+    // in production would throttle every attendee as a single source.
+    trustedProxyHops: nonNegativeInt('TRUSTED_PROXY_HOPS', 1),
     auth: {
       passwordPepper: required('AUTH_PASSWORD_PEPPER'),
       attemptHashKey: required('AUTH_ATTEMPT_HASH_KEY'),
       sessionIdleMs: positiveInt('AUTH_SESSION_IDLE_DAYS', 14) * 24 * 60 * 60 * 1000,
+      maxServedDelayMs: nonNegativeInt('AUTH_MAX_SERVED_DELAY_MS', 5_000),
     },
   }
 

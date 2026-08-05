@@ -65,17 +65,62 @@ jobs:
   # every push, and deleted when the pull request closes.
   db-branch:
     name: db-branch
-    if: github.event_name != 'pull_request' || github.event.action != 'closed'
+    # Pull requests only. Running on push created a branch named `pr-<run_id>` that the cleanup
+    # job — which only fires on a closed pull request — could never delete, so every merge
+    # leaked one database permanently until the project hit Neon's branch limit and the whole
+    # pipeline stopped working for an unrelated reason.
+    if: github.event_name == 'pull_request' && github.event.action != 'closed'
     runs-on: ubuntu-latest
     outputs:
       db_url: ${{ steps.create.outputs.db_url_pooled }}
+      db_url_e2e: ${{ steps.create-e2e.outputs.db_url_pooled }}
+      db_url_a11y: ${{ steps.create-a11y.outputs.db_url_pooled }}
     steps:
+      # ─────────────────────────────────────────────────────────────────────────────────────
+      # **Three branches, not one.** `test-integration`, `test-e2e` and `test-accessibility` run
+      # concurrently, and every one of them destructively resets the database it is given —
+      # `resetDatabase()` truncates and re-seeds, and `pnpm db:seed` deletes and re-inserts every
+      # attendee with fresh identifiers. Sharing one branch meant a suite's signed-in session
+      # could have the attendee row deleted out from under it mid-run, and one suite's
+      # deliberately failed sign-ins throttled another's. That produces nondeterministic red
+      # runs whose usual remedy — "re-run the job" — is exactly the habit that destroys trust in
+      # a gate (FR-064).
+      # ─────────────────────────────────────────────────────────────────────────────────────
       - name: create a database branch for this pull request
         id: create
         uses: neondatabase/create-branch-action@v5
         with:
           project_id: ${{ secrets.NEON_PROJECT_ID }}
-          branch_name: pr-${{ github.event.number || github.run_id }}
+          branch_name: pr-${{ github.event.number }}
+          # ─────────────────────────────────────────────────────────────────────────────────
+          # **Explicit parent, never the project default.** Omitting this branches from the
+          # default branch — which is where production data will live. Today that is harmless
+          # because there is no production data; the day there is, every pull request would
+          # silently receive a copy-on-write clone of the real attendee table, credential
+          # hashes included, behind a publicly reachable preview API. FR-067 forbids exactly
+          # that, and it would arrive with no code change to trigger it.
+          #
+          # `preview-base` is a permanently data-free branch. It is owner provisioning (T001).
+          # ─────────────────────────────────────────────────────────────────────────────────
+          parent_branch: preview-base
+          api_key: ${{ secrets.NEON_API_KEY }}
+
+      - name: create an isolated branch for the end-to-end suite
+        id: create-e2e
+        uses: neondatabase/create-branch-action@v5
+        with:
+          project_id: ${{ secrets.NEON_PROJECT_ID }}
+          branch_name: pr-${{ github.event.number }}-e2e
+          parent_branch: preview-base
+          api_key: ${{ secrets.NEON_API_KEY }}
+
+      - name: create an isolated branch for the accessibility suite
+        id: create-a11y
+        uses: neondatabase/create-branch-action@v5
+        with:
+          project_id: ${{ secrets.NEON_PROJECT_ID }}
+          branch_name: pr-${{ github.event.number }}-a11y
+          parent_branch: preview-base
           api_key: ${{ secrets.NEON_API_KEY }}
 
   # ── Gate 1: type checking (FR-001) ──────────────────────────────────────────────────────
@@ -147,6 +192,12 @@ jobs:
   contract:
     name: contract
     runs-on: ubuntu-latest
+    # `contract:check` builds the Fastify app to read its route schemas, and `buildApp` calls
+    # `loadConfig()`, which requires DATABASE_URL. No query is ever issued — `getDb()` is lazy —
+    # so a syntactically valid placeholder is enough, and using one keeps this job independent
+    # of the database branch it does not need.
+    env:
+      DATABASE_URL: postgresql://unused:unused@localhost:5432/unused
     steps:
       - uses: actions/checkout@v5
       - uses: pnpm/action-setup@v4
@@ -240,7 +291,7 @@ jobs:
     needs: [db-branch, migrations]
     runs-on: ubuntu-latest
     env:
-      DATABASE_URL: ${{ needs.db-branch.outputs.db_url }}
+      DATABASE_URL: ${{ needs.db-branch.outputs.db_url_a11y }}
       VITE_API_BASE_URL: http://localhost:3000
       WEB_ORIGIN: http://localhost:5173
     steps:
@@ -252,6 +303,9 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps chromium
+      # Its own branch, so it applies its own migrations. The `migrations` job proves the
+      # committed migrations apply cleanly; this makes this suite's database usable.
+      - run: pnpm db:migrate
       - run: pnpm exec playwright test e2e/accessibility.spec.ts
       - uses: actions/upload-artifact@v4
         if: failure()
@@ -265,7 +319,7 @@ jobs:
     needs: [db-branch, migrations]
     runs-on: ubuntu-latest
     env:
-      DATABASE_URL: ${{ needs.db-branch.outputs.db_url }}
+      DATABASE_URL: ${{ needs.db-branch.outputs.db_url_e2e }}
       VITE_API_BASE_URL: http://localhost:3000
       WEB_ORIGIN: http://localhost:5173
     steps:
@@ -277,6 +331,7 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm db:migrate
       # Everything except the accessibility suite, which reports as its own required check.
       - run: pnpm exec playwright test --ignore-snapshots e2e/sign-in.spec.ts e2e/durability.spec.ts e2e/navigation.spec.ts e2e/responsive.spec.ts e2e/offline.spec.ts
       - uses: actions/upload-artifact@v4
@@ -386,17 +441,44 @@ jobs:
     if: github.event_name == 'pull_request' && github.event.action == 'closed'
     runs-on: ubuntu-latest
     steps:
+      # ─────────────────────────────────────────────────────────────────────────────────────
+      # Every step carries `if: always()`, because without it a transient failure in the first
+      # step skips the rest — leaving the Fly application alive, publicly reachable, and still
+      # holding its database URL and auth secrets as Fly secrets. The `|| true` that used to sit
+      # on the destroy step made the opposite mistake: it reported success while orphaning the
+      # application, so nobody found out until a billing statement.
+      #
+      # A cleanup job that only ever runs on `closed` also has no way to recover from its own
+      # past failures. `reconcile-orphans.yml` sweeps up what this misses.
+      # ─────────────────────────────────────────────────────────────────────────────────────
       - name: delete the database branch
+        if: always()
         uses: neondatabase/delete-branch-action@v3
         with:
           project_id: ${{ secrets.NEON_PROJECT_ID }}
           branch: pr-${{ github.event.number }}
           api_key: ${{ secrets.NEON_API_KEY }}
-      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - name: delete the end-to-end database branch
+        if: always()
+        uses: neondatabase/delete-branch-action@v3
+        with:
+          project_id: ${{ secrets.NEON_PROJECT_ID }}
+          branch: pr-${{ github.event.number }}-e2e
+          api_key: ${{ secrets.NEON_API_KEY }}
+      - name: delete the accessibility database branch
+        if: always()
+        uses: neondatabase/delete-branch-action@v3
+        with:
+          project_id: ${{ secrets.NEON_PROJECT_ID }}
+          branch: pr-${{ github.event.number }}-a11y
+          api_key: ${{ secrets.NEON_API_KEY }}
+      - if: always()
+        uses: superfly/flyctl-actions/setup-flyctl@master
       - name: destroy the ephemeral API
+        if: always()
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
-        run: flyctl apps destroy "mynet-api-pr-${{ github.event.number }}" --yes || true
+        run: flyctl apps destroy "mynet-api-pr-${{ github.event.number }}" --yes
 
   # ── The aggregate gate (FR-064, FR-071) ─────────────────────────────────────────────────
   #
@@ -412,7 +494,18 @@ jobs:
   verify:
     name: verify
     runs-on: ubuntu-latest
-    if: always() && (github.event_name != 'pull_request' || github.event.action != 'closed')
+    # ─────────────────────────────────────────────────────────────────────────────────────────
+    # **Pull requests only.** The eleven checks include a preview deployment, which exists only
+    # for a pull request. Asserting all eleven succeeded on a `push` meant `deploy-preview` was
+    # skipped, `skipped != success`, and every merge into `develop` or `main` produced a
+    # permanently red check on a protected branch.
+    #
+    # That is its own kind of FR-064 failure, arriving from the opposite direction: a signal
+    # that is always red teaches reviewers to ignore it, which is exactly as useless as one that
+    # is always green. `verify-push` below covers the post-merge path with the jobs that can
+    # genuinely run there.
+    # ─────────────────────────────────────────────────────────────────────────────────────────
+    if: always() && github.event_name == 'pull_request' && github.event.action != 'closed'
     needs:
       - typecheck
       - lint
@@ -448,3 +541,35 @@ jobs:
           fi
 
           echo "All 11 required checks succeeded."
+
+  # ── The post-merge aggregate ────────────────────────────────────────────────────────────
+  #
+  # After a squash merge the ephemeral per-pull-request resources are gone, so the checks that
+  # depend on them cannot run. These six can, and they are the ones that would catch a bad
+  # merge resolution. Same refusal to accept anything other than literal success.
+  verify-push:
+    name: verify-push
+    runs-on: ubuntu-latest
+    if: always() && github.event_name == 'push'
+    needs: [typecheck, lint, test-unit, test-component, contract, build]
+    steps:
+      - name: assert every post-merge check succeeded
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          echo "$RESULTS"
+
+          count=$(echo "$RESULTS" | jq -r 'length')
+          if [ "$count" -ne 6 ]; then
+            echo "::error::Expected 6 post-merge checks, found $count."
+            exit 1
+          fi
+
+          failed=$(echo "$RESULTS" | jq -r 'to_entries[] | select(.value.result != "success") | "\(.key)=\(.value.result)"')
+          if [ -n "$failed" ]; then
+            echo "::error::Post-merge checks did not succeed:"
+            echo "$failed" | while read -r line; do echo "::error::  $line"; done
+            exit 1
+          fi
+
+          echo "All 6 post-merge checks succeeded."

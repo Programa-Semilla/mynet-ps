@@ -14,6 +14,8 @@ import fastifyCors from '@fastify/cors'
 import Fastify, { type FastifyInstance } from 'fastify'
 
 import { loadConfig } from './config.js'
+import { closeDb } from './db/client.js'
+import maintenance from './maintenance.js'
 import authContext from './plugins/auth-context.js'
 import errors from './plugins/errors.js'
 import swagger from './plugins/swagger.js'
@@ -42,9 +44,23 @@ export const buildApp = async (): Promise<FastifyInstance> => {
         remove: true,
       },
     },
-    // The request source drives throttling (FR-031a). Behind a proxy, the socket address is
-    // the load balancer — throttling every attendee as one source.
-    trustProxy: true,
+    // ─────────────────────────────────────────────────────────────────────────────────────
+    // The request source drives throttling (FR-031a). Behind a proxy the socket address is the
+    // load balancer, so some `X-Forwarded-For` handling is required — but **`true` is the wrong
+    // amount of trust**.
+    //
+    // `trustProxy: true` trusts every hop, which means Fastify takes the leftmost
+    // `X-Forwarded-For` entry — a value any client can write. The source dimension of the
+    // throttle then becomes attacker-chosen: rotate the header per request and every guess
+    // lands in a fresh bucket, so the source threshold never binds and a password spray from
+    // one machine is unlimited. Worse, an attacker can *name* a venue's public address and
+    // poison that bucket from anywhere, denying sign-in to everyone behind it.
+    //
+    // A hop count trusts exactly the proxies actually in front of this service and no further.
+    // One is correct for a single Fly.io edge; raise it only when another proxy is genuinely
+    // added, and never back to `true`.
+    // ─────────────────────────────────────────────────────────────────────────────────────
+    trustProxy: config.trustedProxyHops,
   })
 
   // 1. Cookies. Must precede auth-context, which reads the sign-in session cookie.
@@ -72,7 +88,18 @@ export const buildApp = async (): Promise<FastifyInstance> => {
   //    attach it as a preHandler.
   await app.register(authContext)
 
-  // 6. Routes.
+  // 6. Retention sweeps. Registered here rather than in `server.ts` so that the integration
+  //    harness tears the timers down with the app rather than leaking them between suites.
+  await app.register(maintenance)
+
+  // 7. The database pool follows the application's lifecycle, so every entry point — the
+  //    server, the test harness, the contract generator — releases it the same way. Doing this
+  //    only in `server.ts` left the pool to be torn down by process death.
+  app.addHook('onClose', async () => {
+    await closeDb()
+  })
+
+  // 8. Routes.
   await app.register(healthRoutes)
   await app.register(signInRoutes)
   await app.register(signOutRoutes)

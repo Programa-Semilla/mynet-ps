@@ -4,6 +4,7 @@ import { and, desc, eq, gte, sql } from 'drizzle-orm'
 
 import { loadConfig } from '../config.js'
 import { getDb } from '../db/client.js'
+import { authSessions } from '../db/schema/auth-sessions.js'
 import { signInAttempts } from '../db/schema/sign-in-attempts.js'
 
 /**
@@ -30,7 +31,7 @@ const WINDOW_MS = 60 * 60 * 1000
  * Identifier thresholds. Escalation starts after 3 consecutive failures and grows to a
  * ceiling that caps sustained guessing at roughly 10 attempts per hour (research.md D9).
  */
-const IDENTIFIER_FREE_ATTEMPTS = 3
+export const IDENTIFIER_FREE_ATTEMPTS = 3
 const IDENTIFIER_MAX_DELAY_MS = 6 * 60 * 1000
 
 /**
@@ -38,7 +39,7 @@ const IDENTIFIER_MAX_DELAY_MS = 6 * 60 * 1000
  * legitimate attendees behind one public address — the edge case the spec names explicitly.
  * Treating that address like a single guesser would lock out a whole conference hall.
  */
-const SOURCE_FREE_ATTEMPTS = 30
+export const SOURCE_FREE_ATTEMPTS = 30
 const SOURCE_MAX_DELAY_MS = 60 * 1000
 
 export interface AttemptKey {
@@ -76,10 +77,24 @@ interface FailureStreak {
   readonly lastFailureAt: Date | undefined
 }
 
-/** Consecutive failures since the last success, within the rolling window. */
-const consecutiveFailures = async (
+/**
+ * Failures for one key within the rolling window.
+ *
+ * `resetOnSuccess` is the difference between the two dimensions, and it is not cosmetic:
+ *
+ * - **Identifier**: a streak, ended by a success. A legitimate attendee who mistypes three
+ *   times and then gets in must not carry those failures forward.
+ * - **Source**: an absolute count, *not* ended by a success. Resetting the source on any
+ *   success let an attacker holding one valid account spray indefinitely from a single
+ *   address — sign in to their own account every thirty guesses and the source counter never
+ *   reaches its threshold. Source throttling is the only bound on a spray across thousands of
+ *   identifiers (each of which gets three free attempts of its own), so it must not be
+ *   resettable by the attacker at will (FR-031a).
+ */
+const countFailures = async (
   column: typeof signInAttempts.identifierHash | typeof signInAttempts.sourceHash,
   value: string,
+  { resetOnSuccess }: { resetOnSuccess: boolean },
 ): Promise<FailureStreak> => {
   const since = new Date(Date.now() - WINDOW_MS)
 
@@ -88,15 +103,16 @@ const consecutiveFailures = async (
     .from(signInAttempts)
     .where(and(eq(column, value), gte(signInAttempts.occurredAt, since)))
     .orderBy(desc(signInAttempts.occurredAt))
-    .limit(100)
+    .limit(200)
 
   let count = 0
   let lastFailureAt: Date | undefined
 
   for (const row of rows) {
-    // A success resets the streak — this is what makes the delay recoverable rather than a
-    // slow-motion lockout.
-    if (row.succeeded) break
+    if (row.succeeded) {
+      if (resetOnSuccess) break
+      continue
+    }
     lastFailureAt ??= row.occurredAt
     count += 1
   }
@@ -143,17 +159,34 @@ const outstandingDelay = (
 }
 
 /**
- * How long the caller must still wait before this attempt may proceed, in milliseconds. Zero
- * means proceed now.
+ * How long a **failed** attempt must be held before it is answered, in milliseconds.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ * **This is only ever consulted after a credential has already been rejected.**
+ *
+ * That ordering is the whole of FR-031b. When the throttle gated the request *before*
+ * verification, an attacker could hold any account they could name permanently unreachable:
+ * failures from anyone counted toward the streak, the outstanding delay was measured from the
+ * newest failure, and only a *success* could clear it — but the gate refused the owner's
+ * correct password before it was ever checked. A closed loop, and precisely the
+ * "anyone who knows an attendee's email can deny them access" outcome FR-031b names.
+ *
+ * With verification first, the correct credential is never refused, however many failures
+ * precede it, and SC-003a's "accounts an attacker can render permanently inaccessible" is zero
+ * by construction rather than by clamping.
+ * ─────────────────────────────────────────────────────────────────────────────────────────
  *
  * The larger of the two dimensions wins, so a well-behaved attendee behind a hostile shared
  * address is still protected, and a single hostile identifier is still throttled on an
  * otherwise quiet network.
  */
-export const nextDelayMs = async ({ identifierHash, sourceHash }: AttemptKey): Promise<number> => {
+export const failureDelayMs = async ({
+  identifierHash,
+  sourceHash,
+}: AttemptKey): Promise<number> => {
   const [identifier, source] = await Promise.all([
-    consecutiveFailures(signInAttempts.identifierHash, identifierHash),
-    consecutiveFailures(signInAttempts.sourceHash, sourceHash),
+    countFailures(signInAttempts.identifierHash, identifierHash, { resetOnSuccess: true }),
+    countFailures(signInAttempts.sourceHash, sourceHash, { resetOnSuccess: false }),
   ])
 
   return Math.max(
@@ -162,9 +195,51 @@ export const nextDelayMs = async ({ identifierHash, sourceHash }: AttemptKey): P
   )
 }
 
-/** Prunes rows beyond the window. Retention past it is pointless and adds risk. */
+/**
+ * Serves as much of the delay as is reasonable to hold a request open for, and reports the
+ * remainder as retry-after guidance.
+ *
+ * Returns the number of seconds still outstanding after sleeping, or 0 when the delay has been
+ * served in full. A caller that receives a non-zero value should refuse with `too_many_attempts`.
+ */
+export const serveDelay = async (delayMs: number): Promise<number> => {
+  if (delayMs <= 0) return 0
+
+  // The bound is configuration, not a constant: sleeping for the full six-minute ceiling would
+  // exceed every sensible request timeout, so the escalation is served up to this bound and the
+  // remainder becomes guidance. The attacker still pays — each failed guess occupies a
+  // connection for this long before it is answered.
+  const served = Math.min(delayMs, loadConfig().auth.maxServedDelayMs)
+  await new Promise((resolve) => setTimeout(resolve, served))
+
+  return Math.ceil((delayMs - served) / 1000)
+}
+
+/**
+ * Deletes attempt rows past their usefulness.
+ *
+ * Retention beyond the counting window is pointless and adds risk: these are keyed hashes of
+ * every address ever typed at the service, including addresses belonging to people who are not
+ * attendees (FR-042, Principle VIII). The margin over `WINDOW_MS` exists only so that a clock
+ * skew or a slow sweep cannot delete rows the throttle is still counting.
+ */
 export const pruneAttempts = async (): Promise<void> => {
   await getDb()
     .delete(signInAttempts)
-    .where(sql`${signInAttempts.occurredAt} < now() - interval '24 hours'`)
+    .where(sql`${signInAttempts.occurredAt} < now() - interval '2 hours'`)
+}
+
+/**
+ * Deletes sign-in sessions that ended long enough ago to be of no further use.
+ *
+ * Expired and revoked rows are dead weight: they can never authenticate anything, and each one
+ * is a record of when a particular attendee was using MyNet.
+ */
+export const pruneSessions = async (): Promise<void> => {
+  await getDb()
+    .delete(authSessions)
+    .where(
+      sql`${authSessions.expiresAt} < now() - interval '30 days'
+          or ${authSessions.revokedAt} < now() - interval '30 days'`,
+    )
 }

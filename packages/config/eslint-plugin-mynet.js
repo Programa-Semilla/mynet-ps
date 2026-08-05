@@ -115,6 +115,7 @@ const noDirectPlatformAccess = {
         'Direct platform API ({{ name }}) in feature code. Device capabilities are reached through the interfaces in packages/platform (FR-045, SC-008).',
       storage:
         'Direct storage access ({{ name }}) in feature code. Use SecureStorage from packages/platform (FR-045, SC-008).',
+      dom: 'Direct DOM global ({{ name }}) in feature code. Reach the platform through an interface from packages/platform, or move this to the composition root (FR-045, SC-008).',
     },
   },
   create(context) {
@@ -130,24 +131,98 @@ const noDirectPlatformAccess = {
       'permissions',
       'credentials',
     ])
+    /**
+     * The ambient DOM globals.
+     *
+     * These were missing, and their absence is why the count was zero: feature code was calling
+     * `document.title`, `window.location.assign`, and `document.getElementById` in files that
+     * are not the exempted composition root, and the rule could not see any of them. SC-009's
+     * count read zero because the detector was narrow, not because the violations were absent —
+     * the "gate that passes while not checking" this codebase warns about elsewhere.
+     */
+    const DOM = new Set([
+      'document',
+      'window',
+      'location',
+      'history',
+      'navigator',
+      'matchMedia',
+      'alert',
+      'confirm',
+      'caches',
+    ])
 
-    const report = (node, name) => {
-      if (NETWORK.has(name)) context.report({ node, messageId: 'network', data: { name } })
-      else if (STORAGE.has(name)) context.report({ node, messageId: 'storage', data: { name } })
-      else if (PLATFORM.has(name)) context.report({ node, messageId: 'platform', data: { name } })
+    /**
+     * Objects whose *properties* name a capability, rather than the object being one.
+     *
+     * `navigator.share` is a violation; a domain object that happens to have a `share` field is
+     * not. Restricting the property check to these objects is what tells the two apart.
+     */
+    const CAPABILITY_OBJECTS = new Set(['navigator', 'window'])
+
+    /**
+     * Resolved against the global scope rather than matched by name.
+     *
+     * Matching bare identifiers reported `event.location` on a domain object and a local
+     * variable named `alert` — false positives that would have taught people to reach for
+     * disable comments, which costs more than the rule is worth. An unresolved reference in the
+     * global scope is, by definition, the ambient global.
+     */
+    const globalReferences = () => {
+      const sourceCode = context.sourceCode ?? context.getSourceCode()
+      const scope = sourceCode.scopeManager.globalScope
+      if (!scope) return []
+
+      // Two sources, and both are needed. `through` holds references that resolve to nothing at
+      // all; `variables` with no `defs` are the environment globals the config declares (this
+      // project sets `globals.browser` for the client), which resolve and so never appear in
+      // `through`. Checking only one of the two silently misses half the violations.
+      const references = [...scope.through]
+      for (const variable of scope.variables) {
+        if (variable.defs.length === 0) references.push(...variable.references)
+      }
+      return references
     }
 
     return {
-      Identifier(node) {
-        // Skip property positions that are not member reads (e.g. `{ fetch: … }` keys).
-        const parent = node.parent
-        if (parent?.type === 'Property' && parent.key === node && !parent.computed) return
-        if (parent?.type === 'MemberExpression' && parent.property === node && !parent.computed) {
-          report(node, node.name)
-          return
+      'Program:exit'() {
+        for (const reference of globalReferences()) {
+          const node = reference.identifier
+          const name = node.name
+
+          if (NETWORK.has(name)) {
+            context.report({ node, messageId: 'network', data: { name } })
+            continue
+          }
+          if (STORAGE.has(name)) {
+            context.report({ node, messageId: 'storage', data: { name } })
+            continue
+          }
+          if (PLATFORM.has(name)) {
+            context.report({ node, messageId: 'platform', data: { name } })
+            continue
+          }
+
+          if (DOM.has(name)) {
+            // `navigator.mediaDevices` is reported as a platform capability rather than twice.
+            const parent = node.parent
+            const property =
+              parent?.type === 'MemberExpression' && parent.object === node && !parent.computed
+                ? parent.property.name
+                : undefined
+
+            if (CAPABILITY_OBJECTS.has(name) && property && PLATFORM.has(property)) {
+              context.report({
+                node: parent.property,
+                messageId: 'platform',
+                data: { name: `${name}.${property}` },
+              })
+              continue
+            }
+
+            context.report({ node, messageId: 'dom', data: { name } })
+          }
         }
-        if (parent?.type === 'MemberExpression' && parent.object !== node) return
-        report(node, node.name)
       },
     }
   },

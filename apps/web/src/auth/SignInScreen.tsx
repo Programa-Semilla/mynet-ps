@@ -1,4 +1,4 @@
-import { ApiError } from '@mynet/data/http'
+import { RequestRefusedError } from '@mynet/data'
 import { useAuthGateway } from '@mynet/platform'
 import { useId, useState, type FormEvent } from 'react'
 
@@ -52,11 +52,18 @@ export const SignInScreen = () => {
       // The server's message is shown verbatim. It is written to be attendee-facing (FR-059)
       // and is deliberately identical for every sign-in failure cause (FR-030) — rewording it
       // here would risk reintroducing the distinction the server works to erase.
+      //
+      // `RequestRefusedError` rather than the transport's `ApiError`: presentation code must be
+      // able to recognise a refusal without importing anything that knows HTTP exists (FR-045).
       setFailure(
-        error instanceof ApiError
+        error instanceof RequestRefusedError
           ? error.message
           : 'Could not reach MyNet. Check your connection and try again.',
       )
+    } finally {
+      // Unconditionally. Resetting only in the catch left the button stuck on "Signing in…"
+      // with submission permanently disabled whenever sign-in succeeded but the follow-up
+      // identity check did not — a dead end with no way back, which is what FR-061 forbids.
       setSubmitting(false)
     }
   }

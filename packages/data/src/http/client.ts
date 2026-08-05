@@ -1,4 +1,9 @@
-import { NotAuthenticatedError, OfflineError, SessionExpiredError } from '../interfaces/index.js'
+import {
+  NotAuthenticatedError,
+  OfflineError,
+  RequestRefusedError,
+  SessionExpiredError,
+} from '../interfaces/index.js'
 
 /**
  * T042 — the only place in the client that constructs a request (FR-045).
@@ -7,6 +12,12 @@ import { NotAuthenticatedError, OfflineError, SessionExpiredError } from '../int
  * or knows that HTTP is involved at all — `mynet/no-direct-platform-access` enforces that and
  * SC-008 counts it.
  */
+
+/** Upper bound on any single request. See the `signal` in `request` for why one is needed. */
+const REQUEST_TIMEOUT_MS = 20_000
+
+/** Shorter for the probe: it must not outlive the interval that schedules it. */
+const PROBE_TIMEOUT_MS = 4_000
 
 export interface HttpClientOptions {
   readonly baseUrl: string
@@ -32,17 +43,21 @@ export interface ApiErrorBody {
   retryAfterSeconds?: number
 }
 
-/** A refusal the server explained. Carries the server's attendee-facing message (FR-059). */
-export class ApiError extends Error {
+/**
+ * A refusal the server explained, with the HTTP detail attached.
+ *
+ * Extends `RequestRefusedError` so that presentation code can recognise a refusal by importing
+ * from `@mynet/data` — the interfaces — while anything that genuinely needs the status stays on
+ * this side of the transport boundary (FR-045).
+ */
+export class ApiError extends RequestRefusedError {
   readonly status: number
-  readonly code: string
   readonly retryAfterSeconds: number | undefined
 
   constructor(status: number, body: ApiErrorBody) {
-    super(body.message ?? 'The request could not be completed.')
+    super(body.code ?? 'unknown', body.message ?? 'The request could not be completed.')
     this.name = 'ApiError'
     this.status = status
-    this.code = body.code ?? 'unknown'
     this.retryAfterSeconds = body.retryAfterSeconds
   }
 }
@@ -70,7 +85,10 @@ export class HttpClient {
    */
   async probe(): Promise<boolean> {
     try {
-      await this.#options.fetch(`${this.#options.baseUrl}/health`, { method: 'GET' })
+      await this.#options.fetch(`${this.#options.baseUrl}/health`, {
+        method: 'GET',
+        signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
+      })
       this.#options.onReachability?.(true)
       return true
     } catch {
@@ -91,6 +109,13 @@ export class HttpClient {
     try {
       response = await this.#options.fetch(`${this.#options.baseUrl}${path}`, {
         ...init,
+        // A request that connects and then stalls would otherwise hang for the browser's
+        // default — minutes. The attendee sees a spinner that never resolves, the offline
+        // banner never appears because nothing has failed yet, and there is no retry
+        // affordance. FR-058 asks for a defined failure presentation; a failure that is never
+        // reported has none. An abort lands in the catch below and is reported as unreachable,
+        // which is exactly what it is.
+        signal: init.signal ?? AbortSignal.timeout(REQUEST_TIMEOUT_MS),
         // The sign-in session travels as an HttpOnly cookie, so every request must carry
         // credentials. Without this the API sees an anonymous request and refuses.
         credentials: 'include',
@@ -135,9 +160,15 @@ export class HttpClient {
 
     // FR-028c — the client must tell "signed out for inactivity" from "never signed in", so
     // it can explain the first and simply ask for sign-in on the second.
+    //
+    // **Only the two session codes are translated.** Treating every 401 as a session problem
+    // swallowed `invalid_credentials`, so a wrong password surfaced on the sign-in screen as
+    // "Could not reach MyNet. Check your connection and try again." — the server's carefully
+    // worded refusal was unreachable, and the attendee was sent to fix a network that was
+    // working (FR-059).
     if (response.status === 401) {
       if (body.code === 'session_expired') throw new SessionExpiredError()
-      throw new NotAuthenticatedError()
+      if (body.code === 'not_authenticated') throw new NotAuthenticatedError()
     }
 
     throw new ApiError(response.status, body)

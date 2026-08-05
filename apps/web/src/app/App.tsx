@@ -1,34 +1,26 @@
 import { PlatformProvider, type PlatformServices } from '@mynet/platform'
-import { useEffect } from 'react'
 import { BrowserRouter } from 'react-router'
 
 import { AuthProvider } from '../auth/useAuth.js'
-import { PRODUCT_NAME } from './branding.js'
-import { ErrorBoundary } from './ErrorBoundary.js'
 import { AppRoutes } from './routes.js'
 
 /**
  * The application root.
  *
- * Provider order is load-bearing. `BrowserRouter` sits above `AuthProvider` because the route
- * guard and the top bar both read the current address, and inside `ErrorBoundary` so that a
- * failure anywhere below still renders a working shell rather than a blank page (FR-061).
+ * Provider order is load-bearing. `BrowserRouter` sits above `AuthProvider` because the shell
+ * below both reads the current address — `TopBar` and `RouteAnnouncer` call `useLocation`, and
+ * the routes themselves obviously need a router.
+ *
+ * `ErrorBoundary` is deliberately **not** here. It wraps this component in `main.tsx`, so that a
+ * failure in the providers themselves is still caught (FR-061) — and so that the recovery
+ * action, which touches the platform, is supplied by the bootstrap rather than by feature code.
  */
-export const App = ({ services }: { services: PlatformServices }) => {
-  useEffect(() => {
-    // FR-049 — the document title comes from the single branding constant.
-    document.title = PRODUCT_NAME
-  }, [])
-
-  return (
-    <ErrorBoundary>
-      <PlatformProvider services={services}>
-        <BrowserRouter>
-          <AuthProvider>
-            <AppRoutes />
-          </AuthProvider>
-        </BrowserRouter>
-      </PlatformProvider>
-    </ErrorBoundary>
-  )
-}
+export const App = ({ services }: { services: PlatformServices }) => (
+  <PlatformProvider services={services}>
+    <BrowserRouter>
+      <AuthProvider>
+        <AppRoutes />
+      </AuthProvider>
+    </BrowserRouter>
+  </PlatformProvider>
+)

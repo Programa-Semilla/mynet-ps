@@ -21,6 +21,17 @@ import { seed } from '../../src/db/seed.js'
  * binding a port (research.md D11).
  */
 
+/**
+ * The escalating delay is served in-request, so the suite would otherwise spend minutes asleep
+ * proving properties that do not depend on how long the sleep is. Shrinking it exercises the
+ * same branches at a hundredth of the wall-clock cost.
+ *
+ * Set before anything calls `loadConfig`, which memoises.
+ */
+process.env['AUTH_MAX_SERVED_DELAY_MS'] ??= '20'
+
+export { IDENTIFIER_FREE_ATTEMPTS, SOURCE_FREE_ATTEMPTS } from '../../src/auth/throttle.js'
+
 export const SEED_PASSWORD = 'correct-horse-battery-staple'
 export const ADA = 'ada@example.com'
 export const GRACE = 'grace@example.com'

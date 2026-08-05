@@ -4,7 +4,7 @@ import type { FastifyInstance } from 'fastify'
 
 import { SESSION_COOKIE, sessionCookieOptions } from '../../auth/cookie.js'
 import { hashPassword, verifyPassword } from '../../auth/password.js'
-import { hashAttemptValue, nextDelayMs, recordAttempt } from '../../auth/throttle.js'
+import { failureDelayMs, hashAttemptValue, recordAttempt, serveDelay } from '../../auth/throttle.js'
 import { issueToken } from '../../auth/token.js'
 import { loadConfig } from '../../config.js'
 import { getDb } from '../../db/client.js'
@@ -117,13 +117,22 @@ export const signInRoutes = async (app: FastifyInstance): Promise<void> => {
       const identifierHash = hashAttemptValue(normaliseEmail(email))
       const sourceHash = hashAttemptValue(request.ip)
 
-      // FR-031a — throttling is checked before any credential work, so a throttled caller
-      // cannot use response timing to distinguish anything either.
-      const delay = await nextDelayMs({ identifierHash, sourceHash })
-      if (delay > 0) {
-        throw tooManyAttempts(Math.ceil(delay / 1000))
-      }
-
+      // ─────────────────────────────────────────────────────────────────────────────────────
+      // **The credential is verified BEFORE the throttle is consulted, and that ordering is
+      // load-bearing for FR-031b.**
+      //
+      // Gating the request on the throttle first — the obvious arrangement — made the account
+      // lockout the spec forbids. Failures from *anyone* counted toward the streak, the
+      // outstanding delay was measured from the newest failure, and only a success could clear
+      // it. An attacker failing once every few minutes against a known address therefore held
+      // that account shut for as long as they cared to continue, because the owner's correct
+      // password was refused before it was ever looked at. SC-003a requires the number of
+      // accounts that can be rendered permanently inaccessible to be zero.
+      //
+      // Verifying first costs one Argon2id hash on every attempt including throttled ones.
+      // That is the intended price: it is what makes the throttle a delay imposed on guessing
+      // rather than a denial imposed on the owner.
+      // ─────────────────────────────────────────────────────────────────────────────────────
       const attendee = await findAttendeeForSignIn(email)
 
       // FR-030 — the unknown-identifier path does the same work as the real one, so the two
@@ -140,9 +149,19 @@ export const signInRoutes = async (app: FastifyInstance): Promise<void> => {
         // FR-031c — records the hashed identifier only. There is no parameter for the
         // credential, so it cannot be written here even by mistake.
         await recordAttempt({ identifierHash, sourceHash, succeeded: false })
+
+        // FR-031a — the escalating delay, applied to the *failure*. Served in-request up to a
+        // bound; anything beyond becomes retry-after guidance. Both branches are reached
+        // identically whether or not the identifier exists, so FR-031d still holds.
+        const outstanding = await serveDelay(await failureDelayMs({ identifierHash, sourceHash }))
+        if (outstanding > 0) {
+          throw tooManyAttempts(outstanding)
+        }
+
         throw invalidCredentials()
       }
 
+      // A correct credential is never throttled. This is the line SC-003a rests on.
       await recordAttempt({ identifierHash, sourceHash, succeeded: true })
 
       // FR-026 — an opaque high-entropy token; only its hash is stored.

@@ -11,6 +11,14 @@ import { Component, type ErrorInfo, type ReactNode } from 'react'
  */
 interface Props {
   readonly children: ReactNode
+  /**
+   * How to get back to a working state (FR-061).
+   *
+   * Injected rather than performed here. Recovering means a full reload, which is a platform
+   * action, and this is presentation code — the composition root supplies it, the same way it
+   * supplies every other platform capability.
+   */
+  readonly onRecover: () => void
 }
 
 interface State {
@@ -47,10 +55,10 @@ export class ErrorBoundary extends Component<Props, State> {
           <button
             type="button"
             // A full reload rather than clearing the error: whatever state produced the crash
-            // is gone, so re-rendering the same tree would likely crash again.
-            onClick={() => {
-              window.location.assign('/')
-            }}
+            // is gone, so re-rendering the same tree would likely crash again. The action is
+            // injected because performing it means touching the platform, and this is
+            // presentation code (FR-045).
+            onClick={this.props.onRecover}
             className="rounded-sm bg-accent-strong px-4 py-2 font-medium text-text-inverse"
           >
             Go to Home

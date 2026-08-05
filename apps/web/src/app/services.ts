@@ -71,6 +71,7 @@ const PROBE_INTERVAL_MS = 5_000
  */
 const watchReachability = (http: HttpClient, connectivity: ConnectivityService): void => {
   let timer: ReturnType<typeof setInterval> | undefined
+  let inFlight = false
 
   const stop = () => {
     if (timer !== undefined) {
@@ -85,7 +86,19 @@ const watchReachability = (http: HttpClient, connectivity: ConnectivityService):
       return
     }
     if (timer === undefined) {
-      timer = setInterval(() => void http.probe(), PROBE_INTERVAL_MS)
+      timer = setInterval(() => {
+        // Guarded against re-entry and gated on visibility. Without the guard, a connection
+        // that *hangs* rather than fails accumulates one outstanding probe every interval —
+        // a captive portal or a cold start turns ten minutes into a hundred pending requests,
+        // exhausting the browser's per-host connection budget so that the attendee's own
+        // requests cannot get out. Without the visibility gate, a backgrounded tab spends
+        // battery and cellular data on a connection nobody is waiting for.
+        if (inFlight || document.visibilityState === 'hidden') return
+        inFlight = true
+        void http.probe().finally(() => {
+          inFlight = false
+        })
+      }, PROBE_INTERVAL_MS)
     }
   })
 }
