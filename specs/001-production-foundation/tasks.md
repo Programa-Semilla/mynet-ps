@@ -160,7 +160,7 @@ to obtain a green result (FR-071). **Only the owner can do these.**
 - [X] T040 Create the `PlatformServices` registry type and root provider in `packages/platform/src/registry.ts` — one provider, not eleven nested ones (research.md D10)
 - [X] T041 Create typed consumer hooks in `packages/platform/src/hooks.ts` so feature code never touches the context object directly (FR-045)
 - [X] T042 Create HTTP repository implementations in `packages/data/src/http/` — the only place in the client that constructs requests (FR-045)
-- [ ] T042a *(generation + diff check done in Phase 2; the per-endpoint bindings land at T064, when `/auth/me` and `/events` exist to bind to)* Generate client-side response types from `contracts/openapi.json` into `packages/data/src/generated/` and assert repository parsing against them, so a client expecting a shape the server no longer produces fails the build rather than failing an attendee (FR-044c)
+- [X] T042a Generate client-side response types from `contracts/openapi.json` into `packages/data/src/generated/` and assert repository parsing against them, so a client expecting a shape the server no longer produces fails the build rather than failing an attendee (FR-044c)
 
 **Checkpoint**: Migrations apply to a clean database, seed produces two isolated attendees, and the contract generates.
 
@@ -176,24 +176,24 @@ to obtain a green result (FR-071). **Only the owner can do these.**
 
 > Write these first and confirm they FAIL before implementing.
 
-- [ ] T043 [P] [US1] Integration test for sign-in success and failure in `apps/api/tests/integration/sign-in.test.ts` — asserts identical responses for unknown identifier and wrong credential (FR-030)
-- [ ] T044 [P] [US1] **Isolation test** in `apps/api/tests/integration/isolation.test.ts` — one attendee cannot read another's events by any request manipulation (FR-069, SC-002). The most important test in this slice
-- [ ] T045 [P] [US1] Integration test for session validity in `apps/api/tests/integration/auth-session.test.ts` — expiry, revocation on sign-out, tampered token, sliding extension, and survival across browser restart (FR-026, FR-027, FR-028, FR-028a)
-- [ ] T045a [P] [US1] Integration test for multi-device independence in `apps/api/tests/integration/multi-device.test.ts` — two concurrent sign-in sessions for one attendee, signing out of one leaves the other valid (FR-029)
-- [ ] T046 [P] [US1] Integration test for throttling in `apps/api/tests/integration/throttle.test.ts` — escalating delay, **no permanent lockout**, no existence disclosure (FR-031a, FR-031b, FR-031c, FR-031d, SC-003a)
+- [X] T043 [P] [US1] Integration test for sign-in success and failure in `apps/api/tests/integration/sign-in.test.ts` — asserts identical responses for unknown identifier and wrong credential (FR-030)
+- [X] T044 [P] [US1] **Isolation test** in `apps/api/tests/integration/isolation.test.ts` — one attendee cannot read another's events by any request manipulation (FR-069, SC-002). The most important test in this slice
+- [X] T045 [P] [US1] Integration test for session validity in `apps/api/tests/integration/auth-session.test.ts` — expiry, revocation on sign-out, tampered token, sliding extension, and survival across browser restart (FR-026, FR-027, FR-028, FR-028a)
+- [X] T045a [P] [US1] Integration test for multi-device independence in `apps/api/tests/integration/multi-device.test.ts` — two concurrent sign-in sessions for one attendee, signing out of one leaves the other valid (FR-029)
+- [X] T046 [P] [US1] Integration test for throttling in `apps/api/tests/integration/throttle.test.ts` — escalating delay, **no permanent lockout**, no existence disclosure (FR-031a, FR-031b, FR-031c, FR-031d, SC-003a)
 - [ ] T047 [P] [US1] Component test for the sign-in screen in `apps/web/tests/sign-in.test.tsx` — labels, keyboard operability, error presentation
 
 ### Implementation for User Story 1
 
-- [ ] T048 [US1] Implement `POST /auth/sign-in` with route schema in `apps/api/src/routes/auth/sign-in.ts` — normalises email, verifies credential, issues an `HttpOnly` `Secure` `SameSite=Lax` cookie (FR-025, FR-025b)
-- [ ] T049 [US1] Ensure sign-in failure is indistinguishable across causes in status, body, and as far as practical timing, in `apps/api/src/routes/auth/sign-in.ts` (FR-030)
-- [ ] T050 [US1] Wire throttle enforcement and attempt recording into `apps/api/src/routes/auth/sign-in.ts` — recording the hashed identifier only, never the credential (FR-031a, FR-031c)
-- [ ] T051 [US1] Implement `POST /auth/sign-out` in `apps/api/src/routes/auth/sign-out.ts` — sets `revoked_at` server-side, not merely clearing the cookie (FR-027)
-- [ ] T052 [US1] Implement `GET /auth/me` in `apps/api/src/routes/auth/me.ts` returning identity and display name only — never the credential hash (FR-032)
-- [ ] T053 [US1] Implement sliding expiry in `apps/api/src/plugins/auth-context.ts` — each authenticated request advances `last_used_at` and `expires_at` (FR-028a, FR-028b)
-- [ ] T054 [US1] Distinguish *expired* from *never signed in* in the refusal in `apps/api/src/plugins/auth-context.ts` so the client can explain inactivity (FR-028c)
-- [ ] T055 [US1] Implement `GET /events` in `apps/api/src/routes/events.ts` — scoped through `registrations` for the authenticated attendee, **taking no attendee identifier parameter** (FR-035, FR-036)
-- [ ] T056 [US1] Implement attendee and registration queries in `apps/api/src/db/queries/` respecting the scoping rule in data-model.md
+- [X] T048 [US1] Implement `POST /auth/sign-in` with route schema in `apps/api/src/routes/auth/sign-in.ts` — normalises email, verifies credential, issues an `HttpOnly` `Secure` `SameSite=Lax` cookie (FR-025, FR-025b)
+- [X] T049 [US1] Ensure sign-in failure is indistinguishable across causes in status, body, and as far as practical timing, in `apps/api/src/routes/auth/sign-in.ts` (FR-030)
+- [X] T050 [US1] Wire throttle enforcement and attempt recording into `apps/api/src/routes/auth/sign-in.ts` — recording the hashed identifier only, never the credential (FR-031a, FR-031c)
+- [X] T051 [US1] Implement `POST /auth/sign-out` in `apps/api/src/routes/auth/sign-out.ts` — sets `revoked_at` server-side, not merely clearing the cookie (FR-027)
+- [X] T052 [US1] Implement `GET /auth/me` in `apps/api/src/routes/auth/me.ts` returning identity and display name only — never the credential hash (FR-032)
+- [X] T053 [US1] Implement sliding expiry in `apps/api/src/plugins/auth-context.ts` — each authenticated request advances `last_used_at` and `expires_at` (FR-028a, FR-028b)
+- [X] T054 [US1] Distinguish *expired* from *never signed in* in the refusal in `apps/api/src/plugins/auth-context.ts` so the client can explain inactivity (FR-028c)
+- [X] T055 [US1] Implement `GET /events` in `apps/api/src/routes/events.ts` — scoped through `registrations` for the authenticated attendee, **taking no attendee identifier parameter** (FR-035, FR-036)
+- [X] T056 [US1] Implement attendee and registration queries in `apps/api/src/db/queries/` respecting the scoping rule in data-model.md
 - [ ] T057 [P] [US1] Implement the attendee repository in `packages/data/src/http/attendee-repository.ts`
 - [ ] T058 [P] [US1] Implement the events repository in `packages/data/src/http/events-repository.ts`
 - [ ] T059 [US1] Build the sign-in screen in `apps/web/src/auth/SignInScreen.tsx` — accessible labels, visible focus, disabled submit while invalid rather than post-submit error (FR-021)
@@ -202,7 +202,7 @@ to obtain a green result (FR-071). **Only the owner can do these.**
 - [ ] T062 [US1] Render registered events with an explicit empty state in `apps/web/src/app/destinations/Home.tsx` for an attendee registered for none — not an error, not a blank region (FR-040)
 - [ ] T063 [US1] Add loading and failure presentation for every network-crossing state in `apps/web/src/app/` — a failure must never render as an empty success (FR-058)
 - [ ] T063a [US1] Add the error boundary in `apps/web/src/app/ErrorBoundary.tsx` — an unexpected client error keeps the shell and offers a route back to a working state, never a blank page (FR-061)
-- [ ] T064 [US1] Regenerate and commit `contracts/openapi.json` (FR-044b)
+- [X] T064 [US1] Regenerate and commit `contracts/openapi.json` (FR-044b)
 - [ ] T065 [US1] End-to-end test in `e2e/sign-in.spec.ts` — sign in, see own workspace, browser restart keeps session, sign out revokes access (FR-068, SC-001)
 
 - [ ] T065a [US1] End-to-end durability test in `e2e/durability.spec.ts` — attendee data survives browser reload, sign-out and sign-in, and **redeployment**; the redeploy case is the one most likely to regress silently (FR-033, SC-003)

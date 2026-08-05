@@ -1,4 +1,5 @@
 import type { components, paths } from './generated/api.js'
+import type { Attendee, Event } from './interfaces/index.js'
 
 /**
  * T042a — bind the client's domain types to the generated contract types.
@@ -14,10 +15,8 @@ import type { components, paths } from './generated/api.js'
  *
  * **Ordering note.** tasks.md places T042a in Phase 2, but the assertions it exists to make
  * are about `GET /auth/me` and `GET /events` — which are T052 and T055, in Phase 3. The
- * generation and diff mechanism therefore lands here (wired into `pnpm contract:check`), and
- * the per-endpoint bindings land with their routes at T064, when there is a contract to bind
- * to. Asserting against endpoints that do not exist yet would just be a compile error
- * standing in for work not yet done.
+ * generation and diff mechanism landed in Phase 2 (wired into `pnpm contract:check`); the
+ * per-endpoint bindings below landed at T064, once there were endpoints to bind to.
  */
 
 /**
@@ -29,13 +28,21 @@ import type { components, paths } from './generated/api.js'
  */
 export type Satisfies<T extends U, U> = T
 
-/**
- * Proves the generated types are reachable and the binding mechanism compiles. Replaced by
- * the real endpoint assertions at T064.
- */
+/** Response body of `GET /auth/me`, as the server actually declares it. */
+export type MeResponse = paths['/auth/me']['get']['responses'][200]['content']['application/json']
+
+/** Response body of `GET /events`, as the server actually declares it. */
+export type EventsResponse =
+  paths['/events']['get']['responses'][200]['content']['application/json']
+
 export type HealthResponse =
   paths['/health']['get']['responses'][200]['content']['application/json']
 
+// If any line below stops compiling, the client's domain type expects something the contract
+// no longer guarantees. Fix the domain type or the route schema — never this file, and never
+// contracts/openapi.json, which is generated output.
+export type _AttendeeMatchesContract = Satisfies<MeResponse, Attendee>
+export type _EventsMatchContract = Satisfies<EventsResponse[number], Event>
 export type _HealthIsShaped = Satisfies<HealthResponse, { status: 'ok' }>
 
 export type { components, paths }

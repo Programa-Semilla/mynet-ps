@@ -17,6 +17,10 @@ import { loadConfig } from './config.js'
 import authContext from './plugins/auth-context.js'
 import errors from './plugins/errors.js'
 import swagger from './plugins/swagger.js'
+import { meRoutes } from './routes/auth/me.js'
+import { signInRoutes } from './routes/auth/sign-in.js'
+import { signOutRoutes } from './routes/auth/sign-out.js'
+import { eventRoutes } from './routes/events.js'
 import { healthRoutes } from './routes/health.js'
 
 export const buildApp = async (): Promise<FastifyInstance> => {
@@ -70,6 +74,10 @@ export const buildApp = async (): Promise<FastifyInstance> => {
 
   // 6. Routes.
   await app.register(healthRoutes)
+  await app.register(signInRoutes)
+  await app.register(signOutRoutes)
+  await app.register(meRoutes)
+  await app.register(eventRoutes)
 
   return app
 }
