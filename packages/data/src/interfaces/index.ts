@@ -69,8 +69,11 @@ export interface Repositories {
  * error.
  */
 export class OfflineError extends Error {
-  constructor(action: string) {
-    super(`${action} needs a connection. It has not been saved, and it has not been queued.`)
+  constructor(action: string, options?: ErrorOptions) {
+    super(
+      `${action} needs a connection. It has not been saved, and it has not been queued.`,
+      options,
+    )
     this.name = 'OfflineError'
   }
 }

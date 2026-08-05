@@ -94,6 +94,23 @@ export interface SecureStorage {
 export interface ConnectivityService {
   isOnline(): boolean
   subscribe(listener: (online: boolean) => void): () => void
+  /**
+   * Reports what actually happened when something tried to reach the server.
+   *
+   * ───────────────────────────────────────────────────────────────────────────────────────
+   * **The browser's own online flag cannot carry FR-054 by itself.** A false value is
+   * trustworthy; a true value only means a network interface exists. In practice it also
+   * reports true immediately after a page load on a device with no working connection at all,
+   * so an indicator driven by it alone tells the attendee they are online while nothing loads
+   * — which is precisely the dishonesty FR-052 exists to prevent.
+   *
+   * The transport layer knows better, because it just tried. This is how it says so. Nothing in
+   * feature code calls this: it is wired once at the composition root, from the HTTP client to
+   * the connectivity service, so that what the indicator claims and what the network does
+   * cannot disagree.
+   * ───────────────────────────────────────────────────────────────────────────────────────
+   */
+  reportReachability(reachable: boolean): void
 }
 
 /** Every device capability, in one shape (research.md D10). */

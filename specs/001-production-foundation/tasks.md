@@ -259,17 +259,17 @@ to obtain a green result (FR-071). **Only the owner can do these.**
 
 ### Implementation for User Story 3
 
-- [ ] T083 [US3] Add Neon branch creation and deletion per pull request in `.github/workflows/verify.yml` using `neondatabase/create-branch-action@v5` and `delete-branch-action@v3` (FR-067, research.md D5)
-- [ ] T084 [US3] Add the migration verification job applying all committed migrations to the fresh branch in `.github/workflows/verify.yml` (FR-038, SC-015)
-- [ ] T085 [US3] Add the integration test job running against the PR's own database branch in `.github/workflows/verify.yml` (FR-005, FR-069)
-- [ ] T086 [US3] Add the contract check job in `.github/workflows/verify.yml` failing both when the committed contract is stale and when client repository types diverge from it (FR-044b, FR-044c)
-- [ ] T087 [US3] Add the end-to-end and accessibility job in `.github/workflows/verify.yml` (FR-068)
-- [ ] T088 [US3] Add the production build job with asset budget enforcement in `.github/workflows/verify.yml` (FR-072)
-- [ ] T089 [US3] Add the ephemeral per-PR API deployment in `.github/workflows/verify.yml`, pointed at the PR's database branch (plan.md Complexity Tracking)
-- [ ] T090 [US3] Add the Cloudflare Pages preview deployment configured against the PR's API in `.github/workflows/verify.yml` — never pointed at real attendee data (FR-066, FR-067, SC-011)
-- [ ] T091 [US3] Ensure any absent, skipped, or errored check fails the run in `.github/workflows/verify.yml` — no path may report success while a gate did not execute (FR-032, FR-064, FR-071)
-- [ ] T091a [US3] Configure required status checks so a non-green run cannot merge, and record in `.githooks/README.md` that server-side enforcement is **unavailable** on this repository (private, free-tier; the branch-protection and ruleset APIs return 403). Until that changes, FR-065 rests on client-side hooks that `--no-verify` bypasses — a known, accepted, and now explicitly assigned gap (FR-065, spec Open Question 17)
-- [ ] T092 [US3] Add `neondatabase/schema-diff-action@v1` to post schema differences as a PR comment, serving the constitution's requirement that migrations be reviewed
+- [X] T083 [US3] Add Neon branch creation and deletion per pull request in `.github/workflows/verify.yml` using `neondatabase/create-branch-action@v5` and `delete-branch-action@v3` (FR-067, research.md D5)
+- [X] T084 [US3] Add the migration verification job applying all committed migrations to the fresh branch in `.github/workflows/verify.yml` (FR-038, SC-015)
+- [X] T085 [US3] Add the integration test job running against the PR's own database branch in `.github/workflows/verify.yml` (FR-005, FR-069)
+- [X] T086 [US3] Add the contract check job in `.github/workflows/verify.yml` failing both when the committed contract is stale and when client repository types diverge from it (FR-044b, FR-044c)
+- [X] T087 [US3] Add the end-to-end and accessibility job in `.github/workflows/verify.yml` (FR-068)
+- [X] T088 [US3] Add the production build job with asset budget enforcement in `.github/workflows/verify.yml` (FR-072)
+- [X] T089 [US3] Add the ephemeral per-PR API deployment in `.github/workflows/verify.yml`, pointed at the PR's database branch (plan.md Complexity Tracking)
+- [X] T090 [US3] Add the Cloudflare Pages preview deployment configured against the PR's API in `.github/workflows/verify.yml` — never pointed at real attendee data (FR-066, FR-067, SC-011)
+- [X] T091 [US3] Ensure any absent, skipped, or errored check fails the run in `.github/workflows/verify.yml` — no path may report success while a gate did not execute (FR-032, FR-064, FR-071)
+- [X] T091a [US3] Configure required status checks so a non-green run cannot merge, and record in `.githooks/README.md` that server-side enforcement is **unavailable** on this repository (private, free-tier; the branch-protection and ruleset APIs return 403). Until that changes, FR-065 rests on client-side hooks that `--no-verify` bypasses — a known, accepted, and now explicitly assigned gap (FR-065, spec Open Question 17)
+- [X] T092 [US3] Add `neondatabase/schema-diff-action@v1` to post schema differences as a PR comment, serving the constitution's requirement that migrations be reviewed
 - [ ] T093 [US3] Verify every gate by deliberately breaking it on a throwaway branch, per quickstart.md Scenario 8 — **a gate that does not fail when broken is not a gate** (SC-010)
 
 **Checkpoint**: No change can merge without passing all eleven checks.
@@ -284,18 +284,18 @@ to obtain a green result (FR-071). **Only the owner can do these.**
 
 ### Tests for User Story 4
 
-- [ ] T094 [P] [US4] End-to-end offline test in `e2e/offline.spec.ts` — shell renders, offline state shown, server-dependent action refused, recovery on reconnect (FR-051, FR-052, FR-053, FR-054, SC-012)
+- [X] T094 [P] [US4] End-to-end offline test in `e2e/offline.spec.ts` — shell renders, offline state shown, server-dependent action refused, recovery on reconnect (FR-051, FR-052, FR-053, FR-054, SC-012)
 
 ### Implementation for User Story 4
 
-- [ ] T095 [US4] Configure `vite-plugin-pwa` with content-hashed precache in `apps/web/vite.config.ts` so a new deployment supersedes stale assets (FR-055, research.md D14)
-- [ ] T096 [US4] Create the web app manifest sourcing the product name from the single branding constant in `apps/web/src/app/branding.ts` — the name is **MyNet** (FR-048, FR-049, SC-013)
-- [ ] T097 [P] [US4] Create provisional 192px, 512px, and maskable icons in `apps/web/public/icons/`, visibly marked as provisional, with `apps/web/public/icons/README.md` recording that they are not approved branding (FR-050)
-- [ ] T098 [US4] Implement the offline shell and navigation fallback in `apps/web/vite.config.ts` — **API responses are never precached**, so offline never serves stale attendee data (FR-051, research.md D14)
-- [ ] T099 [US4] Implement the web `ConnectivityService` in `packages/platform/src/web/connectivity.ts` with debouncing so transient drops do not make the indicator oscillate (FR-054)
-- [ ] T100 [US4] Build the offline state presentation in `apps/web/src/shell/OfflineBanner.tsx` naming what is unavailable rather than implying full function (FR-052)
-- [ ] T101 [US4] Refuse server-dependent actions while offline with a clear explanation in `packages/data/src/http/` — never queued silently, never shown as succeeded (FR-053, FR-057)
-- [ ] T102 [US4] Assert sign-out leaves no attendee data on the device in `e2e/offline.spec.ts` (FR-056)
+- [X] T095 [US4] Configure `vite-plugin-pwa` with content-hashed precache in `apps/web/vite.config.ts` so a new deployment supersedes stale assets (FR-055, research.md D14)
+- [X] T096 [US4] Create the web app manifest sourcing the product name from the single branding constant in `apps/web/src/app/branding.ts` — the name is **MyNet** (FR-048, FR-049, SC-013)
+- [X] T097 [P] [US4] Create provisional 192px, 512px, and maskable icons in `apps/web/public/icons/`, visibly marked as provisional, with `apps/web/public/icons/README.md` recording that they are not approved branding (FR-050)
+- [X] T098 [US4] Implement the offline shell and navigation fallback in `apps/web/vite.config.ts` — **API responses are never precached**, so offline never serves stale attendee data (FR-051, research.md D14)
+- [X] T099 [US4] Implement the web `ConnectivityService` in `packages/platform/src/web/connectivity.ts` with debouncing so transient drops do not make the indicator oscillate (FR-054)
+- [X] T100 [US4] Build the offline state presentation in `apps/web/src/shell/OfflineBanner.tsx` naming what is unavailable rather than implying full function (FR-052)
+- [X] T101 [US4] Refuse server-dependent actions while offline with a clear explanation in `packages/data/src/http/` — never queued silently, never shown as succeeded (FR-053, FR-057)
+- [X] T102 [US4] Assert sign-out leaves no attendee data on the device in `e2e/offline.spec.ts` (FR-056)
 
 **Checkpoint**: Installable, and honest about what it cannot do offline.
 
@@ -312,14 +312,14 @@ to obtain a green result (FR-071). **Only the owner can do these.**
 
 ### Tests for User Story 5
 
-- [ ] T103 [P] [US5] Substitutability tests for all six device interfaces in `packages/platform/tests/substitution.test.ts` (FR-047)
-- [ ] T104 [P] [US5] Substitutability tests for every repository in `packages/data/tests/substitution.test.ts` (FR-047)
+- [X] T103 [P] [US5] Substitutability tests for all six device interfaces in `packages/platform/tests/substitution.test.ts` (FR-047)
+- [X] T104 [P] [US5] Substitutability tests for every repository in `packages/data/tests/substitution.test.ts` (FR-047)
 
 ### Implementation for User Story 5
 
-- [ ] T105 [US5] Complete web or no-op implementations for all six device interfaces in `packages/platform/src/web/` — each returns a defined result appropriate to its contract; completing without effect is a defined result where the contract has no return value (FR-046)
-- [ ] T106 [US5] Add the verification that counts direct browser API and network calls in feature code, failing when the count is non-zero, in `packages/config/eslint.config.js` (SC-008, FR-045)
-- [ ] T107 [US5] Confirm the notification and calendar implementations in `packages/platform/src/web/` are **not** wired to real delivery — the interfaces exist, the delivery does not, until a recorded decision brings it into scope
+- [X] T105 [US5] Complete web or no-op implementations for all six device interfaces in `packages/platform/src/web/` — each returns a defined result appropriate to its contract; completing without effect is a defined result where the contract has no return value (FR-046)
+- [X] T106 [US5] Add the verification that counts direct browser API and network calls in feature code, failing when the count is non-zero, in `packages/config/eslint.config.js` (SC-008, FR-045)
+- [X] T107 [US5] Confirm the notification and calendar implementations in `packages/platform/src/web/` are **not** wired to real delivery — the interfaces exist, the delivery does not, until a recorded decision brings it into scope
 
 **Checkpoint**: All five user stories independently functional.
 
@@ -332,7 +332,7 @@ to obtain a green result (FR-071). **Only the owner can do these.**
 - [ ] T110 [P] Audit the dependency set against FR-003 — confirm nothing was carried forward from the prototype's inherited list without justification
 - [ ] T111 Review against constitution Principle VIII — identity scoping, server-side authorization, secret placement, field minimisation
 - [ ] T112 Conduct the recorded design review for FR-011 against its four named criteria, capturing the outcome and reviewer in the pull request
-- [ ] T113 Tune the asset budget to a value that is tight enough to fail on a careless dependency addition (FR-072)
+- [X] T113 Tune the asset budget to a value that is tight enough to fail on a careless dependency addition (FR-072)
 - [ ] T114 Manual accessibility pass for what automation cannot judge — reduced motion, 200% zoom, screen-reader announcement of destination changes
 
 ---

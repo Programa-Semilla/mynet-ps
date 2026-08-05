@@ -1,4 +1,4 @@
-import type { Event } from '@mynet/data'
+import { OfflineError, type Event } from '@mynet/data'
 import { useEventsRepository } from '@mynet/platform'
 import { useCallback } from 'react'
 
@@ -38,7 +38,14 @@ export const Home = () => {
       */}
       {events.status === 'failed' && (
         <Failed
-          message="Your events could not be loaded. This is a problem on our side, not with your account."
+          message={
+            // FR-053 — being offline is not a server fault, and saying so would send the
+            // attendee looking for a problem that is not there. The two causes get two
+            // explanations because they call for two different responses.
+            events.error instanceof OfflineError
+              ? 'Your events need a connection, and there is not one right now. Nothing has been lost — they will load when you reconnect.'
+              : 'Your events could not be loaded. This is a problem on our side, not with your account.'
+          }
           onRetry={events.retry}
         />
       )}

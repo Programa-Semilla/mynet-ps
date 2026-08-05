@@ -17,6 +17,13 @@ export interface HttpClientOptions {
   readonly isOnline: () => boolean
   /** Seam for tests. Defaults to the platform `fetch` at the composition root. */
   readonly fetch: typeof globalThis.fetch
+  /**
+   * Reports what this client observed on the wire, so the connectivity indicator reflects
+   * reality rather than the browser's optimistic flag (FR-054).
+   *
+   * Optional because a test double rarely cares. Wired at the composition root in production.
+   */
+  readonly onReachability?: ((reachable: boolean) => void) | undefined
 }
 
 export interface ApiErrorBody {
@@ -47,6 +54,31 @@ export class HttpClient {
     this.#options = options
   }
 
+  /**
+   * Asks whether the server is reachable, and reports the answer.
+   *
+   * ─────────────────────────────────────────────────────────────────────────────────────────
+   * Deliberately **skips the offline pre-check in `request`**, because it is the thing that
+   * resolves being offline. Without a path that ignores the current belief, that belief latches:
+   * the client will not send a request because it thinks it is offline, and it cannot learn
+   * otherwise because it sends no request. The attendee is then stuck behind a banner until they
+   * reload, which is precisely what FR-054's "without a manual reload" rules out.
+   *
+   * `/health` is used because it touches no attendee data and no database row — it is safe to
+   * call repeatedly, and safe to call while unauthenticated.
+   * ─────────────────────────────────────────────────────────────────────────────────────────
+   */
+  async probe(): Promise<boolean> {
+    try {
+      await this.#options.fetch(`${this.#options.baseUrl}/health`, { method: 'GET' })
+      this.#options.onReachability?.(true)
+      return true
+    } catch {
+      this.#options.onReachability?.(false)
+      return false
+    }
+  }
+
   async request<T>(path: string, init: RequestInit = {}): Promise<T> {
     // FR-053 — refuse rather than queue, and refuse *before* attempting, so the failure is
     // reported as connectivity rather than as an ambiguous network error. Never queued
@@ -73,12 +105,27 @@ export class HttpClient {
         },
       })
     } catch (cause) {
-      // The connection dropped between the check above and the request completing.
-      if (!this.#options.isOnline()) {
-        throw new OfflineError(describeAction(init.method ?? 'GET', path))
-      }
-      throw new Error('Could not reach MyNet. Check your connection and try again.', { cause })
+      // ─────────────────────────────────────────────────────────────────────────────────────
+      // A throw from `fetch` means the request never reached the server: no response, no status,
+      // nothing applied. That is exactly `OfflineError`'s contract — "it has not been saved, and
+      // it has not been queued" — so it is reported as one regardless of what the browser's
+      // online flag currently claims.
+      //
+      // Consulting `isOnline()` here instead was a defect. `navigator.onLine` reports true after
+      // a page load even on a device with no working connection, so a genuine outage surfaced as
+      // a generic failure, the client concluded the attendee was signed out, and it showed them
+      // a sign-in form that could not possibly submit.
+      //
+      // A CORS or DNS misconfiguration also lands here. That is acceptable: from the attendee's
+      // side "MyNet could not be reached, nothing was changed, try again when you have a
+      // connection" is true in every one of those cases, and diagnosing which is not their job.
+      // ─────────────────────────────────────────────────────────────────────────────────────
+      this.#options.onReachability?.(false)
+      throw new OfflineError(describeAction(init.method ?? 'GET', path), { cause })
     }
+
+    // The server answered. Whatever it said, it was reachable — including a 401 or a 500.
+    this.#options.onReachability?.(true)
 
     if (response.ok) {
       return response.status === 204 ? (undefined as T) : ((await response.json()) as T)

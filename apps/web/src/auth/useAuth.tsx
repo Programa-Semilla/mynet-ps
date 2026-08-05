@@ -1,6 +1,6 @@
 import type { Attendee } from '@mynet/data'
-import { NotAuthenticatedError, SessionExpiredError } from '@mynet/data'
-import { useAttendeeRepository } from '@mynet/platform'
+import { NotAuthenticatedError, OfflineError, SessionExpiredError } from '@mynet/data'
+import { useAttendeeRepository, useConnectivity } from '@mynet/platform'
 import {
   createContext,
   useCallback,
@@ -25,7 +25,17 @@ import {
 
 export type AuthStatus =
   /** Still asking the server who we are. Distinct from signed-out — see below. */
-  'checking' | 'signed-in' | 'signed-out'
+  | 'checking'
+  | 'signed-in'
+  | 'signed-out'
+  /**
+   * We could not ask, because there is no connection (FR-052).
+   *
+   * **Not the same as signed-out, and treating it as such was a defect.** An attendee who opens
+   * MyNet on a plane has not been signed out; we simply do not know. Claiming they were is both
+   * untrue and useless — the sign-in screen it sends them to cannot submit anything either.
+   */
+  | 'offline'
 
 export interface AuthState {
   readonly status: AuthStatus
@@ -44,6 +54,7 @@ const AuthContext = createContext<AuthState | null>(null)
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const attendeeRepository = useAttendeeRepository()
+  const online = useConnectivity()
 
   // 'checking' rather than 'signed-out' initially. Starting at signed-out would flash the
   // sign-in screen at an attendee who is signed in — and worse, would be indistinguishable
@@ -60,15 +71,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setExpired(false)
     } catch (error) {
       setAttendee(null)
+
+      // Being unable to ask is not an answer. Reporting 'signed-out' here would state something
+      // we do not know, and would replace the shell — which works offline — with a sign-in form
+      // that cannot possibly succeed (FR-051, FR-052).
+      if (error instanceof OfflineError) {
+        setStatus('offline')
+        setExpired(false)
+        return
+      }
+
       setStatus('signed-out')
       // FR-028c — only inactivity gets the explanation. "Never signed in" and "signed out
       // deliberately" must not claim the attendee was idle.
       setExpired(error instanceof SessionExpiredError)
 
       if (!(error instanceof SessionExpiredError) && !(error instanceof NotAuthenticatedError)) {
-        // A network or server failure is not a sign-out. Re-throwing would break the shell;
-        // swallowing it silently would render an empty success (FR-058). Surface it as
-        // signed-out but leave the failure visible in the console for diagnosis.
+        // A server failure is not a sign-out either, but unlike the offline case there is
+        // nothing better to show. Re-throwing would break the shell; swallowing it silently
+        // would render an empty success (FR-058). Leave it visible for diagnosis.
         console.error('Could not establish sign-in state:', error)
       }
     }
@@ -86,6 +107,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void refresh()
   }, [refresh])
+
+  // FR-054 — recover without a manual reload. The question we could not answer while offline
+  // becomes answerable the moment the connection returns, and making the attendee reload to
+  // discover that would be the product forgetting something it already knows.
+  //
+  // Guarded on `status === 'offline'` so a connectivity blip does not re-interrogate the server
+  // for somebody whose session is already established.
+  useEffect(() => {
+    // Same reasoning as the mount effect above: every setState inside `refresh` happens after an
+    // await, so this is not the synchronous cascade the rule targets — and the rule cannot see
+    // through the async boundary to tell.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (online && status === 'offline') void refresh()
+  }, [online, status, refresh])
 
   const markSignedIn = useCallback(async () => {
     setExpired(false)

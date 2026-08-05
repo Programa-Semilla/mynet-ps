@@ -83,6 +83,16 @@ export default tseslint.config(
       // would otherwise accumulate; the prototype hardcoded seven of them throughout.
       'mynet/no-colour-literals': 'error',
 
+      // SC-008 — zero direct platform and network calls in feature code (T106, FR-045).
+      //
+      // Registered here, on `apps/web/**`, which is exactly the feature and presentation code
+      // constitution Principle V is about. The adapter layers are deliberately outside this
+      // block: `packages/platform/src/web` and `packages/data/src/http` exist precisely to make
+      // these calls, and forbidding them there would forbid implementing the interfaces at all.
+      //
+      // The composition root is exempted below — see `mynet/composition-root`.
+      'mynet/no-direct-platform-access': 'error',
+
       ...reactHooks.configs.recommended.rules,
 
       /**
@@ -96,6 +106,25 @@ export default tseslint.config(
        * catching them in a browser.
        */
       ...jsxA11y.flatConfigs.recommended.rules,
+    },
+  },
+
+  {
+    /**
+     * The composition root — the one module in `apps/web` allowed to name a platform API.
+     *
+     * Principle V is about *feature and presentation* code not reaching past the interfaces.
+     * Something, somewhere, has to hand the real `fetch` to the HTTP client and the real device
+     * implementations to the registry; that something is this file, and it is one file precisely
+     * so the exemption is a single reviewable line rather than a habit.
+     *
+     * SC-008 counts violations in feature code. This is not feature code: it constructs no
+     * requests, renders nothing, and is the only import of `@mynet/platform/web` in the client.
+     */
+    name: 'mynet/composition-root',
+    files: ['apps/web/src/app/services.ts'],
+    rules: {
+      'mynet/no-direct-platform-access': 'off',
     },
   },
 

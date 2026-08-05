@@ -4,12 +4,31 @@ name: verify
 # Apple infrastructure. A change is not complete until this is green, and completion is
 # claimed from this output rather than from inspection.
 #
-# This file grows through Phase 5 (T083–T092) into the eleven required checks FR-063 names.
-# The cheap gates land here first, in Phase 1, because establishing a gate before the code
-# exists is the only time it is free.
+# ─────────────────────────────────────────────────────────────────────────────────────────
+# FR-063 names eleven required checks. Each has its own job below so that each reports its own
+# result, and the aggregate `verify` job at the bottom refuses to report success unless every
+# one of them literally succeeded (FR-064):
+#
+#    1 typecheck        5 contract          9 test-e2e
+#    2 lint             6 migrations       10 build
+#    3 test-unit        7 test-integration 11 deploy-preview
+#    4 test-component   8 test-accessibility
+#
+# Three ephemeral resources are created per pull request — a Neon database branch, a Fly.io API
+# deployment, and a Cloudflare Pages preview — and wired to each other. plan.md records that
+# cost under Complexity Tracking: FR-066 wants a working preview of that exact change, and
+# FR-067 forbids pointing any preview at real attendee data, so the preview needs its own API,
+# which needs its own database.
+# ─────────────────────────────────────────────────────────────────────────────────────────
+#
+# **This pipeline cannot be green until T001–T003 provisioning exists.** FR-070 fixes that
+# order and FR-071 forbids the obvious shortcut: no check here may be disabled, skipped, or
+# made non-blocking to obtain a green result. A red pipeline with the secrets missing is the
+# correct state until the owner provisions them.
 
 on:
   pull_request:
+    types: [opened, reopened, synchronize, closed]
     branches: [develop, main]
   push:
     branches: [develop, main]
@@ -21,11 +40,44 @@ concurrency:
 
 permissions:
   contents: read
+  pull-requests: write
+  deployments: write
 
 env:
   NODE_VERSION: '22'
+  # ─────────────────────────────────────────────────────────────────────────────────────────
+  # Every database this workflow touches is an ephemeral branch holding seeded throwaway
+  # attendees (FR-067). These values are therefore **not secrets**, and writing them in the open
+  # is deliberate: putting them in the secret store would sit them next to real credentials and
+  # invite somebody to assume this workflow is safe to point at production. It is not.
+  #
+  # Declared at workflow level so every job inherits them as environment variables. They cannot
+  # be composed into a job-level `env:` block — the `env` context is not available there.
+  # ─────────────────────────────────────────────────────────────────────────────────────────
+  AUTH_PASSWORD_PEPPER: preview-only-pepper-not-a-secret
+  AUTH_ATTEMPT_HASH_KEY: preview-only-attempt-key-not-a-secret
 
 jobs:
+  # ── Ephemeral database branch, per pull request (FR-067, research.md D5) ─────────────────
+  #
+  # One mechanism serving two requirements: preview isolation, and a genuinely clean database
+  # for migration verification (FR-038). A branch is created from the parent on open and on
+  # every push, and deleted when the pull request closes.
+  db-branch:
+    name: db-branch
+    if: github.event_name != 'pull_request' || github.event.action != 'closed'
+    runs-on: ubuntu-latest
+    outputs:
+      db_url: ${{ steps.create.outputs.db_url_pooled }}
+    steps:
+      - name: create a database branch for this pull request
+        id: create
+        uses: neondatabase/create-branch-action@v5
+        with:
+          project_id: ${{ secrets.NEON_PROJECT_ID }}
+          branch_name: pr-${{ github.event.number || github.run_id }}
+          api_key: ${{ secrets.NEON_API_KEY }}
+
   # ── Gate 1: type checking (FR-001) ──────────────────────────────────────────────────────
   typecheck:
     name: typecheck
@@ -86,6 +138,266 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm test:component
 
+  # ── Gate 5: API contract (FR-044a, FR-044b, FR-044c) ────────────────────────────────────
+  #
+  # Fails on two distinct drifts, which is why one job covers both: the committed contract no
+  # longer matching what the routes generate, and the client's generated types no longer
+  # matching the committed contract. Either one alone would let a client ship expecting a shape
+  # the server does not produce.
+  contract:
+    name: contract
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm contract:check
+
+  # ── Gate 6: migrations against a genuinely clean database (FR-038, SC-015) ──────────────
+  #
+  # The branch is fresh, so this proves the committed migrations apply from nothing — not that
+  # they apply to a database that already happens to have the right shape. `drizzle-kit push`
+  # is prohibited everywhere (research.md D6); this is the only path a schema change travels.
+  migrations:
+    name: migrations
+    needs: db-branch
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: ${{ needs.db-branch.outputs.db_url }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm db:migrate
+      # Applying twice proves idempotence. A migration that only works once turns the second
+      # deployment of the day into an outage.
+      - name: migrations are idempotent
+        run: pnpm db:migrate
+
+  # ── Gate 7: integration tests against a real database (FR-005, FR-069) ──────────────────
+  #
+  # Against this pull request's own branch, never a shared one. FR-069's isolation case is the
+  # most important test in the slice and it is meaningless against a mock: the claim is that the
+  # *query* cannot reach another attendee's rows.
+  test-integration:
+    name: test-integration
+    needs: [db-branch, migrations]
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: ${{ needs.db-branch.outputs.db_url }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test:integration
+
+  # ── Gate 10: production build and asset budget (FR-072) ─────────────────────────────────
+  #
+  # Ordered before the browser gates because they consume this artifact: the end-to-end suite
+  # runs against a production build, not a dev server, so that the service worker and the bundle
+  # it actually asserts on are the ones an attendee receives.
+  build:
+    name: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - name: asset budget
+        run: node scripts/asset-budget.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: web-dist
+          path: apps/web/dist
+          retention-days: 7
+
+  # ── Gates 8 and 9: accessibility and end-to-end (FR-068, SC-005) ────────────────────────
+  #
+  # Two jobs from one suite, because FR-063 names accessibility checks and end-to-end browser
+  # tests as separate required checks. Reporting them as one would let an accessibility
+  # regression hide behind a passing navigation suite.
+  #
+  # Both drive a real browser against a production build and a real API over a real database.
+  test-accessibility:
+    name: test-accessibility
+    needs: [db-branch, migrations]
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: ${{ needs.db-branch.outputs.db_url }}
+      VITE_API_BASE_URL: http://localhost:3000
+      WEB_ORIGIN: http://localhost:5173
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm exec playwright test e2e/accessibility.spec.ts
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: accessibility-report
+          path: playwright-report
+          retention-days: 7
+
+  test-e2e:
+    name: test-e2e
+    needs: [db-branch, migrations]
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: ${{ needs.db-branch.outputs.db_url }}
+      VITE_API_BASE_URL: http://localhost:3000
+      WEB_ORIGIN: http://localhost:5173
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      # Everything except the accessibility suite, which reports as its own required check.
+      - run: pnpm exec playwright test --ignore-snapshots e2e/sign-in.spec.ts e2e/durability.spec.ts e2e/navigation.spec.ts e2e/responsive.spec.ts e2e/offline.spec.ts
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: e2e-report
+          path: playwright-report
+          retention-days: 7
+
+  # ── The ephemeral API for this pull request (plan.md Complexity Tracking) ────────────────
+  #
+  # A client preview with no API is a shell that cannot sign in, which is not the "working
+  # preview" FR-066 asks for. This deploys the pull request's own API, pointed at the pull
+  # request's own database branch — never at anything holding real attendee data (FR-067).
+  deploy-api:
+    name: deploy-api
+    if: github.event_name == 'pull_request' && github.event.action != 'closed'
+    needs: [db-branch, migrations, test-integration]
+    runs-on: ubuntu-latest
+    outputs:
+      api_url: ${{ steps.deploy.outputs.api_url }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - name: deploy an ephemeral API for this pull request
+        id: deploy
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+          APP_NAME: mynet-api-pr-${{ github.event.number }}
+          DATABASE_URL: ${{ needs.db-branch.outputs.db_url }}
+        run: |
+          set -euo pipefail
+          flyctl apps create "$APP_NAME" || echo "App already exists, redeploying."
+          flyctl secrets set --app "$APP_NAME" --stage \
+            DATABASE_URL="$DATABASE_URL" \
+            AUTH_PASSWORD_PEPPER="$AUTH_PASSWORD_PEPPER" \
+            AUTH_ATTEMPT_HASH_KEY="$AUTH_ATTEMPT_HASH_KEY" \
+            WEB_ORIGIN="https://pr-${{ github.event.number }}.${{ secrets.CLOUDFLARE_PAGES_PROJECT }}.pages.dev"
+          flyctl deploy --app "$APP_NAME" --config apps/api/fly.toml --dockerfile apps/api/Dockerfile --remote-only
+          echo "api_url=https://$APP_NAME.fly.dev" >> "$GITHUB_OUTPUT"
+      - name: seed the preview database
+        env:
+          DATABASE_URL: ${{ needs.db-branch.outputs.db_url }}
+        run: |
+          # Seeded throwaway attendees, so a reviewer can actually sign in to the preview.
+          # This script never runs against an environment holding real data (data-model.md).
+          pnpm install --frozen-lockfile
+          pnpm db:seed
+
+  # ── Gate 11: the preview a reviewer can open (FR-066, FR-067, SC-011) ───────────────────
+  deploy-preview:
+    name: deploy-preview
+    if: github.event_name == 'pull_request' && github.event.action != 'closed'
+    needs: [build, deploy-api]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # Rebuilt rather than reusing the `build` artifact, because the client bakes its API
+      # address in at build time and that address is this pull request's ephemeral API. The
+      # artifact from `build` was compiled against a placeholder and would call the wrong host.
+      - name: build the client against this pull request's API
+        env:
+          VITE_API_BASE_URL: ${{ needs.deploy-api.outputs.api_url }}
+        run: pnpm --filter @mynet/web build
+      - name: publish the preview
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy apps/web/dist --project-name=${{ secrets.CLOUDFLARE_PAGES_PROJECT }} --branch=pr-${{ github.event.number }}
+
+  # ── Schema differences, as a review aid (T092) ──────────────────────────────────────────
+  #
+  # Not a gate. The constitution requires schema changes to be *reviewed*, and a reviewer
+  # cannot review what they cannot see — a generated migration is easy to approve by scrolling
+  # past. This posts the difference where the discussion is.
+  schema-diff:
+    name: schema-diff
+    if: github.event_name == 'pull_request' && github.event.action != 'closed'
+    needs: db-branch
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: neondatabase/schema-diff-action@v1
+        with:
+          project_id: ${{ secrets.NEON_PROJECT_ID }}
+          compare_branch: pr-${{ github.event.number }}
+          api_key: ${{ secrets.NEON_API_KEY }}
+
+  # ── Clean-up (FR-067) ───────────────────────────────────────────────────────────────────
+  #
+  # An ephemeral resource that outlives its pull request is neither ephemeral nor free. Runs on
+  # close whether the pull request merged or not.
+  cleanup:
+    name: cleanup
+    if: github.event_name == 'pull_request' && github.event.action == 'closed'
+    runs-on: ubuntu-latest
+    steps:
+      - name: delete the database branch
+        uses: neondatabase/delete-branch-action@v3
+        with:
+          project_id: ${{ secrets.NEON_PROJECT_ID }}
+          branch: pr-${{ github.event.number }}
+          api_key: ${{ secrets.NEON_API_KEY }}
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - name: destroy the ephemeral API
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: flyctl apps destroy "mynet-api-pr-${{ github.event.number }}" --yes || true
+
   # ── The aggregate gate (FR-064, FR-071) ─────────────────────────────────────────────────
   #
   # `needs` alone is NOT sufficient: a skipped or cancelled dependency leaves a dependent job
@@ -94,19 +406,39 @@ jobs:
   # every result is literally 'success'. Anything else — skipped, cancelled, timed out — is
   # a failure here.
   #
-  # T091 extends this to the full eleven checks. Until then it guards the four that exist,
-  # so the mechanism is proven before the expensive jobs depend on it.
+  # This is also the line of defence against the specific shortcut FR-071 names. Commenting a
+  # job out of `needs` below is the only way to make this pass without that job succeeding, and
+  # it is visible in the diff.
   verify:
     name: verify
     runs-on: ubuntu-latest
-    if: always()
-    needs: [typecheck, lint, test-unit, test-component]
+    if: always() && (github.event_name != 'pull_request' || github.event.action != 'closed')
+    needs:
+      - typecheck
+      - lint
+      - test-unit
+      - test-component
+      - contract
+      - migrations
+      - test-integration
+      - test-accessibility
+      - test-e2e
+      - build
+      - deploy-preview
     steps:
       - name: assert every required check succeeded
         env:
           RESULTS: ${{ toJSON(needs) }}
         run: |
           echo "$RESULTS"
+
+          count=$(echo "$RESULTS" | jq -r 'length')
+          if [ "$count" -ne 11 ]; then
+            echo "::error::Expected 11 required checks, found $count."
+            echo "FR-063 names eleven. A check removed from \`needs\` is a check that no longer gates."
+            exit 1
+          fi
+
           failed=$(echo "$RESULTS" | jq -r 'to_entries[] | select(.value.result != "success") | "\(.key)=\(.value.result)"')
           if [ -n "$failed" ]; then
             echo "::error::Required checks did not succeed:"
@@ -114,4 +446,5 @@ jobs:
             echo "A skipped, cancelled, or errored check MUST NOT report success (FR-064, FR-071)."
             exit 1
           fi
-          echo "All required checks succeeded."
+
+          echo "All 11 required checks succeeded."

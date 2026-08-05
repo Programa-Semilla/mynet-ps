@@ -2,6 +2,7 @@ import { Outlet } from 'react-router'
 
 import { DesktopRail } from './DesktopRail.js'
 import { MobileNav } from './MobileNav.js'
+import { OfflineBanner } from './OfflineBanner.js'
 import { TabletRail } from './TabletRail.js'
 import { TopBar } from './TopBar.js'
 
@@ -38,6 +39,11 @@ export const AppShell = () => (
     */}
     <div className="flex min-w-0 flex-1 flex-col">
       <TopBar />
+      {/*
+        Above the workspace and below the bar, so it is the first thing read after "where am I"
+        and cannot be scrolled past while the attendee wonders why nothing loads (FR-052).
+      */}
+      <OfflineBanner />
 
       <main
         className={[

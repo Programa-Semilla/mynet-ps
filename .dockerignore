@@ -1,0 +1,36 @@
+# Kept small on purpose: the build stage copies the whole workspace, so anything not excluded
+# here is sent to the daemon and can end up in a layer.
+node_modules
+**/node_modules
+dist
+**/dist
+build
+**/build
+.vite
+**/.vite
+coverage
+**/coverage
+
+# Secrets must never reach an image (FR-041).
+.env
+.env.*
+!.env.example
+
+.git
+.github
+.githooks
+.specify
+.claude
+
+# Not the API's concern, and the largest directories in the repository.
+GroundZero
+specs
+brainstorm
+e2e
+playwright-report
+test-results
+blob-report
+
+*.log
+.DS_Store
+Thumbs.db

@@ -57,7 +57,12 @@ export default defineConfig({
     url: WEB_ORIGIN,
     // Generous because the command includes a production build.
     timeout: 240_000,
-    reuseExistingServer: !process.env['CI'],
+    // **Never reuse.** The command above builds and then serves, so reusing a server that is
+    // already listening silently skips the build and tests the previous run's bundle. That is
+    // not a slow feedback loop, it is a wrong answer: a change can appear to fail after it was
+    // fixed, or — far worse — appear to pass after it was broken. The few seconds a rebuild
+    // costs are the price of the suite meaning what it says (SC-010).
+    reuseExistingServer: false,
     stdout: 'pipe',
     stderr: 'pipe',
   },

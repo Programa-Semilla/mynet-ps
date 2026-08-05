@@ -36,5 +36,21 @@ export const RequireAuth = () => {
     )
   }
 
+  // ─────────────────────────────────────────────────────────────────────────────────────────
+  // Offline renders the shell, not the sign-in screen (FR-051, FR-052).
+  //
+  // We do not know whether this visitor is signed in — that is what 'offline' means — so we
+  // claim neither. What the shell shows in that state is navigation, the destinations' own
+  // static structure, and the offline banner naming what is unavailable. It shows no identity
+  // and no attendee data, because it has none: every read still goes to a server that is not
+  // answering, and authorization was never the client's job anyway (FR-035, FR-036).
+  //
+  // The alternative — a sign-in form — would be worse in both directions. To somebody already
+  // signed in it is a false claim that their session ended; to somebody who is not, it is a
+  // form that cannot submit. Neither can be acted on until the connection returns, at which
+  // point `useAuth` re-asks and this resolves itself.
+  // ─────────────────────────────────────────────────────────────────────────────────────────
+  if (status === 'offline') return <Outlet />
+
   return status === 'signed-in' ? <Outlet /> : <SignInScreen />
 }

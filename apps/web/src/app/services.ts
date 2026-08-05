@@ -4,9 +4,8 @@ import {
   HttpClient,
   HttpEventsRepository,
 } from '@mynet/data/http'
-import type { PlatformServices } from '@mynet/platform'
-
-import { webDevices } from '../platform/webDevices.js'
+import type { ConnectivityService, PlatformServices } from '@mynet/platform'
+import { webDevices } from '@mynet/platform/web'
 
 /**
  * The composition root — the single place that wires interfaces to implementations.
@@ -28,8 +27,15 @@ export const createServices = (): PlatformServices => {
     // Connectivity is read through the interface, not from `navigator` directly, so the
     // offline path is substitutable and SC-008 stays at zero.
     isOnline: () => devices.connectivity.isOnline(),
+    // …and the transport reports back what it observed, which is the only authoritative source
+    // of "is MyNet reachable" (FR-054). This one wire is why the offline indicator and the
+    // network cannot disagree. It is deliberately made here, at the composition root, and
+    // nowhere else: feature code neither knows nor needs to know that the two are connected.
+    onReachability: (reachable) => devices.connectivity.reportReachability(reachable),
     fetch: globalThis.fetch.bind(globalThis),
   })
+
+  watchReachability(http, devices.connectivity)
 
   return {
     devices,
@@ -39,4 +45,47 @@ export const createServices = (): PlatformServices => {
     },
     auth: new HttpAuthGateway(http),
   }
+}
+
+/** How often to re-test the connection while the server is believed unreachable. */
+const PROBE_INTERVAL_MS = 5_000
+
+/**
+ * Re-tests the connection while MyNet is believed unreachable, so recovery is discovered rather
+ * than waited for (FR-054).
+ *
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ * Needed because the browser's `online` event is not a reliable recovery signal. It only fires
+ * when `navigator.onLine` *changes*, and that flag reports true throughout an outage that began
+ * before the page loaded — so a connection can come back with no event at all, leaving the
+ * attendee behind an offline banner until they think to reload.
+ *
+ * Probing only while offline is the whole design. There is no polling in the normal case: the
+ * loop starts when something fails and stops the moment a probe succeeds, so a healthy session
+ * makes no requests it did not need.
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ *
+ * Lives at the composition root because it is a wire between two collaborators, not a behaviour
+ * of either. `ConnectivityService` has no business knowing HTTP exists, and `HttpClient` has no
+ * business owning a timer.
+ */
+const watchReachability = (http: HttpClient, connectivity: ConnectivityService): void => {
+  let timer: ReturnType<typeof setInterval> | undefined
+
+  const stop = () => {
+    if (timer !== undefined) {
+      clearInterval(timer)
+      timer = undefined
+    }
+  }
+
+  connectivity.subscribe((online) => {
+    if (online) {
+      stop()
+      return
+    }
+    if (timer === undefined) {
+      timer = setInterval(() => void http.probe(), PROBE_INTERVAL_MS)
+    }
+  })
 }

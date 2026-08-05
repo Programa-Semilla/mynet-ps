@@ -31,7 +31,11 @@ const noopDevices: PlatformServices['devices'] = {
     remove: async () => {},
     clear: async () => {},
   },
-  connectivity: { isOnline: () => true, subscribe: () => () => {} },
+  connectivity: {
+    isOnline: () => true,
+    subscribe: () => () => {},
+    reportReachability: () => {},
+  },
 }
 
 const renderSignIn = (overrides: Partial<PlatformServices> = {}) => {
