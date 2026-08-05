@@ -15,7 +15,7 @@ constitution 1.x, which assumed a stateless front-end demo.
 **Input**: Foundation slice for MyNet as a real product. Client scaffold, design tokens, and a
 responsive application shell over five individually addressable destinations. A project-owned API
 service over managed PostgreSQL with versioned migrations. Real authentication with server-side
-sessions and per-attendee data isolation. Repository interfaces for data access and the six device
+sign-in sessions and per-attendee data isolation. Repository interfaces for data access and the six device
 capability interfaces. Installable PWA with bounded offline behaviour. Linux CI covering client,
 API, migrations, and integration.
 
@@ -38,6 +38,18 @@ attendee cards, no message threads. But the slice is a true vertical slice: an a
 the browser calls the API, the API queries PostgreSQL scoped to that attendee's identity, and the
 shell renders who they are and which events they are registered for. Every layer is exercised end
 to end. Content arrives in later slices through a seam that already exists.
+
+---
+
+## Clarifications
+
+### Session 2026-08-04
+
+- Q: "Session" means both a conference talk and a signed-in record. Which keeps the bare term? → A: The conference talk keeps it. The auth concept becomes **sign-in session** (`AuthSession` in schema and code); bare "session" in this spec always means a conference talk.
+- Q: What uniquely identifies an attendee at sign-in? → A: **Email address, unique across the whole product.** One person holds one account and reuses it across every event they attend.
+- Q: How is sign-in protected against brute-force attempts? → A: **Throttle on both the identifier and the request source, with escalating delay rather than hard lockout.** Failed attempts are recorded server-side. No permanent lockout, so an attacker cannot deny service to an attendee whose email they know.
+- Q: How does a sign-in session expire? → A: **Sliding idle expiry.** The session extends on each use and expires after a defined period of inactivity. The exact period is a planning decision; the sliding behaviour is the requirement.
+- Q: What form does the API contract take? → A: **Derived from the server implementation and published**; the client is verified against it. The generated contract is committed so that changes to it appear in the pull-request diff rather than passing silently.
 
 ---
 
@@ -65,20 +77,20 @@ attendee's data by manipulating the request directly, and confirm the server ref
 
 1. **Given** an attendee who is not signed in, **When** they open any destination address, **Then**
    they are asked to sign in and are not shown attendee data.
-2. **Given** valid credentials, **When** the attendee signs in, **Then** a server-side session is
-   established and the workspace shows their name and their registered events.
+2. **Given** valid credentials, **When** the attendee signs in, **Then** a server-side sign-in
+   session is established and the workspace shows their name and their registered events.
 3. **Given** invalid credentials, **When** sign-in is attempted, **Then** it is refused with a
    message that does not reveal whether the identifier exists.
-4. **Given** a signed-in attendee, **When** they close and reopen the browser within the session
-   lifetime, **Then** they remain signed in.
-5. **Given** a signed-in attendee, **When** they sign out, **Then** the session is invalidated
-   server-side and previously reachable data is no longer returned.
+4. **Given** a signed-in attendee, **When** they close and reopen the browser within the sign-in
+   session lifetime, **Then** they remain signed in.
+5. **Given** a signed-in attendee, **When** they sign out, **Then** the sign-in session is
+   invalidated server-side and previously reachable data is no longer returned.
 6. **Given** two attendees with different registered events, **When** each signs in, **Then** each
    sees only their own identity and only their own events.
 7. **Given** a signed-in attendee, **When** a request is altered to reference another attendee's
    data, **Then** the server refuses it regardless of what the client asked for.
-8. **Given** an expired or tampered session, **When** any data request is made, **Then** it is
-   refused and the attendee is returned to sign-in.
+8. **Given** an expired or tampered sign-in session, **When** any data request is made, **Then** it
+   is refused and the attendee is returned to sign-in.
 
 ---
 
@@ -147,8 +159,11 @@ the pipeline and names the defect. Then confirm a clean change passes and publis
 
 1. **Given** a change introducing a type error, a lint violation, or a failing unit or component
    test, **When** the pipeline runs, **Then** it fails and identifies the defect.
-2. **Given** a change whose API response violates its declared contract, **When** contract checks
-   run, **Then** they fail and name the divergence.
+2. **Given** a change altering what the server produces, **When** contract checks run, **Then** the
+   committed contract no longer matches the generated one and the pipeline fails until the change is
+   reflected and reviewed.
+2a. **Given** client data access expecting a shape the server no longer produces, **When** contract
+    checks run, **Then** they fail and name the divergence.
 3. **Given** a migration that cannot apply cleanly to an empty database, **When** migration
    verification runs, **Then** it fails before any environment holding real data is touched.
 4. **Given** a change that breaks an identity-scoped read path, **When** integration tests run
@@ -259,14 +274,23 @@ Each states the required behaviour. None is left as an open question.
 
 **Identity and data**
 
-- **Session expiry mid-action**: the action is refused, the attendee is returned to sign-in, and no
-  partial write occurs.
-- **Sign-in on a second device**: both sessions remain valid independently; signing out of one does
-  not sign out the other.
+- **Sign-in session expiry mid-action**: the action is refused, the attendee is returned to sign-in
+  with an inactivity explanation, and no partial write occurs.
+- **Session used regularly over a long period**: under a sliding window with no absolute ceiling,
+  such a session does not expire on its own. Revocation and sign-out remain the means of ending it.
+  Recorded as a residual risk in Open Questions rather than silently accepted.
+- **Sign-in on a second device**: both sign-in sessions remain valid independently; signing out of
+  one does not sign out the other.
 - **Request for another attendee's data**: refused server-side with a response that does not
   disclose whether the referenced record exists.
 - **Attendee registered for no events**: the workspace renders with an explicit empty state rather
   than an error or a blank region.
+- **Repeated failed sign-in attempts**: throttled with escalating delay on both the identifier and
+  the source. The account is never permanently locked, and the throttled response does not reveal
+  whether the identifier exists.
+- **Legitimate attendees behind shared network address**: source-based throttling must not lock out a
+  venue full of attendees sharing one public address — identifier-based throttling carries the
+  targeted case, so source limits are set to tolerate many distinct legitimate attendees.
 
 **Connectivity**
 
@@ -373,14 +397,36 @@ Each states the required behaviour. None is left as an open question.
 #### Identity and authentication
 
 - **FR-025**: An attendee MUST be able to sign in, and MUST NOT reach attendee data without doing so.
-- **FR-026**: Sessions MUST be established and validated server-side. A session that is expired,
-  revoked, or tampered with MUST be refused.
-- **FR-027**: An attendee MUST be able to sign out, and signing out MUST invalidate the session
-  server-side rather than only clearing client state.
-- **FR-028**: A session MUST survive the browser closing and reopening within its lifetime.
-- **FR-029**: Sessions on different devices MUST be independent; ending one MUST NOT end another.
+- **FR-025a**: An attendee is identified by **email address, unique across the entire product** — not
+  per event. One account is reused across every event the attendee attends, which is what makes the
+  multi-event switcher coherent.
+- **FR-025b**: Email comparison for identity purposes MUST be case-insensitive and MUST ignore
+  surrounding whitespace, so that one person cannot hold two accounts differing only in case.
+- **FR-026**: Sign-in sessions MUST be established and validated server-side. A sign-in session that
+  is expired, revoked, or tampered with MUST be refused.
+- **FR-027**: An attendee MUST be able to sign out, and signing out MUST invalidate the sign-in
+  session server-side rather than only clearing client state.
+- **FR-028**: A sign-in session MUST survive the browser closing and reopening within its lifetime.
+- **FR-028a**: Sign-in sessions MUST expire on a **sliding idle window** — each authenticated request
+  extends the window, and the session expires after a defined period of inactivity. The exact period
+  is a planning decision; the sliding behaviour is the requirement.
+- **FR-028b**: Expiry MUST be enforced server-side. A session MUST NOT be treated as valid because
+  the client believes it is.
+- **FR-028c**: When a session expires, the attendee MUST be returned to sign-in with an explanation
+  that they were signed out for inactivity, distinguishable from a failed sign-in.
+- **FR-029**: Sign-in sessions on different devices MUST be independent; ending one MUST NOT end
+  another.
 - **FR-030**: Failed sign-in MUST NOT disclose whether an identifier exists.
 - **FR-031**: Credentials MUST NOT be stored in a recoverable form, and MUST never be logged.
+- **FR-031a**: Repeated failed sign-in attempts MUST be throttled on **both** the identifier and the
+  request source, so that neither a targeted attack on one account nor a distributed attack across
+  many sources proceeds unimpeded.
+- **FR-031b**: Throttling MUST take the form of escalating delay and MUST NOT permanently lock an
+  account. Because the identifier is an email address (FR-025a), a hard lockout would let anyone who
+  knows an attendee's email deny them access deliberately.
+- **FR-031c**: Failed sign-in attempts MUST be recorded server-side with enough detail to detect an
+  attack, and those records MUST NOT contain the submitted credential.
+- **FR-031d**: A throttled response MUST NOT reveal whether the identifier exists, preserving FR-030.
 - **FR-032**: The signed-in attendee's identity MUST be visible in the shell.
 
 #### Data, persistence, and isolation
@@ -398,8 +444,8 @@ Each states the required behaviour. None is left as an open question.
   and applied in a defined order. Ad-hoc changes to a live database are prohibited.
 - **FR-038**: Every migration MUST be verified against a clean database in the pipeline before it
   reaches any environment holding real data.
-- **FR-039**: The schema in this slice MUST support attendee identity, sessions, events, and the
-  registration relating an attendee to the events they attend. Content entities arrive with the
+- **FR-039**: The schema in this slice MUST support attendee identity, sign-in sessions, events, and
+  the registration relating an attendee to the events they attend. Content entities arrive with the
   slices that own them.
 - **FR-040**: An attendee registered for no events MUST be presented with an explicit empty state,
   not an error and not a blank region.
@@ -414,6 +460,13 @@ Each states the required behaviour. None is left as an open question.
   calendar, camera, contact sharing, secure storage, and connectivity.
 - **FR-044**: The project MUST define and own repository interfaces for data access, expressed in
   domain terms.
+- **FR-044a**: The API contract MUST be **derived from the server implementation** and published in a
+  machine-readable form. The server implementation is the source of truth for the contract.
+- **FR-044b**: The generated contract MUST be committed to the repository, and the pipeline MUST fail
+  when the committed contract does not match what the current server generates. This makes every
+  contract change visible in the pull-request diff rather than passing silently.
+- **FR-044c**: Client data access MUST be verified against the published contract, so that a client
+  expecting a shape the server no longer produces fails the pipeline rather than failing an attendee.
 - **FR-045**: Feature and presentation code MUST obtain device capabilities and data only through
   those interfaces, and MUST NOT call browser APIs, construct network requests, or know transport,
   endpoint, or serialization details.
@@ -498,15 +551,19 @@ Each states the required behaviour. None is left as an open question.
 
 ### Key Entities
 
-- **Attendee** — a person who uses MyNet. Has an identity, a display name, and the profile fields the
-  product requires. Owns all data attributed to them.
+- **Attendee** — a person who uses MyNet. Identified by **email address, unique product-wide**. Has a
+  display name and the profile fields the product requires. Owns all data attributed to them, across
+  every event they attend.
 - **Credential** — the secret by which an attendee proves identity. Stored only in a non-recoverable
   form.
-- **Session** — a server-side record that an attendee is currently signed in on one device, with a
-  lifetime and the ability to be revoked independently of other sessions.
+- **Sign-in session** (`AuthSession`) — a server-side record that an attendee is currently signed in
+  on one device. Expires on a sliding idle window, extended by each authenticated request, and can be
+  revoked independently of other sign-in sessions. **Never called simply "session":** in MyNet's domain language a *session* is a conference
+  talk (see `CLAUDE.md` domain terminology), and Agenda is built on that meaning. The
+  infrastructure concept yields the bare term to the product concept.
 - **Event** — a conference. Has a name, a location, and a span of days.
-- **Registration** — the relationship establishing that an attendee attends an event. Determines
-  which events appear in that attendee's workspace.
+- **Registration** — the relationship establishing that an attendee attends an event. Many per
+  attendee and many per event. Determines which events appear in that attendee's workspace.
 - **Destination** — one of the five primary areas. Has a name, an icon, a distinct address, an
   active state, and no content in this slice.
 - **Device capability service** — a project-owned contract for a device or browser capability, with
@@ -516,6 +573,9 @@ Each states the required behaviour. None is left as an open question.
 - **Connectivity state** — whether the attendee is currently online or offline, observable, settled
   rather than instantaneous, and surfaced to the attendee.
 - **Migration** — a versioned, ordered, reviewed schema change committed to the repository.
+- **API contract** — the machine-readable description of the API, generated from the server
+  implementation and committed so that changes to it are visible in review. The client is verified
+  against it.
 - **Cache version** — the identifier distinguishing one deployed set of cached assets from another.
 - **Design token** — a named visual value referenced by components instead of a literal.
 - **Branding constant** — the single definition of the product name.
@@ -533,6 +593,10 @@ Each states the required behaviour. None is left as an open question.
   100% of attempts, and the refusal does not disclose whether the record exists.
 - **SC-003**: An attendee's data survives browser reload, sign-out and sign-in, and redeployment in
   100% of trials.
+- **SC-003a**: Consecutive failed sign-in attempts against one identifier face a delay that increases
+  with each failure, capping guesses per hour at a defined maximum; a legitimate attendee sharing a
+  network address with many others is never prevented from signing in; and the number of accounts an
+  attacker can render permanently inaccessible is zero.
 - **SC-004**: The complete navigation journey across all five destinations can be performed using
   only a keyboard, with a visible focus indicator present at 100% of stops.
 - **SC-005**: Automated accessibility scanning reports zero critical or serious violations across all
@@ -671,3 +735,23 @@ Not resolved by this specification. The authoritative register is in `.specify/m
 17. **Server-side branch protection remains unavailable** — private repository on a free personal
     account, APIs return 403. Enforcement is client-side and bypassable, and materially more serious
     now that real attendee data is in scope.
+
+**Residual risks accepted by the 2026-08-04 clarification decisions**
+
+18. **A regularly-used sign-in session never expires on its own.** Sliding idle expiry was chosen
+    without an absolute ceiling (FR-028a), so a session used often persists indefinitely. Revocation
+    and sign-out are the only ways to end it. Revisit if the product later holds data whose exposure
+    window must be bounded.
+19. **A breaking API change is visible but not prevented.** With a server-derived contract
+    (FR-044a), a change to what the server produces alters the contract by definition; FR-044b makes
+    that alteration appear in the diff, but nothing classifies it as breaking versus additive. Whether
+    the pipeline should distinguish the two is undecided.
+
+**Deferred — reached the clarification question limit**
+
+20. **Observability baseline.** FR-060 requires server-side error recording, but there is no
+    requirement for health or readiness signalling, request-level logging, or metrics. A deployed API
+    with no health signal is difficult to operate. Better suited to planning, but it must not be lost.
+21. **Reliability and availability expectations.** No uptime target, recovery objective, or backup
+    and restore expectation is stated for the database holding attendee data. Low impact at
+    foundation scale; high impact the moment real attendees exist.
