@@ -126,41 +126,41 @@ to obtain a green result (FR-071). **Only the owner can do these.**
 
 ### Database and schema
 
-- [ ] T018 Create the Drizzle configuration in `apps/api/drizzle.config.ts` pointing at `apps/api/src/db/schema/` with output to `apps/api/migrations/` (research.md D6)
-- [ ] T019 Create the database client in `apps/api/src/db/client.ts` with pooled connections
-- [ ] T020 [P] Define `attendees` and `attendee_credentials` in `apps/api/src/db/schema/attendees.ts` — email `citext` UNIQUE globally, credential hash in its own table so it cannot ride along in an attendee query (data-model.md, FR-025a, FR-031, FR-034, FR-039)
-- [ ] T021 [P] Define `auth_sessions` in `apps/api/src/db/schema/auth-sessions.ts` — stores `token_hash` not the token, with `last_used_at`, `expires_at`, `revoked_at`; one row per device is what makes sign-in sessions independent (FR-026, FR-028a, FR-029, FR-039)
-- [ ] T022 [P] Define `events` and `registrations` in `apps/api/src/db/schema/events.ts` — UNIQUE `(attendee_id, event_id)` (data-model.md, FR-034, FR-039)
-- [ ] T023 [P] Define `sign_in_attempts` in `apps/api/src/db/schema/sign-in-attempts.ts` — hashed identifier and source, no foreign key, no credential material (FR-031c, FR-042)
-- [ ] T024 Generate the initial migration into `apps/api/migrations/` with `drizzle-kit generate` and commit the SQL for review (FR-037)
-- [ ] T025 Create the migration runner wired to `pnpm db:migrate` in `apps/api/src/db/migrate.ts` (FR-037)
-- [ ] T026 Verify no `drizzle-kit push` invocation exists in any script in any `package.json` — it changes a database without producing a reviewable artifact, which the constitution prohibits (research.md D6)
-- [ ] T027 Create the seed script in `apps/api/src/db/seed.ts` producing **two** attendees with **different** event registrations — one attendee cannot demonstrate isolation, which is this slice's central claim (FR-069)
+- [X] T018 Create the Drizzle configuration in `apps/api/drizzle.config.ts` pointing at `apps/api/src/db/schema/` with output to `apps/api/migrations/` (research.md D6)
+- [X] T019 Create the database client in `apps/api/src/db/client.ts` with pooled connections
+- [X] T020 [P] Define `attendees` and `attendee_credentials` in `apps/api/src/db/schema/attendees.ts` — email `citext` UNIQUE globally, credential hash in its own table so it cannot ride along in an attendee query (data-model.md, FR-025a, FR-031, FR-034, FR-039)
+- [X] T021 [P] Define `auth_sessions` in `apps/api/src/db/schema/auth-sessions.ts` — stores `token_hash` not the token, with `last_used_at`, `expires_at`, `revoked_at`; one row per device is what makes sign-in sessions independent (FR-026, FR-028a, FR-029, FR-039)
+- [X] T022 [P] Define `events` and `registrations` in `apps/api/src/db/schema/events.ts` — UNIQUE `(attendee_id, event_id)` (data-model.md, FR-034, FR-039)
+- [X] T023 [P] Define `sign_in_attempts` in `apps/api/src/db/schema/sign-in-attempts.ts` — hashed identifier and source, no foreign key, no credential material (FR-031c, FR-042)
+- [X] T024 Generate the initial migration into `apps/api/migrations/` with `drizzle-kit generate` and commit the SQL for review (FR-037)
+- [X] T025 Create the migration runner wired to `pnpm db:migrate` in `apps/api/src/db/migrate.ts` (FR-037)
+- [X] T026 Verify no `drizzle-kit push` invocation exists in any script in any `package.json` — it changes a database without producing a reviewable artifact, which the constitution prohibits (research.md D6)
+- [X] T027 Create the seed script in `apps/api/src/db/seed.ts` producing **two** attendees with **different** event registrations — one attendee cannot demonstrate isolation, which is this slice's central claim (FR-069)
 
 ### API foundation
 
-- [ ] T028 Create the Fastify application bootstrap in `apps/api/src/app.ts` with plugin registration order
-- [ ] T029 Register `@fastify/swagger` in `apps/api/src/plugins/swagger.ts` so the contract is generated from route schemas (FR-044a, research.md D4)
-- [ ] T030 Create the contract generation script writing `fastify.swagger()` output to `contracts/openapi.json` in `apps/api/src/contract/generate.ts` (FR-044a)
-- [ ] T031 Create the `contract:check` script that regenerates and fails on any difference from the committed `contracts/openapi.json` (FR-044b)
-- [ ] T032 Create the error-handling plugin in `apps/api/src/plugins/errors.ts` — attendee-facing messages explain what happened and expose no internal detail; server records carry no credentials, session tokens, or message content (FR-059, FR-060)
-- [ ] T033 Create the `GET /health` route in `apps/api/src/routes/health.ts` for the hosting platform
-- [ ] T034 Create the authenticated-context plugin in `apps/api/src/plugins/auth-context.ts` binding the identity at the request boundary — **the mechanism that makes FR-036 structural**, because no handler can then express another attendee's data (FR-035)
+- [X] T028 Create the Fastify application bootstrap in `apps/api/src/app.ts` with plugin registration order
+- [X] T029 Register `@fastify/swagger` in `apps/api/src/plugins/swagger.ts` so the contract is generated from route schemas (FR-044a, research.md D4)
+- [X] T030 Create the contract generation script writing `fastify.swagger()` output to `contracts/openapi.json` in `apps/api/src/contract/generate.ts` (FR-044a)
+- [X] T031 Create the `contract:check` script that regenerates and fails on any difference from the committed `contracts/openapi.json` (FR-044b)
+- [X] T032 Create the error-handling plugin in `apps/api/src/plugins/errors.ts` — attendee-facing messages explain what happened and expose no internal detail; server records carry no credentials, session tokens, or message content (FR-059, FR-060)
+- [X] T033 Create the `GET /health` route in `apps/api/src/routes/health.ts` for the hosting platform
+- [X] T034 Create the authenticated-context plugin in `apps/api/src/plugins/auth-context.ts` binding the identity at the request boundary — **the mechanism that makes FR-036 structural**, because no handler can then express another attendee's data (FR-035)
 
 ### Authentication primitives
 
-- [ ] T035 [P] Create Argon2id hashing and verification in `apps/api/src/auth/password.ts` (FR-031, research.md D8)
-- [ ] T036 [P] Create opaque session token generation and hashing in `apps/api/src/auth/token.ts` — only the hash is ever stored (FR-026)
-- [ ] T037 [P] Create database-backed throttle counters in `apps/api/src/auth/throttle.ts` — keyed separately by identifier and source, escalating delay, **no lockout path may exist** (FR-031a, FR-031b, research.md D9)
+- [X] T035 [P] Create Argon2id hashing and verification in `apps/api/src/auth/password.ts` (FR-031, research.md D8)
+- [X] T036 [P] Create opaque session token generation and hashing in `apps/api/src/auth/token.ts` — only the hash is ever stored (FR-026)
+- [X] T037 [P] Create database-backed throttle counters in `apps/api/src/auth/throttle.ts` — keyed separately by identifier and source, escalating delay, **no lockout path may exist** (FR-031a, FR-031b, research.md D9)
 
 ### Abstraction layers (Principle V)
 
-- [ ] T038 [P] Define the six device capability interfaces in `packages/platform/src/interfaces/` — notification, calendar, camera, contact-share, secure-storage, connectivity (FR-043)
-- [ ] T039 [P] Define repository interfaces in domain terms in `packages/data/src/interfaces/` — **no method may accept a caller-supplied attendee identifier** (FR-044, data-model.md scoping rule)
-- [ ] T040 Create the `PlatformServices` registry type and root provider in `packages/platform/src/registry.ts` — one provider, not eleven nested ones (research.md D10)
-- [ ] T041 Create typed consumer hooks in `packages/platform/src/hooks.ts` so feature code never touches the context object directly (FR-045)
-- [ ] T042 Create HTTP repository implementations in `packages/data/src/http/` — the only place in the client that constructs requests (FR-045)
-- [ ] T042a Generate client-side response types from `contracts/openapi.json` into `packages/data/src/generated/` and assert repository parsing against them, so a client expecting a shape the server no longer produces fails the build rather than failing an attendee (FR-044c)
+- [X] T038 [P] Define the six device capability interfaces in `packages/platform/src/interfaces/` — notification, calendar, camera, contact-share, secure-storage, connectivity (FR-043)
+- [X] T039 [P] Define repository interfaces in domain terms in `packages/data/src/interfaces/` — **no method may accept a caller-supplied attendee identifier** (FR-044, data-model.md scoping rule)
+- [X] T040 Create the `PlatformServices` registry type and root provider in `packages/platform/src/registry.ts` — one provider, not eleven nested ones (research.md D10)
+- [X] T041 Create typed consumer hooks in `packages/platform/src/hooks.ts` so feature code never touches the context object directly (FR-045)
+- [X] T042 Create HTTP repository implementations in `packages/data/src/http/` — the only place in the client that constructs requests (FR-045)
+- [ ] T042a *(generation + diff check done in Phase 2; the per-endpoint bindings land at T064, when `/auth/me` and `/events` exist to bind to)* Generate client-side response types from `contracts/openapi.json` into `packages/data/src/generated/` and assert repository parsing against them, so a client expecting a shape the server no longer produces fails the build rather than failing an attendee (FR-044c)
 
 **Checkpoint**: Migrations apply to a clean database, seed produces two isolated attendees, and the contract generates.
 

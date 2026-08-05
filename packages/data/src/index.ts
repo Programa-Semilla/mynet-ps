@@ -1,8 +1,15 @@
 /**
  * Repository interfaces in domain terms (constitution Principle V).
  *
- * Populated in T039 (interfaces), T042 (HTTP implementations), and T042a (generated response
- * types). No method here may accept a caller-supplied attendee identifier — that absence is
- * what makes FR-036 structural rather than a rule someone has to remember.
+ * No method here accepts a caller-supplied attendee identifier — that absence is what makes
+ * FR-036 structural rather than a rule someone has to remember. See `interfaces/index.ts`.
  */
-export {}
+export type {
+  Attendee,
+  AttendeeRepository,
+  Event,
+  EventsRepository,
+  Repositories,
+} from './interfaces/index.js'
+
+export { NotAuthenticatedError, OfflineError, SessionExpiredError } from './interfaces/index.js'

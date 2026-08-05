@@ -1,0 +1,67 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "MyNet API",
+    "description": "Project-owned API for the MyNet attendee workspace. Every endpoint except sign-in requires a valid sign-in session cookie, and every authenticated endpoint resolves the attendee from that cookie server-side — never from a client-supplied identifier (FR-035, FR-036).",
+    "version": "0.1.0"
+  },
+  "components": {
+    "securitySchemes": {
+      "sessionCookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "mynet_session",
+        "description": "Opaque sign-in session token. HttpOnly, Secure, SameSite=Lax. Never appears in a response body."
+      }
+    },
+    "schemas": {}
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "summary": "Liveness probe",
+        "tags": [
+          "operational"
+        ],
+        "description": "Reports that the process is running. Does not check dependencies.",
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "status"
+                  ],
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "ok"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "auth",
+      "description": "Sign-in session lifecycle"
+    },
+    {
+      "name": "workspace",
+      "description": "The signed-in attendee's own data"
+    },
+    {
+      "name": "operational",
+      "description": "Liveness for the hosting platform"
+    }
+  ]
+}

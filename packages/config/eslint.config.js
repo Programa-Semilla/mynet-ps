@@ -98,6 +98,17 @@ export default tseslint.config(
   },
 
   {
+    name: 'mynet/declaration-files',
+    files: ['**/*.d.ts'],
+    rules: {
+      // A declaration file imports types that are used only inside `declare module` blocks.
+      // ESLint's scope analysis does not traverse module augmentation, so every such import
+      // reads as unused. The alternative is an inline disable comment on every one.
+      '@typescript-eslint/no-unused-vars': 'off',
+    },
+  },
+
+  {
     name: 'mynet/tests',
     files: [
       '**/tests/**/*.{ts,tsx}',

@@ -10,10 +10,13 @@
     "./http": "./src/http/index.ts"
   },
   "scripts": {
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "types:generate": "openapi-typescript ../../contracts/openapi.json -o src/generated/api.ts",
+    "types:check": "openapi-typescript ../../contracts/openapi.json -o /tmp/mynet-api-types.ts && diff -q /tmp/mynet-api-types.ts src/generated/api.ts"
   },
   "devDependencies": {
     "@mynet/config": "workspace:*",
+    "openapi-typescript": "^7.13.0",
     "typescript": "6.0.3"
   }
 }
