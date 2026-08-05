@@ -203,9 +203,9 @@ to obtain a green result (FR-071). **Only the owner can do these.**
 - [X] T063 [US1] Add loading and failure presentation for every network-crossing state in `apps/web/src/app/` — a failure must never render as an empty success (FR-058)
 - [X] T063a [US1] Add the error boundary in `apps/web/src/app/ErrorBoundary.tsx` — an unexpected client error keeps the shell and offers a route back to a working state, never a blank page (FR-061)
 - [X] T064 [US1] Regenerate and commit `contracts/openapi.json` (FR-044b)
-- [ ] T065 [US1] End-to-end test in `e2e/sign-in.spec.ts` — sign in, see own workspace, browser restart keeps session, sign out revokes access (FR-068, SC-001)
+- [X] T065 [US1] End-to-end test in `e2e/sign-in.spec.ts` — sign in, see own workspace, browser restart keeps session, sign out revokes access (FR-068, SC-001)
 
-- [ ] T065a [US1] End-to-end durability test in `e2e/durability.spec.ts` — attendee data survives browser reload, sign-out and sign-in, and **redeployment**; the redeploy case is the one most likely to regress silently (FR-033, SC-003)
+- [X] T065a [US1] End-to-end durability test in `e2e/durability.spec.ts` — attendee data survives browser reload, sign-out and sign-in, and **redeployment**; the redeploy case is the one most likely to regress silently (FR-033, SC-003)
 
 **Checkpoint**: User Story 1 is fully functional and independently testable. This is the MVP.
 
@@ -255,7 +255,7 @@ to obtain a green result (FR-071). **Only the owner can do these.**
 
 ### Tests for User Story 3
 
-- [ ] T082 [P] [US3] Create the base workflow in `.github/workflows/verify.yml` running typecheck, lint, unit, and component tests on Linux (FR-062, FR-063)
+- [X] T082 [P] [US3] Create the base workflow in `.github/workflows/verify.yml` running typecheck, lint, unit, and component tests on Linux (FR-062, FR-063)
 
 ### Implementation for User Story 3
 

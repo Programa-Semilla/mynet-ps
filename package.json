@@ -31,8 +31,10 @@
     "verify": "pnpm typecheck && pnpm lint && pnpm test:unit && pnpm test:component && pnpm contract:check && pnpm test:integration && pnpm build && pnpm test:e2e"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.12.1",
     "@eslint/css": "^1.4.0",
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.62.1",
     "eslint": "^10.8.0",
     "eslint-plugin-jsx-a11y": "^6.10.2",
     "eslint-plugin-react-hooks": "^7.1.1",

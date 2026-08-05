@@ -8,7 +8,12 @@
  * Missing configuration fails at boot, not at the first request that needs it. A server that
  * starts without `AUTH_PASSWORD_PEPPER` and then fails every sign-in is strictly worse than
  * one that refuses to start.
+ *
+ * Importing `./env.js` first populates `process.env` from a local `.env` when one exists,
+ * without overwriting anything the environment already set. Every entry point reaches
+ * configuration through this module, so that is the one place the loading has to happen.
  */
+import './env.js'
 
 const required = (name: string): string => {
   const value = process.env[name]

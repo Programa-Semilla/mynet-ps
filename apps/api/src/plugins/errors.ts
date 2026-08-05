@@ -57,6 +57,26 @@ const errorsPlugin = async (app: FastifyInstance): Promise<void> => {
       })
     }
 
+    // Framework-level refusals that are the *caller's* fault — a malformed or empty JSON body,
+    // an unsupported media type, a payload over the limit. Fastify raises these with a 4xx
+    // `statusCode` of its own, and they are not `validation` errors.
+    //
+    // Without this branch they fall through to the 500 below, which is actively misleading:
+    // the attendee is told something went wrong on our side when nothing did, and the log
+    // records an "unhandled error" that will be investigated as a server fault. FR-059 asks the
+    // message to explain what happened; calling a bad request an internal failure does not.
+    //
+    // The Fastify code stays in the log. The response carries one stable public code, so the
+    // contract does not grow a vocabulary of framework internals.
+    const statusCode = typeof error.statusCode === 'number' ? error.statusCode : undefined
+    if (statusCode !== undefined && statusCode >= 400 && statusCode < 500) {
+      request.log.info({ code: error.code, statusCode, path: request.url }, 'request refused')
+      return reply.status(statusCode).send({
+        code: 'bad_request',
+        message: 'The request could not be understood. Nothing was changed.',
+      })
+    }
+
     // Everything unexpected. The attendee gets a reference; the cause goes only to the log.
     const correlationId = randomUUID()
     request.log.error(

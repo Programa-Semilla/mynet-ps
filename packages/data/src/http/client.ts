@@ -63,7 +63,12 @@ export class HttpClient {
         // credentials. Without this the API sees an anonymous request and refuses.
         credentials: 'include',
         headers: {
-          'content-type': 'application/json',
+          // **Only when there is a body.** Declaring `application/json` on a bodyless request
+          // makes the server parse an empty payload as JSON and refuse it — which is how
+          // sign-out came to clear the cookie in the browser while never revoking the session
+          // on the server, defeating FR-027. `fastify.inject()` does not reproduce the header
+          // combination a browser sends, so only the end-to-end suite could catch it.
+          ...(init.body === undefined ? {} : { 'content-type': 'application/json' }),
           ...init.headers,
         },
       })
