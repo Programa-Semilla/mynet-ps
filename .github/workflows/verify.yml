@@ -101,8 +101,13 @@ jobs:
           # that, and it would arrive with no code change to trigger it.
           #
           # `preview-base` is a permanently data-free branch. It is owner provisioning (T001).
+          #
+          # The input is `parent`, not `parent_branch`. The action accepts unknown inputs with
+          # only a warning, so the wrong name silently branched from the default anyway — the
+          # guard would have looked present in review and done nothing. Caught by reading a real
+          # run's log rather than by any check.
           # ─────────────────────────────────────────────────────────────────────────────────
-          parent_branch: preview-base
+          parent: preview-base
           api_key: ${{ secrets.NEON_API_KEY }}
 
       - name: create an isolated branch for the end-to-end suite
@@ -111,7 +116,7 @@ jobs:
         with:
           project_id: ${{ secrets.NEON_PROJECT_ID }}
           branch_name: pr-${{ github.event.number }}-e2e
-          parent_branch: preview-base
+          parent: preview-base
           api_key: ${{ secrets.NEON_API_KEY }}
 
       - name: create an isolated branch for the accessibility suite
@@ -120,7 +125,7 @@ jobs:
         with:
           project_id: ${{ secrets.NEON_PROJECT_ID }}
           branch_name: pr-${{ github.event.number }}-a11y
-          parent_branch: preview-base
+          parent: preview-base
           api_key: ${{ secrets.NEON_API_KEY }}
 
   # ── Gate 1: type checking (FR-001) ──────────────────────────────────────────────────────

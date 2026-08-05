@@ -171,6 +171,12 @@ explicitly from a permanently data-free `preview-base`.
 
 **This adds an owner provisioning step:** `preview-base` must exist (T001).
 
+**Follow-up, caught by the first real pipeline run:** the fix initially used `parent_branch`,
+which is not an input this action accepts. It warns and continues, so the guard would have read
+as present in review and branched from the default anyway. The correct input is `parent`. Worth
+recording as its own lesson: a workflow input typo is invisible to YAML validation, to review,
+and to every local gate — only a real run says anything, and only in a warning.
+
 ### FINDING-10 — Three CI jobs shared one database and reset it underneath each other
 
 - **Severity:** Important · **Confidence:** 88
