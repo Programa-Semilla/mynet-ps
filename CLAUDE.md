@@ -13,6 +13,30 @@ GroundZero/
   prototype/       # Approved Figma Make prototype (reference only)
 ```
 
+Project governance lives in `.specify/memory/constitution.md`. It is authoritative for how work
+is done here and supersedes tool defaults and habit.
+
+## Branching and change flow
+
+`main` and `develop` are protected. **Never commit or push directly to either.** Every change
+goes through a pull request.
+
+- Branch from `develop`, named `<type>/<short-description>` (`feat`, `fix`, `chore`, `docs`,
+  `spec`, `refactor`).
+- Open the PR against `develop`; merge with **squash** and delete the branch.
+- Promoting `develop` → `main` is also a PR.
+
+Activate the local guardrails once per clone:
+
+```bash
+git config core.hooksPath .githooks
+```
+
+`.githooks/pre-commit` and `.githooks/pre-push` block direct commits and pushes to `main` and
+`develop`. They are bypassable with `--no-verify` — server-side GitHub branch protection is not
+yet active because this is a private repository on a free personal account. See
+`.githooks/README.md`.
+
 ## Product
 
 **EventLink** — a multi-event attendee engagement and professional networking platform. The experience must feel like an authenticated attendee workspace, not a marketing site.
