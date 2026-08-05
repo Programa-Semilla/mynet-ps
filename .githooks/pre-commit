@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+#
+# Blocks commits made directly on a protected branch.
+# Protected branches accept changes only through a pull request.
+#
+# Enable in a fresh clone with:  git config core.hooksPath .githooks
+
+set -euo pipefail
+
+PROTECTED_BRANCHES="main develop"
+
+branch="$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo '')"
+
+for protected in $PROTECTED_BRANCHES; do
+  if [ "$branch" = "$protected" ]; then
+    cat >&2 <<EOF
+
+  ✗ Direct commits to '$protected' are not allowed.
+
+    Every change reaches main and develop through a pull request.
+
+    Move your work onto a branch:
+
+      git switch -c <type>/<short-description>
+      git commit ...
+      git push -u origin <type>/<short-description>
+      gh pr create --base develop
+
+    If you already staged changes here, they are preserved — creating a
+    branch with 'git switch -c' carries them over untouched.
+
+EOF
+    exit 1
+  fi
+done
+
+exit 0

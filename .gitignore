@@ -16,3 +16,9 @@ pnpm-debug.log*
 
 .DS_Store
 Thumbs.db
+
+# spex: generated/local files (only constitution is committed)
+**/.claude/
+**/.specify/**
+!**/.specify/memory/
+!**/.specify/memory/constitution.md

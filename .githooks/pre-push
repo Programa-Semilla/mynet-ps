@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+#
+# Blocks pushes that target a protected branch.
+# Protected branches advance only through a merged pull request.
+#
+# Enable in a fresh clone with:  git config core.hooksPath .githooks
+
+set -euo pipefail
+
+PROTECTED_REFS="refs/heads/main refs/heads/develop"
+
+while read -r _local_ref _local_sha remote_ref _remote_sha; do
+  for protected in $PROTECTED_REFS; do
+    if [ "$remote_ref" = "$protected" ]; then
+      cat >&2 <<EOF
+
+  ✗ Direct push to '${remote_ref#refs/heads/}' is not allowed.
+
+    main and develop advance only by merging a pull request.
+
+      git push -u origin <your-branch>
+      gh pr create --base develop
+      gh pr merge --squash --delete-branch
+
+EOF
+      exit 1
+    fi
+  done
+done
+
+exit 0
