@@ -54,6 +54,30 @@ must be **bounded and honest** rather than pretending to work (FR-052, FR-053)
 **Scale/Scope**: Five destinations with no content · six tables · roughly five endpoints · one actor.
 Volume assumptions are not stated and are not needed at this scale
 
+## Global Constraints
+
+Project-wide values copied verbatim from spec.md and constitution v2.0.0. **Every task inherits
+these**, whether or not it restates them.
+
+| Constraint | Value | Source |
+|---|---|---|
+| Product name | **MyNet**, from a single branding constant feeding installed name, document title, and package identity | FR-049 |
+| Attendee identifier | Email address, **unique across the entire product**, compared case-insensitively with whitespace trimmed | FR-025a, FR-025b |
+| Sign-in session expiry | Sliding idle window, extended by each authenticated request; **14 days** | FR-028a, D17 |
+| Throttling | Both identifier and source; escalating delay; **no permanent lockout may exist** | FR-031a, FR-031b |
+| Breakpoints | Mobile `<768px` · Tablet `768–1279px` · Desktop `≥1280px`, half-open so exactly one layout matches any width | FR-019, D16 |
+| Minimum supported width | **320px** — no horizontal scrolling for any content or primary action at or above it | FR-020 |
+| Accessibility floor | Zero critical or serious violations, every control with an accessible name, visible focus, keyboard operable | FR-021, SC-005 |
+| Colour literals | **Zero** outside `apps/web/src/theme/tokens.css` | FR-008, SC-009 |
+| Direct platform/network calls in feature code | **Zero** — device capabilities and data reached only through project-owned interfaces | FR-045, SC-008 |
+| Client asset budget | **200 KB gzipped** for the shell, enforced in the pipeline | FR-072, D18 |
+| Required checks | Eleven; an absent, skipped, or errored check **must not** report success | FR-063, FR-064 |
+| Schema changes | Versioned migrations committed and reviewed. **`drizzle-kit push` is prohibited everywhere, including local development** | FR-037, D6 |
+| Preview environments | **Never** connected to a store holding real attendee data | FR-067 |
+| Secrets | Never in the client bundle, the repository, or preview deployments | FR-041 |
+| Terminology | A *session* is a conference talk. The auth record is a **sign-in session** / `AuthSession` | Clarification 1 |
+| Branch flow | Branch from `develop` as `<type>/<short-description>`; PR into `develop`; squash merge; never commit directly to `main` or `develop` | Constitution |
+
 ## Constitution Check
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
