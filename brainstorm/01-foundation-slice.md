@@ -236,3 +236,113 @@ tests · production build · preview deployment to Cloudflare Pages.
 - **Server-side branch protection is still unavailable** (private repository on a free personal
   account; branch-protection and ruleset APIs return 403). Enforcement remains client-side and
   bypassable with `--no-verify`. Recorded in the constitution as a known, accepted risk.
+
+---
+
+## Revisit: 2026-08-04
+
+### Updated Problem Framing
+
+The original session accepted `GroundZero/requirements.md`'s "single-route, front-end product demo"
+as a binding constraint, and scoped the foundation accordingly — no backend, no database, no
+authentication, no durable persistence.
+
+The project owner corrected two things during specification review:
+
+1. **This is the real product, not a demo.** The demo framing is withdrawn entirely.
+2. **`requirements.md` is authoritative for WHAT the product is, not HOW it is delivered.** Its
+   demo-mode statements describe the prototype's construction, not a decision the client made about
+   architecture.
+
+The owner also raised the question that exposed the gap: *where does the database live, where does
+the API live, and shouldn't that be considered from the very beginning?*
+
+That question was correct, and it revealed a blind spot in the original session. The constitution at
+1.x mandated a platform abstraction layer for six **device** capabilities — precisely so a later
+native move would be a packaging change rather than a rewrite — but specified **no equivalent seam
+for data**. Under a demo with in-file constants that omission was invisible. The moment a real API
+exists, it is the difference between changing one implementation and changing every component that
+reads data.
+
+### New Approaches Considered
+
+#### Backend and database architecture
+
+- **A: Managed BaaS (Supabase / Firebase).** Fastest to a working product, near-zero operations,
+  auth and realtime included. Cost: vendor coupling, and row-level security becomes load-bearing for
+  privacy.
+- **B: Custom API over managed PostgreSQL** *(chosen)*. The API contract belongs to the project;
+  portable; no vendor lock on business logic. Cost: a materially larger foundation and real
+  operational burden — deploys, migrations, secrets, monitoring.
+- **C: Serverless functions over a managed database.** Middle path; pairs naturally with the
+  Cloudflare choice already made. Cost: cold starts, logic fragmented across deploy units.
+
+#### Authentication timing
+
+- **A: Auth is foundational** *(chosen)*. Per-attendee data cannot exist safely without identity.
+- **B: Database now, auth next slice.** Smaller foundation, but every query written in the interim
+  assumes a single user, and adding tenancy later touches all of them — the same retrofit class the
+  constitution calls expensive.
+
+#### Resequencing
+
+- **A: Re-brainstorm the foundation** *(chosen)*. The original decision's premise no longer holds.
+- **B: Patch spec 001 in place.** Faster, but its user stories and Out-of-Scope section were written
+  around a demo premise.
+- **C: Split into 001 frontend + 002 backend.** Focused specs, but 001 would still need the data
+  seam for 002 to plug into.
+
+### Updated Decision
+
+MyNet is built as a **real product with durable server-side state from the first slice**:
+
+- A **project-owned API service over managed PostgreSQL**. Schema changes are versioned, reviewed
+  migrations committed to the repository and verified in CI.
+- **Real authentication**, with server-side session establishment and validation, and per-attendee
+  data isolation enforced server-side rather than by client-side filtering.
+- **Repository interfaces for data access**, mirroring the existing device-capability abstraction.
+  Components never call the network or know transport details.
+- Attendee profiles, private conversations, personal notes, and appointments are treated as
+  **personal data** with the obligations that entails.
+
+Ratified in **constitution v2.0.0** (MAJOR — Principle I reframed, Principle V widened to data
+access, Principle VI's backend bar lifted, Principle VII extended to API/migration/integration
+verification, new Principle VIII for personal data). `CLAUDE.md` updated in the same change.
+
+### What this invalidates from the original decision
+
+**Reversed:**
+
+- "Out of scope: real authentication, any backend, durable persistence beyond demo scope."
+- Open Question 6 (`SecureStorage` semantics) is reframed — `SecureStorage` now covers client-side
+  secrets only and is explicitly not a general cache; durable attendee data lives server-side.
+- The assumption that browser reload resetting state is acceptable.
+
+**Still standing:**
+
+- Walking-skeleton depth for the client shell, and the reasoning behind it.
+- Cloudflare Pages for client preview deployments — though preview environments must now never
+  point at production data, which is a new constraint.
+- Provisional placeholder icons, and the missing brand mark.
+- Addressable routes for the five destinations.
+- Design tokens, single icon set, no hex literals in components.
+
+**Now questionable and deliberately left open:**
+
+- **The single-PR delivery decision.** Option C was chosen when the slice was frontend-only. The
+  scope has roughly doubled — it now includes an API service, a database schema, migrations, an auth
+  flow, and backend CI. A single pull request containing all of that is a substantially different
+  proposition from the one that was agreed. Flagged for the owner rather than silently re-decided.
+
+### Open Threads
+
+- Attendee identity model — self sign-up, event invitation, ticket holder, or organizer-provisioned.
+  Determines the authentication design; a client question.
+- Event scoping of data, the connection model behind Network contacts, and what a digital-card
+  exchange actually records. All three were cosmetic under sample data; a real schema forces answers.
+- Data retention, deletion, and export obligations for personal data.
+- Repository shape — API in this repository or its own.
+- API hosting and the managed PostgreSQL provider.
+- Authentication ownership — self-implemented or a delegated provider.
+- Preview environments must never point at production data; preview access control undecided.
+- Whether the foundation still ships as a single pull request.
