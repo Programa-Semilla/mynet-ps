@@ -110,14 +110,54 @@ describe('sign-in throttling', () => {
       await attempt(ADA, 'wrong')
     }
 
-    // Clearing the window simulates waiting out the delay. What matters is that waiting is
-    // *sufficient* — that there is no state which permanently denies access.
+    // Clearing the window stands in for the failures ageing out of it. What matters is that
+    // there is no state which permanently denies access.
+    //
+    // **This is necessary but not sufficient**, and on its own it hid a real lockout: deleting
+    // the rows proves the window eventually clears, not that an attendee can wait out the
+    // delay. The test below is the one that catches that, and it is the one that failed.
     await clearThrottle()
 
     const response = await attempt(ADA, SEED_PASSWORD)
     expect(
       response.statusCode,
       'after any number of failures, the correct credential must still sign in (FR-031b)',
+    ).toBe(204)
+  })
+
+  /**
+   * FR-031a, FR-031b, SC-003a — **the delay must actually be servable.**
+   *
+   * This is the regression that was live. `nextDelayMs` returned the delay a failure count
+   * earns, and the sign-in route refused on any non-zero value — but nothing ever subtracted
+   * the time already waited. The delay could therefore never be served: once past the free
+   * attempts, every request was refused for the remaining hour of the rolling window.
+   *
+   * Because email is the identifier and anyone can type anyone's address, that let an attacker
+   * hold any account they could name shut indefinitely by failing four times an hour. SC-003a
+   * requires the number of accounts that can be rendered permanently inaccessible to be zero.
+   *
+   * Nothing above caught it: the "never locks" test deletes the attempt rows, which is a
+   * different thing from waiting.
+   */
+  it('lets the attendee wait out the delay and sign in, without clearing anything', async () => {
+    // Four consecutive failures — one past the free allowance — which earns a 1 second delay.
+    for (let i = 0; i < 4; i += 1) {
+      await attempt(ADA, 'wrong')
+    }
+
+    const throttled = await attempt(ADA, SEED_PASSWORD)
+    expect(throttled.statusCode, 'the fifth attempt is throttled, as designed').toBe(429)
+
+    // Wait longer than the earned delay. No rows are deleted and the window has not moved on;
+    // the only thing that has changed is that time has passed, which is the entire point of
+    // calling it a delay.
+    await new Promise((resolve) => setTimeout(resolve, 1_400))
+
+    const afterWaiting = await attempt(ADA, SEED_PASSWORD)
+    expect(
+      afterWaiting.statusCode,
+      'having served the delay, the correct credential must sign in (FR-031b, SC-003a)',
     ).toBe(204)
   })
 

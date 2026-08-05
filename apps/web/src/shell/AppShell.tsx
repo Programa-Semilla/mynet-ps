@@ -3,6 +3,7 @@ import { Outlet } from 'react-router'
 import { DesktopRail } from './DesktopRail.js'
 import { MobileNav } from './MobileNav.js'
 import { OfflineBanner } from './OfflineBanner.js'
+import { RouteAnnouncer } from './RouteAnnouncer.js'
 import { TabletRail } from './TabletRail.js'
 import { TopBar } from './TopBar.js'
 
@@ -29,6 +30,9 @@ import { TopBar } from './TopBar.js'
  */
 export const AppShell = () => (
   <div className="flex min-h-screen bg-surface">
+    {/* Nothing visible. Tells a screen-reader user that the destination changed (FR-022). */}
+    <RouteAnnouncer />
+
     <DesktopRail />
     <TabletRail />
 

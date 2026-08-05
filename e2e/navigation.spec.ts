@@ -113,6 +113,22 @@ test.describe('navigation', () => {
     }
   })
 
+  test('a destination change is announced to assistive technology', async ({ page }) => {
+    await signedIn(page)
+
+    // FR-022 — a single-page navigation is silent without this. The live region is the only
+    // thing that tells a screen-reader user their activation did anything at all.
+    const announcer = page.locator('[aria-live="polite"][aria-atomic="true"]')
+
+    for (const destination of DESTINATIONS.slice(1)) {
+      await page.getByRole('link', { name: destination.label }).click()
+      await expect(announcer).toContainText(destination.label)
+    }
+
+    await page.goto('/not-a-destination')
+    await expect(announcer).toContainText('Page not found')
+  })
+
   test('the complete journey across all five destinations works by keyboard alone', async ({
     page,
   }) => {

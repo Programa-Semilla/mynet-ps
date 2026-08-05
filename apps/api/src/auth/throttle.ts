@@ -70,28 +70,38 @@ export const recordAttempt = async ({
   await getDb().insert(signInAttempts).values({ identifierHash, sourceHash, succeeded })
 }
 
+interface FailureStreak {
+  readonly count: number
+  /** When the most recent failure happened. Undefined when there is no streak. */
+  readonly lastFailureAt: Date | undefined
+}
+
 /** Consecutive failures since the last success, within the rolling window. */
 const consecutiveFailures = async (
   column: typeof signInAttempts.identifierHash | typeof signInAttempts.sourceHash,
   value: string,
-): Promise<number> => {
+): Promise<FailureStreak> => {
   const since = new Date(Date.now() - WINDOW_MS)
 
   const rows = await getDb()
-    .select({ succeeded: signInAttempts.succeeded })
+    .select({ succeeded: signInAttempts.succeeded, occurredAt: signInAttempts.occurredAt })
     .from(signInAttempts)
     .where(and(eq(column, value), gte(signInAttempts.occurredAt, since)))
     .orderBy(desc(signInAttempts.occurredAt))
     .limit(100)
 
   let count = 0
+  let lastFailureAt: Date | undefined
+
   for (const row of rows) {
     // A success resets the streak — this is what makes the delay recoverable rather than a
     // slow-motion lockout.
     if (row.succeeded) break
+    lastFailureAt ??= row.occurredAt
     count += 1
   }
-  return count
+
+  return { count, lastFailureAt }
 }
 
 /** Exponential escalation, clamped. The clamp is what keeps FR-031b true. */
@@ -102,22 +112,53 @@ const delayFor = (failures: number, freeAttempts: number, ceilingMs: number): nu
 }
 
 /**
- * How long the caller must wait before this attempt may proceed, in milliseconds. Zero means
- * proceed now.
+ * How much of the escalated delay is **still outstanding**, given how long the caller has
+ * already waited since their last failure.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ * **This subtraction is what makes the delay a delay.**
+ *
+ * Without it, `delayFor` returns a non-zero number for as long as the failure streak sits
+ * inside the rolling window, and the caller in `sign-in.ts` refuses on anything non-zero. The
+ * effect was a **one-hour lockout keyed on the email address** that no amount of waiting could
+ * clear — and since anyone can type anyone's address, an attacker could hold an account shut
+ * indefinitely by failing four times an hour.
+ *
+ * That is precisely what FR-031b forbids ("no permanent lockout may exist") and what SC-003a
+ * measures as "the number of accounts an attacker can render permanently inaccessible is zero".
+ * The header of this file always claimed the correct credential works however many failures
+ * preceded it; until this subtraction existed, that claim was false.
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ */
+const outstandingDelay = (
+  streak: FailureStreak,
+  freeAttempts: number,
+  ceilingMs: number,
+): number => {
+  const required = delayFor(streak.count, freeAttempts, ceilingMs)
+  if (required === 0 || !streak.lastFailureAt) return 0
+
+  const waited = Date.now() - streak.lastFailureAt.getTime()
+  return Math.max(0, required - waited)
+}
+
+/**
+ * How long the caller must still wait before this attempt may proceed, in milliseconds. Zero
+ * means proceed now.
  *
  * The larger of the two dimensions wins, so a well-behaved attendee behind a hostile shared
  * address is still protected, and a single hostile identifier is still throttled on an
  * otherwise quiet network.
  */
 export const nextDelayMs = async ({ identifierHash, sourceHash }: AttemptKey): Promise<number> => {
-  const [identifierFailures, sourceFailures] = await Promise.all([
+  const [identifier, source] = await Promise.all([
     consecutiveFailures(signInAttempts.identifierHash, identifierHash),
     consecutiveFailures(signInAttempts.sourceHash, sourceHash),
   ])
 
   return Math.max(
-    delayFor(identifierFailures, IDENTIFIER_FREE_ATTEMPTS, IDENTIFIER_MAX_DELAY_MS),
-    delayFor(sourceFailures, SOURCE_FREE_ATTEMPTS, SOURCE_MAX_DELAY_MS),
+    outstandingDelay(identifier, IDENTIFIER_FREE_ATTEMPTS, IDENTIFIER_MAX_DELAY_MS),
+    outstandingDelay(source, SOURCE_FREE_ATTEMPTS, SOURCE_MAX_DELAY_MS),
   )
 }
 

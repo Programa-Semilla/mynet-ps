@@ -327,13 +327,13 @@ to obtain a green result (FR-071). **Only the owner can do these.**
 
 ## Phase 8: Polish & Cross-Cutting Concerns
 
-- [ ] T108 [P] Write `README.md` covering setup, run, and verification for a clean clone with no undocumented steps (FR-006, FR-007, SC-014)
-- [ ] T109 Execute every scenario in [quickstart.md](./quickstart.md) and record the results
-- [ ] T110 [P] Audit the dependency set against FR-003 — confirm nothing was carried forward from the prototype's inherited list without justification
-- [ ] T111 Review against constitution Principle VIII — identity scoping, server-side authorization, secret placement, field minimisation
-- [ ] T112 Conduct the recorded design review for FR-011 against its four named criteria, capturing the outcome and reviewer in the pull request
+- [X] T108 [P] Write `README.md` covering setup, run, and verification for a clean clone with no undocumented steps (FR-006, FR-007, SC-014)
+- [X] T109 Execute every scenario in [quickstart.md](./quickstart.md) and record the results
+- [X] T110 [P] Audit the dependency set against FR-003 — confirm nothing was carried forward from the prototype's inherited list without justification
+- [X] T111 Review against constitution Principle VIII — identity scoping, server-side authorization, secret placement, field minimisation
+- [X] T112 Conduct the recorded design review for FR-011 against its four named criteria, capturing the outcome and reviewer in the pull request
 - [X] T113 Tune the asset budget to a value that is tight enough to fail on a careless dependency addition (FR-072)
-- [ ] T114 Manual accessibility pass for what automation cannot judge — reduced motion, 200% zoom, screen-reader announcement of destination changes
+- [X] T114 Manual accessibility pass for what automation cannot judge — reduced motion, 200% zoom, screen-reader announcement of destination changes
 
 ---
 
