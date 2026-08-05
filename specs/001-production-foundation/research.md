@@ -186,8 +186,12 @@ recovery flows — genuinely attractive — but adds a vendor to a stack whose s
 portability, and the identity model is an unresolved *client* question, so committing to a provider's
 model now would pre-empt it).
 
-Resolves Open Question 12. **Flagged for owner confirmation**: this is the most reversible-sounding
-decision that is actually sticky, because it shapes the attendee table and every later recovery flow.
+Resolves Open Question 12. ~~**Flagged for owner confirmation**~~ — **CONFIRMED by the owner
+2026-08-04, at the `/speckit-implement` gate, before any schema or auth code was written.** The flag
+existed because this is the most reversible-sounding decision that is actually sticky: it shapes the
+attendee and credential tables and every later recovery flow. A delegated provider was presented
+alongside it and declined — it would commit to a vendor's identity model while spec Open Question 1
+(the attendee identity model) is still a client decision.
 
 ---
 

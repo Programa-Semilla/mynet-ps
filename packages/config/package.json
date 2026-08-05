@@ -1,0 +1,15 @@
+{
+  "name": "@mynet/config",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Shared TypeScript, lint, and test configuration (T006, T007, T008)",
+  "exports": {
+    "./tsconfig.base.json": "./tsconfig.base.json",
+    "./eslint": "./eslint.config.js",
+    "./vitest": "./vitest.base.ts"
+  },
+  "scripts": {
+    "typecheck": "echo \"@mynet/config holds configuration only\""
+  }
+}

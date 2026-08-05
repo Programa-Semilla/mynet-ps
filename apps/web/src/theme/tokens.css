@@ -1,0 +1,241 @@
+/**
+ * MyNet design tokens — T012, T015, T081.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ * THIS IS THE ONLY FILE IN THE REPOSITORY WHERE A COLOUR MAY BE WRITTEN LITERALLY.
+ *
+ * FR-008 requires colours, typography, spacing, and radii to be defined as named tokens in
+ * one place. SC-009 requires the count of colour literals outside this file to be zero, and
+ * `mynet/no-colour-literals` in packages/config/eslint.config.js enforces it — this file is
+ * the single entry in that rule's `allow` list.
+ *
+ * Adding a colour here is a design decision. Writing one anywhere else is a lint error.
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ */
+
+@import 'tailwindcss';
+
+@theme {
+  /* ══ Palette ═══════════════════════════════════════════════════════════════════════════
+   * The approved editorial conference aesthetic (constitution, Technology and Architecture
+   * Constraints): deep navy surfaces, warm coral accents, soft cream backgrounds, white
+   * content cards, subtle mint status cues.
+   *
+   * Base values are the prototype's, which the client approved. Each has been given a scale
+   * so that contrast obligations (FR-021, SC-005) can be met without inventing colours at
+   * the call site — the failure mode that produces literals in components.
+   */
+
+  /* Navy — surfaces, primary text, the navigation rail. */
+  --color-navy-50: #f4f5f8;
+  --color-navy-100: #e3e6ee;
+  --color-navy-200: #c2c8d9;
+  --color-navy-300: #94a0bd;
+  --color-navy-400: #6b7899;
+  --color-navy-500: #4a5678;
+  --color-navy-600: #333d5c;
+  --color-navy-700: #262e47;
+  --color-navy-800: #1b2340; /* prototype navy — the primary surface */
+  --color-navy-900: #131930;
+
+  /* Coral — the single accent. Primary actions, active state, emphasis. */
+  --color-coral-50: #fef4f2;
+  --color-coral-100: #fde3de;
+  --color-coral-200: #fbc4ba;
+  --color-coral-300: #f59a8a;
+  --color-coral-400: #ef7a66;
+  --color-coral-500: #e8634d; /* prototype coral */
+  --color-coral-600: #cf4a34;
+  --color-coral-700: #a93a28;
+  --color-coral-800: #7d2b1e;
+
+  /* Cream — the page background. Warm, not grey; this is what keeps it off enterprise-dashboard. */
+  --color-cream-50: #fffdfb;
+  --color-cream-100: #fdf8f3; /* prototype cream — the page background */
+  --color-cream-200: #f7efe6;
+  --color-cream-300: #efe8e1; /* prototype border */
+
+  /* Mint — status only. Availability, success, "open to meetings". Never decorative. */
+  --color-mint-100: #e2f6ef;
+  --color-mint-300: #9adcc5;
+  --color-mint-500: #5cc9a7; /* prototype mint */
+  --color-mint-700: #35876e;
+
+  /* Neutrals for body copy and de-emphasis. */
+  --color-ink-body: #525a70; /* prototype body text */
+  --color-ink-muted: #8f96a8; /* prototype muted text */
+  --color-surface-card: #ffffff; /* white content cards */
+
+  /* Feedback. Amber and red are additions, not prototype values: the prototype had no
+   * failure states to colour (constitution Principle IV requires them, FR-058). */
+  --color-warning-100: #fdf1dd;
+  --color-warning-500: #c07d18;
+  --color-danger-100: #fdeceb;
+  --color-danger-500: #c0392b;
+  --color-danger-700: #8f2820;
+
+  /* Semantic aliases. Feature code SHOULD reach for these rather than the scales above, so a
+   * palette change stays a change to this file. */
+  --color-surface: var(--color-cream-100);
+  --color-surface-raised: var(--color-surface-card);
+  --color-surface-inverse: var(--color-navy-800);
+  --color-border-subtle: var(--color-cream-300);
+  --color-border-strong: var(--color-navy-200);
+  --color-text-primary: var(--color-navy-800);
+  --color-text-body: var(--color-ink-body);
+  --color-text-muted: var(--color-ink-muted);
+  --color-text-inverse: var(--color-cream-50);
+  --color-accent: var(--color-coral-500);
+  --color-accent-hover: var(--color-coral-600);
+  --color-status-available: var(--color-mint-500);
+
+  /* Focus. Constitution Principle IV: focus states MUST NOT be removed, and the prototype's
+   * `focus:outline-none` with only a border-colour change is named there as a defect. This
+   * token exists so every focusable control has one visible treatment to reach for. */
+  --color-focus-ring: var(--color-coral-500);
+  --focus-ring-width: 3px;
+  --focus-ring-offset: 2px;
+
+  /* ══ Typography ════════════════════════════════════════════════════════════════════════
+   * Confident contemporary typography. Outfit for display, Geist for body — the prototype's
+   * pairing. Font files are NOT vendored yet; the fallback stack carries the layout until
+   * they are. See ./README.md. */
+  --font-display: 'Outfit', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --font-body: 'Geist', 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+
+  --text-2xs: 0.6875rem;
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.375rem;
+  --text-2xl: 1.75rem;
+  --text-3xl: 2.25rem;
+  --text-4xl: 3rem;
+
+  --leading-tight: 1.15;
+  --leading-snug: 1.35;
+  --leading-normal: 1.55;
+  --leading-relaxed: 1.7;
+
+  --tracking-tight: -0.02em;
+  --tracking-normal: 0;
+  --tracking-wide: 0.04em;
+
+  /* ══ Radii ═════════════════════════════════════════════════════════════════════════════
+   * Restrained rounded corners — the requirement is "restrained", so the scale stops well
+   * short of pill-shaped everything. */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+  --radius-full: 9999px;
+
+  /* ══ Shadows ═══════════════════════════════════════════════════════════════════════════
+   * "Purposeful shadows" — three levels, each with a stated job. */
+  --shadow-card: 0 1px 2px rgb(27 35 64 / 0.04), 0 2px 8px rgb(27 35 64 / 0.06);
+  --shadow-raised: 0 2px 4px rgb(27 35 64 / 0.06), 0 8px 20px rgb(27 35 64 / 0.08);
+  --shadow-overlay: 0 8px 16px rgb(27 35 64 / 0.1), 0 24px 48px rgb(27 35 64 / 0.16);
+
+  /* ══ Motion ════════════════════════════════════════════════════════════════════════════ */
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-decelerate: cubic-bezier(0, 0, 0, 1);
+  --duration-fast: 120ms;
+  --duration-normal: 200ms;
+  --duration-slow: 320ms;
+
+  /* ══ Layout ════════════════════════════════════════════════════════════════════════════ */
+  --spacing-rail-desktop: 15rem; /* persistent left rail (FR-016) */
+  --spacing-rail-tablet: 4.5rem; /* reduced rail (FR-017) */
+  --spacing-bottom-nav: 4rem; /* mobile bottom navigation (FR-018) */
+  --spacing-touch-target: 2.75rem; /* 44px — touch-sized controls (FR-018) */
+  --spacing-measure-max: 82rem; /* readable maximum on very large viewports (T077) */
+
+  /* ══ Breakpoints ═══════════════════════════════════════════════════════════════════════
+   * T015, FR-019, research.md D16 — HALF-OPEN intervals, so exactly one layout matches any
+   * width and there is no width at which two layouts both claim to apply:
+   *
+   *   Mobile   width < 768px             (unprefixed — the base styles)
+   *   Tablet   768px <= width < 1280px   (`tablet:max-desktop:`)
+   *   Desktop  width >= 1280px           (`desktop:`)
+   *
+   * Tailwind generates min-width variants from these, and `max-*` variants from the same
+   * values. The half-open property comes from pairing them: `tablet:` starts the band and
+   * `max-desktop:` ends it exclusively at the desktop threshold.
+   *
+   * Minimum supported width is 320px (FR-020). There is no breakpoint for it, because no
+   * layout switches there — it is the floor at which the mobile layout must already work
+   * without horizontal scrolling. e2e/responsive.spec.ts asserts that (T080).
+   */
+  --breakpoint-tablet: 768px;
+  --breakpoint-desktop: 1280px;
+}
+
+/* ══ Base ═══════════════════════════════════════════════════════════════════════════════ */
+
+:root {
+  color-scheme: light;
+}
+
+html {
+  /* Respect the reader's font size; never lock the root to px. Required for the 200% zoom
+   * reflow obligation (FR-024, T081). */
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background-color: var(--color-surface);
+  color: var(--color-text-body);
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+  -webkit-font-smoothing: antialiased;
+}
+
+/**
+ * Visible focus, applied once, globally.
+ *
+ * Constitution Principle IV names `focus:outline-none` without a visible replacement as a
+ * defect. Putting the treatment here rather than per-component means a new control cannot
+ * be shipped without it — the failure mode quickstart.md Scenario 3 step 5 calls out ("one
+ * missing indicator is a defect, not a rough edge").
+ */
+:focus-visible {
+  outline: var(--focus-ring-width) solid var(--color-focus-ring);
+  outline-offset: var(--focus-ring-offset);
+  border-radius: var(--radius-xs);
+}
+
+/**
+ * FR-024, T081 — suppress non-essential animation under a reduced-motion preference.
+ *
+ * `!important` is deliberate here and is not a smell: this must win against any component
+ * that sets its own transition, because the preference is an accessibility obligation rather
+ * than a default to be overridden. Animation-dependent behaviour must not break — durations
+ * collapse to effectively instant rather than to zero, which keeps transition-end handlers
+ * firing.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/**
+ * FR-020, SC-006 — no content and no primary action may require horizontal scrolling at any
+ * width from 320px. This is the structural half; e2e/responsive.spec.ts (T080) asserts the
+ * behavioural half at every width.
+ */
+html,
+body {
+  overflow-x: clip;
+  max-width: 100%;
+}

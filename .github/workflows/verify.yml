@@ -1,0 +1,117 @@
+name: verify
+
+# Constitution Principle VII — every change passes an automated pipeline on Linux with no
+# Apple infrastructure. A change is not complete until this is green, and completion is
+# claimed from this output rather than from inspection.
+#
+# This file grows through Phase 5 (T083–T092) into the eleven required checks FR-063 names.
+# The cheap gates land here first, in Phase 1, because establishing a gate before the code
+# exists is the only time it is free.
+
+on:
+  pull_request:
+    branches: [develop, main]
+  push:
+    branches: [develop, main]
+
+# A superseded run tells a reviewer nothing, and its preview resources cost money. Cancel it.
+concurrency:
+  group: verify-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: '22'
+
+jobs:
+  # ── Gate 1: type checking (FR-001) ──────────────────────────────────────────────────────
+  typecheck:
+    name: typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      # `--frozen-lockfile` is what makes FR-002 a gate: if a manifest and the committed
+      # lockfile disagree, this fails rather than silently resolving something else.
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+
+  # ── Gate 2: lint (FR-004, and SC-009's colour-literal count) ────────────────────────────
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - name: formatting
+        run: pnpm format:check
+
+  # ── Gate 3: unit tests (FR-005) ─────────────────────────────────────────────────────────
+  test-unit:
+    name: test-unit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test:unit
+
+  # ── Gate 4: component tests (FR-005) ────────────────────────────────────────────────────
+  test-component:
+    name: test-component
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test:component
+
+  # ── The aggregate gate (FR-064, FR-071) ─────────────────────────────────────────────────
+  #
+  # `needs` alone is NOT sufficient: a skipped or cancelled dependency leaves a dependent job
+  # skipped, and a skipped job reports neutral — which branch protection reads as "not
+  # failing". FR-064 forbids exactly that, so this job runs with `if: always()` and asserts
+  # every result is literally 'success'. Anything else — skipped, cancelled, timed out — is
+  # a failure here.
+  #
+  # T091 extends this to the full eleven checks. Until then it guards the four that exist,
+  # so the mechanism is proven before the expensive jobs depend on it.
+  verify:
+    name: verify
+    runs-on: ubuntu-latest
+    if: always()
+    needs: [typecheck, lint, test-unit, test-component]
+    steps:
+      - name: assert every required check succeeded
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          echo "$RESULTS"
+          failed=$(echo "$RESULTS" | jq -r 'to_entries[] | select(.value.result != "success") | "\(.key)=\(.value.result)"')
+          if [ -n "$failed" ]; then
+            echo "::error::Required checks did not succeed:"
+            echo "$failed" | while read -r line; do echo "::error::  $line"; done
+            echo "A skipped, cancelled, or errored check MUST NOT report success (FR-064, FR-071)."
+            exit 1
+          fi
+          echo "All required checks succeeded."

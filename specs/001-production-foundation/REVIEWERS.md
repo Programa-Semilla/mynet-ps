@@ -127,10 +127,15 @@ gives preview isolation and clean-database migration verification with one mecha
 
 **Where reasonable engineers would disagree:**
 
-- **Slice size.** 119 tasks spanning a client shell, an API, a schema, an auth flow, and CI. Single-PR
-  delivery was agreed when this was frontend-only, before the database and auth entered scope. The
-  phase boundaries in `tasks.md` are natural split points. **This is the most likely thing to push
-  back on, and pushing back would be reasonable.**
+- **Slice size.** 115 code tasks spanning a client shell, an API, a schema, an auth flow, and CI,
+  plus four owner provisioning actions outside the pull request. Single-PR delivery was agreed when
+  this was frontend-only, before the database and auth entered scope, so it was **re-opened and
+  re-decided on 2026-08-04** (spec Open Question 16): still one pull request. Four split options
+  along the `tasks.md` phase boundaries were considered and declined, because a split would open
+  pull requests whose required checks — the preview deployment above all — do not yet exist, which
+  FR-071 does not accommodate. **This remains the most likely thing to push back on, and pushing
+  back is still reasonable — but it is now a recorded decision with a stated cost, not an
+  unexamined default.**
 
 - **Three ephemeral resources per pull request** — Neon branch, API deployment, Pages preview — all
   wired together. Recorded in plan.md Complexity Tracking. A shared preview API cannot work (one

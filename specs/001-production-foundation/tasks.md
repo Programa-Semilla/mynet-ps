@@ -100,19 +100,19 @@ to obtain a green result (FR-071). **Only the owner can do these.**
 
 **Purpose**: Workspace, tooling, and the token system every later phase depends on
 
-- [ ] T005 Create the pnpm workspace root — `pnpm-workspace.yaml`, root `package.json`, `.npmrc` — with `apps/*` and `packages/*` globs
-- [ ] T006 [P] Create shared TypeScript configuration in `packages/config/tsconfig.base.json` with strict mode enabled (FR-001)
-- [ ] T007 [P] Create shared ESLint and formatter configuration in `packages/config/eslint.config.js` (FR-004)
-- [ ] T008 [P] Create shared Vitest configuration in `packages/config/vitest.base.ts` (FR-005)
-- [ ] T009 [P] Create `.env.example` at repository root documenting database URL, session secret, and hashing pepper — never real values, and pointing at a non-production database so local work never needs access to real attendee data (FR-041, FR-007)
-- [ ] T010 Scaffold the client in `apps/web/` — Vite + React + TypeScript, extending `packages/config` (research.md D3)
-- [ ] T011 Scaffold the API in `apps/api/` — Fastify + TypeScript, extending `packages/config` (research.md D4)
-- [ ] T012 [P] Define the complete design-token set in `apps/web/src/theme/tokens.css` — the approved palette, typography, spacing, and radii as CSS custom properties, in this file only (FR-008, FR-009)
-- [ ] T013 [P] Add the lint rule banning colour literals outside `apps/web/src/theme/tokens.css` in `packages/config/eslint.config.js` — this is what makes SC-009 machine-checked rather than review-dependent
-- [ ] T014 [P] Add `lucide-react` and document it in `apps/web/src/theme/README.md` as the single permitted icon set (FR-010)
-- [ ] T015 Define breakpoints as half-open intervals in `apps/web/src/theme/tokens.css` — mobile `<768`, tablet `768–1279`, desktop `≥1280` — so exactly one layout matches any width (FR-019, research.md D16)
-- [ ] T016 Add workspace scripts to the root `package.json`: `dev`, `build`, `typecheck`, `lint`, `test:unit`, `test:component`, `test:integration`, `test:e2e`, `contract:check`, `db:migrate`, `db:seed`, `verify` (FR-006)
-- [ ] T017 Commit `pnpm-lock.yaml` and verify a clean-clone install resolves an identical dependency set (FR-002)
+- [X] T005 Create the pnpm workspace root — `pnpm-workspace.yaml`, root `package.json`, `.npmrc` — with `apps/*` and `packages/*` globs
+- [X] T006 [P] Create shared TypeScript configuration in `packages/config/tsconfig.base.json` with strict mode enabled (FR-001)
+- [X] T007 [P] Create shared ESLint and formatter configuration in `packages/config/eslint.config.js` (FR-004)
+- [X] T008 [P] Create shared Vitest configuration in `packages/config/vitest.base.ts` (FR-005)
+- [X] T009 [P] Create `.env.example` at repository root documenting database URL, session secret, and hashing pepper — never real values, and pointing at a non-production database so local work never needs access to real attendee data (FR-041, FR-007)
+- [X] T010 Scaffold the client in `apps/web/` — Vite + React + TypeScript, extending `packages/config` (research.md D3)
+- [X] T011 Scaffold the API in `apps/api/` — Fastify + TypeScript, extending `packages/config` (research.md D4)
+- [X] T012 [P] Define the complete design-token set in `apps/web/src/theme/tokens.css` — the approved palette, typography, spacing, and radii as CSS custom properties, in this file only (FR-008, FR-009)
+- [X] T013 [P] Add the lint rule banning colour literals outside `apps/web/src/theme/tokens.css` in `packages/config/eslint.config.js` — this is what makes SC-009 machine-checked rather than review-dependent
+- [X] T014 [P] Add `lucide-react` and document it in `apps/web/src/theme/README.md` as the single permitted icon set (FR-010)
+- [X] T015 Define breakpoints as half-open intervals in `apps/web/src/theme/tokens.css` — mobile `<768`, tablet `768–1279`, desktop `≥1280` — so exactly one layout matches any width (FR-019, research.md D16)
+- [X] T016 Add workspace scripts to the root `package.json`: `dev`, `build`, `typecheck`, `lint`, `test:unit`, `test:component`, `test:integration`, `test:e2e`, `contract:check`, `db:migrate`, `db:seed`, `verify` (FR-006)
+- [X] T017 Commit `pnpm-lock.yaml` and verify a clean-clone install resolves an identical dependency set (FR-002)
 
 **Checkpoint**: `pnpm install`, `pnpm typecheck`, and `pnpm lint` succeed on an empty project.
 
@@ -423,12 +423,17 @@ Story priority reflects **value**, not necessarily build order. Two pragmatic de
   green pipeline by disabling the check. Start it immediately even though nothing depends on it until
   merge.
 
-### Open decision affecting this plan
+### Resolved decision affecting this plan
 
-**Spec Open Question 16 — does this ship as one pull request?** 114 tasks spanning a client shell, an
-API, a database schema, an auth flow, and CI orchestrating three ephemeral resources per PR is a large
-single review. The phase boundaries above are the natural split points if the answer changes.
-`/speckit-spex-collab-phase-split` is the place to settle it.
+**Spec Open Question 16 — does this ship as one pull request? Yes.** Settled 2026-08-04 by the owner
+through `/speckit-spex-collab-phase-split`. All 115 code tasks (T005–T114) ship as a single pull
+request against `develop`; the phase headings above stay as execution order, not PR boundaries.
+FR-071 decided it — splitting would open pull requests whose required checks, the preview deployment
+in particular, do not yet exist. The accepted cost is one review spanning the client shell, the API,
+the schema, the auth flow, and CI orchestrating three ephemeral resources per PR.
+
+T001–T004 remain outside that pull request: they are owner provisioning actions with no file to
+change, and they block its merge rather than its implementation.
 
 ---
 

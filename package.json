@@ -1,0 +1,43 @@
+{
+  "name": "mynet",
+  "version": "0.0.0",
+  "private": true,
+  "description": "MyNet — multi-event attendee engagement and professional networking platform",
+  "license": "UNLICENSED",
+  "type": "module",
+  "packageManager": "pnpm@9.15.9",
+  "engines": {
+    "node": ">=22.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "scripts": {
+    "dev": "pnpm --parallel --filter \"./apps/*\" dev",
+    "dev:api": "pnpm --filter @mynet/api dev",
+    "dev:web": "pnpm --filter @mynet/web dev",
+    "build": "pnpm --filter @mynet/api build && pnpm --filter @mynet/web build",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "eslint . --max-warnings=0",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test:unit": "vitest run --project unit",
+    "test:component": "vitest run --project component",
+    "test:integration": "vitest run --project integration",
+    "test:e2e": "playwright test",
+    "contract:generate": "pnpm --filter @mynet/api contract:generate",
+    "contract:check": "pnpm --filter @mynet/api contract:check",
+    "db:migrate": "pnpm --filter @mynet/api db:migrate",
+    "db:seed": "pnpm --filter @mynet/api db:seed",
+    "db:generate": "pnpm --filter @mynet/api db:generate",
+    "verify": "pnpm typecheck && pnpm lint && pnpm test:unit && pnpm test:component && pnpm contract:check && pnpm test:integration && pnpm build && pnpm test:e2e"
+  },
+  "devDependencies": {
+    "@eslint/css": "^1.4.0",
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.8.0",
+    "globals": "^17.9.0",
+    "prettier": "^3.9.6",
+    "typescript": "6.0.3",
+    "typescript-eslint": "^8.66.0",
+    "vitest": "^4.1.10"
+  }
+}

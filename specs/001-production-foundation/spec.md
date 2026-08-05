@@ -728,10 +728,16 @@ Not resolved by this specification. The authoritative register is in `.specify/m
 13. **Abstraction layer shape** — root-injected registry versus context provider per service.
 14. **Package manager.**
 15. **Preview access control.** Cloudflare Pages previews are publicly reachable by default.
-16. **Whether this slice still ships as a single pull request.** Single-PR delivery was agreed when
-    the slice was frontend-only; it now also contains an API, a schema, migrations, an auth flow, and
-    backend CI. Flagged rather than silently re-decided; a natural decision point for
-    `/speckit-spex-collab-phase-split` before implementation.
+16. ~~**Whether this slice still ships as a single pull request.**~~ **RESOLVED 2026-08-04 (owner,
+    via `/speckit-spex-collab-phase-split`): single pull request, as originally agreed.** The
+    question was reopened because the slice now also contains an API, a schema, migrations, an auth
+    flow, and backend CI; the owner re-affirmed single-PR delivery after seeing four split options.
+    The deciding factor is FR-071: a split would put T005–T081 on pull requests whose required
+    checks — preview deployment above all — do not yet exist, and no reading of FR-071 makes that
+    comfortable. Accepted cost: one review covering 115 tasks across the client shell, the API, the
+    schema, the auth flow, and CI orchestrating three ephemeral resources. `REVIEWERS.md` is the
+    mitigation and must carry that weight. Recorded in `.specify/.spex-state` under
+    `collab.split_decision`.
 17. **Server-side branch protection remains unavailable** — private repository on a free personal
     account, APIs return 403. Enforcement is client-side and bypassable, and materially more serious
     now that real attendee data is in scope.

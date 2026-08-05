@@ -1,0 +1,19 @@
+{
+  "name": "@mynet/data",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Repository interfaces in domain terms, and the only place the client constructs requests (constitution Principle V)",
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./http": "./src/http/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@mynet/config": "workspace:*",
+    "typescript": "6.0.3"
+  }
+}
