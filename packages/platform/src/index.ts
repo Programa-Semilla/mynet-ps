@@ -19,6 +19,7 @@ export type { PlatformServices, PlatformProviderProps } from './registry.js'
 
 export {
   useAttendeeRepository,
+  useAuthGateway,
   useCalendar,
   useCamera,
   useConnectivity,

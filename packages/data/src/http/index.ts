@@ -7,3 +7,7 @@
  */
 export { ApiError, HttpClient } from './client.js'
 export type { HttpClientOptions } from './client.js'
+export { HttpAttendeeRepository } from './attendee-repository.js'
+export { HttpEventsRepository } from './events-repository.js'
+export { HttpAuthGateway } from './auth.js'
+export type { AuthGateway } from './auth.js'

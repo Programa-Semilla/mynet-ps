@@ -181,7 +181,7 @@ to obtain a green result (FR-071). **Only the owner can do these.**
 - [X] T045 [P] [US1] Integration test for session validity in `apps/api/tests/integration/auth-session.test.ts` — expiry, revocation on sign-out, tampered token, sliding extension, and survival across browser restart (FR-026, FR-027, FR-028, FR-028a)
 - [X] T045a [P] [US1] Integration test for multi-device independence in `apps/api/tests/integration/multi-device.test.ts` — two concurrent sign-in sessions for one attendee, signing out of one leaves the other valid (FR-029)
 - [X] T046 [P] [US1] Integration test for throttling in `apps/api/tests/integration/throttle.test.ts` — escalating delay, **no permanent lockout**, no existence disclosure (FR-031a, FR-031b, FR-031c, FR-031d, SC-003a)
-- [ ] T047 [P] [US1] Component test for the sign-in screen in `apps/web/tests/sign-in.test.tsx` — labels, keyboard operability, error presentation
+- [X] T047 [P] [US1] Component test for the sign-in screen in `apps/web/tests/sign-in.test.tsx` — labels, keyboard operability, error presentation
 
 ### Implementation for User Story 1
 
@@ -194,14 +194,14 @@ to obtain a green result (FR-071). **Only the owner can do these.**
 - [X] T054 [US1] Distinguish *expired* from *never signed in* in the refusal in `apps/api/src/plugins/auth-context.ts` so the client can explain inactivity (FR-028c)
 - [X] T055 [US1] Implement `GET /events` in `apps/api/src/routes/events.ts` — scoped through `registrations` for the authenticated attendee, **taking no attendee identifier parameter** (FR-035, FR-036)
 - [X] T056 [US1] Implement attendee and registration queries in `apps/api/src/db/queries/` respecting the scoping rule in data-model.md
-- [ ] T057 [P] [US1] Implement the attendee repository in `packages/data/src/http/attendee-repository.ts`
-- [ ] T058 [P] [US1] Implement the events repository in `packages/data/src/http/events-repository.ts`
-- [ ] T059 [US1] Build the sign-in screen in `apps/web/src/auth/SignInScreen.tsx` — accessible labels, visible focus, disabled submit while invalid rather than post-submit error (FR-021)
-- [ ] T060 [US1] Implement client auth state and session-expired handling in `apps/web/src/auth/useAuth.ts` — returns to sign-in with an inactivity explanation (FR-028c)
-- [ ] T061 [US1] Display the signed-in attendee's identity in `apps/web/src/shell/TopBar.tsx` (FR-032)
-- [ ] T062 [US1] Render registered events with an explicit empty state in `apps/web/src/app/destinations/Home.tsx` for an attendee registered for none — not an error, not a blank region (FR-040)
-- [ ] T063 [US1] Add loading and failure presentation for every network-crossing state in `apps/web/src/app/` — a failure must never render as an empty success (FR-058)
-- [ ] T063a [US1] Add the error boundary in `apps/web/src/app/ErrorBoundary.tsx` — an unexpected client error keeps the shell and offers a route back to a working state, never a blank page (FR-061)
+- [X] T057 [P] [US1] Implement the attendee repository in `packages/data/src/http/attendee-repository.ts`
+- [X] T058 [P] [US1] Implement the events repository in `packages/data/src/http/events-repository.ts`
+- [X] T059 [US1] Build the sign-in screen in `apps/web/src/auth/SignInScreen.tsx` — accessible labels, visible focus, disabled submit while invalid rather than post-submit error (FR-021)
+- [X] T060 [US1] Implement client auth state and session-expired handling in `apps/web/src/auth/useAuth.ts` — returns to sign-in with an inactivity explanation (FR-028c)
+- [X] T061 [US1] Display the signed-in attendee's identity in `apps/web/src/shell/TopBar.tsx` (FR-032)
+- [X] T062 [US1] Render registered events with an explicit empty state in `apps/web/src/app/destinations/Home.tsx` for an attendee registered for none — not an error, not a blank region (FR-040)
+- [X] T063 [US1] Add loading and failure presentation for every network-crossing state in `apps/web/src/app/` — a failure must never render as an empty success (FR-058)
+- [X] T063a [US1] Add the error boundary in `apps/web/src/app/ErrorBoundary.tsx` — an unexpected client error keeps the shell and offers a route back to a working state, never a blank page (FR-061)
 - [X] T064 [US1] Regenerate and commit `contracts/openapi.json` (FR-044b)
 - [ ] T065 [US1] End-to-end test in `e2e/sign-in.spec.ts` — sign in, see own workspace, browser restart keeps session, sign out revokes access (FR-068, SC-001)
 

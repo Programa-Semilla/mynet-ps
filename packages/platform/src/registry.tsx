@@ -23,6 +23,15 @@ export interface PlatformServices {
     readonly attendee: { getCurrent(): Promise<unknown> }
     readonly events: { listRegistered(): Promise<unknown[]> }
   }
+  /**
+   * Session lifecycle. Not a repository — it changes session state rather than reading domain
+   * data — but it lives in the registry for the same reason: feature code must not know that
+   * HTTP exists, and a test must be able to substitute it in the same single line.
+   */
+  readonly auth: {
+    signIn(credentials: { email: string; password: string }): Promise<void>
+    signOut(): Promise<void>
+  }
 }
 
 /**

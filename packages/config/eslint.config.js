@@ -8,6 +8,8 @@
 import js from '@eslint/js'
 import css from '@eslint/css'
 import globals from 'globals'
+import jsxA11y from 'eslint-plugin-jsx-a11y'
+import reactHooks from 'eslint-plugin-react-hooks'
 import tseslint from 'typescript-eslint'
 import mynet from './eslint-plugin-mynet.js'
 
@@ -75,11 +77,25 @@ export default tseslint.config(
       globals: { ...globals.browser },
       parserOptions: { ecmaFeatures: { jsx: true } },
     },
-    plugins: { mynet },
+    plugins: { mynet, 'react-hooks': reactHooks, 'jsx-a11y': jsxA11y },
     rules: {
       // SC-009 — zero colour literals outside the token file. The client is where colours
       // would otherwise accumulate; the prototype hardcoded seven of them throughout.
       'mynet/no-colour-literals': 'error',
+
+      ...reactHooks.configs.recommended.rules,
+
+      /**
+       * Accessibility, linted rather than only reviewed.
+       *
+       * This does **not** replace the axe checks in Playwright (T068) — a linter cannot see
+       * focus indicators, contrast, or responsive layout, which is why SC-005 is asserted
+       * against the rendered application. What it catches is the class of defect the
+       * prototype shipped: a control with no accessible name, a label bound to nothing, an
+       * interactive element that is a `<div>`. Catching those at lint is cheaper than
+       * catching them in a browser.
+       */
+      ...jsxA11y.flatConfigs.recommended.rules,
     },
   },
 
