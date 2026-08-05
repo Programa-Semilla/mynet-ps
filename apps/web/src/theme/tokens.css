@@ -45,7 +45,9 @@
   --color-coral-300: #f59a8a;
   --color-coral-400: #ef7a66;
   --color-coral-500: #e8634d; /* prototype coral */
-  --color-coral-600: #cf4a34;
+  /* 5.04:1 against --color-text-inverse. This is the lightest coral that can carry text and
+   * still meet AA, which is the whole reason the scale exists — see --color-accent-strong. */
+  --color-coral-600: #c14329;
   --color-coral-700: #a93a28;
   --color-coral-800: #7d2b1e;
 
@@ -62,8 +64,13 @@
   --color-mint-700: #35876e;
 
   /* Neutrals for body copy and de-emphasis. */
-  --color-ink-body: #525a70; /* prototype body text */
-  --color-ink-muted: #8f96a8; /* prototype muted text */
+  --color-ink-body: #525a70; /* prototype body text — 6.87:1 on white, passes as-is */
+  /* The prototype's muted text was #8f96a8, which is 2.96:1 on white and 2.80:1 on cream —
+   * below the 4.5:1 AA minimum, so SC-005's "zero serious violations" cannot hold with it.
+   * Darkened to the nearest value in the same blue-grey family that passes on both surfaces
+   * (4.85:1 and 4.60:1). Accessibility is not negotiable against an approved palette
+   * (constitution Principle IV); the hue is preserved, the luminance is not. */
+  --color-ink-muted: #6b7185;
   --color-surface-card: #ffffff; /* white content cards */
 
   /* Feedback. Amber and red are additions, not prototype values: the prototype had no
@@ -85,8 +92,19 @@
   --color-text-body: var(--color-ink-body);
   --color-text-muted: var(--color-ink-muted);
   --color-text-inverse: var(--color-cream-50);
+  /* Two accents, because one cannot do both jobs and meet AA.
+   *
+   * `accent` is the approved prototype coral. It is 4.65:1 against the navy surface, so it is
+   * correct for text on navy, for icons, indicators, and borders — but only 3.27:1 behind
+   * --color-text-inverse, so text on a coral-500 background fails.
+   *
+   * `accent-strong` is for exactly that case: an accent surface that carries text. Reaching for
+   * `accent` where text sits on top is the mistake this split exists to make visible, and
+   * e2e/accessibility.spec.ts is what catches it if the split is ignored. */
   --color-accent: var(--color-coral-500);
   --color-accent-hover: var(--color-coral-600);
+  --color-accent-strong: var(--color-coral-600);
+  --color-accent-strong-hover: var(--color-coral-700);
   --color-status-available: var(--color-mint-500);
 
   /* Focus. Constitution Principle IV: focus states MUST NOT be removed, and the prototype's

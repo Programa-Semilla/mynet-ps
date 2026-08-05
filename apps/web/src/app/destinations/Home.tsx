@@ -23,7 +23,7 @@ export const Home = () => {
   const events = useAsync<Event[]>(load, [load])
 
   return (
-    <section aria-labelledby="home-heading" className="px-4 py-6">
+    <section aria-labelledby="home-heading" className="px-4 py-6 tablet:px-6">
       <h1 id="home-heading" className="mb-1 font-display text-2xl font-semibold text-text-primary">
         {attendee ? `Hello, ${attendee.displayName}` : 'Home'}
       </h1>

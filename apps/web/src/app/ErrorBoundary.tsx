@@ -51,7 +51,7 @@ export class ErrorBoundary extends Component<Props, State> {
             onClick={() => {
               window.location.assign('/')
             }}
-            className="rounded-sm bg-accent px-4 py-2 font-medium text-text-inverse"
+            className="rounded-sm bg-accent-strong px-4 py-2 font-medium text-text-inverse"
           >
             Go to Home
           </button>

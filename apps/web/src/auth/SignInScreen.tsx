@@ -136,7 +136,7 @@ export const SignInScreen = () => {
           <button
             type="submit"
             disabled={!canSubmit}
-            className="w-full rounded-sm bg-accent px-4 py-2 font-medium text-text-inverse disabled:cursor-not-allowed disabled:opacity-50"
+            className="w-full rounded-sm bg-accent-strong px-4 py-2 font-medium text-text-inverse disabled:cursor-not-allowed disabled:opacity-50"
           >
             {submitting ? 'Signing in…' : 'Sign in'}
           </button>

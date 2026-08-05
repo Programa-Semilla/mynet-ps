@@ -219,25 +219,25 @@ to obtain a green result (FR-071). **Only the owner can do these.**
 
 ### Tests for User Story 2
 
-- [ ] T066 [P] [US2] Component tests for all three navigation forms in `apps/web/tests/navigation.test.tsx` — accessible names and current state (FR-022)
-- [ ] T067 [P] [US2] End-to-end test in `e2e/navigation.spec.ts` — direct address entry, history traversal consistency, and the not-found view (FR-014, FR-015, SC-007)
-- [ ] T068 [P] [US2] End-to-end accessibility test in `e2e/accessibility.spec.ts` using `@axe-core/playwright` across all five destinations at all three widths (SC-005)
+- [X] T066 [P] [US2] Component tests for all three navigation forms in `apps/web/tests/navigation.test.tsx` — accessible names and current state (FR-022)
+- [X] T067 [P] [US2] End-to-end test in `e2e/navigation.spec.ts` — direct address entry, history traversal consistency, and the not-found view (FR-014, FR-015, SC-007)
+- [X] T068 [P] [US2] End-to-end accessibility test in `e2e/accessibility.spec.ts` using `@axe-core/playwright` across all five destinations at all three widths (SC-005)
 
 ### Implementation for User Story 2
 
-- [ ] T069 [US2] Configure the router with five addressable destinations in `apps/web/src/app/routes.tsx` — Home as default (FR-012, FR-013)
-- [ ] T070 [US2] Implement direct-address entry rendering the correct destination without passing through Home in `apps/web/src/app/routes.tsx` (FR-014)
-- [ ] T071 [US2] Implement the not-found view inside the shell with a route back to Home in `apps/web/src/shell/NotFound.tsx` — never a blank screen, including offline (FR-015)
-- [ ] T072 [US2] Add the route guard sending unauthenticated visitors to sign-in in `apps/web/src/app/RequireAuth.tsx` (FR-025)
-- [ ] T073 [P] [US2] Build the desktop persistent rail and contextual top bar in `apps/web/src/shell/DesktopRail.tsx` (FR-016)
-- [ ] T074 [P] [US2] Build the tablet reduced rail in `apps/web/src/shell/TabletRail.tsx` (FR-017)
-- [ ] T075 [P] [US2] Build the mobile compact header and bottom navigation with touch-sized targets in `apps/web/src/shell/MobileNav.tsx` (FR-018)
-- [ ] T076 [US2] Compose the responsive shell in `apps/web/src/shell/AppShell.tsx` selecting exactly one layout per width (FR-019)
-- [ ] T077 [US2] Constrain workspace content to a readable maximum measure on very large viewports in `apps/web/src/shell/AppShell.tsx` (edge case)
-- [ ] T078 [P] [US2] Create the five content-free destination regions in `apps/web/src/app/destinations/` — structurally present with headings, so verification has legitimate targets (FR-023)
-- [ ] T079 [US2] Implement visible focus indicators, accessible names, and current-destination state in `apps/web/src/shell/` (FR-021, FR-022, SC-004)
-- [ ] T080 [US2] Add the no-horizontal-scrolling assertion at every width from 320px upward across all destinations in `e2e/responsive.spec.ts` (FR-020, SC-006)
-- [ ] T081 [US2] Suppress non-essential animation under reduced-motion preference in `apps/web/src/theme/tokens.css` and assert reflow at 200% text zoom in `e2e/responsive.spec.ts` (FR-024)
+- [X] T069 [US2] Configure the router with five addressable destinations in `apps/web/src/app/routes.tsx` — Home as default (FR-012, FR-013)
+- [X] T070 [US2] Implement direct-address entry rendering the correct destination without passing through Home in `apps/web/src/app/routes.tsx` (FR-014)
+- [X] T071 [US2] Implement the not-found view inside the shell with a route back to Home in `apps/web/src/shell/NotFound.tsx` — never a blank screen, including offline (FR-015)
+- [X] T072 [US2] Add the route guard sending unauthenticated visitors to sign-in in `apps/web/src/app/RequireAuth.tsx` (FR-025)
+- [X] T073 [P] [US2] Build the desktop persistent rail and contextual top bar in `apps/web/src/shell/DesktopRail.tsx` (FR-016)
+- [X] T074 [P] [US2] Build the tablet reduced rail in `apps/web/src/shell/TabletRail.tsx` (FR-017)
+- [X] T075 [P] [US2] Build the mobile compact header and bottom navigation with touch-sized targets in `apps/web/src/shell/MobileNav.tsx` (FR-018)
+- [X] T076 [US2] Compose the responsive shell in `apps/web/src/shell/AppShell.tsx` selecting exactly one layout per width (FR-019)
+- [X] T077 [US2] Constrain workspace content to a readable maximum measure on very large viewports in `apps/web/src/shell/AppShell.tsx` (edge case)
+- [X] T078 [P] [US2] Create the five content-free destination regions in `apps/web/src/app/destinations/` — structurally present with headings, so verification has legitimate targets (FR-023)
+- [X] T079 [US2] Implement visible focus indicators, accessible names, and current-destination state in `apps/web/src/shell/` (FR-021, FR-022, SC-004)
+- [X] T080 [US2] Add the no-horizontal-scrolling assertion at every width from 320px upward across all destinations in `e2e/responsive.spec.ts` (FR-020, SC-006)
+- [X] T081 [US2] Suppress non-essential animation under reduced-motion preference in `apps/web/src/theme/tokens.css` and assert reflow at 200% text zoom in `e2e/responsive.spec.ts` (FR-024)
 
 **Checkpoint**: User Stories 1 and 2 both work independently.
 
