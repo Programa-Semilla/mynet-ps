@@ -4,24 +4,44 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Status of this repository
 
-This repository contains the GroundZero materials plus in-progress specification work. **No production application code exists yet.**
+The production foundation has shipped. The five destinations exist and are addressable, an attendee
+can sign in, and the client reaches PostgreSQL through a project-owned API — but **the destinations
+carry no product content yet**: no sessions, no attendee cards, no threads, no appointments.
 
 ```
 GroundZero/
   README.md        # Initialization brief + tech-stack recommendation
   requirements.md  # Product requirements (read for WHAT, not HOW — see below)
   prototype/       # Approved Figma Make prototype (reference only)
+apps/
+  api/             # Fastify + Drizzle over managed PostgreSQL; versioned migrations
+  web/             # React + TypeScript PWA; shell, sign-in, five destinations
+packages/
+  data/            # Repository interfaces + HTTP implementations + generated contract types
+  platform/        # The six device-capability interfaces + web implementations
+  config/          # Shared TypeScript and Vitest bases
+contracts/         # Generated, committed OpenAPI contract
+e2e/               # Playwright end-to-end tests
 brainstorm/        # Design sessions and their decisions
 specs/             # Feature specifications
+docs/superpowers/  # Design documents and implementation plans
 ```
 
-Project governance lives in `.specify/memory/constitution.md` (**v2.0.0**). It is authoritative for
+Project governance lives in `.specify/memory/constitution.md` (**v2.1.0**). It is authoritative for
 how work is done here and supersedes tool defaults, habit, and any conflicting statement in this
 file.
 
-### Standing decisions (2026-08-04, project owner)
+The **delivery roadmap** — `docs/superpowers/specs/2026-08-06-mynet-delivery-roadmap-design.md` —
+is the authoritative decomposition of the remaining product into features, with their dependency
+order, reserved migration numbers, and gate schedule. Read it before starting any new feature. It is
+a plan rather than governance: it may be revised without a constitutional amendment, but a feature
+that departs from it must say so in its specification.
 
-These were decided explicitly and are **not** open for re-inference:
+### Standing decisions (project owner)
+
+These were decided explicitly and are **not** open for re-inference.
+
+**2026-08-04:**
 
 1. **The product is MyNet.** Not EventLink.
 2. **MyNet is the real product, not a demo.** The front-end-demo framing is withdrawn.
@@ -29,6 +49,21 @@ These were decided explicitly and are **not** open for re-inference:
 4. **Durable persistence is foundational** — a project-owned API over managed PostgreSQL.
 5. **Real authentication is foundational**, not a later addition.
 6. **The five destinations are individually addressable** (each has its own URL).
+
+**2026-08-06:**
+
+7. **Event scoping is hybrid.** Conference content — sessions, tracks, speakers, the Discover
+   directory, appointments — is per-event and swaps on switch. Relationships — contacts, exchanged
+   cards, message threads — persist across every event. Every new table declares which rule applies
+   and why; neither is a default.
+8. **Conference content is seeded; profiles are attendee-authored.** Events, sessions, tracks,
+   rooms, and speakers ship as committed seed data. Each attendee authors their own profile and no
+   one else's. No administrative interface and **no content import path** — both would be organizer
+   administration, which stays out of scope.
+9. **Home is composed, not aggregated.** Home is a registry of independent cards; each owns its
+   loading, empty, and failure states; a failing card must not blank the dashboard; no card depends
+   on another's presence or data. Features contribute a card, never edit another feature's card.
+10. **Features run mostly sequentially**, in parallel only where they touch disjoint files.
 
 ## Branching and change flow
 
@@ -114,8 +149,11 @@ owner decision, classify every statement before relying on it:
 
 - **Real product with durable server-side state.** Project-owned API over managed PostgreSQL, with real authentication. Schema changes are versioned, reviewed migrations committed to the repository.
 - **Attendee data is personal data.** Every record is attributable to one identity; every read path is scoped by identity; authorization is enforced server-side, never by client-side filtering. Secrets never reach the client bundle. See constitution Principle VIII.
-- **Still out of product scope**: organizer administration and payment processing. Notification delivery and calendar integration stay out until a recorded decision brings them in — their interfaces exist but must not be wired to real delivery.
+- **Still out of product scope**: organizer administration and payment processing. Notification delivery and calendar integration stay out until a recorded decision brings them in — their interfaces exist but must not be wired to real delivery. Seed data must not become a route around the organizer exclusion: no admin interface, no privileged role, no content import path.
+- **Event scoping is hybrid** (standing decision 7). Conference content is per-event; relationships persist across events. Every new table states which rule applies and why. The predicate is enforced server-side, alongside identity binding — an attendee must not reach another event's content by manipulating a request.
+- **Home is composed, not aggregated** (standing decision 9). Contribute a card; never edit another feature's card.
 - **Data access goes through repository interfaces.** Components never call the network or know transport details. See constitution Principle V.
+- **Every feature declares its own completeness** (constitution Principle IX). Offline behaviour, all three layouts, empty/loading/failure states, accessibility, checklist items discharged, identity scoping, event scoping, register position, and reserved migration number — declared in the spec, or presumed unmet. None of these may be deferred to a later polish pass.
 - Loading and failure states are required wherever data crosses the network, alongside the empty states below.
 - Every interactive control has an accessible label, a visible focus state, and keyboard support. Modals need a clear close action and Escape-key behavior where practical.
 - Responsive: desktop = persistent left navigation rail, contextual top bar, multi-column dashboard; tablet = reduced rail, two-column cards, stacked detail; mobile = compact header, bottom navigation, single-column cards, full-width overlays, touch-sized controls. **No content or primary action may require horizontal scrolling.**
@@ -182,34 +220,33 @@ Do not silently resolve any of these. The authoritative register is in
 (MyNet), and demo scope versus persistence (MyNet is the real product with durable server-side
 state).
 
+**Resolved 2026-08-06 by owner decision** — likewise closed: **event scoping** (hybrid; see standing
+decision 7), **attendee profile view** (a profile detail view ships with Discover), and **repository
+shape** (the API lives here, at `apps/api`).
+
 ### Require a client decision
 
+Each entry names the feature it blocks, because when to ask matters as much as what to ask.
+
+- **Attendee identity model.** How a person becomes an attendee — self sign-up, event invitation, ticket holder, organizer-provisioned — is unspecified, and it determines the authentication design. **Blocks the attendee profile feature.**
+- **Data retention, deletion, and export obligations** for personal data are recognised (constitution Principle VIII) but unspecified. **Blocks the attendee profile feature**, the first to store substantial personal data.
+- **The connection model behind Network contacts.** The prototype derives contacts from the existence of a conversation. There is no connect or accept action, so there is no defined relationship to store. **Blocks the Network feature entirely.**
+- **Exchanged digital cards.** Requirements place them in Network; the prototype shows a transient 2-second confirmation and records nothing. What a card exchange creates, and whether it is mutual, is undefined. **Blocks the Network feature entirely.**
+- **Audience-question attribution.** Whether a Q&A question is attributed to its author or anonymous. It decides whether Q&A is a personal-data surface under Principle VIII. **Blocks the Q&A feature.**
+- **Desktop and tablet layouts are unvalidated by the client.** The responsive shell exists, but the approved prototype is mobile-only: a fixed 390×844 phone frame with a simulated iOS status bar, centered on a navy page. Every desktop layout built before this is answered is unreviewed design, so the cost compounds with each feature.
+- **Real brand mark and application icons.** No logo exists in this repository. Long lead time — it blocks release readiness rather than any single feature.
 - **`requirements.md` is now knowingly out of step** with the constitution on product name, delivery mode, persistence, authentication, and routing. Whether it is amended or the divergence is simply recorded is undecided.
-- **Attendee identity model.** How a person becomes an attendee — self sign-up, event invitation, ticket holder, organizer-provisioned — is unspecified, and it determines the authentication design.
-- **Data retention, deletion, and export obligations** for personal data are recognised (constitution Principle VIII) but unspecified.
+- **Notifications.** The prototype header shows a notification bell with an unread dot, but notifications are out of product scope. The bell must not be reproduced until a decision brings notifications in.
 - **What "PS" denotes** in the repository name `mynet-ps`.
-- **Real brand mark and application icons.** No logo exists in this repository.
-- **Desktop experience does not exist.** `requirements.md` requires a desktop navigation rail, contextual top bar, and multi-column dashboard, plus a tablet layout. The prototype is mobile-only: a fixed 390×844 phone frame with a simulated iOS status bar and bottom navigation, centered on a navy page. Desktop and tablet layouts are unimplemented and unvalidated by the client.
 - **Stack guidance is not where the brief says it is.** `GroundZero/README.md` designates `requirements.md` as authoritative for the technology stack, but `requirements.md` contains no stack section. The recommendation exists only in `README.md`.
-- **Attendee profile view.** Requirements say the attendee can "open a profile"; the prototype has no profile detail screen — only Discover cards with inline actions.
 
 ### Require an owner or planning decision
 
-- **Repository shape** — whether the API lives here or in its own repository.
 - **API hosting and the managed PostgreSQL provider.**
 - **Authentication ownership** — self-implemented versus a delegated provider.
+- **Attendee avatar handling** — seeded imagery versus real upload. Upload pulls in object storage and `CameraService` and opens a new personal-data surface. Deferring it is the working assumption, not a decision. **Blocks the attendee profile feature.**
 - **Preview environments must never point at production data**, and preview access control is undecided. Cloudflare Pages previews are publicly reachable by default.
 - **Server-side branch protection is unavailable** (private repo, free personal account; APIs return 403). Enforcement is client-side and bypassable — materially more serious now that real attendee data is in scope.
-
-### Data-model questions the database forces (client decision)
-
-These were cosmetic while everything was sample data. With a real schema they must be answered
-before the tables that depend on them are created.
-
-- **Event scoping.** Are sessions, attendees, conversations, and appointments scoped per event or shared across events? In the prototype, switching events changes only the name, location, and day counter — everything else is global. Strongly implied to be per-event, but unspecified.
-- **The connection model behind Network contacts.** The prototype derives contacts from the existence of a conversation. There is no connect or accept action, so there is no defined relationship to store.
-- **Exchanged digital cards.** Requirements place them in Network; the prototype shows a transient 2-second confirmation and records nothing. What a card exchange creates, and whether it is mutual, is undefined.
-- **Notifications.** The prototype header shows a notification bell with an unread dot, but notifications are out of product scope. The bell should not exist until a decision brings notifications in.
 
 ### Not open questions — settled requirements the prototype failed to meet
 

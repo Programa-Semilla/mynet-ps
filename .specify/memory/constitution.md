@@ -1,5 +1,58 @@
 <!--
 SYNC IMPACT REPORT
+Version change: 2.0.0 → 2.1.0
+Rationale: MINOR. One principle added, two sections materially expanded, three Open Questions
+Register entries resolved. No principle is removed or redefined, and no work performed under 2.0.0
+is invalidated.
+
+Owner decisions cited by this amendment (all 2026-08-06, recorded in
+docs/superpowers/specs/2026-08-06-mynet-delivery-roadmap-design.md):
+  D1. Event scoping is hybrid. Conference content — sessions, tracks, speakers, the Discover
+      directory, appointments — is per-event. Relationships — contacts, exchanged cards, message
+      threads — persist across events. (Resolves register entry "Event scoping of data".)
+  D2. Conference content is seeded; each attendee authors their own profile. No administrative
+      interface, and no content import path.
+  D3. Home is a slot-based card registry built early, not a dashboard aggregated late.
+  D4. Phases run mostly sequentially, in parallel only where they touch disjoint files.
+
+Added principles:
+  - IX. Every Feature Declares Its Own Completeness
+Expanded sections:
+  - Technology and Architecture Constraints → new "Data scoping, content provenance, and
+    composition" block recording D1, D2, D3 as binding constraints.
+  - Branching and Change Flow → new "Parallel work and shared artifacts" block recording D4's
+    coordination protocol.
+  - Governance → the delivery roadmap is named as the authoritative decomposition.
+  - Governance → Open Questions Register (three entries resolved, two added, all renumbered).
+
+Resolved register entries:
+  - "Event scoping of data" (was #6) — by D1.
+  - "Attendee profile view" (was #9) — a profile detail view is delivered in phase 006.
+  - "Repository shape" (was #12) — the API lives in this repository at apps/api.
+
+Added register entries:
+  - Audience-question attribution (client decision) — blocks phase 009.
+  - Attendee avatar handling (owner decision) — blocks phase 004.
+
+Templates and dependent artifacts:
+  ✅ .specify/templates/plan-template.md — Constitution Check resolves against this file at plan
+     time; no static edit required.
+  ✅ .specify/templates/spec-template.md — updated. Principle IX makes a per-feature declaration
+     mandatory, so the template now carries a "Feature Declarations" section.
+  ✅ .specify/templates/tasks-template.md — task categories already accommodate the declared
+     obligations; no edit required.
+  ✅ CLAUDE.md — updated in this change. Its open-questions summary listed the three now-resolved
+     entries, and its constraints did not carry D1–D3.
+  ✅ docs/superpowers/specs/2026-08-06-mynet-delivery-roadmap-design.md — the decision record this
+     amendment cites. Unchanged by it.
+  ✅ specs/001-production-foundation/ — unaffected. Nothing in 2.1.0 contradicts the delivered
+     slice; Principle IX applies to specifications written after this amendment.
+
+Deferred TODOs:
+  - GroundZero/requirements.md remains knowingly out of step (open question, client decision).
+    Unchanged by this amendment.
+
+--- PRIOR REPORT: 2.0.0 ---
 Version change: 1.1.0 → 2.0.0
 Rationale: MAJOR. The project owner decided on 2026-08-04 that MyNet is the real product, not a
 front-end demo, and that durable persistence and real authentication are foundational rather than
@@ -270,6 +323,40 @@ migration.
 real attendee data created a privacy surface in one step, and the failure modes there are not
 recoverable by a later patch — leaked data stays leaked.
 
+### IX. Every Feature Declares Its Own Completeness
+
+The obligations in Principles IV, VI, VII, and VIII apply to every feature. They are stated in four
+different places, which is how they get missed. Each feature specification MUST therefore carry an
+explicit, reviewable declaration covering all of the following:
+
+- **Offline behaviour** — what works offline, what does not, and what happens to an action attempted
+  offline (Principle VI).
+- **Layout** — how the feature renders at desktop, tablet, and mobile widths (Principle IV).
+- **Empty, loading, and failure states** — for every surface that crosses the network (Principle IV).
+- **Accessibility** — accessible labels, visible focus, keyboard operability, and Escape-key
+  dismissal where the feature introduces a modal (Principle IV).
+- **Validation checklist items discharged** — which of the requirements checklist this feature
+  satisfies, and which it deliberately leaves to a later feature (Principle VII).
+- **Identity scoping and server-side authorization** — mandatory for any feature that stores or
+  reads attendee data (Principle VIII).
+- **Register position** — which Open Questions Register entries block this feature, and which it
+  resolves.
+
+**An obligation that is not declared is presumed unmet.** An explicit "not applicable, because…" is
+a valid declaration; silence is not. A specification missing this declaration MUST NOT pass its
+review gate, and a feature MUST NOT be marked complete while any declared obligation is outstanding.
+
+These obligations MUST NOT be deferred to a consolidated later pass. A feature that postpones its
+accessibility, responsive, or offline work to a future "polish" or "hardening" activity has not
+discharged it. Such an activity is legitimate only as verification of work already done.
+
+**Rationale**: The prototype failed Principle IV in exactly the way this prevents — Escape handling
+and focus states were requirements from the beginning, were never anyone's stated responsibility in
+any particular screen, and so were built by nobody. Scattering an obligation across four principles
+makes it everyone's job in the abstract and no one's in the concrete. A per-feature declaration makes
+the omission visible at spec review, which is the cheapest moment it can be caught, and it removes
+the failure mode where a hardening phase becomes a rubber stamp for work that was never done.
+
 ## Technology and Architecture Constraints
 
 - **Client stack**: React + TypeScript, built as an installable PWA. Type checking MUST be enabled
@@ -307,6 +394,42 @@ recoverable by a later patch — leaked data stays leaked.
   secrets and MUST NOT be used as a general cache. What may be cached on the client, and for how
   long, MUST be specified per feature rather than assumed.
 
+### Data scoping, content provenance, and composition
+
+Decided by the project owner on 2026-08-06. Binding on every subsequent feature.
+
+- **Event scoping is hybrid.** Conference **content** is per-event and swaps when the attendee
+  switches events: sessions, tracks, speakers, rooms, the Discover directory, and appointments.
+  **Relationships** persist across every event: contacts, exchanged digital cards, and message
+  threads. Every new table MUST state which of the two rules applies to it and why; neither rule is
+  a default that may be assumed. The scoping predicate is enforced server-side, as part of the same
+  identity binding required by Principle VIII — an attendee MUST NOT be able to read another
+  event's content by manipulating a request.
+
+  *Rationale*: MyNet is a professional networking product. A contact made at last year's conference
+  must not vanish because the attendee is now at a different one. But discovering people means
+  discovering people who are present, and an appointment is a time and a place at a specific event.
+
+- **Conference content is seeded; profiles are attendee-authored.** Events, sessions, tracks, rooms,
+  and speakers ship as committed, versioned seed data. Each attendee authors their own profile —
+  company, role, interests, networking intent, availability — and MUST NOT be able to edit anyone
+  else's. Networking intent and availability are decisions a person makes, not facts an organizer
+  records.
+
+  Seed data MUST NOT become a route around the organizer-administration exclusion in Principle III.
+  No administrative interface, no privileged role, and **no content import path** may be built
+  without an amendment. Adding a conference is a reviewed change to committed seed data.
+
+- **Home is composed, not aggregated.** Home is a registry of independent cards. Each card owns its
+  own loading, empty, and failure states, and a card that fails MUST NOT blank the dashboard or
+  prevent any other card from rendering. No card may depend on another card's presence, ordering, or
+  data. A feature contributing to Home does so by adding a card and registering it, never by editing
+  another feature's card.
+
+  *Rationale*: Home is the first viewport, and Principle III makes the first viewport a success
+  criterion. It is also the one surface every feature wants to touch. Composition keeps it improving
+  continuously without becoming a shared file that every change contends for.
+
 ## Branching and Change Flow
 
 `main` and `develop` are protected. **No commit and no push may be made directly to either
@@ -334,6 +457,29 @@ repository public or upgrading to GitHub Pro, then applying the configuration re
 not a resolved one. **With real attendee data now in scope, this gap is materially more serious than
 it was under 1.x.**
 
+### Parallel work and shared artifacts
+
+Features run mostly one at a time, in parallel only where they touch disjoint files. Where two do
+run in parallel, the following apply.
+
+- **Migration numbers are reserved, not discovered.** A feature claims its migration number when its
+  specification is written, from the sequence recorded in the delivery roadmap. Two open pull
+  requests MUST NOT introduce the same migration number, and a migration file MUST NOT be renamed to
+  resolve a conflict — renaming a migration that another branch has already applied is how a
+  database and its history diverge.
+- **Generated artifacts are never hand-merged.** The published API contract and any other generated
+  file MUST be resolved by taking one side wholesale and regenerating, never by editing the merged
+  result. A hand-reconciled generated file is indistinguishable from a correct one until it is wrong
+  in production.
+- **Extension points are append-only registries.** Where more than one feature will contribute to
+  the same surface — Home cards, API route registration, repository interfaces, seed data, card
+  actions — the surface MUST be a registry that features append to, with each contribution in its
+  own file. A feature MUST NOT be required to edit another feature's file in order to be included.
+- **Each clone stands alone.** `core.hooksPath` is local configuration and MUST be activated in
+  every clone, not only the first. Each clone used for integration testing MUST have its own
+  database branch; two suites sharing one database overwrite each other's fixtures and produce
+  failures that reproduce nowhere.
+
 ## Development Workflow and Quality Gates
 
 - Work follows the Spec Kit flow: `/speckit-specify` → `/speckit-clarify` → `/speckit-plan` →
@@ -349,6 +495,9 @@ it was under 1.x.**
   touches. A feature touching UI MUST produce tasks for both.
 - **A feature that stores or reads attendee data MUST produce tasks for identity scoping,
   server-side authorization, and migration verification.** These are not implied by "make it work".
+- **The Principle IX declaration is a spec review gate.** A specification without it is incomplete
+  and MUST be returned rather than planned. Each declared obligation MUST be traceable to at least
+  one task, and the feature MUST NOT be marked complete while any of them is outstanding.
 
 ## Governance
 
@@ -359,6 +508,13 @@ repository. Where a tool default, a template, or prior code conflicts with it, t
 written rationale and, where the change invalidates existing work, a migration note. Amendments that
 resolve an entry in the Open Questions Register MUST cite the decision that resolved it.
 
+**Delivery decomposition**: `docs/superpowers/specs/2026-08-06-mynet-delivery-roadmap-design.md` is
+the authoritative decomposition of the product into features, and records their dependency order,
+reserved migration numbers, and gate schedule. It is a plan, not governance: it does not bind
+conduct, and it may be revised without an amendment. But a feature whose scope, dependencies, or
+migration number departs from it MUST say so in its specification, because the roadmap is what the
+next session reads to know what has been decided and what has not.
+
 **Versioning policy** (semantic):
 
 - **MAJOR** — a principle is removed or redefined in a backward-incompatible way, or governance
@@ -367,61 +523,77 @@ resolve an entry in the Open Questions Register MUST cite the decision that reso
 - **PATCH** — clarification, wording, or typo fixes with no change in meaning.
 
 **Compliance review**: Every plan verifies compliance at its Constitution Check gate. Every code
-review verifies compliance against Principles III, IV, V, VII, and VIII specifically, because those
-are the ones a passing build can still violate. Unjustified complexity is a review blocker.
+review verifies compliance against Principles III, IV, V, VII, VIII, and IX specifically, because
+those are the ones a passing build can still violate. Unjustified complexity is a review blocker.
 
 ### Open Questions Register
 
 Recorded discrepancies and undecided matters. Adding is always permitted; removing requires a
 decision cited in an amendment.
 
-**Resolved by this amendment**
+**Resolved in 2.0.0**
 
 - ~~Product name (EventLink vs. MyNet)~~ — **RESOLVED 2026-08-04 by owner decision: the product is
   MyNet.** Consequence: `GroundZero/requirements.md` and the prototype UI now carry a stale name.
 - ~~Demo scope vs. the PWA persistence recommendation~~ — **RESOLVED 2026-08-04 by owner decision:
   MyNet is the real product with durable server-side persistence.**
 
+**Resolved in 2.1.0**
+
+- ~~Event scoping of data~~ — **RESOLVED 2026-08-06 by owner decision D1: hybrid.** Conference
+  content is per-event; relationships persist across events. Recorded as a binding constraint under
+  "Data scoping, content provenance, and composition".
+- ~~Attendee profile view~~ — **RESOLVED 2026-08-06: a profile detail view is delivered**, closing
+  the gap where `requirements.md` says a profile can be opened and the prototype has no such screen.
+- ~~Repository shape~~ — **RESOLVED 2026-08-06: the API lives in this repository**, at `apps/api`
+  inside the pnpm workspace, alongside the client.
+
 **Open — require a client decision**
 
 1. **What "PS" denotes** in the repository name `mynet-ps`.
 2. **Real brand mark and application icons.** No logo exists in the repository; the only images are
-   avatar photographs used as prototype sample data.
+   avatar photographs used as prototype sample data. Long lead time — it blocks release readiness,
+   not any single feature.
 3. **`GroundZero/requirements.md` is now knowingly out of step** with this constitution on product
    name, delivery mode, persistence, authentication, and routing. Whether it is amended or the
    divergence is recorded is undecided.
 4. **Desktop and tablet layouts have never been validated by the client.** The approved prototype is
-   mobile-only at a fixed 390×844 frame.
+   mobile-only at a fixed 390×844 frame. Every desktop layout built before this is answered is
+   unreviewed design, so the cost of leaving it open compounds with each feature.
 5. **Attendee identity model.** How a person becomes an attendee — self sign-up, event invitation,
    ticket holder, organizer-provisioned — is unspecified, and it determines the authentication
-   design.
-6. **Event scoping of data.** Whether sessions, attendees, conversations, and appointments are
-   scoped per event or shared across events is unspecified but strongly implied by the multi-event
-   product.
+   design. Blocks the attendee profile feature.
+6. **Data retention, deletion, and export obligations** for personal data (Principle VIII) are
+   recognised but unspecified. Blocks the attendee profile feature, which is the first to store
+   substantial personal data.
 7. **The connection model behind Network contacts.** The prototype derives contacts from the
-   existence of a conversation; no explicit connect or accept action is defined.
-8. **Where exchanged digital cards are recorded.** Requirements place them in Network; the prototype
-   shows only a transient confirmation and stores nothing.
-9. **Attendee profile view.** Requirements say a profile can be opened; the prototype has no profile
-   detail screen.
+   existence of a conversation; no explicit connect or accept action is defined, so there is no
+   relationship to store. Blocks the Network feature entirely.
+8. **What an exchanged digital card records, and whether the exchange is mutual.** Requirements
+   place exchanged cards in Network; the prototype shows a transient confirmation and stores
+   nothing. Blocks the Network feature entirely.
+9. **Audience-question attribution.** Whether a question asked in a session's Q&A is attributed to
+   its author or anonymous. It determines whether Q&A is a personal-data surface under Principle
+   VIII. Blocks the Q&A feature.
 10. **Notifications.** The prototype header shows a notification bell; notifications are out of
-    product scope until a recorded decision brings them in.
-11. **Data retention, deletion, and export obligations** for personal data (Principle VIII) are
-    recognised but unspecified.
+    product scope until a recorded decision brings them in. The bell MUST NOT be reproduced before
+    then.
 
 **Open — require an owner or planning decision**
 
-12. **Repository shape** — whether the API lives in this repository or its own.
-13. **API hosting and the managed PostgreSQL provider.**
-14. **Authentication ownership** — self-implemented versus a delegated provider.
-15. **Public preview URLs.** Cloudflare Pages previews are publicly reachable by default; with real
+11. **API hosting and the managed PostgreSQL provider.**
+12. **Authentication ownership** — self-implemented versus a delegated provider.
+13. **Attendee avatar handling** — seeded imagery versus real upload. Upload pulls in object storage
+    and `CameraService` and creates a new personal-data surface; deferring it is the current
+    working assumption but is not a decision. Blocks the attendee profile feature.
+14. **Public preview URLs.** Cloudflare Pages previews are publicly reachable by default; with real
     data in scope, preview environments MUST NOT be pointed at production data, and preview access
     control is undecided.
-16. **Server-side branch protection remains unavailable** (private repository, free personal
+15. **Server-side branch protection remains unavailable** (private repository, free personal
     account; APIs return 403). Enforcement is client-side and bypassable.
 
 **Runtime guidance**: `CLAUDE.md` provides durable project context for AI-assisted sessions. It MUST
 stay consistent with this constitution and MUST NOT contain implementation plans, session tasks,
 progress updates, or invented requirements.
 
-**Version**: 2.0.0 | **Ratified**: 2026-08-04 | **Last Amended**: 2026-08-04
+**Version**: 2.1.0 | **Ratified**: 2026-08-04 | **Last Amended**: 2026-08-06

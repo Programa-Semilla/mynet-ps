@@ -439,8 +439,7 @@ When to ask matters as much as what to ask.
 
 ## Register impact
 
-**Resolved by this design** (each requires a constitution amendment to record formally; this document
-does not amend the constitution):
+**Resolved by this design** — recorded in constitution **v2.1.0**, which cites the decisions below:
 
 - *Event scoping* — resolved by D1.
 - *Attendee profile view* — resolved: a profile detail view is built in 006.
@@ -453,8 +452,18 @@ semantics; brand mark; desktop validation; API hosting and PostgreSQL provider; 
 ownership; preview data isolation; what "PS" denotes; whether `requirements.md` is amended or its
 divergence merely recorded.
 
+**Added to the register by v2.1.0**: audience-question attribution (client decision, blocks 009) and
+attendee avatar handling (owner decision, blocks 004). Both surfaced while detailing the phases above.
+
 **Added by this design**: the Home card composition contract (D3) is a new architectural commitment
-that later phases depend on. If 002 gets it wrong, every subsequent phase inherits the mistake.
+that later phases depend on. If 002 gets it wrong, every subsequent phase inherits the mistake. It is
+recorded as a binding constraint in v2.1.0 under "Data scoping, content provenance, and composition",
+alongside D1 and D2.
+
+**Also added by v2.1.0**: Principle IX, *Every Feature Declares Its Own Completeness*. The
+obligations this roadmap assigns to each phase — offline behaviour, three layouts, empty/loading/
+failure states, accessibility, checklist items discharged — are now a mandatory declaration in every
+specification rather than a convention of this document, and the spec template carries the section.
 
 ---
 
