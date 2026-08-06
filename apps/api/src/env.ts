@@ -23,20 +23,41 @@ import { existsSync } from 'node:fs'
 import { fileURLToPath, URL } from 'node:url'
 
 /** Repository root, from `apps/api/src/`. */
-const ENV_FILE = fileURLToPath(new URL('../../../.env', import.meta.url))
+const ROOT = fileURLToPath(new URL('../../../', import.meta.url))
+
+/**
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ * **Load order is reverse precedence, and that is not a mistake.**
+ *
+ * `process.loadEnvFile` does not overwrite a variable that is already set. So the file loaded
+ * *first* wins, and the real process environment — set before any of this runs — beats every
+ * file. `.env.local` therefore goes first: it is generated per directory by `pnpm start` and
+ * must override the committed defaults in `.env`, while never being able to override what the
+ * pipeline injected (FR-067).
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ */
+const FILES = ['.env.local', '.env'] as const
 
 let loaded = false
 
+/** Exported with an explicit root so the precedence rule is testable rather than asserted. */
+export const loadEnvFiles = (root: string): void => {
+  for (const file of FILES) {
+    const path = `${root}${file}`
+    if (existsSync(path)) {
+      process.loadEnvFile(path)
+    }
+  }
+}
+
 /**
- * Loads the repository-root `.env` if one exists. Absent is not an error: a deployed API is
+ * Loads the repository-root env files if they exist. Absent is not an error: a deployed API is
  * configured by its host, and a pipeline job is configured by its secrets. Neither has a file.
  */
 export const loadDotEnv = (): void => {
   if (loaded) return
   loaded = true
-  if (existsSync(ENV_FILE)) {
-    process.loadEnvFile(ENV_FILE)
-  }
+  loadEnvFiles(ROOT)
 }
 
 loadDotEnv()

@@ -11,6 +11,14 @@ import { PRODUCT_NAME, PRODUCT_SHORT_NAME, PRODUCT_TAGLINE } from './src/app/bra
 const resolve = (path: string) => fileURLToPath(new URL(path, import.meta.url))
 
 /**
+ * The dev server and `vite preview` must both answer on the port this instance was assigned,
+ * because the API's CORS allow-list is the single origin in WEB_ORIGIN. Vite loads `.env.local`
+ * natively via `envDir`, but that happens after this config is evaluated — so the port is read
+ * from the process environment, which `pnpm start` sets on the child it spawns.
+ */
+const webPort = Number(process.env['MYNET_WEB_PORT'] ?? 5173)
+
+/**
  * Reads a colour token out of the token file at build time.
  *
  * ─────────────────────────────────────────────────────────────────────────────────────────
@@ -151,14 +159,14 @@ export default defineConfig({
     },
   },
   server: {
-    port: 5173,
+    port: webPort,
   },
   // The end-to-end suite runs against `vite preview`, and the API's CORS allow-list is a single
   // origin read from WEB_ORIGIN. Preview must therefore answer on the same port the dev server
   // does, rather than Vite's default 4173 — otherwise every cross-origin request in the suite
   // is refused for a reason that has nothing to do with the code under test.
   preview: {
-    port: 5173,
+    port: webPort,
     strictPort: true,
   },
   build: {

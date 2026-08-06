@@ -13,15 +13,23 @@ import { existsSync } from 'node:fs'
 import { fileURLToPath, URL } from 'node:url'
 
 /** Repository root, from `e2e/support/`. */
-const ENV_FILE = fileURLToPath(new URL('../../.env', import.meta.url))
+const ROOT = fileURLToPath(new URL('../../', import.meta.url))
+
+// Same reverse-precedence rule as `apps/api/src/env.ts`: `process.loadEnvFile` will not
+// overwrite an already-set variable, so the file loaded first wins and the real process
+// environment beats both. `.env.local` is generated per directory by `pnpm start`.
+const FILES = ['.env.local', '.env'] as const
 
 let loaded = false
 
 export const loadDotEnv = (): void => {
   if (loaded) return
   loaded = true
-  if (existsSync(ENV_FILE)) {
-    process.loadEnvFile(ENV_FILE)
+  for (const file of FILES) {
+    const path = `${ROOT}${file}`
+    if (existsSync(path)) {
+      process.loadEnvFile(path)
+    }
   }
 }
 
