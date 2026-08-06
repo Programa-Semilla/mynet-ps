@@ -11,6 +11,7 @@
     "pnpm": ">=9.0.0"
   },
   "scripts": {
+    "start": "node scripts/local-up.mjs",
     "dev": "pnpm --parallel --filter \"./apps/*\" dev",
     "dev:api": "pnpm --filter @mynet/api dev",
     "dev:web": "pnpm --filter @mynet/web dev",
