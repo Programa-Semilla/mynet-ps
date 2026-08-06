@@ -74,8 +74,11 @@ const main = async () => {
     if (await portInUse(port)) {
       throw new Error(
         `Port ${port} (${label}) is already in use.\n` +
-          'Another instance of this directory is probably already running.\n' +
-          'Stop it, or set MYNET_PORT_OFFSET to move this one out of the way.',
+          'Another MyNet instance is probably already running — this one, or a separate\n' +
+          'clone. Every clone is a main working tree, so every clone claims 5173/3000;\n' +
+          'only linked worktrees get their own ports automatically.\n\n' +
+          'Stop the other instance, or move this one out of the way:\n' +
+          '  MYNET_PORT_OFFSET=10 pnpm start',
       )
     }
   }
