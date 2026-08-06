@@ -2,14 +2,24 @@
  * The dev-server side of the branch legend (`apply: 'serve'`).
  *
  * ─────────────────────────────────────────────────────────────────────────────────────────
- * `apply: 'serve'` is the guarantee, not a convenience. The virtual module resolves only while
- * the dev server is running, so if the `import.meta.env.DEV` guard in `main.tsx` were ever
- * removed, `pnpm build` fails to resolve it — loudly, in CI — rather than shipping a developer
- * badge to an attendee.
+ * **The legend is injected into the served HTML, not imported by `main.tsx`.**
+ *
+ * The obvious construction — a dynamic `import()` in `main.tsx` behind `import.meta.env.DEV` —
+ * does not work, and fails in a way worth recording. Rolldown resolves an import specifier
+ * while building the module graph, *before* eliminating the dead `if (false)` branch that
+ * `import.meta.env.DEV` becomes. So `virtual:mynet-dev-legend` was looked up during every
+ * production build, found nothing (this plugin does not run there), and failed the build
+ * outright.
+ *
+ * Injecting a script tag during `serve` instead means the production entry graph contains no
+ * reference to any of this. Not "a reference that gets dropped" — no reference. That is a
+ * stronger guarantee than the guard it replaces, and `e2e/navigation.spec.ts` checks it
+ * against a real production build rather than trusting the reasoning.
  * ─────────────────────────────────────────────────────────────────────────────────────────
  */
 import { execFileSync } from 'node:child_process'
 import { readFileSync, watch } from 'node:fs'
+import { basename, dirname } from 'node:path'
 
 import type { Plugin } from 'vite'
 
@@ -56,6 +66,17 @@ export const devBranchLegend = (): Plugin => {
       branch = readBranch(path)
     },
 
+    // The only thing that pulls the legend into the page, and it exists only while serving.
+    transformIndexHtml() {
+      return [
+        {
+          tag: 'script',
+          attrs: { type: 'module', src: '/src/dev/mount.tsx' },
+          injectTo: 'body',
+        },
+      ]
+    },
+
     resolveId(id) {
       return id === VIRTUAL_ID ? RESOLVED_ID : undefined
     },
@@ -75,14 +96,29 @@ export const devBranchLegend = (): Plugin => {
 
     configureServer(server) {
       if (!path) return
+      const watched = path
 
-      // `git checkout` replaces HEAD rather than editing it in place, so `fs.watch` on the file
-      // reports a rename. Re-reading on any event covers both.
-      const watcher = watch(path, () => {
-        const next = readBranch(path)
+      /**
+       * **Watch the directory, not the file.** `git checkout` does not edit HEAD in place — it
+       * writes a temporary file and renames it over the top. An `fs.watch` on the file itself
+       * follows the replaced inode and stops reporting anything, so the first checkout appears
+       * to work and every one after it is silent. Watching the containing directory and
+       * filtering by name survives the rename.
+       */
+      const watcher = watch(dirname(watched), (_event, filename) => {
+        if (filename !== basename(watched)) return
+
+        const next = readBranch(watched)
         if (next === branch) return
         branch = next
+
+        // Updates a page that is already open…
         server.ws.send({ type: 'custom', event: 'mynet:branch', data: { branch } })
+
+        // …and this updates the next one. Without it the transformed module stays cached, so a
+        // newly opened tab would confidently show the branch you were on before.
+        const module = server.moduleGraph.getModuleById(RESOLVED_ID)
+        if (module) server.moduleGraph.invalidateModule(module)
       })
 
       server.httpServer?.once('close', () => watcher.close())

@@ -171,6 +171,11 @@
   --spacing-touch-target: 2.75rem; /* 44px — touch-sized controls (FR-018) */
   --spacing-measure-max: 82rem; /* readable maximum on very large viewports (T077) */
 
+  /* Reserved by the dev-only instance legend (src/dev/DevLegend.tsx), which sets it to its own
+   * height while it is expanded. Always 0 in a production build, where that component does not
+   * exist — the two references to it in the shell are inert there. */
+  --spacing-dev-legend: 0px;
+
   /* ══ Breakpoints ═══════════════════════════════════════════════════════════════════════
    * T015, FR-019, research.md D16 — HALF-OPEN intervals, so exactly one layout matches any
    * width and there is no width at which two layouts both claim to apply:

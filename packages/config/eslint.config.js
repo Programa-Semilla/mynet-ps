@@ -129,6 +129,25 @@ export default tseslint.config(
   },
 
   {
+    /**
+     * Dev-server-only scaffolding: the local instance legend.
+     *
+     * These files mount a strip showing the branch and instance while `vite dev` is running.
+     * They are excluded from every production build twice over — `main.tsx` imports them behind
+     * `import.meta.env.DEV`, and the virtual module they depend on is provided by a plugin
+     * declared `apply: 'serve'`. `e2e/navigation.spec.ts` asserts their absence from a real
+     * production build, so this exemption rests on a check rather than on a promise.
+     *
+     * SC-008 counts violations in feature code. This is not feature code: it is not shipped.
+     */
+    name: 'mynet/dev-scaffolding',
+    files: ['apps/web/src/dev/**/*.{ts,tsx}'],
+    rules: {
+      'mynet/no-direct-platform-access': 'off',
+    },
+  },
+
+  {
     name: 'mynet/css',
     files: ['**/*.css'],
     language: 'css/css',

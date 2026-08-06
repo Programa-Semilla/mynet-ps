@@ -20,7 +20,7 @@ export const MobileNav = () => (
   <nav
     aria-label="Main"
     data-nav-layout="mobile"
-    className="fixed inset-x-0 bottom-0 z-10 flex items-stretch justify-around border-t border-border-subtle bg-surface-inverse pb-[env(safe-area-inset-bottom)] tablet:hidden"
+    className="fixed inset-x-0 bottom-(--spacing-dev-legend) z-10 flex items-stretch justify-around border-t border-border-subtle bg-surface-inverse pb-[env(safe-area-inset-bottom)] tablet:hidden"
   >
     {DESTINATIONS.map(({ path, label, icon: Icon }) => (
       <NavLink

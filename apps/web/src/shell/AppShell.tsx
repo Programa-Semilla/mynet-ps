@@ -57,7 +57,7 @@ export const AppShell = () => (
           'max-w-(--spacing-measure-max)',
           // Clears the fixed mobile bottom navigation, which would otherwise sit on top of the
           // last of the content. No effect once the bar is hidden.
-          'pb-(--spacing-bottom-nav) tablet:pb-0',
+          'pb-[calc(var(--spacing-bottom-nav)+var(--spacing-dev-legend))] tablet:pb-(--spacing-dev-legend)',
         ].join(' ')}
       >
         <Outlet />
