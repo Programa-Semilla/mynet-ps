@@ -200,6 +200,35 @@ export const appliedMigrationHashes = async (name) => {
     .filter(Boolean)
 }
 
+/**
+ * Removes a database outright, connections and all.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ * `dropSchema` is not a substitute here. It leaves the database itself in place, and with it
+ * anything that lives outside `public` and `drizzle` — a role, a setting, or an extension
+ * installed into another schema. `pnpm verify:clean` claims to run against a database that has
+ * never existed, and "almost never existed" is the claim that lets the `citext` class of bug
+ * through: it passes locally and fails on the first genuinely clean database it meets.
+ *
+ * `WITH (FORCE)` terminates other sessions first (PostgreSQL 13+, and the container is 17).
+ * Without it a `vite preview` still holding a pool from a previous run makes the drop fail,
+ * which would leave the next run reusing a database it believes it just created.
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ */
+export const dropDatabase = async (name) => {
+  await docker([
+    'exec',
+    CONTAINER,
+    'psql',
+    '-U',
+    USER,
+    '-d',
+    'postgres',
+    '-c',
+    `DROP DATABASE IF EXISTS "${name}" WITH (FORCE)`,
+  ])
+}
+
 /** The rebuild path. Only ever reached for a local, per-directory database. */
 export const dropSchema = async (name) => {
   await docker([

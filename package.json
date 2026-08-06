@@ -30,7 +30,8 @@
     "db:seed": "pnpm --filter @mynet/api db:seed",
     "db:generate": "pnpm --filter @mynet/api db:generate",
     "budget": "node scripts/asset-budget.mjs",
-    "verify": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm test:unit && pnpm test:component && pnpm contract:check && pnpm test:integration && pnpm build && pnpm budget && pnpm test:e2e"
+    "verify": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm test:unit && pnpm test:component && pnpm contract:check && pnpm test:integration && pnpm build && pnpm budget && pnpm test:e2e",
+    "verify:clean": "node scripts/verify-clean.mjs"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.12.1",
