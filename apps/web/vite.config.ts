@@ -7,6 +7,7 @@ import { defineConfig } from 'vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
 import { PRODUCT_NAME, PRODUCT_SHORT_NAME, PRODUCT_TAGLINE } from './src/app/branding.js'
+import { devBranchLegend } from './src/dev/branch-plugin.js'
 
 const resolve = (path: string) => fileURLToPath(new URL(path, import.meta.url))
 
@@ -45,6 +46,9 @@ export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
+
+    // Dev server only — see the note at the top of the plugin. Absent from every build.
+    devBranchLegend(),
 
     /**
      * T095, T096, T098 — the installable PWA and its bounded offline behaviour
