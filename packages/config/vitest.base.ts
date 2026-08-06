@@ -26,6 +26,10 @@ export const unitProject: UserWorkspaceConfig = {
       'packages/*/tests/**/*.test.ts',
       'apps/api/tests/unit/**/*.test.ts',
       'apps/web/tests/unit/**/*.test.ts',
+      // The local-run orchestration is plain `.mjs`, matching `scripts/asset-budget.mjs`. Its
+      // pure logic — instance identity, drift classification — is exactly the part worth
+      // testing, so the runner has to be able to see it.
+      'scripts/**/*.test.mjs',
     ],
     exclude: ['**/node_modules/**', '**/dist/**'],
   },

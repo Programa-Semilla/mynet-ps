@@ -4,7 +4,7 @@
 
 **Goal:** `pnpm start` takes any clone or worktree of this repository from nothing to a running MyNet at a printed URL, repairing database drift caused by branch switches on the way.
 
-**Architecture:** Small, single-responsibility `.mjs` modules under `scripts/local/`, sequenced by one orchestrator (`scripts/local-up.mjs`). All derived configuration travels through a generated, gitignored `.env.local` that every entrypoint loads *before* `.env` — because `process.loadEnvFile` refuses to overwrite an already-set variable, loading first is what makes a value win. A dev-server-only Vite plugin and React component display the current branch and instance.
+**Architecture:** Small, single-responsibility `.mjs` modules under `scripts/local/`, sequenced by one orchestrator (`scripts/local-up.mjs`). All derived configuration travels through a generated, gitignored `.env.local` that every entrypoint loads _before_ `.env` — because `process.loadEnvFile` refuses to overwrite an already-set variable, loading first is what makes a value win. A dev-server-only Vite plugin and React component display the current branch and instance.
 
 **Tech Stack:** Node 22 (`node:crypto`, `node:child_process`, `process.loadEnvFile`), pnpm 9 workspaces, Docker (`postgres:17`), drizzle-orm/postgres-js, Vite 8, React, Vitest 4, Playwright.
 
@@ -27,37 +27,37 @@
 
 ## File Structure
 
-| File | Responsibility |
-|---|---|
-| `scripts/local/instance.mjs` | Pure. Directory → database name, port offset, ports |
-| `scripts/local/instance.test.mjs` | Unit tests for the above |
-| `scripts/local/schema.mjs` | Pure classification + effectful migrate/rebuild/seed |
-| `scripts/local/schema.test.mjs` | Unit tests for classification and journal reading |
-| `scripts/local/env-file.mjs` | Render `.env.local`; create `.env` from the example |
-| `scripts/local/env-file.test.mjs` | Unit tests for rendering and secret generation |
-| `scripts/local/postgres.mjs` | Docker container and database lifecycle |
-| `scripts/local/servers.mjs` | Spawn dev servers, wait for readiness, render the banner |
-| `scripts/local/servers.test.mjs` | Unit tests for banner rendering |
-| `scripts/local-up.mjs` | Orchestration, exit codes, signal handling |
-| `apps/api/src/env.ts` | *Modify.* Load `.env.local` then `.env` |
-| `e2e/support/env.ts` | *Modify.* Same |
-| `apps/api/tests/unit/env-precedence.test.ts` | Unit test proving `.env.local` wins and real env beats both |
-| `apps/web/vite.config.ts` | *Modify.* Env-driven ports; register the dev-legend plugin |
-| `apps/web/src/dev/head.ts` | Pure. Git HEAD contents → branch name |
-| `apps/web/src/dev/branch-plugin.ts` | Vite plugin: watch HEAD, serve the virtual module, push updates |
-| `apps/web/src/dev/DevLegend.tsx` | Presentational component, props only |
-| `apps/web/src/dev/mount.tsx` | The only file touching the virtual module and the websocket |
-| `apps/web/src/main.tsx` | *Modify.* Dynamic import behind `import.meta.env.DEV` |
-| `apps/web/src/theme/tokens.css` | *Modify.* Add `--spacing-dev-legend: 0px` |
-| `apps/web/src/shell/MobileNav.tsx` | *Modify.* Offset by the token |
-| `apps/web/src/shell/AppShell.tsx` | *Modify.* Offset by the token |
-| `apps/web/tests/unit/head.test.ts` | Unit tests for HEAD parsing |
-| `apps/web/tests/dev-legend.test.tsx` | Component tests |
-| `e2e/navigation.spec.ts` | *Modify.* Assert the legend is absent from the production build |
-| `packages/config/vitest.base.ts` | *Modify.* Add `scripts/**/*.test.mjs` to the unit project |
-| `package.json` | *Modify.* Add the `start` script |
-| `README.md` | *Modify.* Setup and Run collapse to `pnpm start` |
-| `specs/001-production-foundation/quickstart.md` | *Modify.* Eight corrections |
+| File                                            | Responsibility                                                  |
+| ----------------------------------------------- | --------------------------------------------------------------- |
+| `scripts/local/instance.mjs`                    | Pure. Directory → database name, port offset, ports             |
+| `scripts/local/instance.test.mjs`               | Unit tests for the above                                        |
+| `scripts/local/schema.mjs`                      | Pure classification + effectful migrate/rebuild/seed            |
+| `scripts/local/schema.test.mjs`                 | Unit tests for classification and journal reading               |
+| `scripts/local/env-file.mjs`                    | Render `.env.local`; create `.env` from the example             |
+| `scripts/local/env-file.test.mjs`               | Unit tests for rendering and secret generation                  |
+| `scripts/local/postgres.mjs`                    | Docker container and database lifecycle                         |
+| `scripts/local/servers.mjs`                     | Spawn dev servers, wait for readiness, render the banner        |
+| `scripts/local/servers.test.mjs`                | Unit tests for banner rendering                                 |
+| `scripts/local-up.mjs`                          | Orchestration, exit codes, signal handling                      |
+| `apps/api/src/env.ts`                           | _Modify._ Load `.env.local` then `.env`                         |
+| `e2e/support/env.ts`                            | _Modify._ Same                                                  |
+| `apps/api/tests/unit/env-precedence.test.ts`    | Unit test proving `.env.local` wins and real env beats both     |
+| `apps/web/vite.config.ts`                       | _Modify._ Env-driven ports; register the dev-legend plugin      |
+| `apps/web/src/dev/head.ts`                      | Pure. Git HEAD contents → branch name                           |
+| `apps/web/src/dev/branch-plugin.ts`             | Vite plugin: watch HEAD, serve the virtual module, push updates |
+| `apps/web/src/dev/DevLegend.tsx`                | Presentational component, props only                            |
+| `apps/web/src/dev/mount.tsx`                    | The only file touching the virtual module and the websocket     |
+| `apps/web/src/main.tsx`                         | _Modify._ Dynamic import behind `import.meta.env.DEV`           |
+| `apps/web/src/theme/tokens.css`                 | _Modify._ Add `--spacing-dev-legend: 0px`                       |
+| `apps/web/src/shell/MobileNav.tsx`              | _Modify._ Offset by the token                                   |
+| `apps/web/src/shell/AppShell.tsx`               | _Modify._ Offset by the token                                   |
+| `apps/web/tests/unit/head.test.ts`              | Unit tests for HEAD parsing                                     |
+| `apps/web/tests/dev-legend.test.tsx`            | Component tests                                                 |
+| `e2e/navigation.spec.ts`                        | _Modify._ Assert the legend is absent from the production build |
+| `packages/config/vitest.base.ts`                | _Modify._ Add `scripts/**/*.test.mjs` to the unit project       |
+| `package.json`                                  | _Modify._ Add the `start` script                                |
+| `README.md`                                     | _Modify._ Setup and Run collapse to `pnpm start`                |
+| `specs/001-production-foundation/quickstart.md` | _Modify._ Eight corrections                                     |
 
 ---
 
@@ -66,11 +66,13 @@
 Pure functions mapping a directory to the database name and ports that make parallel instances possible. This task also opens `scripts/` to the unit test runner, which every later script task depends on.
 
 **Files:**
+
 - Create: `scripts/local/instance.mjs`
 - Create: `scripts/local/instance.test.mjs`
 - Modify: `packages/config/vitest.base.ts` (unit project `include`)
 
 **Interfaces:**
+
 - Consumes: nothing
 - Produces:
   - `databaseNameFor(directory: string): string`
@@ -258,10 +260,12 @@ Claude-Session: https://claude.ai/code/session_019zmAh259rthUvJ95KRJQyF"
 The part that makes a branch switch a non-event. Drizzle records one row per applied migration in `drizzle.__drizzle_migrations`, whose `hash` column is `sha256` of the migration file's raw contents — verified against this repository's applied row before this plan was written. Comparing that sequence against the journal tells you exactly which of three situations you are in.
 
 **Files:**
+
 - Create: `scripts/local/schema.mjs`
 - Create: `scripts/local/schema.test.mjs`
 
 **Interfaces:**
+
 - Consumes: nothing
 - Produces:
   - `classifyDrift(committedHashes: string[], appliedHashes: string[]): 'none' | 'ahead' | 'diverged'`
@@ -441,10 +445,12 @@ Claude-Session: https://claude.ai/code/session_019zmAh259rthUvJ95KRJQyF"
 Renders `.env.local`, and creates `.env` with real generated secrets when it is missing. The second half is what makes a fresh clone genuinely one command.
 
 **Files:**
+
 - Create: `scripts/local/env-file.mjs`
 - Create: `scripts/local/env-file.test.mjs`
 
 **Interfaces:**
+
 - Consumes: nothing
 - Produces:
   - `renderEnvLocal(values: { databaseUrl, apiPort, webOrigin, apiOrigin }): string`
@@ -592,8 +598,14 @@ export const ensureEnvFile = (root) => {
 
   const example = readFileSync(join(root, '.env.example'), 'utf8')
   const generated = example
-    .replace(/^AUTH_PASSWORD_PEPPER=.*$/m, `AUTH_PASSWORD_PEPPER=${randomBytes(48).toString('base64')}`)
-    .replace(/^AUTH_ATTEMPT_HASH_KEY=.*$/m, `AUTH_ATTEMPT_HASH_KEY=${randomBytes(48).toString('base64')}`)
+    .replace(
+      /^AUTH_PASSWORD_PEPPER=.*$/m,
+      `AUTH_PASSWORD_PEPPER=${randomBytes(48).toString('base64')}`,
+    )
+    .replace(
+      /^AUTH_ATTEMPT_HASH_KEY=.*$/m,
+      `AUTH_ATTEMPT_HASH_KEY=${randomBytes(48).toString('base64')}`,
+    )
 
   writeFileSync(envPath, generated, 'utf8')
   return 'created'
@@ -624,15 +636,17 @@ Claude-Session: https://claude.ai/code/session_019zmAh259rthUvJ95KRJQyF"
 
 ### Task 4: Environment loader precedence
 
-Make `.env.local` reach the API, the Playwright harness, and Vite. The mechanism is subtle enough to deserve a test: `process.loadEnvFile` **does not overwrite an already-set variable**, so *earlier* load means *higher* precedence — the reverse of what most `.env` tooling does.
+Make `.env.local` reach the API, the Playwright harness, and Vite. The mechanism is subtle enough to deserve a test: `process.loadEnvFile` **does not overwrite an already-set variable**, so _earlier_ load means _higher_ precedence — the reverse of what most `.env` tooling does.
 
 **Files:**
+
 - Modify: `apps/api/src/env.ts`
 - Modify: `e2e/support/env.ts`
 - Modify: `apps/web/vite.config.ts:server.port`, `preview.port`
 - Create: `apps/api/tests/unit/env-precedence.test.ts`
 
 **Interfaces:**
+
 - Consumes: `.env.local` written by `writeEnvLocal` (Task 3)
 - Produces: `loadEnvFiles(root: string): void` exported from `apps/api/src/env.ts`, replacing `loadDotEnv`
 
@@ -810,9 +824,11 @@ Claude-Session: https://claude.ai/code/session_019zmAh259rthUvJ95KRJQyF"
 Container and database management. No unit tests: every function here is a thin wrapper over `docker`, and a mock would only prove the mock was called. It is verified by running it, including the failure paths.
 
 **Files:**
+
 - Create: `scripts/local/postgres.mjs`
 
 **Interfaces:**
+
 - Consumes: nothing
 - Produces:
   - `CONTAINER = 'mynet-pg'`, `HOST_PORT = 55432`
@@ -916,12 +932,19 @@ export const ensureContainer = async () => {
   if (state === 'absent') {
     console.log(`Creating the ${CONTAINER} container on :${HOST_PORT}…`)
     await docker([
-      'run', '--name', CONTAINER,
-      '-e', `POSTGRES_USER=${USER}`,
-      '-e', `POSTGRES_PASSWORD=${PASSWORD}`,
-      '-e', 'POSTGRES_DB=postgres',
-      '-p', `${HOST_PORT}:5432`,
-      '-d', IMAGE,
+      'run',
+      '--name',
+      CONTAINER,
+      '-e',
+      `POSTGRES_USER=${USER}`,
+      '-e',
+      `POSTGRES_PASSWORD=${PASSWORD}`,
+      '-e',
+      'POSTGRES_DB=postgres',
+      '-p',
+      `${HOST_PORT}:5432`,
+      '-d',
+      IMAGE,
     ])
   } else if (state !== 'running') {
     await docker(['start', CONTAINER])
@@ -937,14 +960,28 @@ export const ensureContainer = async () => {
  */
 export const ensureDatabase = async (name) => {
   const existing = await docker([
-    'exec', CONTAINER, 'psql', '-U', USER, '-d', 'postgres', '-tAc',
+    'exec',
+    CONTAINER,
+    'psql',
+    '-U',
+    USER,
+    '-d',
+    'postgres',
+    '-tAc',
     `select 1 from pg_database where datname = '${name}'`,
   ])
 
   if (existing !== '1') {
     console.log(`Creating database ${name}…`)
     await docker([
-      'exec', CONTAINER, 'psql', '-U', USER, '-d', 'postgres', '-c',
+      'exec',
+      CONTAINER,
+      'psql',
+      '-U',
+      USER,
+      '-d',
+      'postgres',
+      '-c',
       `CREATE DATABASE "${name}"`,
     ])
   }
@@ -953,17 +990,34 @@ export const ensureDatabase = async (name) => {
 /** Applied migrations, oldest first. Empty when the schema has never been created. */
 export const appliedMigrationHashes = async (name) => {
   const out = await docker([
-    'exec', CONTAINER, 'psql', '-U', USER, '-d', name, '-tAc',
-    "select hash from drizzle.__drizzle_migrations order by id",
+    'exec',
+    CONTAINER,
+    'psql',
+    '-U',
+    USER,
+    '-d',
+    name,
+    '-tAc',
+    'select hash from drizzle.__drizzle_migrations order by id',
   ]).catch(() => '')
 
-  return out.split('\n').map((line) => line.trim()).filter(Boolean)
+  return out
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
 }
 
 /** The rebuild path. Only ever reached for a local, per-directory database. */
 export const dropSchema = async (name) => {
   await docker([
-    'exec', CONTAINER, 'psql', '-U', USER, '-d', name, '-c',
+    'exec',
+    CONTAINER,
+    'psql',
+    '-U',
+    USER,
+    '-d',
+    name,
+    '-c',
     'DROP SCHEMA IF EXISTS public CASCADE; DROP SCHEMA IF EXISTS drizzle CASCADE; CREATE SCHEMA public;',
   ])
 }
@@ -1022,10 +1076,12 @@ Claude-Session: https://claude.ai/code/session_019zmAh259rthUvJ95KRJQyF"
 Spawning both dev servers, waiting until they actually answer, and printing the thing the whole feature exists to produce. The banner is a pure function, so it is tested.
 
 **Files:**
+
 - Create: `scripts/local/servers.mjs`
 - Create: `scripts/local/servers.test.mjs`
 
 **Interfaces:**
+
 - Consumes: `instanceFor` (Task 1)
 - Produces:
   - `renderBanner(context: { branch, instance, database, hostPort }): string`
@@ -1049,7 +1105,9 @@ const CONTEXT = {
 
 describe('renderBanner', () => {
   it('leads with the URL, because that is the one thing being copied', () => {
-    const lines = renderBanner(CONTEXT).split('\n').filter((line) => line.trim())
+    const lines = renderBanner(CONTEXT)
+      .split('\n')
+      .filter((line) => line.trim())
     const urlLine = lines.findIndex((line) => line.includes('http://localhost:5173'))
     const branchLine = lines.findIndex((line) => line.includes('spec/production-foundation'))
     expect(urlLine).toBeLessThan(branchLine)
@@ -1070,7 +1128,10 @@ describe('renderBanner', () => {
   })
 
   it('follows the instance rather than assuming 5173', () => {
-    const banner = renderBanner({ ...CONTEXT, instance: { ...CONTEXT.instance, webPort: 5241, apiPort: 3068 } })
+    const banner = renderBanner({
+      ...CONTEXT,
+      instance: { ...CONTEXT.instance, webPort: 5241, apiPort: 3068 },
+    })
     expect(banner).toContain('http://localhost:5241')
     expect(banner).toContain('http://localhost:3068')
   })
@@ -1207,10 +1268,12 @@ Claude-Session: https://claude.ai/code/session_019zmAh259rthUvJ95KRJQyF"
 Sequences everything. This is the task that makes the feature real.
 
 **Files:**
+
 - Create: `scripts/local-up.mjs`
 - Modify: `package.json` (`scripts.start`)
 
 **Interfaces:**
+
 - Consumes: every module from Tasks 1, 2, 3, 5, 6
 - Produces: `pnpm start`, `pnpm start --reset`
 
@@ -1268,8 +1331,7 @@ const isMainWorktree = async () => {
 
 const currentBranch = async () => (await git(['rev-parse', '--abbrev-ref', 'HEAD'])) || 'detached'
 
-const pnpm = (args, env) =>
-  run('pnpm', args, { cwd: ROOT, env: { ...process.env, ...env } })
+const pnpm = (args, env) => run('pnpm', args, { cwd: ROOT, env: { ...process.env, ...env } })
 
 const main = async () => {
   // Before anything is created, so a misconfigured shell fails in under a second.
@@ -1289,7 +1351,10 @@ const main = async () => {
     },
   })
 
-  for (const [label, port] of [['web', instance.webPort], ['API', instance.apiPort]]) {
+  for (const [label, port] of [
+    ['web', instance.webPort],
+    ['API', instance.apiPort],
+  ]) {
     if (await portInUse(port)) {
       throw new Error(
         `Port ${port} (${label}) is already in use.\n` +
@@ -1419,12 +1484,14 @@ Claude-Session: https://claude.ai/code/session_019zmAh259rthUvJ95KRJQyF"
 The dev-only half. HEAD parsing is pure and tested; the plugin around it is thin.
 
 **Files:**
+
 - Create: `apps/web/src/dev/head.ts`
 - Create: `apps/web/src/dev/branch-plugin.ts`
 - Create: `apps/web/tests/unit/head.test.ts`
 - Modify: `apps/web/vite.config.ts`
 
 **Interfaces:**
+
 - Consumes: `MYNET_WEB_PORT` handling from Task 4
 - Produces:
   - `branchFromHead(contents: string): string`
@@ -1631,6 +1698,7 @@ Claude-Session: https://claude.ai/code/session_019zmAh259rthUvJ95KRJQyF"
 Split in two deliberately: a presentational component that takes props and is therefore testable under Vitest, and a mount module that is the only thing touching the virtual module and the websocket.
 
 **Files:**
+
 - Create: `apps/web/src/dev/DevLegend.tsx`
 - Create: `apps/web/src/dev/mount.tsx`
 - Create: `apps/web/tests/dev-legend.test.tsx`
@@ -1640,6 +1708,7 @@ Split in two deliberately: a presentational component that takes props and is th
 - Modify: `apps/web/src/shell/AppShell.tsx:60`
 
 **Interfaces:**
+
 - Consumes: `virtual:mynet-dev-legend` and the `mynet:branch` event (Task 8)
 - Produces: `DevLegend(props: { branch, instance, webPort, database })`, `mountDevLegend(): void`
 
@@ -1745,7 +1814,9 @@ export const DevLegend = ({
       <button
         type="button"
         onClick={() => setCollapsed((value) => !value)}
-        aria-label={collapsed ? 'Expand the local instance legend' : 'Collapse the local instance legend'}
+        aria-label={
+          collapsed ? 'Expand the local instance legend' : 'Collapse the local instance legend'
+        }
         className="flex w-full items-center gap-2 text-left"
       >
         <span aria-hidden="true">⎇</span>
@@ -1828,10 +1899,10 @@ if (import.meta.env.DEV) {
 In `apps/web/src/theme/tokens.css`, after line 170 (`--spacing-bottom-nav`):
 
 ```css
-  /* Reserved by the dev-only instance legend (see src/dev/DevLegend.tsx). Always 0 in a
+/* Reserved by the dev-only instance legend (see src/dev/DevLegend.tsx). Always 0 in a
      production build, where that component does not exist — the two references to it below
      are inert there. */
-  --spacing-dev-legend: 0px;
+--spacing-dev-legend: 0px;
 ```
 
 - [ ] **Step 8: Offset the shell by it**
@@ -1880,9 +1951,11 @@ Claude-Session: https://claude.ai/code/session_019zmAh259rthUvJ95KRJQyF"
 The guard in `main.tsx` is an assertion about the production bundle. This turns it into a check, in the one suite that runs against a real production build.
 
 **Files:**
+
 - Modify: `e2e/navigation.spec.ts`
 
 **Interfaces:**
+
 - Consumes: `DevLegend`'s `data-dev-legend` attribute (Task 9)
 - Produces: nothing
 
@@ -1891,13 +1964,13 @@ The guard in `main.tsx` is an assertion about the production bundle. This turns 
 Append to `e2e/navigation.spec.ts`, inside the existing `describe('navigation')` block:
 
 ```ts
-  test('the developer instance legend is absent from a production build', async ({ page }) => {
-    // This suite runs against `vite preview`, so this is a claim about the bundle an attendee
-    // actually receives — not about the source. If the `import.meta.env.DEV` guard in main.tsx
-    // is ever removed, this is what catches it.
-    await page.goto('/')
-    await expect(page.locator('[data-dev-legend]')).toHaveCount(0)
-  })
+test('the developer instance legend is absent from a production build', async ({ page }) => {
+  // This suite runs against `vite preview`, so this is a claim about the bundle an attendee
+  // actually receives — not about the source. If the `import.meta.env.DEV` guard in main.tsx
+  // is ever removed, this is what catches it.
+  await page.goto('/')
+  await expect(page.locator('[data-dev-legend]')).toHaveCount(0)
+})
 ```
 
 - [ ] **Step 2: Confirm it would catch the regression**
@@ -1936,10 +2009,12 @@ Claude-Session: https://claude.ai/code/session_019zmAh259rthUvJ95KRJQyF"
 README collapses to `pnpm start`; `quickstart.md` gets the eight corrections confirmed against a full local run on 2026-08-06.
 
 **Files:**
+
 - Modify: `README.md` (Setup and Run sections, roughly lines 40–125)
 - Modify: `specs/001-production-foundation/quickstart.md`
 
 **Interfaces:**
+
 - Consumes: `pnpm start` (Task 7)
 - Produces: nothing
 
@@ -1969,10 +2044,10 @@ so each worktree gets its own. The main working tree keeps 5173 and 3000. Overri
 
 **Seeded accounts.** Both use the password `correct-horse-battery-staple`:
 
-| Email | Registered for |
-| --- | --- |
-| `ada@example.com` | Product & Design Summit, Frontend Horizons |
-| `grace@example.com` | Product & Design Summit, Systems & Scale |
+| Email               | Registered for                             |
+| ------------------- | ------------------------------------------ |
+| `ada@example.com`   | Product & Design Summit, Frontend Horizons |
+| `grace@example.com` | Product & Design Summit, Systems & Scale   |
 
 They share one event and differ on the other. The shared one shows that the isolation boundary is
 the _registration_ rather than the event; the differing one shows that the boundary holds.
@@ -2068,7 +2143,7 @@ starts its own API; with `pnpm start` running it fails on the port, not on the c
 
 In Scenario 6, replace the instruction to shorten the idle window:
 
-```markdown
+````markdown
 Fourteen days of idling is impractical to test by hand, and `AUTH_SESSION_IDLE_DAYS` is parsed as
 a positive integer — one day is the shortest it will accept. So expire the session directly
 instead:
@@ -2076,9 +2151,11 @@ instead:
 ```sql
 update auth_sessions set expires_at = now() - interval '1 second';
 ```
+````
 
 Then:
-```
+
+````
 
 - [ ] **Step 5: Verify the documentation is true**
 
@@ -2101,7 +2178,7 @@ Scenario 6's unachievable idle-window step with a direct expiry.
 
 Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_019zmAh259rthUvJ95KRJQyF"
-```
+````
 
 ---
 
@@ -2160,18 +2237,18 @@ docker exec mynet-pg psql -U mynet -d postgres -c 'DROP DATABASE mynet_parallel_
 
 **Spec coverage** — every section of the design maps to a task:
 
-| Spec section | Task |
-|---|---|
-| 1. Command surface | 7 |
-| 2. Modules | 1, 2, 3, 5, 6, 7 |
-| 3. Instance identity | 1 |
-| 4. Postgres | 5 |
-| 5. Schema drift | 2 (classification), 7 (application) |
-| 6. Configuration transport | 3 (writing), 4 (loading) |
-| 7. Branch legend | 8 (plugin), 9 (component) |
-| 8. Failure handling | 5 (docker, remote URL), 7 (ports, migrations), 3 (`.env`) |
-| 9. Testing | 1, 2, 3, 4, 6, 8, 9, 10 |
-| 10. Documentation | 11 |
+| Spec section               | Task                                                      |
+| -------------------------- | --------------------------------------------------------- |
+| 1. Command surface         | 7                                                         |
+| 2. Modules                 | 1, 2, 3, 5, 6, 7                                          |
+| 3. Instance identity       | 1                                                         |
+| 4. Postgres                | 5                                                         |
+| 5. Schema drift            | 2 (classification), 7 (application)                       |
+| 6. Configuration transport | 3 (writing), 4 (loading)                                  |
+| 7. Branch legend           | 8 (plugin), 9 (component)                                 |
+| 8. Failure handling        | 5 (docker, remote URL), 7 (ports, migrations), 3 (`.env`) |
+| 9. Testing                 | 1, 2, 3, 4, 6, 8, 9, 10                                   |
+| 10. Documentation          | 11                                                        |
 
 **Type consistency** — names used across task boundaries were checked against their definitions:
 `instanceFor` returns `{ name, databaseName, portOffset, webPort, apiPort }`, consumed with those
@@ -2181,6 +2258,7 @@ exact keys in Tasks 6 and 7; `classifyDrift` returns the three strings Task 7 sw
 `mount.tsx`; `data-dev-legend` matches between Task 9 and Task 10.
 
 **Verified before writing, not assumed:**
+
 - `drizzle.__drizzle_migrations.hash` is `sha256` of the raw `.sql` file — checked against this
   repository's applied row.
 - `process.loadEnvFile` does not overwrite an already-set variable — checked empirically, and it
