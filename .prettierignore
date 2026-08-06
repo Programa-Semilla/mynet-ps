@@ -1,0 +1,28 @@
+node_modules/
+dist/
+build/
+coverage/
+.vite/
+playwright-report/
+test-results/
+
+pnpm-lock.yaml
+
+# Generated from Fastify route schemas — an output, never hand-edited (contracts/README.md).
+contracts/openapi.json
+packages/data/src/generated/
+
+# Generated SQL. Formatting it would obscure the diff that reviewers read (FR-037).
+apps/api/migrations/
+
+# Approved visual reference, explicitly not production code (constitution Principle II).
+GroundZero/
+
+# Authored and reviewed documents, not code. Reformatting them would rewrite artifacts that
+# went through the spec and plan review gates, burying real revisions in whitespace churn.
+specs/
+brainstorm/
+.specify/
+.githooks/
+CLAUDE.md
+

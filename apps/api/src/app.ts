@@ -1,0 +1,110 @@
+/**
+ * T028 — Fastify application composition.
+ *
+ * **Registration order is load-bearing and is expressed only here.** Each step below states
+ * why it sits where it does; reordering them silently breaks a requirement rather than
+ * producing an obvious error.
+ *
+ * Kept separate from `server.ts` so tests build the application and drive it with
+ * `fastify.inject()` without binding a port — exercising the real routing, validation, and
+ * auth stack rather than a substitute for it (research.md D11).
+ */
+import fastifyCookie from '@fastify/cookie'
+import fastifyCors from '@fastify/cors'
+import Fastify, { type FastifyInstance } from 'fastify'
+
+import { loadConfig } from './config.js'
+import { closeDb } from './db/client.js'
+import maintenance from './maintenance.js'
+import authContext from './plugins/auth-context.js'
+import errors from './plugins/errors.js'
+import swagger from './plugins/swagger.js'
+import { meRoutes } from './routes/auth/me.js'
+import { signInRoutes } from './routes/auth/sign-in.js'
+import { signOutRoutes } from './routes/auth/sign-out.js'
+import { eventRoutes } from './routes/events.js'
+import { healthRoutes } from './routes/health.js'
+
+export const buildApp = async (): Promise<FastifyInstance> => {
+  const config = loadConfig()
+
+  const app = Fastify({
+    logger: {
+      level: config.isProduction ? 'info' : 'warn',
+      // FR-060 — server records carry no credentials, session tokens, or message content.
+      // Declared at the logger rather than trusted to every call site, because a call site
+      // that forgets is a leak that no test would notice.
+      redact: {
+        paths: [
+          'req.headers.cookie',
+          'req.headers.authorization',
+          'req.body.password',
+          'res.headers["set-cookie"]',
+        ],
+        remove: true,
+      },
+    },
+    // ─────────────────────────────────────────────────────────────────────────────────────
+    // The request source drives throttling (FR-031a). Behind a proxy the socket address is the
+    // load balancer, so some `X-Forwarded-For` handling is required — but **`true` is the wrong
+    // amount of trust**.
+    //
+    // `trustProxy: true` trusts every hop, which means Fastify takes the leftmost
+    // `X-Forwarded-For` entry — a value any client can write. The source dimension of the
+    // throttle then becomes attacker-chosen: rotate the header per request and every guess
+    // lands in a fresh bucket, so the source threshold never binds and a password spray from
+    // one machine is unlimited. Worse, an attacker can *name* a venue's public address and
+    // poison that bucket from anywhere, denying sign-in to everyone behind it.
+    //
+    // A hop count trusts exactly the proxies actually in front of this service and no further.
+    // One is correct for a single Fly.io edge; raise it only when another proxy is genuinely
+    // added, and never back to `true`.
+    // ─────────────────────────────────────────────────────────────────────────────────────
+    trustProxy: config.trustedProxyHops,
+  })
+
+  // 1. Cookies. Must precede auth-context, which reads the sign-in session cookie.
+  await app.register(fastifyCookie)
+
+  // 2. CORS. Credentialed requests need an explicit origin — a wildcard is rejected by the
+  //    browser when credentials are included, which is the behaviour we want: the allowed
+  //    origin is named, not open.
+  await app.register(fastifyCors, {
+    origin: config.webOrigin,
+    credentials: true,
+    methods: ['GET', 'POST'],
+  })
+
+  // 3. Error handling. Registered before routes so that a failure *inside* route
+  //    registration is still shaped by FR-059/FR-060 rather than leaking a stack trace.
+  await app.register(errors)
+
+  // 4. Swagger. Must precede route registration — it builds the contract by observing routes
+  //    as they register, so a route added before it is silently absent from the contract
+  //    (FR-044a).
+  await app.register(swagger)
+
+  // 5. Authenticated context. Decorates the instance with `requireAttendee`; routes below
+  //    attach it as a preHandler.
+  await app.register(authContext)
+
+  // 6. Retention sweeps. Registered here rather than in `server.ts` so that the integration
+  //    harness tears the timers down with the app rather than leaking them between suites.
+  await app.register(maintenance)
+
+  // 7. The database pool follows the application's lifecycle, so every entry point — the
+  //    server, the test harness, the contract generator — releases it the same way. Doing this
+  //    only in `server.ts` left the pool to be torn down by process death.
+  app.addHook('onClose', async () => {
+    await closeDb()
+  })
+
+  // 8. Routes.
+  await app.register(healthRoutes)
+  await app.register(signInRoutes)
+  await app.register(signOutRoutes)
+  await app.register(meRoutes)
+  await app.register(eventRoutes)
+
+  return app
+}

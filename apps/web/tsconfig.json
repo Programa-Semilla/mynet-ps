@@ -1,0 +1,16 @@
+{
+  "extends": "@mynet/config/tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx",
+    "types": ["vite/client", "vite-plugin-pwa/client"],
+    "paths": {
+      "@mynet/platform": ["../../packages/platform/src/index.ts"],
+      "@mynet/platform/web": ["../../packages/platform/src/web/index.ts"],
+      "@mynet/data": ["../../packages/data/src/index.ts"],
+      "@mynet/data/http": ["../../packages/data/src/http/index.ts"],
+      "@/*": ["./src/*"]
+    }
+  },
+  "include": ["src", "tests", "vite.config.ts"]
+}

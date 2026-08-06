@@ -1,0 +1,9 @@
+{
+  "extends": "@mynet/config/tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2023"],
+    "types": ["node"],
+    "moduleResolution": "bundler"
+  },
+  "include": ["src", "tests", "drizzle.config.ts"]
+}

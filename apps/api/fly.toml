@@ -1,0 +1,61 @@
+# Fly.io configuration for the API (research.md D15).
+#
+# `app` is deliberately absent: every deployment this file serves is an ephemeral per-pull-request
+# instance, and the workflow passes `--app mynet-api-pr-<n>`. Naming an app here would make it
+# easy to deploy a pull request over a long-lived environment by omitting the flag.
+#
+# **Unvalidated until T003.** No API hosting account exists yet (FR-070).
+
+primary_region = "fra"
+
+[build]
+  dockerfile = "Dockerfile"
+
+# ─────────────────────────────────────────────────────────────────────────────────────────
+# Migrations run as part of the deployment, not beside it.
+#
+# Without this, the schema was applied only by a separate CI job coupled to the deploy by a
+# `needs:` edge. Any `flyctl deploy` outside that workflow — a rollback, a redeploy of an
+# existing app, or the production path that does not exist yet — would ship new code against an
+# unmigrated schema and return "column does not exist" on every request. The migrations already
+# ship inside the image; this is what makes shipping them mean something.
+#
+# Fly runs this to completion before routing traffic, and aborts the release if it fails.
+# ─────────────────────────────────────────────────────────────────────────────────────────
+[deploy]
+  release_command = "node dist/db/migrate.js"
+  strategy = "rolling"
+
+[env]
+  API_HOST = "0.0.0.0"
+  API_PORT = "3000"
+  NODE_ENV = "production"
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+  # Preview APIs spend most of their life idle between reviewer visits. Stopping them is the
+  # difference between a preview environment costing pennies and costing real money.
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [http_service.concurrency]
+    type = "requests"
+    soft_limit = 40
+    hard_limit = 80
+
+# The platform needs to know the difference between "starting" and "broken". `/health` exists
+# for exactly this and touches no attendee data.
+[[http_service.checks]]
+  interval = "15s"
+  timeout = "3s"
+  grace_period = "10s"
+  method = "GET"
+  path = "/health"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  # Argon2id is deliberately memory-hard (FR-031). 512 MB would work; 1 GB leaves room for the
+  # connection pool without the hash competing with it.
+  memory = "1gb"
