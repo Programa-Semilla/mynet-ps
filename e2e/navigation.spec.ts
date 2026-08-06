@@ -156,6 +156,27 @@ test.describe('navigation', () => {
       await expect(destinationHeading(page, destination.heading)).toBeVisible()
     }
   })
+
+  test('the developer instance legend is absent from a production build', async ({ page }) => {
+    // This suite runs against `vite preview`, so this is a claim about the bundle an attendee
+    // actually receives — not about the source. The legend is injected by a `serve`-only Vite
+    // plugin and nothing in `src/` imports it; if either of those ever changes, this catches it.
+    await page.goto('/')
+    await expect(page.locator('[data-dev-legend]')).toHaveCount(0)
+
+    // ─────────────────────────────────────────────────────────────────────────────────────
+    // **The DOM assertion alone is not enough, and that was found by breaking it.**
+    //
+    // Removing the plugin's `apply: 'serve'` makes it inject `<script src="/src/dev/mount.tsx">`
+    // into the built HTML. That path does not exist in `dist`, so the browser 404s, nothing
+    // mounts, and the check above passes — while the shipped page requests a file that is not
+    // there. A gate that passes on a broken build is not a gate.
+    //
+    // Any `/src/` reference in built HTML means unbundled source was injected, which in this
+    // application can only be development scaffolding.
+    // ─────────────────────────────────────────────────────────────────────────────────────
+    expect(await page.content()).not.toContain('/src/')
+  })
 })
 
 const escapeForRegExp = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
