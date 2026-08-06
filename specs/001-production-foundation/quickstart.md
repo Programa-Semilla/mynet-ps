@@ -15,8 +15,8 @@ success criterion in [spec.md](./spec.md); the commands are the evidence, not th
 | Requirement | Notes |
 |---|---|
 | Node LTS + pnpm | Versions pinned in `package.json`; pnpm is the only supported package manager (D2) |
-| A PostgreSQL database | A personal Neon branch, or local PostgreSQL. **Never** an environment holding real attendee data (FR-007) |
-| `.env` from `.env.example` | Database URL, session signing secret, hashing pepper. Never committed (FR-041) |
+| Docker | `pnpm start` provisions PostgreSQL. Or supply your own — **never** an environment holding real attendee data (FR-007) |
+| Playwright browsers | `pnpm exec playwright install chromium`, once per machine. `pnpm test:e2e` cannot run without it |
 
 Activate the repository guardrails once per clone — they block direct commits to `main` and `develop`:
 
@@ -30,13 +30,22 @@ git config core.hooksPath .githooks
 
 ```bash
 pnpm install                 # workspace install; lockfile is committed (FR-002)
-cp .env.example .env         # then fill in your own values
-pnpm db:migrate              # apply committed migrations in order (FR-037)
-pnpm db:seed                 # two attendees, different event registrations
+pnpm start                   # everything below, then both servers and a URL
 ```
 
-**`pnpm db:seed` creates two attendees deliberately.** One attendee cannot demonstrate isolation, and
-isolation is the point of this slice — see Scenario 2 and FR-069.
+`pnpm start` creates `.env` if absent, provisions PostgreSQL, creates this directory's own
+database, applies migrations (FR-037), seeds, and prints the URL. The individual commands still
+exist — `pnpm db:migrate`, `pnpm db:seed`, `pnpm dev` — and the README documents running them by
+hand.
+
+**Two attendees are seeded deliberately.** One attendee cannot demonstrate isolation, and isolation
+is the point of this slice — see Scenario 2 and FR-069. Both use the password
+`correct-horse-battery-staple`:
+
+| Email | Referred to below as |
+|---|---|
+| `ada@example.com` | the first attendee |
+| `grace@example.com` | the second attendee |
 
 > **Never run `drizzle-kit push`**, in any environment including your own machine. It changes a
 > database without producing a reviewable migration, which the constitution prohibits. If it appears
@@ -45,7 +54,8 @@ isolation is the point of this slice — see Scenario 2 and FR-069.
 ## Run
 
 ```bash
-pnpm dev          # API and client together
+pnpm start        # everything, then a URL
+pnpm dev          # API and client together, no provisioning
 pnpm dev:api      # API alone
 pnpm dev:web      # client alone
 ```
@@ -53,20 +63,29 @@ pnpm dev:web      # client alone
 ## Verify everything
 
 ```bash
-pnpm verify       # everything CI runs, in the same order
+pnpm verify       # the checks CI runs, in CI's order
 ```
+
+Two exceptions to "everything CI runs": CI additionally verifies that migrations apply **twice**
+cleanly against a fresh database branch, and deploys a preview. Neither is reproducible locally.
+
+**Stop any running instance first.** `pnpm test:e2e` builds and serves with `strictPort` and starts
+its own API; with `pnpm start` running it fails on the port, not on the code. Both
+`pnpm test:integration` and `pnpm test:e2e` truncate and re-seed the database they are pointed at.
 
 Individually:
 
 ```bash
 pnpm typecheck        # FR-001
 pnpm lint             # FR-004, and the no-colour-literals rule (SC-009)
+pnpm format:check     # Prettier — part of `pnpm verify` and its own CI gate
 pnpm test:unit        # FR-005 unit
 pnpm test:component   # FR-005 component
 pnpm test:integration # FR-005 integration — needs a real database
 pnpm test:e2e         # FR-068 — Playwright, includes accessibility
 pnpm contract:check   # FR-044b — regenerate and diff the committed contract
-pnpm build            # production build + asset budget (FR-072)
+pnpm build            # production build
+pnpm budget           # the client asset budget (FR-072) — a separate command from the build
 ```
 
 ---
@@ -144,15 +163,28 @@ non-essential animation stops; zoom text to 200% and confirm reflow without loss
 
 ### Scenario 6 — Session expiry *(FR-028a–c)*
 
-Fourteen days of idling is impractical to test by hand. Shorten the idle window in local configuration
-and:
+Fourteen days of idling is impractical to test by hand, and the idle window cannot be shortened
+enough to help: `AUTH_SESSION_IDLE_DAYS` is parsed as a positive integer, so one day is the
+shortest it accepts. Expire the session directly instead — which is what the integration tests do:
 
-1. Sign in, then leave the app idle past the window.
+```sql
+update auth_sessions set expires_at = now() - interval '1 second';
+```
+
+Then:
+
+1. Sign in, expire the session as above rather than waiting.
 2. Act.
 3. **Expect**: refused, returned to sign-in with an **inactivity** explanation distinguishable from a
    failed sign-in (FR-028c), and no partial write.
-4. Sign in again and use the app steadily past the original window.
-5. **Expect**: still signed in — expiry slides on use (FR-028a).
+4. Sign in again, note `expires_at`, use the app, and read it again:
+
+   ```sql
+   select expires_at from auth_sessions order by expires_at desc limit 1;
+   ```
+
+5. **Expect**: it has moved forward — expiry slides on use rather than counting from sign-in
+   (FR-028a). Waiting out the original window would demonstrate the same thing in a fortnight.
 
 ### Scenario 7 — Sign-in throttling *(SC-003a, FR-031a–d)*
 

@@ -28,15 +28,15 @@ There is no brand mark — the icons are visibly provisional placeholders.
 
 ## Prerequisites
 
-| Requirement   | Notes                                                                                           |
-| ------------- | ----------------------------------------------------------------------------------------------- |
-| Node 22+      | Enforced by `engines` in the root `package.json`                                                |
-| pnpm 9+       | The only supported package manager. `corepack enable` will provide it                           |
-| PostgreSQL 17 | A personal Neon branch or a local instance. **Never** an environment holding real attendee data |
+| Requirement | Notes                                                                                |
+| ----------- | ------------------------------------------------------------------------------------ |
+| Node 22+    | Enforced by `engines` in the root `package.json`                                     |
+| pnpm 9+     | The only supported package manager. `corepack enable` will provide it                |
+| Docker      | `pnpm start` provisions PostgreSQL 17 with it. Supply your own instead if you prefer |
 
 Local development never needs access to real attendee data, and is not permitted to (FR-007).
 
-## Setup
+## Run it
 
 ```bash
 git clone <this repository> && cd mynet-ps
@@ -46,36 +46,29 @@ git clone <this repository> && cd mynet-ps
 git config core.hooksPath .githooks
 
 pnpm install
-cp .env.example .env        # then fill it in; see the comments in that file
+pnpm start
 ```
 
-If you do not already have PostgreSQL running:
+That is the whole thing. `pnpm start` creates `.env` if you do not have one, starts the shared
+PostgreSQL container, creates this directory's own database, applies migrations, rebuilds the
+database if you switched to a branch with a different migration history, seeds two attendees,
+starts both servers, and prints the URL once they answer.
 
-```bash
-docker run --name mynet-pg -e POSTGRES_PASSWORD=mynet -e POSTGRES_USER=mynet \
-  -e POSTGRES_DB=mynet_dev -p 5432:5432 -d postgres:17
-```
+It is safe to run repeatedly. Every step checks its state before changing anything, so a second
+run is never destructive. `pnpm start --reset` rebuilds the database from zero without waiting
+for drift to be detected.
 
-Then:
+**Several instances at once.** The database name and both ports come from the directory, so each
+worktree gets its own — `git worktree add ../mynet-feature` then `pnpm start` there, and both run
+side by side. The strip along the bottom of the page names the branch, instance, port and
+database, so two tabs are never confused.
 
-```bash
-pnpm db:migrate             # apply the committed migrations in order
-pnpm db:seed                # two attendees with different event registrations
-```
+One caveat: every _clone_ is a main working tree, and every main working tree claims 5173/3000.
+Only linked worktrees are separated automatically. For a second clone, or if two directories ever
+collide, `MYNET_PORT_OFFSET=10 pnpm start` moves one out of the way; `MYNET_DATABASE_NAME`
+overrides the database.
 
-Once, to run the end-to-end suite — it downloads a browser into a shared cache, so it is a
-no-op if you already have one:
-
-```bash
-pnpm exec playwright install chromium
-```
-
-`.env` is read automatically by every command below. There is no step where you have to export
-it into your shell — if you find one, that is a defect in this document.
-
-**`db:seed` creates two attendees on purpose.** One attendee cannot demonstrate isolation, and
-isolation is the central claim of this slice. Both use the password
-`correct-horse-battery-staple`:
+**Seeded accounts.** Both use the password `correct-horse-battery-staple`:
 
 | Email               | Registered for                             |
 | ------------------- | ------------------------------------------ |
@@ -85,23 +78,56 @@ isolation is the central claim of this slice. Both use the password
 They share one event and differ on the other. The shared one shows that the isolation boundary is
 the _registration_ rather than the event; the differing one shows that the boundary holds.
 
+Once per machine, before running the end-to-end suite — it downloads a browser into a shared
+cache, so it is a no-op if you already have one:
+
+```bash
+pnpm exec playwright install chromium
+```
+
+<details>
+<summary>Running the steps by hand</summary>
+
+```bash
+docker run --name mynet-pg -e POSTGRES_PASSWORD=mynet -e POSTGRES_USER=mynet \
+  -p 55432:5432 -d postgres:17
+cp .env.example .env         # then fill it in; see the comments in that file
+pnpm db:migrate              # apply the committed migrations in order
+pnpm db:seed                 # two attendees with different event registrations
+pnpm dev                     # or dev:api / dev:web
+```
+
+`.env` and `.env.local` are read automatically by every command. There is no step where you have
+to export them into your shell — if you find one, that is a defect in this document.
+
+`.env.local` is generated by `pnpm start` and holds only the values this directory implies: the
+database URL and both ports. Your `.env` keeps the secrets and is never rewritten. Both are
+gitignored. Load order is `.env.local`, then `.env`, then the real environment — and because
+`process.loadEnvFile` will not overwrite an already-set variable, that order means the _first_
+one loaded wins, with your shell beating both.
+
+</details>
+
 > **Never run `drizzle-kit push`**, in any environment including your own machine. It changes a
 > database without producing a reviewable migration. If it appears in a `package.json` script,
 > that is a defect.
 
-## Run
-
-```bash
-pnpm dev            # API and client together
-pnpm dev:api        # API alone, on :3000
-pnpm dev:web        # client alone, on :5173
-```
-
 ## Verify
 
 ```bash
-pnpm verify         # everything the pipeline runs, in the same order
+pnpm verify         # the checks the pipeline runs, in the pipeline's order
 ```
+
+CI additionally verifies that migrations apply twice cleanly against a fresh database branch, and
+deploys a preview. Neither is reproducible locally.
+
+**Stop `pnpm start` first.** The end-to-end suite builds and serves on the same port with
+`strictPort`, and starts its own API. With an instance running, `pnpm verify` fails at
+`test:e2e` with `http://localhost:5173 is already used` — a confusing way to learn that the code
+was fine.
+
+`pnpm test:integration` and `pnpm test:e2e` both truncate and re-seed the database they are
+pointed at. That is your instance's database, not a scratch one.
 
 Individually:
 
