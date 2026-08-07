@@ -110,6 +110,59 @@ describe('every Home card in all four states (SC-109)', () => {
 })
 
 /**
+ * The other half of SC-109, for the cards whose states do not come from a repository.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ * The matrix above varies the **repositories**, which is where Up next, Rest of your day and
+ * Your conferences get their four states. `GreetingDayContext` reads none: its content is a
+ * function of the resolved conference and the session, so all four scenarios above render it
+ * identically and assert nothing about its states.
+ *
+ * For an event-scoped card, "loading", "no conference" and "unresolvable" are states of the
+ * **shell's** active-conference resolution, not of the card's own data. This walks those, so
+ * SC-109 is exercised for every card rather than merely asserted for some of them.
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ */
+describe('event-scoped cards in every active-conference state (SC-109)', () => {
+  const EVENT_SCOPED = HOME_CARDS.filter((card) => card.scope === 'event')
+
+  const ACTIVE_EVENT_STATES = {
+    loading: { status: 'loading' },
+    'no conference': { status: 'none' },
+    unresolvable: {
+      status: 'failed',
+      message: 'We could not tell which conference you are in.',
+      retry: () => {},
+    },
+  } as const
+
+  it('there are event-scoped cards to exercise', () => {
+    expect(EVENT_SCOPED.length).toBeGreaterThan(0)
+  })
+
+  describe.each(EVENT_SCOPED.map((card) => [card.id, card] as const))('%s', (_id, card) => {
+    it.each(Object.keys(ACTIVE_EVENT_STATES) as Array<keyof typeof ACTIVE_EVENT_STATES>)(
+      'stays visible and says why when the conference is %s',
+      (state) => {
+        render(
+          <WithServices services={testServices(SCENARIOS.populated())}>
+            <HomeShell cards={[card]} activeEvent={ACTIVE_EVENT_STATES[state]} />
+          </WithServices>,
+        )
+
+        // Present, named, and carrying an explanation — never a hole in the layout (FR-161).
+        const region = screen.getByRole('region', { name: card.title })
+        const body = (region.textContent ?? '').replace(card.title, '').trim()
+        expect(
+          body.length,
+          `"${card.title}" renders nothing but its heading when the conference is ${state}.`,
+        ).toBeGreaterThan(0)
+      },
+    )
+  })
+})
+
+/**
  * T079 — **at most one card claims the `lead` slot** (FR-157, research D8).
  *
  * Not a compile-time guarantee, deliberately. Expressing "at most one element of this array has

@@ -31,6 +31,3 @@ const UNKNOWN_TRACK_CLASSES = 'bg-track-unknown text-track-unknown-ink'
 
 export const trackClassesFor = (colorToken: string): string =>
   TRACK_CLASSES[colorToken] ?? UNKNOWN_TRACK_CLASSES
-
-/** The token names the theme actually defines. Exported so a test can assert the seed uses them. */
-export const KNOWN_TRACK_TOKENS = Object.keys(TRACK_CLASSES)
