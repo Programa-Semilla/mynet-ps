@@ -2,6 +2,8 @@ import type { PlatformServices } from '@mynet/platform'
 import { PlatformProvider } from '@mynet/platform'
 import type { ReactNode } from 'react'
 
+import { AuthProvider } from '../../src/auth/useAuth.js'
+
 /**
  * A substituted registry, for component tests (FR-047, research D10).
  *
@@ -61,13 +63,24 @@ export const testServices = (
   ...rest,
 })
 
+/**
+ * The registry, plus the authenticated context the real application always has above it.
+ *
+ * `AuthProvider` is included because a card that greets the signed-in attendee is not an
+ * unusual card — it is the lead one — and a harness without it would make every such card throw
+ * for a reason that has nothing to do with what is being tested.
+ */
 export const WithServices = ({
   children,
   services,
 }: {
   children: ReactNode
   services?: PlatformServices
-}) => <PlatformProvider services={services ?? testServices()}>{children}</PlatformProvider>
+}) => (
+  <PlatformProvider services={services ?? testServices()}>
+    <AuthProvider>{children}</AuthProvider>
+  </PlatformProvider>
+)
 
 /** Builds a session fixture with sensible defaults, so a test states only what it cares about. */
 export const aSession = (overrides: Partial<TestSession> = {}): TestSession => ({

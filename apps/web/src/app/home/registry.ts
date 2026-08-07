@@ -1,6 +1,7 @@
 import { greetingDayContextCard } from './cards/GreetingDayContext.js'
 import { restOfDayCard } from './cards/RestOfDay.js'
 import { upNextCard } from './cards/UpNext.js'
+import { yourConferencesCard } from './cards/YourConferences.js'
 import type { HomeCard } from './contract.js'
 
 /**
@@ -42,4 +43,39 @@ export const HOME_CARDS: readonly HomeCard[] = [
   greetingDayContextCard,
   upNextCard,
   restOfDayCard,
+  yourConferencesCard,
 ]
+
+/**
+ * T079 (002) — **at most one card may claim the `lead` slot** (FR-157).
+ *
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ * A development-mode assertion plus a unit test, rather than a type-level guarantee — and the
+ * trade is recorded rather than glossed (research D8).
+ *
+ * Expressing "at most one element of this array has slot: 'lead'" in the type system would mean
+ * giving the registry a shape that counts its own contents: a tuple, or a builder that returns
+ * a narrowed type per append. Either makes the registry hostile to the one operation it exists
+ * for — a later feature adding a single line — which would cost far more than this rule is
+ * worth.
+ *
+ * It fires here as well as in the test because the failure it prevents is a layout that
+ * silently resolves the conflict: two `lead` cards would simply both render full-width, look
+ * plausible, and be nobody's bug.
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ */
+export const assertAtMostOneLead = (cards: readonly HomeCard[]): void => {
+  const leads = cards.filter((card) => card.slot === 'lead')
+  if (leads.length > 1) {
+    throw new Error(
+      `Home has ${leads.length} cards claiming the 'lead' slot (${leads
+        .map((card) => card.id)
+        .join(', ')}), and FR-157 allows at most one. The lead card introduces the screen; two ` +
+        'of them is a layout question nobody decided.',
+    )
+  }
+}
+
+if (import.meta.env.DEV) {
+  assertAtMostOneLead(HOME_CARDS)
+}
