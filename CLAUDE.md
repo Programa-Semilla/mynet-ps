@@ -8,7 +8,8 @@ The production foundation has shipped, event context and the session catalog shi
 (feature 002, [#6](https://github.com/Programa-Semilla/mynet-ps/pull/6)), Agenda became a personal
 schedule rather than a read-only programme (feature 005, squash-merged to `develop` in
 [#8](https://github.com/Programa-Semilla/mynet-ps/pull/8)), and **a person can now become an
-attendee under their own power, describe themselves, and leave** — feature 004.
+attendee under their own power, describe themselves, and leave** — feature 004, squash-merged to
+`develop` in [#12](https://github.com/Programa-Semilla/mynet-ps/pull/12).
 
 An attendee **creates their own account**, joins a conference with its code, and arrives at the
 conference happening now, greeted by name and told which day of it today is in the venue's
@@ -88,18 +89,28 @@ by registering and deleting an account. It expires on the existing two-hour swee
 FR-382 forbids lengthening — an earlier draft of 004's spec assumed 90 days and would have
 *lengthened* retention of pseudonymous data forty-fold.
 
-**004 shipped on 2026-08-07**, unblocked by brainstorm #04 and ratified in constitution **v2.3.0**.
-It claimed migration **`0003`** — exactly one, as reserved — which is why the journal lists `0003`
-before `0004` while carrying a later timestamp; `apps/api/migrations/meta/README.md` explains why
-both halves are load-bearing and what a regenerating feature must not "fix". 006 is next. See
-`brainstorm/00-overview.md` for the queue.
+**004 shipped on 2026-08-07** ([#12](https://github.com/Programa-Semilla/mynet-ps/pull/12)),
+unblocked by brainstorm #04 and ratified in constitution **v2.3.0**. It claimed migration **`0003`**
+— exactly one, as reserved — which is why the journal lists `0003` before `0004` while carrying a
+later timestamp; `apps/api/migrations/meta/README.md` explains why both halves are load-bearing and
+what a regenerating feature must not "fix". **006 (Discover) is next**, and it is the feature that
+reads the profiles 004 authors. See `brainstorm/00-overview.md` for the queue.
 
-**004 now departs substantially from the delivery roadmap**, and its specification must say so. The
-roadmap scopes it as profile fields plus an edit surface, treating the identity model as an input.
-As decided it also carries self sign-up, event join by code, email verification, password recovery, a
-transactional mail provider, avatar upload behind a new `StorageService`, account deletion, personal-
-data export, a retention purge, and a discoverability toggle. A phase split is the first thing to
-settle once the spec exists.
+**004 departed substantially from the delivery roadmap**, and its specification says so. The roadmap
+scopes it as profile fields plus an edit surface, treating the identity model as an input. As
+delivered it also carries self sign-up, event join by code, email verification, password recovery, a
+transactional mail port, avatar upload behind a new `StorageService`, account deletion, personal-data
+export, a retention purge, and a discoverability toggle. No phase split was taken — it shipped as one
+PR of 131 tasks.
+
+**004's deep review is worth reading before 006 touches any of this.**
+`specs/004-attendee-identity-and-profile/review-findings.md` records 37 findings, the 21 fixed, and
+**ten Minor ones deliberately left open with stated reasons**. Two of those are real and unclaimed:
+neither token table has an index on `attendee_id` (Postgres does not create one for a foreign key,
+so every account deletion cascade-scans both), and migration `0003` rewrites `events` under a
+volatile default with no `lock_timeout`. Both were left because the fix requires regenerating the
+Drizzle snapshot, which is exactly what the migration README warns a later feature not to do
+casually — so they need doing deliberately, not incidentally.
 
 ```
 GroundZero/
