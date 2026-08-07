@@ -33,11 +33,11 @@ new architecture in the same review.
 
 **Behaviour must not change.** Each split hides behind a barrel, so no consumer's import path moves.
 
-- [ ] T001 [P] Split `packages/data/src/interfaces/index.ts` into `interfaces/attendee.ts`, `interfaces/events.ts`, `interfaces/errors.ts`, leaving `interfaces/index.ts` as a re-exporting barrel. Carry the file-top note forbidding attendee identifiers into `attendee.ts` and `events.ts` — it is the rule, not decoration
-- [ ] T002 [P] Extract route registration from step 8 of `apps/api/src/app.ts` into a new `apps/api/src/routes/index.ts` exporting an ordered, append-only array of route plugins; `app.ts` iterates it. Steps 1–7 and their ordering commentary stay exactly where they are
-- [ ] T003 [P] Split `apps/api/src/db/seed.ts` into `apps/api/src/db/seed/{index,attendees,events}.ts`, with `index.ts` an ordered registry — order is load-bearing because of foreign keys
-- [ ] T004 Point the `db:seed` script in `apps/api/package.json` at the new seed entry point
-- [ ] T005 Prove behaviour-neutrality (SC-110): run `pnpm verify` at the commit before and the commit after, and confirm `contracts/openapi.json` is byte-identical across the split
+- [X] T001 [P] Split `packages/data/src/interfaces/index.ts` into `interfaces/attendee.ts`, `interfaces/events.ts`, `interfaces/errors.ts`, leaving `interfaces/index.ts` as a re-exporting barrel. Carry the file-top note forbidding attendee identifiers into `attendee.ts` and `events.ts` — it is the rule, not decoration
+- [X] T002 [P] Extract route registration from step 8 of `apps/api/src/app.ts` into a new `apps/api/src/routes/index.ts` exporting an ordered, append-only array of route plugins; `app.ts` iterates it. Steps 1–7 and their ordering commentary stay exactly where they are
+- [X] T003 [P] Split `apps/api/src/db/seed.ts` into `apps/api/src/db/seed/{index,attendees,events}.ts`, with `index.ts` an ordered registry — order is load-bearing because of foreign keys
+- [X] T004 Point the `db:seed` script in `apps/api/package.json` at the new seed entry point
+- [X] T005 Prove behaviour-neutrality (SC-110): run `pnpm verify` at the commit before and the commit after, and confirm `contracts/openapi.json` is byte-identical across the split
 
 **Checkpoint**: the split is committed on its own. Nothing below may be squashed into it.
 

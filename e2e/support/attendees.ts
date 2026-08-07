@@ -1,7 +1,7 @@
 /**
  * The seeded attendees, and the sign-in journey every spec starts from.
  *
- * These mirror `apps/api/src/db/seed.ts`. Two attendees with **different** registrations is the
+ * These mirror `apps/api/src/db/seed/`. Two attendees with **different** registrations is the
  * whole point — one attendee cannot demonstrate isolation, because there is nobody else's data
  * to fail to see (FR-069, SC-001).
  */

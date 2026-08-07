@@ -8,7 +8,7 @@ import { attendeeCredentials, attendees } from '../../src/db/schema/attendees.js
 import { authSessions } from '../../src/db/schema/auth-sessions.js'
 import { events, registrations } from '../../src/db/schema/events.js'
 import { signInAttempts } from '../../src/db/schema/sign-in-attempts.js'
-import { seed } from '../../src/db/seed.js'
+import { seed } from '../../src/db/seed/index.js'
 
 /**
  * Integration test harness — the API against a **real** PostgreSQL database (FR-005, FR-069).

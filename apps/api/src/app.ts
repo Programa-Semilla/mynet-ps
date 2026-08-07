@@ -19,11 +19,7 @@ import maintenance from './maintenance.js'
 import authContext from './plugins/auth-context.js'
 import errors from './plugins/errors.js'
 import swagger from './plugins/swagger.js'
-import { meRoutes } from './routes/auth/me.js'
-import { signInRoutes } from './routes/auth/sign-in.js'
-import { signOutRoutes } from './routes/auth/sign-out.js'
-import { eventRoutes } from './routes/events.js'
-import { healthRoutes } from './routes/health.js'
+import { ROUTES } from './routes/index.js'
 
 export const buildApp = async (): Promise<FastifyInstance> => {
   const config = loadConfig()
@@ -99,12 +95,13 @@ export const buildApp = async (): Promise<FastifyInstance> => {
     await closeDb()
   })
 
-  // 8. Routes.
-  await app.register(healthRoutes)
-  await app.register(signInRoutes)
-  await app.register(signOutRoutes)
-  await app.register(meRoutes)
-  await app.register(eventRoutes)
+  // 8. Routes, from the append-only registry in `routes/index.ts` (T002, FR-181). A feature
+  //    adding routes appends there and leaves this file — and the ordering above — alone.
+  //    Sequential rather than concurrent: registration order decides the order paths appear in
+  //    the generated contract, and `Promise.all` would make that order non-deterministic.
+  for (const route of ROUTES) {
+    await app.register(route)
+  }
 
   return app
 }
