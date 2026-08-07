@@ -73,18 +73,21 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       db_url: ${{ steps.create.outputs.db_url_pooled }}
-      db_url_e2e: ${{ steps.create-e2e.outputs.db_url_pooled }}
-      db_url_a11y: ${{ steps.create-a11y.outputs.db_url_pooled }}
     steps:
       # ─────────────────────────────────────────────────────────────────────────────────────
-      # **Three branches, not one.** `test-integration`, `test-e2e` and `test-accessibility` run
-      # concurrently, and every one of them destructively resets the database it is given —
-      # `resetDatabase()` truncates and re-seeds, and `pnpm db:seed` deletes and re-inserts every
-      # attendee with fresh identifiers. Sharing one branch meant a suite's signed-in session
-      # could have the attendee row deleted out from under it mid-run, and one suite's
-      # deliberately failed sign-ins throttled another's. That produces nondeterministic red
-      # runs whose usual remedy — "re-run the job" — is exactly the habit that destroys trust in
-      # a gate (FR-064).
+      # ─────────────────────────────────────────────────────────────────────────────────────
+      # **One branch, for the preview only.**
+      #
+      # This used to create three — one each for `test-integration`, `test-e2e` and
+      # `test-accessibility` — because all three destructively reset the database they are
+      # given, and sharing one let a suite's sign-in session have its attendee row deleted out
+      # from under it mid-run.
+      #
+      # Those three suites now run against their own per-job PostgreSQL service containers,
+      # which is stronger isolation than three shared branches and, more importantly, does not
+      # depend on a repository secret. What remains is the branch the **preview** uses: an API
+      # deployed to Fly outlives the job that deployed it, so it needs a database that outlives
+      # the job too.
       # ─────────────────────────────────────────────────────────────────────────────────────
       - name: create a database branch for this pull request
         id: create
@@ -107,24 +110,6 @@ jobs:
           # guard would have looked present in review and done nothing. Caught by reading a real
           # run's log rather than by any check.
           # ─────────────────────────────────────────────────────────────────────────────────
-          parent: preview-base
-          api_key: ${{ secrets.NEON_API_KEY }}
-
-      - name: create an isolated branch for the end-to-end suite
-        id: create-e2e
-        uses: neondatabase/create-branch-action@v5
-        with:
-          project_id: ${{ secrets.NEON_PROJECT_ID }}
-          branch_name: pr-${{ github.event.number }}-e2e
-          parent: preview-base
-          api_key: ${{ secrets.NEON_API_KEY }}
-
-      - name: create an isolated branch for the accessibility suite
-        id: create-a11y
-        uses: neondatabase/create-branch-action@v5
-        with:
-          project_id: ${{ secrets.NEON_PROJECT_ID }}
-          branch_name: pr-${{ github.event.number }}-a11y
           parent: preview-base
           api_key: ${{ secrets.NEON_API_KEY }}
 
@@ -220,10 +205,57 @@ jobs:
   # is prohibited everywhere (research.md D6); this is the only path a schema change travels.
   migrations:
     name: migrations
-    needs: db-branch
     runs-on: ubuntu-latest
+    # ─────────────────────────────────────────────────────────────────────────────────────
+    # **A PostgreSQL service container, not a Neon branch.**
+    #
+    # These gates need *a real database*, which is what FR-005 and FR-069 ask for — not Neon
+    # specifically. Binding them to `db-branch` meant one unset repository secret
+    # (`NEON_API_KEY`) skipped every database-dependent check in the pipeline, and under
+    # Principle VII a skip is not a pass: the checks that enforce this product's personal-data
+    # guarantees had never executed once, across three merged features.
+    #
+    # A per-job container is also **more** isolated than the three shared Neon branches it
+    # replaces, because each job gets its own runner and therefore its own database that no
+    # other job can reach. `pnpm verify:clean` has always run these same suites against stock
+    # `postgres:17` locally, so this is the environment they were already proved against.
+    #
+    # Neon is still what the **preview** uses (`deploy-api`, `schema-diff`): a preview API
+    # outlives its job and needs a database that outlives it too. FR-067's "never point a
+    # preview at real attendee data" is unchanged, and `preview-base` is still its parent.
+    # ─────────────────────────────────────────────────────────────────────────────────────
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: mynet
+          POSTGRES_PASSWORD: mynet
+          POSTGRES_DB: mynet_ci
+        ports:
+          - 5432:5432
+        # Without a health gate the first migration races the server's startup and fails with a
+        # connection error that reads like a broken migration.
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     env:
-      DATABASE_URL: ${{ needs.db-branch.outputs.db_url }}
+      DATABASE_URL: postgresql://mynet:mynet@localhost:5432/mynet_ci
+      # ───────────────────────────────────────────────────────────────────────────────────
+      # **`loadConfig()` requires these, and the workflow has never supplied them.**
+      #
+      # A second latent fault, invisible until now because `db-branch` failed first: every job
+      # below builds the Fastify app, and `loadConfig()` refuses to start without a pepper and
+      # an attempt-hash key. Had the Neon secret been set, these jobs would simply have failed
+      # one line further on.
+      #
+      # Throwaway values for a container that is destroyed with the job. They are deliberately
+      # NOT repository secrets: nothing they protect outlives the run, and a real secret here
+      # would be a production credential sitting in a public repository's workflow environment.
+      # ───────────────────────────────────────────────────────────────────────────────────
+      AUTH_PASSWORD_PEPPER: ci-only-not-a-secret-ephemeral-database
+      AUTH_ATTEMPT_HASH_KEY: ci-only-not-a-secret-ephemeral-database
     steps:
       - uses: actions/checkout@v5
       - uses: pnpm/action-setup@v4
@@ -245,10 +277,60 @@ jobs:
   # *query* cannot reach another attendee's rows.
   test-integration:
     name: test-integration
-    needs: [db-branch, migrations]
+    # Still ordered after `migrations` so a broken migration fails once, loudly, rather than as
+    # a confusing cascade here. The harness applies them itself against its own container.
+    needs: migrations
     runs-on: ubuntu-latest
+    # ─────────────────────────────────────────────────────────────────────────────────────
+    # **A PostgreSQL service container, not a Neon branch.**
+    #
+    # These gates need *a real database*, which is what FR-005 and FR-069 ask for — not Neon
+    # specifically. Binding them to `db-branch` meant one unset repository secret
+    # (`NEON_API_KEY`) skipped every database-dependent check in the pipeline, and under
+    # Principle VII a skip is not a pass: the checks that enforce this product's personal-data
+    # guarantees had never executed once, across three merged features.
+    #
+    # A per-job container is also **more** isolated than the three shared Neon branches it
+    # replaces, because each job gets its own runner and therefore its own database that no
+    # other job can reach. `pnpm verify:clean` has always run these same suites against stock
+    # `postgres:17` locally, so this is the environment they were already proved against.
+    #
+    # Neon is still what the **preview** uses (`deploy-api`, `schema-diff`): a preview API
+    # outlives its job and needs a database that outlives it too. FR-067's "never point a
+    # preview at real attendee data" is unchanged, and `preview-base` is still its parent.
+    # ─────────────────────────────────────────────────────────────────────────────────────
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: mynet
+          POSTGRES_PASSWORD: mynet
+          POSTGRES_DB: mynet_ci
+        ports:
+          - 5432:5432
+        # Without a health gate the first migration races the server's startup and fails with a
+        # connection error that reads like a broken migration.
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     env:
-      DATABASE_URL: ${{ needs.db-branch.outputs.db_url }}
+      DATABASE_URL: postgresql://mynet:mynet@localhost:5432/mynet_ci
+      # ───────────────────────────────────────────────────────────────────────────────────
+      # **`loadConfig()` requires these, and the workflow has never supplied them.**
+      #
+      # A second latent fault, invisible until now because `db-branch` failed first: every job
+      # below builds the Fastify app, and `loadConfig()` refuses to start without a pepper and
+      # an attempt-hash key. Had the Neon secret been set, these jobs would simply have failed
+      # one line further on.
+      #
+      # Throwaway values for a container that is destroyed with the job. They are deliberately
+      # NOT repository secrets: nothing they protect outlives the run, and a real secret here
+      # would be a production credential sitting in a public repository's workflow environment.
+      # ───────────────────────────────────────────────────────────────────────────────────
+      AUTH_PASSWORD_PEPPER: ci-only-not-a-secret-ephemeral-database
+      AUTH_ATTEMPT_HASH_KEY: ci-only-not-a-secret-ephemeral-database
     steps:
       - uses: actions/checkout@v5
       - uses: pnpm/action-setup@v4
@@ -293,12 +375,60 @@ jobs:
   # Both drive a real browser against a production build and a real API over a real database.
   test-accessibility:
     name: test-accessibility
-    needs: [db-branch, migrations]
+    needs: migrations
     runs-on: ubuntu-latest
+    # ─────────────────────────────────────────────────────────────────────────────────────
+    # **A PostgreSQL service container, not a Neon branch.**
+    #
+    # These gates need *a real database*, which is what FR-005 and FR-069 ask for — not Neon
+    # specifically. Binding them to `db-branch` meant one unset repository secret
+    # (`NEON_API_KEY`) skipped every database-dependent check in the pipeline, and under
+    # Principle VII a skip is not a pass: the checks that enforce this product's personal-data
+    # guarantees had never executed once, across three merged features.
+    #
+    # A per-job container is also **more** isolated than the three shared Neon branches it
+    # replaces, because each job gets its own runner and therefore its own database that no
+    # other job can reach. `pnpm verify:clean` has always run these same suites against stock
+    # `postgres:17` locally, so this is the environment they were already proved against.
+    #
+    # Neon is still what the **preview** uses (`deploy-api`, `schema-diff`): a preview API
+    # outlives its job and needs a database that outlives it too. FR-067's "never point a
+    # preview at real attendee data" is unchanged, and `preview-base` is still its parent.
+    # ─────────────────────────────────────────────────────────────────────────────────────
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: mynet
+          POSTGRES_PASSWORD: mynet
+          POSTGRES_DB: mynet_ci
+        ports:
+          - 5432:5432
+        # Without a health gate the first migration races the server's startup and fails with a
+        # connection error that reads like a broken migration.
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     env:
-      DATABASE_URL: ${{ needs.db-branch.outputs.db_url_a11y }}
+      DATABASE_URL: postgresql://mynet:mynet@localhost:5432/mynet_ci
       VITE_API_BASE_URL: http://localhost:3000
       WEB_ORIGIN: http://localhost:5173
+      # ───────────────────────────────────────────────────────────────────────────────────
+      # **`loadConfig()` requires these, and the workflow has never supplied them.**
+      #
+      # A second latent fault, invisible until now because `db-branch` failed first: every job
+      # below builds the Fastify app, and `loadConfig()` refuses to start without a pepper and
+      # an attempt-hash key. Had the Neon secret been set, these jobs would simply have failed
+      # one line further on.
+      #
+      # Throwaway values for a container that is destroyed with the job. They are deliberately
+      # NOT repository secrets: nothing they protect outlives the run, and a real secret here
+      # would be a production credential sitting in a public repository's workflow environment.
+      # ───────────────────────────────────────────────────────────────────────────────────
+      AUTH_PASSWORD_PEPPER: ci-only-not-a-secret-ephemeral-database
+      AUTH_ATTEMPT_HASH_KEY: ci-only-not-a-secret-ephemeral-database
     steps:
       - uses: actions/checkout@v5
       - uses: pnpm/action-setup@v4
@@ -308,7 +438,7 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps chromium
-      # Its own branch, so it applies its own migrations. The `migrations` job proves the
+      # Its own container, so it applies its own migrations. The `migrations` job proves the
       # committed migrations apply cleanly; this makes this suite's database usable.
       - run: pnpm db:migrate
       - run: pnpm exec playwright test e2e/accessibility.spec.ts
@@ -321,12 +451,60 @@ jobs:
 
   test-e2e:
     name: test-e2e
-    needs: [db-branch, migrations]
+    needs: migrations
     runs-on: ubuntu-latest
+    # ─────────────────────────────────────────────────────────────────────────────────────
+    # **A PostgreSQL service container, not a Neon branch.**
+    #
+    # These gates need *a real database*, which is what FR-005 and FR-069 ask for — not Neon
+    # specifically. Binding them to `db-branch` meant one unset repository secret
+    # (`NEON_API_KEY`) skipped every database-dependent check in the pipeline, and under
+    # Principle VII a skip is not a pass: the checks that enforce this product's personal-data
+    # guarantees had never executed once, across three merged features.
+    #
+    # A per-job container is also **more** isolated than the three shared Neon branches it
+    # replaces, because each job gets its own runner and therefore its own database that no
+    # other job can reach. `pnpm verify:clean` has always run these same suites against stock
+    # `postgres:17` locally, so this is the environment they were already proved against.
+    #
+    # Neon is still what the **preview** uses (`deploy-api`, `schema-diff`): a preview API
+    # outlives its job and needs a database that outlives it too. FR-067's "never point a
+    # preview at real attendee data" is unchanged, and `preview-base` is still its parent.
+    # ─────────────────────────────────────────────────────────────────────────────────────
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: mynet
+          POSTGRES_PASSWORD: mynet
+          POSTGRES_DB: mynet_ci
+        ports:
+          - 5432:5432
+        # Without a health gate the first migration races the server's startup and fails with a
+        # connection error that reads like a broken migration.
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     env:
-      DATABASE_URL: ${{ needs.db-branch.outputs.db_url_e2e }}
+      DATABASE_URL: postgresql://mynet:mynet@localhost:5432/mynet_ci
       VITE_API_BASE_URL: http://localhost:3000
       WEB_ORIGIN: http://localhost:5173
+      # ───────────────────────────────────────────────────────────────────────────────────
+      # **`loadConfig()` requires these, and the workflow has never supplied them.**
+      #
+      # A second latent fault, invisible until now because `db-branch` failed first: every job
+      # below builds the Fastify app, and `loadConfig()` refuses to start without a pepper and
+      # an attempt-hash key. Had the Neon secret been set, these jobs would simply have failed
+      # one line further on.
+      #
+      # Throwaway values for a container that is destroyed with the job. They are deliberately
+      # NOT repository secrets: nothing they protect outlives the run, and a real secret here
+      # would be a production credential sitting in a public repository's workflow environment.
+      # ───────────────────────────────────────────────────────────────────────────────────
+      AUTH_PASSWORD_PEPPER: ci-only-not-a-secret-ephemeral-database
+      AUTH_ATTEMPT_HASH_KEY: ci-only-not-a-secret-ephemeral-database
     steps:
       - uses: actions/checkout@v5
       - uses: pnpm/action-setup@v4
@@ -462,20 +640,6 @@ jobs:
         with:
           project_id: ${{ secrets.NEON_PROJECT_ID }}
           branch: pr-${{ github.event.number }}
-          api_key: ${{ secrets.NEON_API_KEY }}
-      - name: delete the end-to-end database branch
-        if: always()
-        uses: neondatabase/delete-branch-action@v3
-        with:
-          project_id: ${{ secrets.NEON_PROJECT_ID }}
-          branch: pr-${{ github.event.number }}-e2e
-          api_key: ${{ secrets.NEON_API_KEY }}
-      - name: delete the accessibility database branch
-        if: always()
-        uses: neondatabase/delete-branch-action@v3
-        with:
-          project_id: ${{ secrets.NEON_PROJECT_ID }}
-          branch: pr-${{ github.event.number }}-a11y
           api_key: ${{ secrets.NEON_API_KEY }}
       - if: always()
         uses: superfly/flyctl-actions/setup-flyctl@master
