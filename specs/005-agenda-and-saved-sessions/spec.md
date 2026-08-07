@@ -6,7 +6,7 @@
 
 **Status**: Draft
 
-**Constitution**: v2.1.0
+**Constitution**: v2.2.0
 
 **Brainstorm**: `brainstorm/03-agenda-and-saved-sessions.md`
 
@@ -597,7 +597,7 @@ attendees (006), message composition (007), card-sharing feedback and meeting sc
 | **Validation checklist discharged** (Principle VII) | Session save (full); personal notes (full); keyboard focus visibility and accessible labels for controls introduced here, including the first focus trap; production build; desktop and mobile rendering extended to the filter and detail panel. Left to later features: audience Q&A with upvoting; attendee search and filter; message composition; card-sharing feedback; meeting scheduling and appointment creation. |
 | **Identity scoping & server-side authorization** (Principle VIII) | Applies, and more heavily than in any prior feature. **Rule**: every saved-session and note operation is bound to the authenticated attendee at the request boundary **and** to a conference for which that attendee holds a registration. **Enforcement**: identity comes from the sign-in session, never from a client-supplied identifier; registration is verified server-side before any read or write, as a precondition rather than an optional step, in the proof-carrying form 002 established; the route audit fails the build when a conference-accepting route lacks it; refusals disclose nothing about the existence of a record, a session or a conference; isolation is asserted by automated tests against real seeded rows exercising the server directly. **New personal data is stored**: saved sessions, and — significantly — attendee-authored free-text notes, this product's first. See the retention position below. |
 | **Event scoping** (Constraints — data scoping) | **Saved sessions — per-event.** A saved session references a session, and sessions exist only within one conference; the set must swap when the attendee switches, and a save made at one conference is meaningless at another. **Session notes — per-event**, for exactly the same reason: a note is written against a session, not against a person or a topic. Neither is cross-event, and neither could be without inventing a cross-conference notion of "the same session" that the product does not have — 002 already records that the same human speaking at two conferences is two unrelated records. **No existing table's scoping changes.** |
-| **Register position** (Governance) | **Blocks this feature**: none, after a recorded narrowing. The register entry *"data retention, deletion and export obligations"* names 004 as the blocked feature, "the first to store substantial personal data" — but 004 is not running first and **this feature is**, storing attendee-authored free text. Brainstorm #03 decided not to stall the only unblocked phase: this feature declares a **narrow commitment** — saved sessions and notes are **deleted with the attendee's account**, and **no export path ships in 005** — as a declared limit under Principle IX rather than a silent omission. **Resolved by this feature**: none; the full retention, deletion and export obligation remains open and still blocks 004. **Escalated by this feature**: client validation of desktop and tablet layouts, which now covers Home, the programme, a filter and an overlay panel before any review has taken place. **Closed as idea-inbox entries, by decision**: `interface-evolution-for-offline-data`, `home-card-duplicate-reads`, `destination-owns-its-element`. **Newly recorded**: an upper bound on cache staleness (see Open Questions). |
+| **Register position** (Governance) | Assessed against constitution **v2.2.0**, which ratified the correction this row previously argued for. **Blocks this feature**: **entry 17** — the pipeline runs red and the migration, integration, accessibility and end-to-end gates have never executed. v2.2.0 states this MUST be waived or closed **before phase 005 merges**, because this feature's personal-data guarantees (FR-227–FR-232, SC-205) are enforced only by the integration suite and the route audit. Root cause is diagnosed and recorded on PR #7: `NEON_API_KEY` is unset, and `event-scope-audit.test.ts` requires `DATABASE_URL` at module load. **Does not block**: **entry 6**, data retention. That entry named 004 as "the first to store substantial personal data"; v2.2.0 corrected it to record that **005 ships first**, and that 005 proceeds on a **narrow commitment** — saved sessions and notes are **deleted with the attendee's account**, **no export path ships in 005** — as a declared limit under Principle IX rather than a silent omission. **Resolved by this feature**: none; the full retention, deletion and export obligation remains open and still blocks 004. **Escalated by this feature**: **entry 4**, client validation of desktop and tablet layouts, which now covers Home, the programme, a filter and an overlay panel before any review has taken place. **Relevant but not acted on**: **entry 16**, the repository being public, which makes this feature's seed data and migrations world-readable — it stores no secrets, so nothing here changes. **Closed as idea-inbox entries, by decision**: `interface-evolution-for-offline-data`, `home-card-duplicate-reads`, `destination-owns-its-element`. **Newly recorded**: whether 24 hours is the right cache lifetime (see Open Questions). |
 | **Reserved migration number** (Branching — parallel work) | **`0004`**, as reserved by the delivery roadmap for phase 005. One migration, carrying both new tables. `0005` remains reserved for 006, which may proceed in parallel, and `0004` MUST NOT be renamed to resolve any conflict with it. Per Principle VII, `0004` MUST be verified in CI — applying forward against a real database instance, with the integration suite run against the result — before it reaches any environment holding real data. |
 
 ---
@@ -651,11 +651,20 @@ challenge them.
 - **The connectivity capability must be able to report the current state and its changes**, since
   FR-217 refuses writes on it and FR-216 depends on distinguishing cached from live. If the shipped
   interface cannot, extending it is part of this feature.
-- **The CI pipeline must actually run.** The overview records that runs have been queued since
-  2026-08-06 17:04 and that **nothing on `develop` has ever passed CI**. This feature's isolation
-  suite and route audit — the enforcement behind FR-230 and FR-232, and behind the personal-data
-  guarantees in SC-205 — are enforced only by CI. Until it runs, they are documentation. This is
-  materially more serious here than in 002, because this is the first feature storing
+- **The CI pipeline must be repaired before this feature merges**, per constitution register entry
+  17 and the Principle VII breach clause added in v2.2.0. Diagnosed 2026-08-07 on PR #7, and more
+  specific than the earlier "runs are queued" description — the runs now complete, and fail:
+  - **`NEON_API_KEY` is unset**, so `db-branch` fails with *"Cannot run interactive auth in CI"*.
+    Every stage downstream of it — `migrations`, `schema-diff`, `test-integration`, `test-e2e`,
+    `test-accessibility`, `deploy-api` — is skipped. **This single missing secret is why those
+    gates have never executed once.**
+  - **`apps/api/tests/unit/event-scope-audit.test.ts` requires `DATABASE_URL` at module load**, so
+    `test-unit` fails while the other 14 files pass.
+
+  Both bear directly on this feature. **FR-230 is the route audit**, and it is the test currently
+  failing to run; **FR-232 and SC-205** are asserted by the integration suite, which is skipped.
+  Until both are repaired, this feature's personal-data guarantees are documentation rather than
+  enforcement — materially more serious here than in 002, because this is the first feature storing
   attendee-authored free text.
 
 ---
