@@ -1,5 +1,68 @@
 <!--
 SYNC IMPACT REPORT
+Version change: 2.1.0 → 2.2.0
+Rationale: MINOR. Principle VII is materially expanded with a breach clause, and three register
+entries are corrected against verified evidence while two are added. No principle is removed or
+redefined, and no work performed under 2.1.0 is invalidated.
+
+This amendment records no new owner decision. It corrects statements of fact that were wrong, and
+adds entries for facts that were true but unrecorded. Evidence was gathered from the GitHub API on
+2026-08-07 rather than from any prior document, because two prior documents disagreed.
+
+Modified principles:
+  - VII. Verified on Linux CI — expanded. The principle stated "a change is not complete until the
+    pipeline is green" without naming the consequence of merging anyway. It now defines merging with
+    a failing, skipped, cancelled, or never-started required check as a governance breach, requires
+    a recorded waiver naming the unsatisfied checks and who accepted the risk, and states that
+    skipped later stages MUST NOT be read as absence of problems.
+
+Corrected sections (factual errors, verified 2026-08-07):
+  - Branching and Change Flow → Enforcement. Said server-side branch protection was "unavailable
+    (private repository on a free personal account; the branch-protection and ruleset APIs both
+    return 403)" and that making the repository public or upgrading to GitHub Pro was required.
+    Every part of that was false: the repository is PUBLIC and organisation-owned, the protection
+    endpoints return 404 (no rule set), rulesets returns [], and protection is free on public
+    repositories. The gap is unconfigured, not unavailable — a configuration task, not a risk to
+    accept.
+  - Register entry 6 (data retention/deletion/export). Justified blocking 004 by calling it "the
+    first to store substantial personal data". It is not first; 005 ships first and stores the
+    product's first attendee-authored free text as personal session notes. The block on 004 stands
+    on other grounds; the justification was corrected and 005's narrow declared commitment recorded.
+  - Register entry 15 (branch protection). Same false premise as the Enforcement paragraph.
+
+Added register entries:
+  - 16. Repository visibility — public and organisation-owned, previously unrecorded anywhere in
+    this constitution. Changes the Principle VIII threat model; interacts with entry 14.
+  - 17. The pipeline runs red and most Principle VII checks have never executed. Features 001 and
+    002 merged in this state. Must be waived or closed before 005 merges.
+
+Templates and dependent artifacts:
+  ✅ .specify/templates/plan-template.md — Constitution Check resolves against this file at plan
+     time; no static edit required.
+  ✅ .specify/templates/spec-template.md — no edit required. Its Principle IX declaration table
+     already carries the rows this amendment touches; nothing in 2.2.0 adds a declaration category.
+  ✅ .specify/templates/tasks-template.md — no edit required; task categories are unaffected.
+  ✅ CLAUDE.md — updated in this change. Carried the same false branch-protection claim in two
+     places and the same "first to store substantial personal data" error.
+  ✅ .githooks/README.md — updated in this change. Carried the false claim and additionally named
+     the repository as `daperezu/mynet-ps`, which is no longer where it lives.
+  ⚠️ brainstorm/00-overview.md — pending, and deliberately not edited here. Its CI entry says runs
+     have "never started", which was true when written and is now wrong in a new way: they run and
+     fail. The file self-declares as subordinate to this register, so it is stale rather than
+     conflicting. It is corrected on the branch carrying brainstorm #03.
+  ✅ specs/001-production-foundation/, specs/002-event-context-and-catalog/ — unaffected as
+     specifications. Both features merged in breach of the clause added to Principle VII; that is
+     recorded as register entry 17 rather than retro-applied to their specs.
+  ✅ specs/005-agenda-and-saved-sessions/ — unaffected. Its Register position declaration already
+     states the entry-6 correction this amendment ratifies, and its Dependencies section already
+     states that its guarantees are documentation until CI runs.
+
+Deferred TODOs:
+  - Entry 17 requires a waiver or a fix. This amendment records the breach; it does not resolve it,
+    and resolving it is code and pipeline work outside a constitution amendment.
+  - GroundZero/requirements.md remains knowingly out of step (register entry 3). Unchanged.
+
+--- PRIOR REPORT: 2.1.0 ---
 Version change: 2.0.0 → 2.1.0
 Rationale: MINOR. One principle added, two sections materially expanded, three Open Questions
 Register entries resolved. No principle is removed or redefined, and no work performed under 2.0.0
@@ -283,6 +346,20 @@ A change is not complete until the pipeline is green. Completion MUST NOT be cla
 inspection; it MUST be claimed from pipeline output. Failing or skipped checks MUST be reported
 explicitly, never silently tolerated.
 
+**Merging with a required check failing, skipped, cancelled, or never started is a governance
+breach.** A check that did not run has not passed, and a pipeline whose later stages are skipped
+because an earlier stage failed has verified nothing beyond the point of failure — the skipped
+stages MUST NOT be read as absence of problems. Where such a merge is nevertheless judged
+necessary, it MUST carry a **recorded waiver** naming the checks not satisfied, why the merge could
+not wait, and who accepted the risk. An unwaived breach MUST be recorded in the Open Questions
+Register and MUST be closed before the next feature merges. Silence is not a waiver, and a green
+subset is not a green pipeline.
+
+*Rationale*: this principle previously stated the standard without naming the consequence of
+breaking it, and the standard was then broken twice — features 001 and 002 both merged with the
+migration, integration, accessibility and end-to-end stages unexecuted. A rule with no stated breach
+condition is guidance; this makes it a gate.
+
 The requirements validation checklist — production build success, desktop and mobile rendering,
 navigation and event switching, search and filter, session save + notes + Q&A, message composition,
 card-sharing feedback, meeting scheduling and appointment creation, keyboard focus visibility, and
@@ -450,12 +527,14 @@ constitution — MUST reach them through a pull request.
 activate them once with `git config core.hooksPath .githooks` — `core.hooksPath` is local
 configuration and cannot be committed. These hooks are a guardrail against mistakes, not a security
 control: they are bypassable with `--no-verify`. Authoritative enforcement is server-side GitHub
-branch protection, which is currently **unavailable** on this repository (private repository on a
-free personal account; the branch-protection and ruleset APIs both return 403). Making the
-repository public or upgrading to GitHub Pro, then applying the configuration recorded in
-`.githooks/README.md`, is required to close this gap. Until then the gap is a known, accepted risk —
-not a resolved one. **With real attendee data now in scope, this gap is materially more serious than
-it was under 1.x.**
+branch protection, which is **unconfigured** on this repository — not unavailable. Verified
+2026-08-07: `branches/main/protection` and `branches/develop/protection` both return **404, meaning
+no rule is set**, and the `rulesets` endpoint returns an empty list. The repository is public and
+organisation-owned (`Programa-Semilla/mynet-ps`), and branch protection is free on public
+repositories, so **nothing external prevents closing this gap**. Applying the configuration recorded
+in `.githooks/README.md` is a configuration task that MUST be completed. Until it is, the gap is a
+known and *unnecessary* risk rather than an accepted one. **With real attendee data now in scope,
+this gap is materially more serious than it was under 1.x.**
 
 ### Parallel work and shared artifacts
 
@@ -564,8 +643,14 @@ decision cited in an amendment.
    ticket holder, organizer-provisioned — is unspecified, and it determines the authentication
    design. Blocks the attendee profile feature.
 6. **Data retention, deletion, and export obligations** for personal data (Principle VIII) are
-   recognised but unspecified. Blocks the attendee profile feature, which is the first to store
-   substantial personal data.
+   recognised but unspecified. **Blocks phase 004, the attendee profile feature.** *Corrected
+   2026-08-07*: this entry previously justified that block by calling 004 "the first to store
+   substantial personal data". It is not. 004 is blocked on other grounds and has no parallel
+   partner, so **phase 005 ships first** and stores the product's first attendee-authored free text,
+   in the form of personal session notes. 005 proceeds on a **narrow declared commitment** recorded
+   in its specification — notes and saved sessions are deleted with the attendee's account, and no
+   export path ships — which Principle VIII permits, since it requires such an absence be recorded
+   rather than passed over. The full obligation remains unanswered and still blocks 004.
 7. **The connection model behind Network contacts.** The prototype derives contacts from the
    existence of a conversation; no explicit connect or accept action is defined, so there is no
    relationship to store. Blocks the Network feature entirely.
@@ -589,11 +674,32 @@ decision cited in an amendment.
 14. **Public preview URLs.** Cloudflare Pages previews are publicly reachable by default; with real
     data in scope, preview environments MUST NOT be pointed at production data, and preview access
     control is undecided.
-15. **Server-side branch protection remains unavailable** (private repository, free personal
-    account; APIs return 403). Enforcement is client-side and bypassable.
+15. **Server-side branch protection is unconfigured** — a configuration task, not an accepted risk.
+    *Corrected 2026-08-07*: this entry previously recorded it as "unavailable (private repository,
+    free personal account; APIs return 403)". **Both halves were wrong.** The repository is public
+    and organisation-owned; the protection endpoints return **404 — no rule set** — and `rulesets`
+    returns an empty list. Branch protection is free on public repositories. Until it is applied,
+    enforcement is client-side only and bypassable with `--no-verify`.
+16. **The repository is public and organisation-owned** — `Programa-Semilla/mynet-ps` — and nothing
+    in this constitution recorded that. Whether it was intended, or is an artifact of how the
+    repository was created, is undecided. It changes the Principle VIII threat model either way:
+    committed seed data, migrations, workflow configuration, and the generated API contract are all
+    world-readable, and preview deployments are reachable by anyone who finds them. This interacts
+    with entry 14. *Added 2026-08-07*.
+17. **The pipeline runs red, and most of the checks Principle VII names have never executed.**
+    *Verified 2026-08-07*: every pull-request run of the `verify` workflow has concluded in failure,
+    and every `develop` push run was cancelled. On the most recent run `lint`, `typecheck`, `build`,
+    `contract` and `test-component` pass, while `test-unit` and `cleanup` fail — and `db-branch`,
+    `schema-diff`, `migrations`, `test-integration`, `test-e2e`, `test-accessibility` and
+    `deploy-api` are all **skipped**. Migration verification, integration tests against a real
+    database, accessibility checks and end-to-end browser tests are therefore specified by Principle
+    VII but have never once run. Features 001 and 002 both merged in this state. Under the breach
+    clause added to Principle VII in 2.2.0 this MUST be waived or closed, and it MUST be closed
+    before phase 005 merges, because 005's personal-data guarantees are enforced only by the
+    integration suite. *Added 2026-08-07*.
 
 **Runtime guidance**: `CLAUDE.md` provides durable project context for AI-assisted sessions. It MUST
 stay consistent with this constitution and MUST NOT contain implementation plans, session tasks,
 progress updates, or invented requirements.
 
-**Version**: 2.1.0 | **Ratified**: 2026-08-04 | **Last Amended**: 2026-08-06
+**Version**: 2.2.0 | **Ratified**: 2026-08-04 | **Last Amended**: 2026-08-07
