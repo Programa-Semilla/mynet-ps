@@ -161,8 +161,12 @@ Five, recorded in the spec rather than resolved, per Principle I:
    question concrete without answering it.
 3. **Whether an explicit event choice should ever expire** — decided as "never" here, with the
    rejected alternative recorded so it can be revisited cheaply.
-4. **Whether the enlarged scope still wants a single pull request** — the phase-split step will put
-   this again against the concrete task list.
+4. ~~**Whether the enlarged scope still wants a single pull request**~~ — **closed at phase-split**:
+   one squash-merged PR into `develop`, reaffirmed against the concrete 89-task list. Reviewers
+   should know the consequence: Phase 1's mechanical split **will** appear in the same diff as the
+   new architecture, because squash-merge does not preserve its separate commit. Read T001–T005
+   first and separately; `contracts/openapi.json` is byte-identical across them (SC-110), so the
+   split is verifiable as behaviour-neutral without reading it alongside everything else.
 5. **What "PS" denotes** in the repository name, and the repository-visibility entry — unchanged by
    this feature.
 

@@ -665,8 +665,14 @@ Recorded rather than resolved, per Principle I.
    An attendee who switches to a past conference and forgets stays there indefinitely. If that proves
    confusing in use, the alternative — falling back to derivation once the chosen conference ends —
    was explored and rejected in brainstorm #02 and can be revisited without reopening anything else.
-4. **Whether the enlarged scope still wants a single pull request.** Reaffirmed by the owner after the
-   catalog was absorbed, and recorded here as the intent. The phase-split step before implementation
-   will put the question again against a concrete task list.
+4. ~~**Whether the enlarged scope still wants a single pull request.**~~ **Closed 2026-08-06** at the
+   phase-split step, put to the owner against the concrete task list — 89 tasks, 8 phases, 6 tables,
+   5 endpoints, 2 migrations, a new destination — alongside a two-PR split at the US1 seam and a
+   three-PR split isolating the shared-file split. **One squash-merged pull request into `develop`,
+   reaffirmed a third time.** Recorded with it: because `develop` is squash-merge only, the
+   shared-file split's "own first commit" (FR-180–FR-183, Phase 1) lives on the feature branch and
+   does not survive the merge, so its stated purpose — a mechanical diff never sitting beside new
+   architecture *in the same review* — is met at the commit level but **not** at the review level.
+   Accepted as the cost of landing the feature atomically.
 5. **What "PS" denotes** in the repository name, and the repository-visibility entry — both unchanged
    by this feature and both still open.
