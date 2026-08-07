@@ -12,7 +12,10 @@ export type {
   Event,
   EventsRepository,
   Room,
+  SavedSessionRepository,
   Session,
+  SessionNote,
+  SessionNotesRepository,
   Speaker,
   Track,
 } from './interfaces/index.js'

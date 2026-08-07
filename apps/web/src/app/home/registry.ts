@@ -1,4 +1,5 @@
 import { greetingDayContextCard } from './cards/GreetingDayContext.js'
+import { nextSavedSessionCard } from './cards/NextSavedSession.js'
 import { restOfDayCard } from './cards/RestOfDay.js'
 import { upNextCard } from './cards/UpNext.js'
 import { yourConferencesCard } from './cards/YourConferences.js'
@@ -44,6 +45,8 @@ export const HOME_CARDS: readonly HomeCard[] = [
   upNextCard,
   restOfDayCard,
   yourConferencesCard,
+  // 005 — the attendee's next SAVED session. Appended; nothing above is edited or reordered.
+  nextSavedSessionCard,
 ]
 
 /**

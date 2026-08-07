@@ -1,4 +1,8 @@
 import { CalendarDays, Compass, Home, MessageSquare, Users, type LucideIcon } from 'lucide-react'
+import { createElement, type ReactElement } from 'react'
+
+import { SessionPanel } from './agenda/SessionPanel.js'
+import { Agenda } from './destinations/Agenda.js'
 
 /**
  * The five destinations, declared once (FR-012, FR-013).
@@ -29,6 +33,50 @@ export interface Destination {
    */
   readonly purpose: string
   readonly icon: LucideIcon
+  /**
+   * T016 (005) — **what renders this destination** (FR-233).
+   *
+   * ───────────────────────────────────────────────────────────────────────────────────────
+   * The router used to decide by comparing the address to the literal `'/agenda'`. That
+   * worked for exactly one destination with content, and it meant each of the four features
+   * still to come — 006 Discover, 007 Messages, 008 Network, and 004's profile view — would
+   * add another branch to the same `if` in `routes.tsx`. Four features editing one shared
+   * expression is precisely the contention 002's per-domain file splits exist to avoid.
+   *
+   * Declaring it here inverts that: a destination says what renders it, and `routes.tsx`
+   * stops naming any address literally. A later feature changes **this line only**, and the
+   * router is not touched again. FR-233 requires the literal special case to be *retired* by
+   * this change, not merely supplemented — so `routes.tsx` now has no address comparison
+   * left in it at all.
+   *
+   * **Optional, because a destination without content is not broken.** Discover, Messages and
+   * Network legitimately have no element yet; `undefined` means "render the placeholder",
+   * which is a real state rather than a missing one.
+   *
+   * Built with `createElement` rather than JSX because this module is `.ts` and is read by the
+   * router, all three navigation forms, and the tests. Renaming it to `.tsx` would churn a
+   * shared file for syntax alone, which is the opposite of what this change is for.
+   * ───────────────────────────────────────────────────────────────────────────────────────
+   */
+  readonly element?: ReactElement
+  /**
+   * T035 (005) — addresses **nested inside** this destination (FR-198, research D4).
+   *
+   * ───────────────────────────────────────────────────────────────────────────────────────
+   * Declared here for exactly the reason `element` is. tasks.md places the nested session
+   * route in `routes.tsx`; putting it there would have reintroduced a literal Agenda special
+   * case into the router one line after FR-233 retired the last one, and 009 — which extends
+   * the same panel — would have had to edit the router to do it.
+   *
+   * A destination owns its addresses. `routes.tsx` renders whatever is declared and names
+   * none of them.
+   *
+   * **Nested, not sibling**: the parent stays mounted, so the programme is still behind the
+   * panel, closing is a navigation rather than a refetch, and Back closes the panel through
+   * the browser's own mechanism (FR-205).
+   * ───────────────────────────────────────────────────────────────────────────────────────
+   */
+  readonly children?: readonly { readonly path: string; readonly element: ReactElement }[]
 }
 
 export const DESTINATIONS: readonly Destination[] = [
@@ -50,8 +98,17 @@ export const DESTINATIONS: readonly Destination[] = [
     */
     path: '/agenda',
     label: 'Agenda',
-    purpose: 'The conference programme, in chronological order.',
+    /*
+      T028 (005) — `purpose` again describes what the destination actually is. 002 narrowed it
+      from "your personalised schedule" to "the conference programme" because saving did not
+      exist yet; 005 is the feature that makes it a personal schedule, so the wording that was
+      premature then is accurate now.
+    */
+    purpose: 'The conference programme, and the sessions you saved from it.',
     icon: CalendarDays,
+    element: createElement(Agenda),
+    // `/agenda/<sessionId>` — the detail panel, rendered over the programme (FR-198).
+    children: [{ path: ':sessionId', element: createElement(SessionPanel) }],
   },
   {
     path: '/discover',
@@ -76,6 +133,34 @@ export const DESTINATIONS: readonly Destination[] = [
 /** Home is the default destination (FR-012). */
 export const HOME = DESTINATIONS[0] as Destination
 
-/** The destination a given address resolves to, or undefined for a not-found address. */
-export const destinationFor = (pathname: string): Destination | undefined =>
-  DESTINATIONS.find((destination) => destination.path === pathname)
+/**
+ * The destination a given address resolves to, or undefined for a not-found address.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ * **Resolves nested addresses to their owning destination** (005).
+ *
+ * This was an exact match, which was correct while every address *was* a destination. 005
+ * added the first nested one — `/agenda/<sessionId>`, the session detail panel — and the exact
+ * match then reported it as no destination at all. The consequences were not cosmetic and were
+ * found in a browser rather than by reading:
+ *
+ *   - the top bar read **"Not found"** while a perfectly valid session panel was open, and
+ *   - `RouteAnnouncer` announced **"Page not found"** to screen-reader users on every open.
+ *
+ * The second is the serious one. Opening a session is exactly the moment a screen-reader user
+ * needs to be told what happened, and they were being told the page did not exist.
+ *
+ * A prefix match with a `/` boundary rather than `startsWith` alone: `/agendaX` must not
+ * resolve to Agenda, and Home's `'/'` must not swallow every address in the product — which it
+ * would, being a prefix of all of them. Home therefore stays exact-only, and the longest match
+ * wins so a future destination nested under another still resolves to the nearer one.
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ */
+export const destinationFor = (pathname: string): Destination | undefined => {
+  const exact = DESTINATIONS.find((destination) => destination.path === pathname)
+  if (exact) return exact
+
+  return DESTINATIONS.filter(
+    (destination) => destination.path !== HOME.path && pathname.startsWith(`${destination.path}/`),
+  ).sort((a, b) => b.path.length - a.path.length)[0]
+}

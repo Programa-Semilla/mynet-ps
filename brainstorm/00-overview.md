@@ -1,6 +1,6 @@
 # Brainstorm Overview
 
-Last updated: 2026-08-06
+Last updated: 2026-08-07
 
 The authoritative registers live elsewhere — open questions in `.specify/memory/constitution.md`,
 delivery sequence in `docs/superpowers/specs/2026-08-06-mynet-delivery-roadmap-design.md`. This file
@@ -13,7 +13,8 @@ win and this is stale.
 |---|------|-------|--------|----------|
 | 01 | 2026-08-04 (revisited same day) | foundation-slice | shipped (PR #2) | `specs/001-production-foundation/` |
 | — | 2026-08-06 | delivery decomposition | recorded, ratified in constitution v2.1.0 | `docs/superpowers/specs/2026-08-06-mynet-delivery-roadmap-design.md` |
-| 02 | 2026-08-06 | event-context-and-catalog | active | — |
+| 02 | 2026-08-06 | event-context-and-catalog | shipped (PR #6) | `specs/002-event-context-and-catalog/` |
+| 03 | 2026-08-07 | agenda-and-saved-sessions | active | — |
 
 ## Delivery queue
 
@@ -26,8 +27,8 @@ the index, and it now differs from the roadmap in the ways #02 records.
 | 002 | Event Context, Session Catalog & Home Composition | **shipped** — 89/89 tasks, squash-merged to `develop` ([#6](https://github.com/Programa-Semilla/mynet-ps/pull/6)) | — |
 | 003 | ~~Session Catalog~~ | **absorbed into 002** (#02); migration `0002` transfers | — |
 | 004 | Attendee Profile & Own-Profile Editing | **next up**, no parallel partner — still blocked | identity model; retention obligations; avatar handling |
-| 005 | Agenda | queued (∥ 006) | 002 ✓ |
-| 006 | Discover | queued (∥ 005) | 004 |
+| 005 | Agenda | **shipped** — 94/94 tasks, squash-merged to `develop` ([#8](https://github.com/Programa-Semilla/mynet-ps/pull/8)) | 002 ✓ |
+| 006 | Discover | **next up** — migration `0005` reserved; 005's shared-file appends keep it uncontended | 004 |
 | 007 | Messages | queued | 004 |
 | 008 | Network & Appointments | queued (∥ 009) | connection model; card-exchange semantics |
 | 009 | Session Q&A | queued (∥ 008) | question attribution |
@@ -43,6 +44,12 @@ Numbers are **not** reassigned: 004–010 keep theirs, and 003 stays in the tabl
 that the roadmap and this index can still be read against each other. The first free parallel pair is
 now 005 ∥ 006 rather than 003 ∥ 004.
 
+**005 departs from the roadmap in two recorded ways** (#03), and its specification must say so.
+Its Home contribution is **its own card** rather than the roadmap's "Up-next prefers saved
+sessions", because that phrasing means editing 002's `UpNext` and standing decision 9 forbids a
+feature editing another feature's card. And it carries a **per-conference cache** the roadmap did
+not scope into this phase, which is what closes two idea-inbox entries at once.
+
 ## Open Threads
 
 ### Client decisions
@@ -51,8 +58,13 @@ Each names the phase it blocks — when to ask matters as much as what to ask.
 
 - **Attendee identity model** — self sign-up, event invitation, ticket holder, or
   organizer-provisioned. Determines the authentication design. *Blocks 004* (from #01 revisit)
-- **Data retention, deletion, and export obligations** for personal data. *Blocks 004* — the first
-  phase to store substantial personal data (from #01 revisit)
+- **Data retention, deletion, and export obligations** for personal data. *Blocks 004* (from #01
+  revisit) — **but it bites a phase earlier than recorded.** That entry assumed 004 ran first. It is
+  not running first, and 005's durable personal notes are attendee-authored free text, more
+  open-ended than anything a profile form collects. #03 decided not to stall on it: 005 declares a
+  **narrow commitment** — notes and saves are deleted with the account, no export path ships — as a
+  declared limit under Principle IX. The full obligation is still unanswered and still blocks 004
+  (revised 2026-08-07 by #03)
 - **The connection model behind Network contacts** — the prototype derives contacts from
   conversations, with no connect or accept action, so there is no relationship to store.
   *Blocks 008 entirely* (from #01 revisit)
@@ -97,6 +109,38 @@ Each names the phase it blocks — when to ask matters as much as what to ask.
   is public, and `branches/develop/protection` returns **404 — no rule set**. Branch protection is
   free on public repositories, so this is a configuration task rather than an accepted risk
   (corrected 2026-08-06)
+
+### Design questions carried into 005's specification — settled
+
+From #03, and now answered by the delivered feature.
+
+- **How long a cached programme may be shown before it is refused rather than stamped** →
+  **settled: 24 hours from retrieval** (FR-221). #03 decided the staleness *stamp* and left the
+  upper bound open; the specification review escalated that absence from a governance gap to an
+  **authorization hole**, because offline there is no server present to refuse and the age limit is
+  the only thing that revokes access after a registration is withdrawn. Beyond it, content is
+  refused with the same wording as a conference never read rather than shown with an old stamp.
+  *Whether 24 hours is the right span stays open below; that there is a value does not.*
+- **Whether a saved session is removable from the detail panel as well as from its row** →
+  **settled: from the row only.** One save affordance per session. Recorded as an open presentation
+  question below, to be answered against the built screen rather than in advance.
+
+### Design questions still open after 005 — for observation, not for a gate
+
+- **Whether 24 hours is the right cache lifetime.** A value is set and enforced; whether a
+  conference day plus an overnight is the right span — against a multi-day conference with poor
+  signal throughout, or against a shorter window for tighter revocation — is a product judgement
+  worth revisiting once the feature is in use.
+- **Whether the two next-session cards on Home need any relationship.** 005's card and 002's
+  `UpNext` can legitimately disagree — the attendee's saved 11:00 talk against the programme's
+  id-first 11:00 talk. Decision 9 says they are independent; whether that reads as *composed* or as
+  *contradictory* on the first viewport is worth looking at now that both are on screen.
+- **Whether a session should be unsavable from the detail panel as well as from its row.** Two
+  affordances for one session may read as redundant or as convenient.
+- **The arbitrary tie-break in `nextSession()` survives** on the generic Up next card. The seed
+  already contains two sessions starting at 11:00, so the first viewport is already featuring one
+  for reasons the attendee cannot see. 005 works around it rather than fixing it; the recorded
+  alternative is preference through `contract.ts` (#03 approach B).
 
 ### Design questions carried into 002's specification — all settled
 
@@ -163,16 +207,30 @@ All from #02, and all now answered by the delivered feature.
 
 ## Parked Ideas
 
-Seven entries in `brainstorm/idea-inbox.md`, all from the 001 deep review: session topology and
-CSRF, security response headers, the production deployment path, readiness versus liveness, throttle
-clock provenance, interface evolution for offline data, and substitutability proven without the
-application. The delivery-queue seed for phase 002 was consumed by #02 and removed.
+Ten entries in `brainstorm/idea-inbox.md` — six from the 001 deep review, four from 002's.
 
-Two of the seven now bear directly on 002 rather than waiting for a deployment conversation:
-`interface-evolution-for-offline-data`, because the catalog is the first content anyone would want
-to read on a conference floor with no signal, and `substitutability-proven-without-the-application`,
-whose lesson shaped three of #02's decisions.
+From 001: session topology and CSRF, security response headers, the production deployment path,
+readiness versus liveness, throttle clock provenance, and substitutability proven without the
+application. From 002: platform-registry structural typing, the seed production guard, the route
+audit's inability to see `$ref` schemas, and integration-test isolation coupling.
 
 Two of them — **session topology and CSRF** and **security response headers** — are the same
 decision seen from two sides, and both are cheapest to settle before the first preview environment is
 opened rather than after.
+
+**Consumed and removed by #03**, each closed with a decision rather than deferred again — and all
+three now **delivered by 005**:
+
+- `interface-evolution-for-offline-data` → 005 caches the active conference's programme, saved set
+  and notes; reads carry a staleness stamp; writes are refused offline rather than queued, so no
+  write queue, optimistic update or conflict resolution is incurred.
+- `home-card-duplicate-reads` → repeat reads are served from that same cache. Cards still call the
+  repository independently and **FR-164 holds unchanged**; identical reads are parsed and sorted
+  once rather than once per caller.
+- `destination-owns-its-element` → an optional `element` moves onto the `Destination` entry, so the
+  router's `path === '/agenda'` special-case becomes an append on Agenda's own line. 005's new
+  `/agenda/<sessionId>` route needs this regardless. **Delivered, and slightly larger than
+  scoped**: the destination also declares its nested `children`, so `routes.tsx` now names no
+  address at all and 006–009 extend `navigation.ts` rather than the router.
+
+The delivery-queue seed for phase 002 was consumed by #02 and removed.

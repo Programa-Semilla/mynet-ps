@@ -90,7 +90,13 @@ export const buildApp = async (options: BuildAppOptions = {}): Promise<FastifyIn
     // PUT is here for `PUT /workspace/active-event` (002, T056). Without it the browser's
     // preflight refuses the switch and the client sees an opaque network failure — which the
     // integration suite cannot catch, because `fastify.inject()` performs no preflight.
-    methods: ['GET', 'POST', 'PUT'],
+    //
+    // DELETE is here for 005: unsaving a session and clearing a note are both `DELETE`
+    // (research D6, FR-212). This is the *only* line 005 changes in this file, and it is
+    // changed for exactly the reason the sentence above already recorded — the lesson was
+    // written down in 002 precisely so the next feature would not have to learn it from a
+    // green test suite and a broken browser.
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
   })
 
   // 3. Error handling. Registered before routes so that a failure *inside* route

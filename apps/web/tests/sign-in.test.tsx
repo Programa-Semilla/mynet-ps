@@ -52,7 +52,21 @@ const renderSignIn = (overrides: Partial<PlatformServices> = {}) => {
         setActive: async () => Promise.reject(new Error('not signed in')),
       },
       catalog: { listSessions: async () => [], listTracks: async () => [] },
+      // 005 — signed out, so these reject for the same reason `getCurrent` does. Present
+      // because the registry is one object substituted whole (FR-047); absent members would
+      // not compile.
+      savedSessions: {
+        listSaved: async () => Promise.reject(new Error('not signed in')),
+        save: async () => Promise.reject(new Error('not signed in')),
+        unsave: async () => Promise.reject(new Error('not signed in')),
+      },
+      sessionNotes: {
+        listNotes: async () => Promise.reject(new Error('not signed in')),
+        writeNote: async () => Promise.reject(new Error('not signed in')),
+        deleteNote: async () => Promise.reject(new Error('not signed in')),
+      },
     },
+    freshness: { lastRetrieved: () => null },
     auth: { signIn, signOut: async () => {} },
     ...overrides,
   }

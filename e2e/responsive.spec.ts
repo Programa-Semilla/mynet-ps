@@ -132,6 +132,89 @@ test.describe('responsive layout', () => {
     }
   })
 
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════════════════
+   * T087, T088, T089 (005) — the session detail panel, **measured** at all three bands
+   * (FR-199, SC-211).
+   *
+   * The panel is the first overlay in the product and the first element rendered in the
+   * browser's **top layer**, which is outside the page's normal flow and therefore outside
+   * every layout assumption the tests above encode. It also inherits a user-agent
+   * `max-width: calc(100% - 6px - 2em)` that no class of ours overrides by accident — which is
+   * how a "full-width" mobile sheet turned out to be 282px on a 320px screen until a
+   * measurement said so.
+   *
+   * Component tests cannot reach any of this: jsdom applies no user-agent stylesheet and
+   * computes no layout. This is the assertion.
+   * ═══════════════════════════════════════════════════════════════════════════════════════
+   */
+  test('the session detail panel does not scroll sideways at any width', async ({ page }) => {
+    await signedIn(page)
+
+    for (const width of SCROLL_WIDTHS) {
+      await page.setViewportSize({ width, height: 900 })
+      await page.goto('/agenda')
+      await page.getByRole('heading', { level: 3 }).first().getByRole('link').click()
+      await expect(page.getByRole('dialog')).toBeVisible()
+
+      const { overflow, widest } = await horizontalOverflow(page)
+      expect(
+        overflow,
+        `the open panel overflows by ${overflow}px at ${width}px. Widest: ${JSON.stringify(widest)}`,
+      ).toBeLessThanOrEqual(0)
+    }
+  })
+
+  test('the panel is a FULL-WIDTH sheet at mobile and a centred overlay above it', async ({
+    page,
+  }) => {
+    await signedIn(page)
+
+    const measure = async (width: number) => {
+      await page.setViewportSize({ width, height: 900 })
+      await page.goto('/agenda')
+      await page.getByRole('heading', { level: 3 }).first().getByRole('link').click()
+      await expect(page.getByRole('dialog')).toBeVisible()
+      const box = await page.getByRole('dialog').boundingBox()
+      return box?.width ?? 0
+    }
+
+    // Mobile: essentially the whole viewport. The declared layout is a full-width overlay, and
+    // a card with gutters is a different design that nobody chose.
+    const mobile = await measure(320)
+    expect(mobile, 'the mobile panel must span the viewport').toBeGreaterThan(300)
+
+    // Tablet and desktop: constrained and centred, with the programme visible behind it.
+    const tablet = await measure(900)
+    expect(tablet, 'the tablet panel must be constrained, not full width').toBeLessThan(900)
+    expect(tablet).toBeGreaterThan(320)
+
+    const desktop = await measure(1440)
+    expect(desktop, 'the desktop panel must stay a centred overlay').toBeLessThan(1440)
+  })
+
+  test('the Agenda filter and save controls are touch-sized at mobile', async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 900 })
+    await signedIn(page)
+    await page.goto('/agenda')
+    await expect(page.getByRole('heading', { name: 'Agenda', level: 1 })).toBeVisible()
+
+    // FR-197 — 44px is the floor. Measured at 320px, where a target that only *looks* big
+    // enough at 375px is actually squeezed.
+    for (const name of ['All sessions', 'Saved']) {
+      const label = page.getByText(name, { exact: true })
+      const box = await label.boundingBox()
+      expect(box, name).not.toBeNull()
+      expect(box!.height, `${name} height`).toBeGreaterThanOrEqual(44)
+    }
+
+    const save = page.getByRole('button', { name: /to your agenda/i }).first()
+    const saveBox = await save.boundingBox()
+    expect(saveBox).not.toBeNull()
+    expect(saveBox!.height, 'save control height').toBeGreaterThanOrEqual(44)
+    expect(saveBox!.width, 'save control width').toBeGreaterThanOrEqual(44)
+  })
+
   test('the sign-in screen does not scroll sideways either', async ({ page }) => {
     for (const width of SCROLL_WIDTHS) {
       await page.setViewportSize({ width, height: 900 })

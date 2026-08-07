@@ -1,4 +1,5 @@
 import { render, screen, within } from '@testing-library/react'
+import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { HomeShell } from '../src/app/home/HomeShell.js'
@@ -28,6 +29,13 @@ const SCENARIOS = {
       listSessions: () => new Promise<never[]>(() => {}),
       listTracks: () => new Promise<never[]>(() => {}),
     },
+    // 005 — driven too, or a card reading it would sit in whatever state the default double
+    // produces and the matrix would record that as its answer for every scenario.
+    savedSessions: {
+      listSaved: () => new Promise<string[]>(() => {}),
+      save: async () => {},
+      unsave: async () => {},
+    },
   }),
   populated: () => ({
     events: { listRegistered: async () => [SUMMIT] },
@@ -50,10 +58,18 @@ const SCENARIOS = {
       ],
       listTracks: async () => [],
     },
+    // Both fixture sessions are saved, so a card about the attendee's own agenda has something
+    // to name rather than falling into its empty state and recording that as "populated".
+    savedSessions: {
+      listSaved: async () => ['s1', 's2'],
+      save: async () => {},
+      unsave: async () => {},
+    },
   }),
   empty: () => ({
     events: { listRegistered: async () => [] },
     catalog: { listSessions: async () => [], listTracks: async () => [] },
+    savedSessions: { listSaved: async () => [], save: async () => {}, unsave: async () => {} },
   }),
   failed: () => ({
     events: {
@@ -68,6 +84,13 @@ const SCENARIOS = {
       listTracks: async () => {
         throw new Error('server fault')
       },
+    },
+    savedSessions: {
+      listSaved: async () => {
+        throw new Error('server fault')
+      },
+      save: async () => {},
+      unsave: async () => {},
     },
   }),
 } as const
@@ -139,7 +162,16 @@ describe('every Home card in all four states (SC-109)', () => {
     it.each(states)('renders something visible and meaningful when %s', async (state) => {
       render(
         <WithServices services={testServices(SCENARIOS[state]())}>
-          <HomeShell cards={[card]} activeEvent={{ status: 'ready', event: SUMMIT }} />
+          {/*
+            005 — a router, because a Home card may legitimately link to a destination: this
+            feature's card offers "Browse the programme" from its empty state and links its
+            session to the detail panel. Without one the card throws, the shell contains it, and
+            the matrix would record a *containment region* as the card's rendering — passing
+            while checking nothing.
+          */}
+          <MemoryRouter>
+            <HomeShell cards={[card]} activeEvent={{ status: 'ready', event: SUMMIT }} />
+          </MemoryRouter>
         </WithServices>,
       )
 
@@ -183,7 +215,10 @@ describe('every Home card in all four states (SC-109)', () => {
       for (const state of states) {
         const { unmount } = render(
           <WithServices services={testServices(SCENARIOS[state]())}>
-            <HomeShell cards={[card]} activeEvent={{ status: 'ready', event: SUMMIT }} />
+            {/* 005 — see the note on the matrix above: a card may link to a destination. */}
+            <MemoryRouter>
+              <HomeShell cards={[card]} activeEvent={{ status: 'ready', event: SUMMIT }} />
+            </MemoryRouter>
           </WithServices>,
         )
         await vi.advanceTimersByTimeAsync(0)

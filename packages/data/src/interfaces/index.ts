@@ -22,6 +22,11 @@
 export type { Attendee, AttendeeRepository } from './attendee.js'
 export type { ActiveEventRepository, Event, EventsRepository } from './events.js'
 export type { CatalogRepository, Room, Session, Speaker, Track } from './catalog.js'
+// 005 — the attendee's own agenda. Separate from the catalog on purpose: the catalog is
+// read-only in perpetuity, and these are attendee state *about* its content (FR-191).
+// **Appended, never moved back into this barrel** (FR-235) — the per-domain split is what lets
+// 005 and 006 add interfaces in parallel without contending over these lines.
+export type { SavedSessionRepository, SessionNote, SessionNotesRepository } from './agenda.js'
 
 export {
   NotAuthenticatedError,
@@ -30,6 +35,7 @@ export {
   SessionExpiredError,
 } from './errors.js'
 
+import type { SavedSessionRepository, SessionNotesRepository } from './agenda.js'
 import type { AttendeeRepository } from './attendee.js'
 import type { CatalogRepository } from './catalog.js'
 import type { ActiveEventRepository, EventsRepository } from './events.js'
@@ -46,4 +52,7 @@ export interface Repositories {
   readonly events: EventsRepository
   readonly activeEvent: ActiveEventRepository
   readonly catalog: CatalogRepository
+  // 005 — appended, not inserted. Two members, one per domain interface.
+  readonly savedSessions: SavedSessionRepository
+  readonly sessionNotes: SessionNotesRepository
 }

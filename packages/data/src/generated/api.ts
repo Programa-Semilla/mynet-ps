@@ -587,6 +587,394 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/events/{eventId}/agenda/saved": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The attendee's saved session identifiers for this conference
+         * @description Identifiers only, not whole sessions (FR-188). The programme is fetched separately and already carries the session data; returning it again here would be a second source of truth that could disagree with the first. An attendee who has saved nothing gets an empty array — a valid answer, not a 404 (FR-195).
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    eventId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            sessionIds: string[];
+                        };
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Not registered for that conference, **or** no such conference, **or** the session is not part of it. All three are deliberately indistinguishable — identical status and identical body — so that an attendee cannot enumerate conferences or sessions by watching which refusal comes back (FR-204, FR-231). */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/events/{eventId}/agenda/saved/{sessionId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Save a session. Idempotent
+         * @description Saving an already-saved session succeeds with the same 204 (FR-187). The address IS the pairing, which is where the idempotency comes from — rather than from a uniqueness constraint doing double duty as business logic, though that constraint exists too as defence in depth (research D6). A double-tap on a slow connection is simply the same request twice.
+         */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    eventId: string;
+                    sessionId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Saved, or already saved. The same either way. */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Not registered for that conference, **or** no such conference, **or** the session is not part of it. All three are deliberately indistinguishable — identical status and identical body — so that an attendee cannot enumerate conferences or sessions by watching which refusal comes back (FR-204, FR-231). */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+            };
+        };
+        post?: never;
+        /**
+         * Unsave a session. Idempotent
+         * @description Succeeds with 204 whether or not the session was saved. The caller does not need to know which, and telling them would leak nothing useful.
+         */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    eventId: string;
+                    sessionId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Not registered for that conference, **or** no such conference, **or** the session is not part of it. All three are deliberately indistinguishable — identical status and identical body — so that an attendee cannot enumerate conferences or sessions by watching which refusal comes back (FR-204, FR-231). */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/events/{eventId}/agenda/notes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Every note the attendee has written in this conference
+         * @description Returned as a set rather than per session, so opening the detail panel needs no additional request and the whole set caches as one entry. Nothing here can read a note the requester did not write — the attendee comes from the sign-in session and there is no parameter in which to name anyone else (FR-208).
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    eventId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            notes: {
+                                /** Format: uuid */
+                                sessionId: string;
+                                body: string;
+                                /** Format: date-time */
+                                updatedAt: string;
+                            }[];
+                        };
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Not registered for that conference, **or** no such conference, **or** the session is not part of it. All three are deliberately indistinguishable — identical status and identical body — so that an attendee cannot enumerate conferences or sessions by watching which refusal comes back (FR-204, FR-231). */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/events/{eventId}/agenda/notes/{sessionId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Write or replace the attendee's note against a session
+         * @description The last confirmed write wins (FR-214); no merge is attempted and no conflict is detected. Returning `updatedAt` is what lets the client enter its saved status FROM A CONFIRMED RESPONSE rather than from the keystroke — the property that keeps the autosave non-optimistic and therefore outside the constitution's optimistic-update clause (FR-210, research D5).
+         */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    eventId: string;
+                    sessionId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** @description The note. Bounded here AND by a CHECK on the column, because client-side presentation of a limit is never its enforcement (Principle VIII, research D9). The editor surfaces the limit as it is approached, so a 400 from this route is defence rather than the designed path (FR-213). */
+                        body: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** Format: date-time */
+                            updatedAt: string;
+                        };
+                    };
+                };
+                /** @description The note was empty or over length. Reachable only by a client that bypassed the editor. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Not registered for that conference, **or** no such conference, **or** the session is not part of it. All three are deliberately indistinguishable — identical status and identical body — so that an attendee cannot enumerate conferences or sessions by watching which refusal comes back (FR-204, FR-231). */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+            };
+        };
+        post?: never;
+        /**
+         * Remove the attendee's note against a session. Idempotent
+         * @description This is the path clearing the text takes (FR-212): an emptied note is deleted rather than stored blank. Combined with the `length(body) > 0` constraint on the column, "no note" has exactly one representation in the database.
+         */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    eventId: string;
+                    sessionId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Not registered for that conference, **or** no such conference, **or** the session is not part of it. All three are deliberately indistinguishable — identical status and identical body — so that an attendee cannot enumerate conferences or sessions by watching which refusal comes back (FR-204, FR-231). */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {

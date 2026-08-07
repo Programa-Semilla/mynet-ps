@@ -57,8 +57,23 @@ export const testServices = (
     events: { listRegistered: async () => [SUMMIT] },
     activeEvent: { getActive: async () => SUMMIT, setActive: async () => SUMMIT },
     catalog: { listSessions: async () => [], listTracks: async () => [] },
+    // 005 — an attendee who has saved nothing and written nothing, which is what both seeded
+    // demo attendees actually start as. A test that wants otherwise says so explicitly.
+    savedSessions: {
+      listSaved: async () => [],
+      save: async () => {},
+      unsave: async () => {},
+    },
+    sessionNotes: {
+      listNotes: async () => [],
+      writeNote: async () => ({ sessionId: '', body: '', updatedAt: '' }),
+      deleteNote: async () => {},
+    },
     ...overrides,
   },
+  // 005 — content is live in a component test unless a test says otherwise, so no staleness
+  // stamp is rendered. `null` is the honest default: nothing here is served from a cache.
+  freshness: { lastRetrieved: () => null },
   auth: { signIn: async () => {}, signOut: async () => {} },
   ...rest,
 })

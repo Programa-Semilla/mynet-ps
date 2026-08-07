@@ -72,7 +72,10 @@ export const ActiveEventProvider = ({ children }: { children: ReactNode }) => {
 
   const failureMessage = (error: unknown): string =>
     error instanceof OfflineError
-      ? 'Your conference needs a connection, and there is not one right now. Nothing has been lost.'
+      ? // 005 — FR-219 asks for both halves: that a connection is needed, *and* that nothing is
+        // stored to show instead. Without the second the attendee cannot tell "wait a moment"
+        // from "there is nothing here for you until you reconnect".
+        'Your conference needs a connection, and there is not one right now. Nothing is cached on this device to show instead, and nothing you have done has been lost.'
       : 'We could not tell which conference you are in. This is a problem on our side, not with your account.'
 
   /**
@@ -170,10 +173,39 @@ export const ActiveEventProvider = ({ children }: { children: ReactNode }) => {
    * healthy account.
    * ═════════════════════════════════════════════════════════════════════════════════════════
    */
-  const state: ActiveEventState =
-    authStatus === 'signed-in' && resolved.attendeeId === attendeeId
-      ? resolved.state
-      : { status: 'loading' }
+  const state: ActiveEventState = (() => {
+    if (authStatus === 'signed-in' && resolved.attendeeId === attendeeId) return resolved.state
+
+    /**
+     * ═══════════════════════════════════════════════════════════════════════════════════════
+     * **005 — offline is an ANSWER, not an indefinite wait** (FR-219, FR-195).
+     *
+     * This derived `loading` used to cover every non-signed-in status, `'offline'` included.
+     * That was invisible while nothing was cached, because there was nothing to render behind
+     * it anyway. 005 makes the agenda readable offline, and the gap showed immediately: an
+     * attendee opening Agenda with an empty cache and no connection sat on **"Loading your
+     * conference…" forever** — a spinner that never resolves, which is exactly what FR-195
+     * names as unacceptable and what FR-219 requires be *said* instead.
+     *
+     * `'offline'` means we could not ask who the attendee is and nothing was stored to answer
+     * from. That is a knowable state and it is reported as one, with the same wording an
+     * offline conference read produces and with a retry that works the moment signal returns.
+     *
+     * Note this is only reached when identity itself is uncached — once it has been read with
+     * a connection, `getCurrent` resolves from the cache, the attendee is signed in as far as
+     * this provider is concerned, and the agenda renders from the cache as FR-215 requires.
+     * ═══════════════════════════════════════════════════════════════════════════════════════
+     */
+    if (authStatus === 'offline') {
+      return {
+        status: 'failed',
+        message: failureMessage(new OfflineError('Your conference')),
+        retry,
+      }
+    }
+
+    return { status: 'loading' }
+  })()
 
   const switchTo = useCallback(
     async (eventId: string): Promise<Event> => {

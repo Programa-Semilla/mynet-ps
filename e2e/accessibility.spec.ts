@@ -111,6 +111,105 @@ test.describe('accessibility', () => {
     expect(blocking(violations), describeViolations(blocking(violations))).toEqual([])
   })
 
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════════════════
+   * T083 (005) — the surfaces this feature adds, at all three widths.
+   *
+   * Three of them are new *kinds* of thing for this product rather than more of the same:
+   *
+   *   - **the first true modal**, which is where focus confinement, background inertness and
+   *     Escape all have to be right at once, and which the register names as a settled
+   *     requirement the prototype failed;
+   *   - **a segmented control built from visually suppressed radios**, which is the classic way
+   *     to lose a focus indicator without removing one — the ring draws around a box with no
+   *     extent;
+   *   - **a free-text editor with a live status region**, announced rather than coloured.
+   *
+   * Scanned at every width because a control that only appears at one width is exactly what a
+   * single-viewport sweep misses.
+   * ═══════════════════════════════════════════════════════════════════════════════════════
+   */
+  for (const width of WIDTHS) {
+    test(`the Agenda filter and save controls are clean at ${width.px}px (${width.layout})`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: width.px, height: 900 })
+      await page.goto('/')
+      await signIn(page, ADA)
+      await page.goto('/agenda')
+      await expect(page.getByRole('radio', { name: 'All sessions' })).toBeAttached()
+
+      const all = await scan(page)
+      expect(
+        blocking(all.violations),
+        `Agenda, All filter at ${width.px}px:\n${describeViolations(blocking(all.violations))}`,
+      ).toEqual([])
+
+      // The Saved view with its empty state, which is what a reviewer sees first.
+      await page.getByRole('radio', { name: 'Saved' }).check()
+      await expect(page.getByText(/nothing saved yet/i)).toBeVisible()
+
+      const saved = await scan(page)
+      expect(
+        blocking(saved.violations),
+        `Agenda, Saved filter at ${width.px}px:\n${describeViolations(blocking(saved.violations))}`,
+      ).toEqual([])
+    })
+
+    test(`the session detail panel is clean at ${width.px}px (${width.layout})`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: width.px, height: 900 })
+      await page.goto('/')
+      await signIn(page, ADA)
+      await page.goto('/agenda')
+
+      await page.getByRole('heading', { level: 3 }).first().getByRole('link').click()
+      await expect(page.getByRole('dialog')).toBeVisible()
+      await expect(page.getByRole('textbox', { name: /private notes/i })).toBeVisible()
+
+      // The whole page, not only the dialog: a modal that is correct in isolation can still
+      // leave the background reachable, and axe reads the document as the browser presents it.
+      const { violations } = await scan(page)
+      expect(
+        blocking(violations),
+        `session panel at ${width.px}px:\n${describeViolations(blocking(violations))}`,
+      ).toEqual([])
+    })
+  }
+
+  test('the note editor is clean with a failure showing', async ({ page, context }) => {
+    // The failure state carries an alert, a retry button and red-on-tinted text — the one
+    // combination in this feature where contrast is most likely to fall short, and one that a
+    // scan of the happy path would never reach.
+    await page.goto('/')
+    await signIn(page, ADA)
+    await page.goto('/agenda')
+    await page.getByRole('heading', { level: 3 }).first().getByRole('link').click()
+    await expect(page.getByRole('dialog')).toBeVisible()
+
+    await context.setOffline(true)
+    try {
+      await page.getByRole('textbox', { name: /private notes/i }).fill('Written with no signal.')
+      await expect(page.getByRole('alert')).toBeVisible({ timeout: 15_000 })
+
+      const { violations } = await scan(page)
+      expect(blocking(violations), describeViolations(blocking(violations))).toEqual([])
+    } finally {
+      await context.setOffline(false)
+    }
+  })
+
+  test('Home is clean with the saved-session card present', async ({ page }) => {
+    // 005 appends a card to the first viewport, which Principle III makes a success criterion.
+    await page.goto('/')
+    await signIn(page, ADA)
+    await expect(page.getByRole('region', { name: 'Next saved session' })).toBeVisible()
+
+    const { violations } = await scan(page)
+    expect(blocking(violations), describeViolations(blocking(violations))).toEqual([])
+  })
+
   test('the not-found view is clean', async ({ page }) => {
     await page.goto('/')
     await signIn(page, ADA)

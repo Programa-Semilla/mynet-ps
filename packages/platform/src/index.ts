@@ -4,6 +4,8 @@
  * Feature code imports from here and never from a browser API directly —
  * `mynet/no-direct-platform-access` counts the violations, and SC-008 requires zero.
  */
+export type { CachedEntry, LocalCache } from './interfaces/local-cache.js'
+
 export type {
   CalendarService,
   CameraService,
@@ -15,7 +17,7 @@ export type {
 } from './interfaces/index.js'
 
 export { PlatformProvider, PlatformContext } from './registry.js'
-export type { PlatformServices, PlatformProviderProps } from './registry.js'
+export type { ConferenceContent, PlatformServices, PlatformProviderProps } from './registry.js'
 
 export {
   useActiveEventRepository,
@@ -27,6 +29,9 @@ export {
   useConnectivity,
   useContactShare,
   useEventsRepository,
+  useFreshness,
   useNotifications,
+  useSavedSessionRepository,
   useSecureStorage,
+  useSessionNotesRepository,
 } from './hooks.js'

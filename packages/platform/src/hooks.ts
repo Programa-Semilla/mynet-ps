@@ -47,6 +47,28 @@ export const useActiveEventRepository = (): PlatformServices['repositories']['ac
 export const useCatalogRepository = (): PlatformServices['repositories']['catalog'] =>
   usePlatform().repositories.catalog
 
+/**
+ * 005 — the attendee's own agenda.
+ *
+ * Two hooks rather than one, matching the two interfaces, because saving and noting are
+ * independent capabilities (FR-207) and a surface that only notes should not be handed the
+ * ability to save.
+ */
+export const useSavedSessionRepository = (): PlatformServices['repositories']['savedSessions'] =>
+  usePlatform().repositories.savedSessions
+
+export const useSessionNotesRepository = (): PlatformServices['repositories']['sessionNotes'] =>
+  usePlatform().repositories.sessionNotes
+
+/**
+ * 005 — when the content on screen was retrieved, or `null` when it is live (FR-216).
+ *
+ * A component calls this to render the staleness stamp. It learns nothing about caching from
+ * the answer: `null` means "current", a timestamp means "this is what your device last
+ * received".
+ */
+export const useFreshness = (): PlatformServices['freshness'] => usePlatform().freshness
+
 export const useAuthGateway = (): PlatformServices['auth'] => usePlatform().auth
 
 /**

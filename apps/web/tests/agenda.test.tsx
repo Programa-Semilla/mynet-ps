@@ -1,4 +1,5 @@
 import { render, screen, within } from '@testing-library/react'
+import { MemoryRouter, Route, Routes } from 'react-router'
 import { describe, expect, it } from 'vitest'
 
 import { ActiveEventProvider } from '../src/app/active-event.js'
@@ -25,7 +26,18 @@ describe('Agenda', () => {
         })}
       >
         <ActiveEventProvider>
-          <Agenda />
+          {/*
+            005 — a router, because a session title is now a link to its detail panel
+            (FR-198). The 002 assertions below are otherwise untouched: this wrapper is what
+            keeps them able to run, not a change to what they claim.
+          */}
+          <MemoryRouter initialEntries={['/agenda']}>
+            <Routes>
+              <Route path="/agenda" element={<Agenda />}>
+                <Route path=":sessionId" element={null} />
+              </Route>
+            </Routes>
+          </MemoryRouter>
         </ActiveEventProvider>
       </WithServices>,
     )
@@ -121,19 +133,52 @@ describe('Agenda', () => {
     expect(screen.queryByText(/no published programme/i)).not.toBeInTheDocument()
   })
 
-  it('offers NO save, add or remove control — and no disabled promise of one (US2 scenario 6)', async () => {
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════════════════
+   * T023 (005) — **002's US2 scenario 6, superseded and UPDATED rather than deleted**
+   * (FR-236).
+   *
+   * This test used to assert the **absence** of a save control on Agenda, and the absence was
+   * deliberate: 002 shipped the programme read-only, on the reasoning that a greyed-out star
+   * is an affordance for a capability that does not exist — the same reason the top bar still
+   * carries no notification bell.
+   *
+   * 005 is the feature that makes the capability exist, so the assertion is inverted here in
+   * place. Deleting it would have left no record that the absence was ever a decision; keeping
+   * it as an inversion means the history reads correctly in a diff — *this was deliberately
+   * absent, and it is now deliberately present.*
+   *
+   * The half that has **not** changed is asserted below too: still no disabled control, still
+   * no affordance for anything 005 did not build. Q&A and note editing are not reachable from
+   * a programme row, and 009 must not find a greyed-out promise of them here.
+   * ═══════════════════════════════════════════════════════════════════════════════════════
+   */
+  it('now offers a save control on every session — 002 asserted its absence (FR-236)', async () => {
     renderWith([MORNING, AFTERNOON, NEXT_DAY])
     await screen.findByText('Opening Keynote')
 
-    for (const pattern of [/save/i, /add to/i, /remove/i, /bookmark/i, /star/i, /favourite/i]) {
+    // One per session, labelled with what activating it will do (FR-189, FR-196).
+    expect(screen.getAllByRole('button', { name: /save .* to your agenda/i })).toHaveLength(3)
+    expect(
+      screen.getByRole('button', { name: /save Opening Keynote to your agenda/i }),
+    ).toBeInTheDocument()
+  })
+
+  it('still promises no capability it does not have, and disables nothing', async () => {
+    renderWith([MORNING, AFTERNOON, NEXT_DAY])
+    await screen.findByText('Opening Keynote')
+
+    // Audience questions arrive in 009. A control for them now would be exactly the empty
+    // promise 002 refused to make about saving.
+    for (const pattern of [/question/i, /upvote/i, /share/i, /invite/i]) {
       expect(
         screen.queryByRole('button', { name: pattern }),
-        `Agenda must not offer a "${String(pattern)}" control — saved sessions arrive in 005.`,
+        `Agenda must not offer a "${String(pattern)}" control — 005 did not build it.`,
       ).not.toBeInTheDocument()
-      expect(screen.queryByRole('checkbox', { name: pattern })).not.toBeInTheDocument()
     }
 
-    // Nor a disabled one, which would promise a capability that does not exist yet.
+    // A disabled save control would lose focus mid-list while a write was in flight, which is
+    // why the control stays enabled and relies on the write being idempotent (FR-187).
     expect(screen.queryAllByRole('button').filter((b) => b.hasAttribute('disabled'))).toHaveLength(
       0,
     )
