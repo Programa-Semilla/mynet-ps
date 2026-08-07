@@ -3,6 +3,7 @@ import { useActiveEventRepository } from '@mynet/platform'
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 
+import { useAuth } from '../auth/useAuth.js'
 import type { ActiveEventState } from './home/HomeShell.js'
 
 /**
@@ -40,6 +41,7 @@ const ActiveEventContext = createContext<ActiveEventContextValue | null>(null)
 
 export const ActiveEventProvider = ({ children }: { children: ReactNode }) => {
   const repository = useActiveEventRepository()
+  const { status: authStatus, attendee } = useAuth()
   const [state, setState] = useState<ActiveEventState>({ status: 'loading' })
 
   /**
@@ -102,10 +104,38 @@ export const ActiveEventProvider = ({ children }: { children: ReactNode }) => {
     fetchActive()
   }, [fetchActive])
 
+  /**
+   * ═════════════════════════════════════════════════════════════════════════════════════════
+   * **The active conference is read only while somebody is signed in, and it is re-read when
+   * that changes.**
+   *
+   * Both halves were missing, and the bug they produced is worth recording because nothing in
+   * the component suite could have caught it. This provider sits inside `AuthProvider` but
+   * above the router, so it mounts on the **sign-in screen** — before there is a session. A
+   * fetch on mount was therefore answered 401, the state went to `failed`, and nothing ever
+   * re-ran it: the attendee signed in successfully and Home told them "we could not tell which
+   * conference you are in" until they reloaded the page.
+   *
+   * Component tests missed it because they substitute a repository that always resolves, which
+   * is exactly the state a signed-in attendee is in. It took the end-to-end suite, where the
+   * app is driven from the sign-in screen the way a person drives it.
+   *
+   * Keying on `attendee?.id` rather than on the status alone also covers the case that matters
+   * on a shared device: signing out and signing in as somebody else must re-resolve, not
+   * inherit the previous attendee's conference.
+   * ═════════════════════════════════════════════════════════════════════════════════════════
+   */
   useEffect(() => {
     loadRef.current = reload
+
+    if (authStatus !== 'signed-in') {
+      // Not a failure — there is simply nobody to have a conference yet. `loading` is the
+      // honest state, and it is what the shell renders on the sign-in screen anyway.
+      return
+    }
+
     fetchActive()
-  }, [fetchActive, reload])
+  }, [fetchActive, reload, authStatus, attendee?.id])
 
   const switchTo = useCallback(
     async (eventId: string): Promise<Event> => {

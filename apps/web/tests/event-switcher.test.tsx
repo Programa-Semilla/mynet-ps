@@ -48,6 +48,71 @@ const openMenu = async (user: ReturnType<typeof userEvent.setup>) => {
   return trigger
 }
 
+/**
+ * The regression the end-to-end suite caught and the component suite did not.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ * `ActiveEventProvider` mounts on the **sign-in screen**, before there is a session. It used to
+ * fetch immediately, be answered 401, and settle into `failed` with nothing to re-run it — so
+ * an attendee who then signed in was told "we could not tell which conference you are in" until
+ * they reloaded.
+ *
+ * Every other test in this file substitutes a repository that resolves, which is the state of a
+ * *already* signed-in attendee. This one starts signed out, the way a person does.
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ */
+describe('the active conference follows the sign-in lifecycle', () => {
+  it('does not request the active conference while signed out', async () => {
+    const getActive = vi.fn(async () => SUMMIT)
+
+    render(
+      <MemoryRouter>
+        <WithServices
+          services={testServices({
+            // Signed out: `getCurrent` rejects, which is what puts AuthProvider in 'signed-out'.
+            attendee: { getCurrent: async () => Promise.reject(new Error('not signed in')) },
+            activeEvent: { getActive, setActive: async () => SUMMIT },
+          })}
+        >
+          <ActiveEventProvider>
+            <EventSwitcher />
+          </ActiveEventProvider>
+        </WithServices>
+      </MemoryRouter>,
+    )
+
+    await waitFor(() => expect(getActive).not.toHaveBeenCalled())
+  })
+
+  it('requests it once the attendee is signed in', async () => {
+    const getActive = vi.fn(async () => SUMMIT)
+
+    render(
+      <MemoryRouter>
+        <WithServices
+          services={testServices({
+            events: { listRegistered: async () => [SUMMIT, HORIZONS] },
+            activeEvent: { getActive, setActive: async () => SUMMIT },
+          })}
+        >
+          <ActiveEventProvider>
+            <EventSwitcher />
+          </ActiveEventProvider>
+        </WithServices>
+      </MemoryRouter>,
+    )
+
+    // The default harness is signed in, so the fetch happens — and the switcher resolves rather
+    // than sitting in the failure state the bug produced.
+    await waitFor(() => expect(getActive).toHaveBeenCalled())
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /change conference/i })).toHaveAccessibleName(
+        /Product & Design Summit/,
+      ),
+    )
+  })
+})
+
 describe('EventSwitcher', () => {
   it('names the active conference and its location, and offers only registered ones (FR-110, FR-111)', async () => {
     const user = userEvent.setup()
@@ -55,7 +120,11 @@ describe('EventSwitcher', () => {
 
     const trigger = await screen.findByRole('button', { name: /change conference/i })
     // The accessible name says where the attendee is without them having to open anything.
-    expect(trigger).toHaveAccessibleName(/Product & Design Summit · Barcelona, Spain/)
+    // Awaited, because the conference resolves only once the sign-in check has completed — the
+    // provider deliberately does not ask while signed out.
+    await waitFor(() =>
+      expect(trigger).toHaveAccessibleName(/Product & Design Summit · Barcelona, Spain/),
+    )
 
     await user.click(trigger)
     const items = screen.getAllByRole('menuitemradio')

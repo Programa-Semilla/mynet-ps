@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 
 import { redeployApi } from './support/api-process.js'
-import { ADA, expectOwnWorkspace, signIn } from './support/attendees.js'
+import { ADA, expectOwnWorkspace, signIn, switchToAnotherConference } from './support/attendees.js'
 
 /**
  * T065a — attendee data is durable (FR-033, SC-003).
@@ -88,12 +88,8 @@ test.describe('durability', () => {
     await page.goto('/')
     await signIn(page, ADA)
 
-    // Switch away from whatever derivation chose, to something explicitly selected.
-    await page.getByRole('button', { name: /change conference/i }).click()
-    await page.getByRole('menuitemradio', { name: new RegExp(ADA.events[1]) }).click()
-    await expect(page.getByRole('button', { name: /change conference/i })).toHaveAccessibleName(
-      new RegExp(ADA.events[1]),
-    )
+    // Switch away from whatever is currently active, to something explicitly selected.
+    const chosen = await switchToAnotherConference(page, ADA)
 
     // A genuinely separate context — not a reload, and not a new tab sharing storage.
     const clean = await browser.newContext()
@@ -105,7 +101,7 @@ test.describe('durability', () => {
       cleanPage.getByRole('button', { name: /change conference/i }),
       'The chosen conference must come back on a different device. If it does not, the choice ' +
         'is living in the browser rather than in the database (SC-103).',
-    ).toHaveAccessibleName(new RegExp(ADA.events[1]))
+    ).toHaveAccessibleName(new RegExp(chosen))
 
     await clean.close()
   })

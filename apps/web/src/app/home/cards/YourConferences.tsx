@@ -72,7 +72,13 @@ const YourConferencesCard = () => {
         <ul className="grid gap-2">
           {events.data.map((event) => (
             <li key={event.id} className="border-b border-border-subtle pb-2 last:border-b-0">
-              <p className="font-medium text-text-primary">{event.name}</p>
+              {/*
+                A heading, not a styled paragraph. Each conference is a named thing in a list,
+                which is how 001 rendered it and how assistive technology navigates it — moving
+                this content into a card changed where it lives, and must not change what it is.
+                `h3` under the card's own `h2`, so the document outline stays coherent.
+              */}
+              <h3 className="font-medium text-text-primary">{event.name}</h3>
               <p className="text-sm text-text-body">{event.location}</p>
               <p className="text-sm text-text-muted">
                 <time dateTime={event.startsOn}>{formatDate(event.startsOn)}</time>

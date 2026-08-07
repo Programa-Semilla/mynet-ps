@@ -167,13 +167,6 @@ export const EventSwitcher = () => {
       {open && (
         <div
           ref={menuRef}
-          id={menuId}
-          role="menu"
-          aria-label="Choose a conference"
-          onKeyDown={onKeyDown}
-          // Focusable so the menu itself can receive the Escape key when focus has not yet
-          // reached an item — an interactive role that cannot be focused is unreachable.
-          tabIndex={-1}
           /*
             T059 — one control, three presentations, selected in CSS so no width is read in
             JavaScript. Mobile is a full-width overlay with touch-sized targets; tablet and
@@ -192,6 +185,7 @@ export const EventSwitcher = () => {
             <button
               type="button"
               onClick={() => close()}
+              onKeyDown={onKeyDown}
               aria-label="Close conference list"
               className="inline-flex h-11 w-11 items-center justify-center rounded-sm"
             >
@@ -199,11 +193,35 @@ export const EventSwitcher = () => {
             </button>
           </div>
 
-          <ul className="grid">
+          {/*
+            ─────────────────────────────────────────────────────────────────────────────────
+            **`role="menu"` sits on the list, and every `li` carries `role="none"`.**
+
+            A `menu` must contain its `menuitem*` children directly. Wrapping them in a plain
+            `<ul>`/`<li>` — which is the natural markup, and what this was first written as —
+            puts list roles between the menu and its items, and axe rejects it on two counts:
+            `aria-required-children` on the menu and `aria-required-parent` on each item. The
+            list semantics are removed rather than the list element, so the markup stays a list
+            for anything that does not understand ARIA.
+
+            The container above deliberately does **not** carry the role: the heading and the
+            close button are part of the overlay, not items of the menu.
+            ─────────────────────────────────────────────────────────────────────────────────
+          */}
+          <ul
+            id={menuId}
+            role="menu"
+            aria-label="Choose a conference"
+            onKeyDown={onKeyDown}
+            // Focusable so the menu can receive Escape before focus reaches an item — an
+            // interactive role that cannot be focused is unreachable.
+            tabIndex={-1}
+            className="grid"
+          >
             {events.data.map((event) => {
               const isActive = active.status === 'ready' && active.event.id === event.id
               return (
-                <li key={event.id}>
+                <li key={event.id} role="none">
                   <button
                     type="button"
                     role="menuitemradio"

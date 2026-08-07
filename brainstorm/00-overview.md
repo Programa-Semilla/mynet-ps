@@ -23,7 +23,7 @@ the index, and it now differs from the roadmap in the ways #02 records.
 
 | # | Phase | Status | Blocked by |
 |---|-------|--------|------------|
-| 002 | Event Context, Session Catalog & Home Composition | **brainstormed** (#02), ready to spec | — |
+| 002 | Event Context, Session Catalog & Home Composition | **implemented**, 89/89 tasks; awaiting review | — |
 | 003 | ~~Session Catalog~~ | **absorbed into 002** (#02); migration `0002` transfers | — |
 | 004 | Attendee Profile & Own-Profile Editing | queued, no parallel partner | identity model; retention obligations; avatar handling |
 | 005 | Agenda | queued (∥ 006) | 002 |
@@ -98,26 +98,38 @@ Each names the phase it blocks — when to ask matters as much as what to ask.
   free on public repositories, so this is a configuration task rather than an accepted risk
   (corrected 2026-08-06)
 
-### Design questions carried into 002's specification
+### Design questions carried into 002's specification — all settled
 
-Not client or owner decisions — these are for `/speckit-specify` and its review gate to settle. All
-from #02.
+Not client or owner decisions — these were for `/speckit-specify` and its review gate to settle.
+All from #02, and all now answered by the delivered feature.
 
-- **Which 002 card exercises the attendee-scoped path?** All three cards the phase contributes are
-  event-scoped, so the other half of the card contract risks being proven by test doubles only —
-  the weakness the session kept flagging
-- **The clock story**, inherited from the absorbed 003: server time or client time for relative
-  displays like "starts in 15m", and defined behaviour when they disagree
-- **Do sessions carry their own timezone or inherit the event's?**
-- **One migration or two**, now that `0001` and `0002` both belong to 002
-- **What happens when two cards claim the `lead` slot** — compile-time impossibility, startup
-  assertion, or last-registration-wins
-- **Offline reading of catalog content.** Responses are never cached today, so offline shows only
-  the shell. An agenda readable on a conference floor with no signal is the first real demand for a
-  staleness policy — the same conversation as the `interface-evolution-for-offline-data` inbox entry,
-  arriving from the product side
-- **Whether the enlarged 002 still wants one pull request.** Reaffirmed after the catalog was
-  absorbed; the `spex-collab` phase-split hook will ask again against a concrete task list
+- ~~**Which 002 card exercises the attendee-scoped path?**~~ **`YourConferences`** (T075), which is
+  the registered-conferences view Home already carried rather than a card invented for the purpose.
+  It is a real card on the real dashboard, so the half of the contract the session kept flagging is
+  proven by use rather than by a test double.
+- ~~**The clock story**~~ — **two clocks, deliberately, each for the thing it is actually about.**
+  The day number follows the **venue's** zone, because it is a fact about the conference; the
+  time-of-day greeting follows the **device's**, because it is about the reader. Session times are
+  stored as absolute instants and all relative wording is computed at display time.
+- ~~**Do sessions carry their own timezone or inherit the event's?**~~ **Inherit.** The timezone is
+  a property of where the conference is held, not of each item on its programme. The limit is
+  recorded: a satellite session in another city would break it, and none is in scope.
+- ~~**One migration or two**~~ — **two.** `0001_event_context.sql` and `0002_session_catalog.sql`,
+  which keeps the event-context change reviewable apart from the catalog and honours the
+  reservation rather than silently retiring a number.
+- ~~**What happens when two cards claim the `lead` slot**~~ — **a unit test plus a development-mode
+  assertion**, not compile-time impossibility. Recorded rather than glossed: a type-level guarantee
+  would need a tuple or a narrowing builder, either of which makes the registry hostile to the
+  one-line append it exists for (research D8).
+- ~~**Offline reading of catalog content**~~ — **nothing is cached, and that is declared rather
+  than defaulted.** Every conference-scoped surface says it needs a connection, distinguished from
+  a server fault. The staleness policy remains genuinely open (see Open questions below); 002 makes
+  the question concrete without answering it.
+- ~~**Whether the enlarged 002 still wants one pull request**~~ — **yes, reaffirmed a third time**
+  at the phase-split hook against the concrete 89-task list, alongside a two-PR split at the US1
+  seam and a three-PR split isolating the shared-file split. Recorded with it: because `develop` is
+  squash-merge only, Phase 1's separate commit does not survive the merge, so its review-isolation
+  purpose is met at the commit level but not at the review level.
 
 ## Resolved
 

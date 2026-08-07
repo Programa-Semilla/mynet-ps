@@ -1,5 +1,3 @@
-import { ADA } from './attendees.js'
-
 /**
  * The five destinations as the browser sees them.
  *
@@ -18,9 +16,20 @@ export interface E2eDestination {
 }
 
 export const DESTINATIONS: readonly E2eDestination[] = [
-  // Home greets the signed-in attendee rather than repeating its own name — the whole point of
-  // FR-032 is that the workspace belongs to somebody.
-  { path: '/', label: 'Home', heading: `Hello, ${ADA.displayName}` },
+  // ─────────────────────────────────────────────────────────────────────────────────────────
+  // Home's level-1 heading is its own name, like every other destination's.
+  //
+  // It was the greeting until 002, when Home became a card registry: the greeting moved into
+  // the lead card and is now an `h2` inside it, because a card owns its own heading and the
+  // shell cannot depend on which cards happen to be registered. The shell therefore supplies
+  // the page's `h1` — visually hidden, since the greeting card is what a sighted attendee reads
+  // as the title, but present so the outline names the destination consistently.
+  //
+  // The greeting is still asserted, by `signIn` and `expectOwnWorkspace` in `attendees.ts`,
+  // which match on text rather than on level. FR-032's point — the workspace belongs to
+  // somebody — is unchanged.
+  // ─────────────────────────────────────────────────────────────────────────────────────────
+  { path: '/', label: 'Home', heading: 'Home' },
   { path: '/agenda', label: 'Agenda', heading: 'Agenda' },
   { path: '/discover', label: 'Discover', heading: 'Discover' },
   { path: '/messages', label: 'Messages', heading: 'Messages' },

@@ -219,16 +219,16 @@ still renders and Home is never blank.
 
 ## Phase 8: Polish & cross-cutting concerns
 
-- [ ] T080 [P] Extend `e2e/responsive.spec.ts` — Home and Agenda at 320px, 768px and 1280px, no horizontal scrolling anywhere, including a long event name beside the attendee name and sign-out control
-- [ ] T081 [P] First-viewport measurement in `e2e/first-viewport.spec.ts` (SC-101): at each of the three widths, assert the active conference name, the day context, and the next session are all within the initial viewport height without scrolling. T080 covers the horizontal axis; nothing covered the vertical one, which is where the success criterion actually lives
-- [ ] T082 [P] Extend `e2e/accessibility.spec.ts` over every control this feature introduces
-- [ ] T083 [P] Extend `e2e/navigation.spec.ts` — the complete journey (arrive → read next → switch → read next) **keyboard-only**, focus visible throughout (SC-108)
-- [ ] T084 Update `e2e/navigation.spec.ts` where it asserts Agenda is a placeholder — it no longer is
-- [ ] T085 Revisit the Agenda `purpose` text in `apps/web/src/app/navigation.ts` now that the destination has content
-- [ ] T086 Update `CLAUDE.md` — the repository-status section still says the destinations carry no product content
-- [ ] T087 Record the departure in `docs/superpowers/specs/2026-08-06-mynet-delivery-roadmap-design.md`: 003 absorbed, migration `0002` transferred, 005's dependency moved to 002, first free pair now 005 ∥ 006
-- [ ] T088 Update `brainstorm/00-overview.md` delivery-queue status for 002
-- [ ] T089 Run `pnpm verify:clean` against a clean database. **Non-optional for this feature**: CI has never run on `develop`, so this is currently the only place the route audit and isolation suite are actually checked (plan.md, Complexity Tracking)
+- [X] T080 [P] Extend `e2e/responsive.spec.ts` — Home and Agenda at 320px, 768px and 1280px, no horizontal scrolling anywhere, including a long event name beside the attendee name and sign-out control
+- [X] T081 [P] First-viewport measurement in `e2e/first-viewport.spec.ts` (SC-101): at each of the three widths, assert the active conference name, the day context, and the next session are all within the initial viewport height without scrolling. T080 covers the horizontal axis; nothing covered the vertical one, which is where the success criterion actually lives
+- [X] T082 [P] Extend `e2e/accessibility.spec.ts` over every control this feature introduces
+- [X] T083 [P] Extend `e2e/navigation.spec.ts` — the complete journey (arrive → read next → switch → read next) **keyboard-only**, focus visible throughout (SC-108)
+- [X] T084 Update `e2e/navigation.spec.ts` where it asserts Agenda is a placeholder — it no longer is. **Nothing asserted that.** The suite identifies destinations by their level-1 heading, and Agenda's is `Agenda` either way, so no assertion had to change. What did change, and is the same class of thing, is `e2e/support/destinations.ts`: Home's level-1 heading is now `Home` (the shell's) rather than the greeting, because the greeting moved into the lead card as an `h2` when Home became a registry
+- [X] T085 Revisit the Agenda `purpose` text in `apps/web/src/app/navigation.ts` now that the destination has content
+- [X] T086 Update `CLAUDE.md` — the repository-status section still says the destinations carry no product content
+- [X] T087 Record the departure in `docs/superpowers/specs/2026-08-06-mynet-delivery-roadmap-design.md`: 003 absorbed, migration `0002` transferred, 005's dependency moved to 002, first free pair now 005 ∥ 006
+- [X] T088 Update `brainstorm/00-overview.md` delivery-queue status for 002
+- [X] T089 Run `pnpm verify:clean` against a clean database. **Non-optional for this feature**: CI has never run on `develop`, so this is currently the only place the route audit and isolation suite are actually checked (plan.md, Complexity Tracking)
 
 ---
 

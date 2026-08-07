@@ -4,9 +4,27 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Status of this repository
 
-The production foundation has shipped. The five destinations exist and are addressable, an attendee
-can sign in, and the client reaches PostgreSQL through a project-owned API — but **the destinations
-carry no product content yet**: no sessions, no attendee cards, no threads, no appointments.
+The production foundation has shipped, and **event context and the session catalog have landed on
+top of it** (feature 002). An attendee signs in and arrives at the conference happening now, greeted
+by name and told which day of it today is in the venue's timezone. Home shows what is next and what
+remains of the day; **Agenda carries the conference programme**, read-only and chronological. The
+conference switcher is in the top bar at all three widths, and the choice survives sign-out and a
+change of device.
+
+Three things 002 established that every later feature inherits:
+
+- **The event scoping predicate is enforced server-side** — a branded `EventScope` that only
+  `requireEventAccess` can construct, which every per-event query demands, plus a route audit that
+  fails when a route declaring an event parameter lacks the guard, plus a lint rule closing the
+  brand's type-assertion escape hatch.
+- **Home is a card registry.** `apps/web/src/app/home/registry.ts` is append-only and is the one
+  shared file the next seven features touch; each contribution is one line and its own file.
+- **Three shared files were split per domain** so later features append rather than edit:
+  repository interfaces, API route registration, and the seed.
+
+**Still carrying no product content**: Discover, Messages and Network. No attendee cards, no
+threads, no appointments. Saved sessions, personal notes and audience Q&A arrive in 005 and 009 —
+Agenda deliberately offers no save control today.
 
 ```
 GroundZero/

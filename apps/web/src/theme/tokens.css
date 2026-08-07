@@ -62,6 +62,8 @@
   --color-mint-300: #9adcc5;
   --color-mint-500: #5cc9a7; /* prototype mint */
   --color-mint-700: #35876e;
+  /* Same reason as --color-warning-700: mint-700 is 3.85:1 on mint-100, below AA. 6.51:1. */
+  --color-mint-800: #256050;
 
   /* Neutrals for body copy and de-emphasis. */
   --color-ink-body: #525a70; /* prototype body text — 6.87:1 on white, passes as-is */
@@ -77,6 +79,9 @@
    * failure states to colour (constitution Principle IV requires them, FR-058). */
   --color-warning-100: #fdf1dd;
   --color-warning-500: #c07d18;
+  /* Dark enough to carry text on --color-warning-100 (5.30:1). warning-500 is 3.04:1 there,
+   * which reads fine and fails AA — the track-chip contrast check is what caught it. */
+  --color-warning-700: #8a5a10;
   --color-danger-100: #fdeceb;
   --color-danger-500: #c0392b;
   --color-danger-700: #8f2820;
@@ -115,8 +120,19 @@
    * design system without touching the design system.
    *
    * Each pair is a tint for the chip background and a darker ink for its text, so the label
-   * meets AA on its own chip rather than relying on the surface underneath. Values are drawn
+   * meets AA **on its own chip** rather than relying on the surface underneath. Values are drawn
    * from the scales above; no new hues are introduced.
+   *
+   * Measured, not assumed — the first version of this block paired product with mint-700 (3.85:1)
+   * and keynote with warning-500 (3.04:1), both of which look perfectly readable and both of
+   * which fail AA. `e2e/accessibility.spec.ts` is what caught them, which is the whole argument
+   * for scanning rendered pixels rather than reviewing colour choices:
+   *
+   *   design  coral-100  / coral-700   5.18:1
+   *   product mint-100   / mint-800    6.51:1
+   *   tech    navy-100   / navy-700   10.75:1
+   *   keynote warning-100/ warning-700  5.30:1
+   *   unknown cream-200  / ink-body     6.04:1
    *
    * **Colour is never the sole carrier of meaning** — every track is rendered as text as well,
    * so these are redundant reinforcement, not the signal. That is why an unknown token
@@ -124,11 +140,11 @@
   --color-track-design: var(--color-coral-100);
   --color-track-design-ink: var(--color-coral-700);
   --color-track-product: var(--color-mint-100);
-  --color-track-product-ink: var(--color-mint-700);
+  --color-track-product-ink: var(--color-mint-800);
   --color-track-tech: var(--color-navy-100);
   --color-track-tech-ink: var(--color-navy-700);
   --color-track-keynote: var(--color-warning-100);
-  --color-track-keynote-ink: var(--color-warning-500);
+  --color-track-keynote-ink: var(--color-warning-700);
 
   /* The **defined neutral** an unrecognised token falls back to. A seed typo must degrade to a
    * plain, legible chip rather than render an unstyled element (research D7). */

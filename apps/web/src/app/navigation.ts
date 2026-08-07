@@ -38,9 +38,18 @@ export const DESTINATIONS: readonly Destination[] = [
     icon: Home,
   },
   {
+    /*
+      T085 (002) — Agenda now has content, so its `purpose` had to stop promising something it
+      does not yet do. The destination renders the conference programme, read-only; saving a
+      session, personal notes and Q&A arrive with feature 005, and "your personalised schedule"
+      described that later state rather than this one.
+
+      `purpose` is shown on placeholder destinations, so for Agenda it is now only a description
+      — but leaving it stale would make the next reader think saving was already built.
+    */
     path: '/agenda',
     label: 'Agenda',
-    purpose: 'Your personalised schedule, in chronological order.',
+    purpose: 'The conference programme, in chronological order.',
     icon: CalendarDays,
   },
   {

@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test'
 
-import { ADA, signIn } from './support/attendees.js'
+import { ADA, signIn, switchToAnotherConference } from './support/attendees.js'
 import { DESTINATIONS, WIDTHS } from './support/destinations.js'
 
 /**
@@ -155,6 +155,101 @@ test.describe('navigation', () => {
       await page.keyboard.press('Enter')
       await expect(destinationHeading(page, destination.heading)).toBeVisible()
     }
+  })
+
+  /**
+   * T083 (002) — **arrive → read what is next → switch → read what is next again, by keyboard
+   * alone** (SC-108, FR-116).
+   *
+   * ═════════════════════════════════════════════════════════════════════════════════════════
+   * The journey above walks the five destinations. This walks the one 002 actually adds, and it
+   * is the journey quickstart.md Scenario 7 describes: the switcher is the first genuinely modal
+   * control in the product, and a menu that can only be opened with a pointer is a menu half the
+   * conference cannot use.
+   *
+   * Focus must remain visible at every stop, which is the requirement the prototype failed
+   * outright with `focus:outline-none`.
+   * ═════════════════════════════════════════════════════════════════════════════════════════
+   */
+  test('the arrive-read-switch-read journey works by keyboard alone', async ({ page }) => {
+    await signedIn(page)
+
+    // Arrive: Home names a conference and what is happening next.
+    await expect(page.locator('[data-card="greeting-day-context"]')).toBeVisible()
+    await expect(page.locator('[data-card="up-next"]')).toBeVisible()
+
+    const before = await page.locator('[data-card="up-next"]').textContent()
+
+    // Switch, without touching the pointer.
+    const trigger = page.getByRole('button', { name: /change conference/i })
+    await tabTo(page, trigger)
+    await expect(trigger).toBeFocused()
+
+    const outline = await trigger.evaluate((element) => {
+      const style = getComputedStyle(element)
+      return { width: style.outlineWidth, style: style.outlineStyle }
+    })
+    expect(outline.style, 'the switcher must show a visible focus ring').not.toBe('none')
+    expect(parseFloat(outline.width)).toBeGreaterThan(0)
+
+    await page.keyboard.press('Enter')
+    await expect(page.getByRole('menu')).toBeVisible()
+
+    // Which conference we are actually in — read, not assumed. An explicit choice is durable
+    // (FR-104) and the database is seeded once per run, so an earlier test may already have
+    // switched.
+    const startingLabel = (await trigger.getAttribute('aria-label')) ?? ''
+    const target = ADA.events.find((name) => !startingLabel.includes(name))
+    if (!target) throw new Error(`No conference to switch to from "${startingLabel}".`)
+
+    // Escape first, to prove dismissal does not change the selection (FR-116).
+    await page.keyboard.press('Escape')
+    await expect(page.getByRole('menu')).toBeHidden()
+    await expect(trigger).toBeFocused()
+    await expect(trigger).toHaveAccessibleName(startingLabel)
+
+    // Then genuinely switch, by keyboard.
+    await page.keyboard.press('Enter')
+    const other = page.getByRole('menuitemradio', { name: new RegExp(target) })
+    await tabTo(page, other)
+    await page.keyboard.press('Enter')
+
+    await expect(trigger).toHaveAccessibleName(new RegExp(target))
+
+    // Read what is next again — and it must have changed, because SC-107 makes the two
+    // programmes disjoint. Identical content here would mean a surface kept the old conference.
+    await expect(page.locator('[data-card="up-next"]')).toBeVisible()
+    await expect.poll(() => page.locator('[data-card="up-next"]').textContent()).not.toBe(before)
+  })
+
+  test('a conference switch leaves the browser address unchanged (FR-119)', async ({ page }) => {
+    await signedIn(page)
+    await page.goto('/agenda')
+    const before = new URL(page.url()).pathname
+
+    await switchToAnotherConference(page, ADA)
+
+    // The active conference travels in requests, never in the address.
+    expect(new URL(page.url()).pathname).toBe(before)
+  })
+
+  test('every conference-scoped surface follows a switch (SC-102)', async ({ page }) => {
+    await signedIn(page)
+    await page.goto('/agenda')
+
+    const programmeBefore = await page.locator('main').textContent()
+
+    const target = await switchToAnotherConference(page, ADA)
+
+    // Agenda re-renders in place, with no reload. The two seeded programmes share no session
+    // title, track, room or speaker (SC-107), so any leftover would be visible.
+    await expect.poll(() => page.locator('main').textContent()).not.toBe(programmeBefore)
+
+    // And Home, which was never remounted, agrees.
+    await page.goto('/')
+    await expect(page.getByRole('button', { name: /change conference/i })).toHaveAccessibleName(
+      new RegExp(target),
+    )
   })
 
   test('the developer instance legend is absent from a production build', async ({ page }) => {
