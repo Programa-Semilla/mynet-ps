@@ -1,4 +1,4 @@
-import { eq, sql } from 'drizzle-orm'
+import { and, eq, sql } from 'drizzle-orm'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 
 import { getDb } from '../../src/db/client.js'
@@ -195,6 +195,48 @@ describe('active event derivation', () => {
       const active = await resolveActiveEvent(adaId)
 
       expect(active?.name).toBe('Frontend Horizons')
+    })
+
+    /**
+     * T071 (002) — **removing a registration removes the selection** (FR-101, US4 scenario 4).
+     *
+     * ─────────────────────────────────────────────────────────────────────────────────────
+     * This is the composite foreign key's cascade, observed rather than assumed. FR-101 says
+     * the active conference may never resolve to an unregistered one *under any sequence of
+     * events*, and "the attendee's registration is withdrawn while they have it selected" is
+     * the sequence that would otherwise leave a dangling pointer at content they may no longer
+     * read.
+     *
+     * No application logic implements this. If someone later replaced the composite key with a
+     * plain reference to `events`, every other test would still pass and this would not.
+     * ─────────────────────────────────────────────────────────────────────────────────────
+     */
+    it('falls back to derivation when the chosen conference’s registration is removed', async () => {
+      const [chosen] = await getDb()
+        .select()
+        .from(events)
+        .where(eq(events.name, 'Frontend Horizons'))
+      if (!chosen) throw new Error('Fixture missing.')
+
+      await getDb().insert(activeEventSelections).values({ attendeeId: adaId, eventId: chosen.id })
+      expect((await resolveActiveEvent(adaId))?.name).toBe('Frontend Horizons')
+
+      await getDb()
+        .delete(registrations)
+        .where(and(eq(registrations.attendeeId, adaId), eq(registrations.eventId, chosen.id)))
+
+      // The selection row is gone by cascade, not by anything the application did.
+      const remaining = await getDb()
+        .select()
+        .from(activeEventSelections)
+        .where(eq(activeEventSelections.attendeeId, adaId))
+      expect(remaining).toHaveLength(0)
+
+      // And the attendee lands on a conference they are still registered for — not an error,
+      // and not the conference they just lost access to.
+      const active = await resolveActiveEvent(adaId)
+      expect(active).not.toBeNull()
+      expect(active?.name).toBe('Product & Design Summit')
     })
 
     it('carries the venue timezone, which day context needs (FR-120)', async () => {

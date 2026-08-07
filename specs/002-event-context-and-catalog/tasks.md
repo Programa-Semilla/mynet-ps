@@ -185,13 +185,13 @@ responses must be identical.
 
 **Depends on**: US2 (the guard and the content it protects).
 
-- [ ] T068 [US4] Route audit in `apps/api/tests/unit/event-scope-audit.test.ts` — build the real app, collect every route through Fastify's `onRoute` hook, fail when a route whose URL declares an event parameter lacks `requireEventAccess` (FR-149)
-- [ ] T069 [US4] **Watch the audit fail.** Remove the guard from one route in `apps/api/src/routes/events/catalog.ts`, confirm `apps/api/tests/unit/event-scope-audit.test.ts` goes red, restore. A guard never seen failing is not known to work — the `substitutability-proven-without-the-application` lesson applied to its own enforcement
-- [ ] T070 [P] [US4] Isolation tests in `apps/api/tests/integration/isolation.test.ts` against real seeded rows: cross-attendee and cross-event over every route accepting an event identifier, **and refusal parity** — an unregistered-but-real event and a nonexistent one must produce identical status *and* identical body (FR-148, FR-150, SC-105)
-- [ ] T071 [P] [US4] Cascade test in `apps/api/tests/integration/active-event.test.ts`: delete a registration, confirm the selection row disappears and the attendee falls back to derivation rather than erroring or seeing the event (FR-101, US4 scenario 4)
-- [ ] T072 [US4] Extend the audit in `apps/api/tests/unit/event-scope-audit.test.ts` to assert **no write route exists against conference content** — no `POST`, `PUT`, `PATCH` or `DELETE` on sessions, tracks, rooms or speakers, at any privilege (FR-132, FR-134). The audit already walks the route table; this costs almost nothing and is the only automated guard on the organizer-administration exclusion
-- [ ] T073 [US4] ESLint `no-restricted-syntax` rule in `eslint.config.js` rejecting type assertions to `EventScope` outside `apps/api/src/plugins/event-access.ts` — closing the brand's known escape hatch (research D2)
-- [ ] T074 [US4] Confirm the rule in `eslint.config.js` actually fires on a deliberate assertion, then revert the assertion
+- [X] T068 [US4] Route audit in `apps/api/tests/unit/event-scope-audit.test.ts` — build the real app, collect every route through Fastify's `onRoute` hook, fail when a route whose URL declares an event parameter lacks `requireEventAccess` (FR-149)
+- [X] T069 [US4] **Watch the audit fail.** Remove the guard from one route in `apps/api/src/routes/events/catalog.ts`, confirm `apps/api/tests/unit/event-scope-audit.test.ts` goes red, restore. A guard never seen failing is not known to work — the `substitutability-proven-without-the-application` lesson applied to its own enforcement
+- [X] T070 [P] [US4] Isolation tests in `apps/api/tests/integration/isolation.test.ts` against real seeded rows: cross-attendee and cross-event over every route accepting an event identifier, **and refusal parity** — an unregistered-but-real event and a nonexistent one must produce identical status *and* identical body (FR-148, FR-150, SC-105)
+- [X] T071 [P] [US4] Cascade test in `apps/api/tests/integration/active-event.test.ts`: delete a registration, confirm the selection row disappears and the attendee falls back to derivation rather than erroring or seeing the event (FR-101, US4 scenario 4)
+- [X] T072 [US4] Extend the audit in `apps/api/tests/unit/event-scope-audit.test.ts` to assert **no write route exists against conference content** — no `POST`, `PUT`, `PATCH` or `DELETE` on sessions, tracks, rooms or speakers, at any privilege (FR-132, FR-134). The audit already walks the route table; this costs almost nothing and is the only automated guard on the organizer-administration exclusion
+- [X] T073 [US4] ESLint `no-restricted-syntax` rule in `eslint.config.js` rejecting type assertions to `EventScope` outside `apps/api/src/plugins/event-access.ts` — closing the brand's known escape hatch (research D2)
+- [X] T074 [US4] Confirm the rule in `eslint.config.js` actually fires on a deliberate assertion, then revert the assertion
 
 **Checkpoint**: Principle VIII's server-side authorization is enforced at compile time, at lint time, and in CI.
 

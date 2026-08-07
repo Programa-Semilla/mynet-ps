@@ -11,7 +11,7 @@
  */
 import fastifyCookie from '@fastify/cookie'
 import fastifyCors from '@fastify/cors'
-import Fastify, { type FastifyInstance } from 'fastify'
+import Fastify, { type FastifyInstance, type RouteOptions } from 'fastify'
 
 import { loadConfig } from './config.js'
 import { closeDb } from './db/client.js'
@@ -22,7 +22,25 @@ import eventAccess from './plugins/event-access.js'
 import swagger from './plugins/swagger.js'
 import { ROUTES } from './routes/index.js'
 
-export const buildApp = async (): Promise<FastifyInstance> => {
+export interface BuildAppOptions {
+  /**
+   * Observes every route as it registers — the seam the route audit uses (002, T068, FR-149).
+   *
+   * ─────────────────────────────────────────────────────────────────────────────────────────
+   * A test seam in production code, and worth justifying rather than hiding. Fastify's
+   * `onRoute` hook only sees routes registered *after* it is added, so an audit that built the
+   * app and then asked what it contained would be too late. The alternative — parsing
+   * `printRoutes()` output — would make the guarantee depend on a human-readable format that
+   * carries no compatibility promise.
+   *
+   * The audit's whole value is that it inspects the **real** application rather than a
+   * reconstruction of it, so this stays.
+   * ─────────────────────────────────────────────────────────────────────────────────────────
+   */
+  readonly onRoute?: (route: RouteOptions) => void
+}
+
+export const buildApp = async (options: BuildAppOptions = {}): Promise<FastifyInstance> => {
   const config = loadConfig()
 
   const app = Fastify({
@@ -103,6 +121,10 @@ export const buildApp = async (): Promise<FastifyInstance> => {
   app.addHook('onClose', async () => {
     await closeDb()
   })
+
+  // 7a. The audit observer, if one was supplied. Added here — after the plugins, before the
+  //     routes — because `onRoute` only sees what registers after it.
+  if (options.onRoute) app.addHook('onRoute', options.onRoute)
 
   // 8. Routes, from the append-only registry in `routes/index.ts` (T002, FR-181). A feature
   //    adding routes appends there and leaves this file — and the ordering above — alone.

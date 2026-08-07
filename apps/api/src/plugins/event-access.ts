@@ -68,7 +68,10 @@ export interface EventParams {
  * enumerate every conference in the product by watching which status came back.
  * ─────────────────────────────────────────────────────────────────────────────────────────
  */
-const requireEventAccess = async (request: FastifyRequest, _reply: FastifyReply): Promise<void> => {
+export const requireEventAccess = async (
+  request: FastifyRequest,
+  _reply: FastifyReply,
+): Promise<void> => {
   const attendee = request.attendee
   // Ordering matters: an unauthenticated caller must not be able to probe event existence at
   // all. `requireAttendee` runs first in every route's preHandler list, and this is the
