@@ -2,6 +2,7 @@ import { Route, Routes } from 'react-router'
 
 import { AppShell } from '../shell/AppShell.js'
 import { NotFound } from '../shell/NotFound.js'
+import { Agenda } from './destinations/Agenda.js'
 import { Home } from './destinations/Home.js'
 import { DestinationPlaceholder } from './destinations/Placeholder.js'
 import { DESTINATIONS, HOME } from './navigation.js'
@@ -37,19 +38,23 @@ export const AppRoutes = () => (
   <Routes>
     <Route element={<RequireAuth />}>
       <Route element={<AppShell />}>
-        {DESTINATIONS.map((destination) =>
-          destination.path === HOME.path ? (
-            // Home is the only destination with content in this slice, and the only one whose
-            // address is the index rather than a segment.
-            <Route key={destination.path} index element={<Home />} />
-          ) : (
-            <Route
-              key={destination.path}
-              path={destination.path.slice(1)}
-              element={<DestinationPlaceholder destination={destination} />}
-            />
-          ),
-        )}
+        {DESTINATIONS.map((destination) => {
+          // Home is the only destination whose address is the index rather than a segment.
+          if (destination.path === HOME.path) {
+            return <Route key={destination.path} index element={<Home />} />
+          }
+
+          // 002 — Agenda stops being a placeholder (T050). Discover, Messages and Network
+          // remain placeholders until the features that own them land.
+          const element =
+            destination.path === '/agenda' ? (
+              <Agenda />
+            ) : (
+              <DestinationPlaceholder destination={destination} />
+            )
+
+          return <Route key={destination.path} path={destination.path.slice(1)} element={element} />
+        })}
 
         {/* FR-015 — inside the shell, so the navigation stays available. Never a blank screen. */}
         <Route path="*" element={<NotFound />} />

@@ -70,6 +70,57 @@ export default tseslint.config(
     },
   },
 
+  /**
+   * T073 (002) — **closes the branded `EventScope`'s one escape hatch** (FR-147, research D2).
+   *
+   * ═════════════════════════════════════════════════════════════════════════════════════════
+   * The brand makes verification a precondition of reading: a handler that skipped
+   * `requireEventAccess` has no `EventScope` and cannot call the query layer. The compiler
+   * enforces that — with one gap, stated openly in research D2 rather than hidden: **a type
+   * assertion defeats any branded type.**
+   *
+   * `as EventScope` anywhere outside the guard would compile cleanly, pass the route audit, and
+   * read a conference the attendee is not registered for. This turns that bypass into a lint
+   * failure rather than an invisible one.
+   *
+   * It is a guard against forgetting, not against a determined author — someone who wants to
+   * get round it can. That is the honest limit of the mechanism, and it is why the brand is
+   * paired with the route audit and the isolation suite rather than presented alone.
+   *
+   * The one legitimate construction site is `plugins/event-access.ts`, exempted below.
+   * ═════════════════════════════════════════════════════════════════════════════════════════
+   */
+  {
+    name: 'mynet/event-scope-brand',
+    files: ['apps/api/**/*.{ts,tsx,mts,cts}'],
+    ignores: ['apps/api/src/plugins/event-access.ts'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: 'TSAsExpression > TSTypeReference > Identifier[name="EventScope"]',
+          message:
+            'Do not assert a value to EventScope. It is proof that the attendee is registered ' +
+            'for the event, and the only place that proof can be produced is requireEventAccess ' +
+            'in plugins/event-access.ts. An assertion here fabricates the proof and reads ' +
+            'another conference (FR-147, research D2).',
+        },
+        {
+          selector: 'TSTypeAssertion > TSTypeReference > Identifier[name="EventScope"]',
+          message: 'Do not assert a value to EventScope — see plugins/event-access.ts (FR-147).',
+        },
+        {
+          // A one-line local alias defeated the two selectors above: `type A = EventScope` and
+          // then `x as unknown as A` matched neither, because both key on the identifier text.
+          selector: 'TSTypeAliasDeclaration > TSTypeReference > Identifier[name="EventScope"]',
+          message:
+            'Do not alias EventScope. An alias defeats the assertion rules above, which match ' +
+            'on the type name. Use EventScope directly (FR-147).',
+        },
+      ],
+    },
+  },
+
   {
     name: 'mynet/client',
     files: ['apps/web/**/*.{ts,tsx}'],

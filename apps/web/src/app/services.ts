@@ -1,6 +1,8 @@
 import {
+  HttpActiveEventRepository,
   HttpAttendeeRepository,
   HttpAuthGateway,
+  HttpCatalogRepository,
   HttpClient,
   HttpEventsRepository,
 } from '@mynet/data/http'
@@ -42,6 +44,8 @@ export const createServices = (): PlatformServices => {
     repositories: {
       attendee: new HttpAttendeeRepository(http),
       events: new HttpEventsRepository(http),
+      activeEvent: new HttpActiveEventRepository(http),
+      catalog: new HttpCatalogRepository(http),
     },
     auth: new HttpAuthGateway(http),
   }

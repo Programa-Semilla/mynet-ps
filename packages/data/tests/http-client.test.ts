@@ -101,3 +101,102 @@ describe('HttpClient', () => {
     await expect(clientWith(recorder.fetch).request('/events')).rejects.toThrow()
   })
 })
+
+/**
+ * In-flight GET coalescing.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ * Home renders four independent cards which, by design, cannot know about each other
+ * (FR-164). Two need the programme and two need the attendee's conferences, so one render
+ * issued five requests where three would do. Coalescing here keeps the card contract intact.
+ *
+ * It is deliberately **not a cache**: the entry is dropped when the request settles, so
+ * nothing is held between renders and no staleness policy is implied — that remains an open
+ * question this feature does not answer.
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ */
+describe('in-flight request coalescing', () => {
+  const clientWith = (fetchImpl: typeof globalThis.fetch) =>
+    new HttpClient({ baseUrl: 'https://api.test', isOnline: () => true, fetch: fetchImpl })
+
+  it('shares one wire request between concurrent identical GETs', async () => {
+    let calls = 0
+    let release: (() => void) | undefined
+    const gate = new Promise<void>((resolve) => {
+      release = resolve
+    })
+
+    const client = clientWith((async () => {
+      calls += 1
+      await gate
+      return new Response('[{"id":"a"}]', {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      })
+    }) as unknown as typeof globalThis.fetch)
+
+    const first = client.request('/events')
+    const second = client.request('/events')
+    release?.()
+
+    expect(await first).toEqual(await second)
+    expect(calls, 'two concurrent identical GETs must reach the network once').toBe(1)
+  })
+
+  it('does NOT share requests for different paths', async () => {
+    let calls = 0
+    const client = clientWith((async () => {
+      calls += 1
+      return new Response('[]', { status: 200, headers: { 'content-type': 'application/json' } })
+    }) as unknown as typeof globalThis.fetch)
+
+    await Promise.all([client.request('/events'), client.request('/workspace/active-event')])
+    expect(calls).toBe(2)
+  })
+
+  it('is not a cache — a later read goes to the network again', async () => {
+    let calls = 0
+    const client = clientWith((async () => {
+      calls += 1
+      return new Response('[]', { status: 200, headers: { 'content-type': 'application/json' } })
+    }) as unknown as typeof globalThis.fetch)
+
+    await client.request('/events')
+    await client.request('/events')
+
+    // Holding the result would imply a staleness policy, which is an open question.
+    expect(calls).toBe(2)
+  })
+
+  it('never coalesces a write, so two deliberate actions stay two', async () => {
+    let calls = 0
+    const client = clientWith((async () => {
+      calls += 1
+      return new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } })
+    }) as unknown as typeof globalThis.fetch)
+
+    await Promise.all([
+      client.request('/workspace/active-event', { method: 'PUT', body: '{"eventId":"a"}' }),
+      client.request('/workspace/active-event', { method: 'PUT', body: '{"eventId":"b"}' }),
+    ])
+
+    expect(calls).toBe(2)
+  })
+
+  it('propagates a failure to every sharer, and does not strand the entry', async () => {
+    let calls = 0
+    const client = clientWith((async () => {
+      calls += 1
+      throw new TypeError('network down')
+    }) as unknown as typeof globalThis.fetch)
+
+    await expect(
+      Promise.all([client.request('/events'), client.request('/events')]),
+    ).rejects.toThrow(OfflineError)
+    expect(calls).toBe(1)
+
+    // The failed entry must not latch — a retry has to be able to reach the network.
+    await expect(client.request('/events')).rejects.toThrow(OfflineError)
+    expect(calls).toBe(2)
+  })
+})

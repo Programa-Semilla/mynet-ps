@@ -71,6 +71,46 @@ test.describe('accessibility', () => {
     })
   }
 
+  /**
+   * T082 (002) — **the controls this feature introduced** (FR-116, Principle IV).
+   *
+   * The destination sweep above scans pages at rest. The conference switcher is only rendered
+   * once opened, so its menu — the one genuinely modal thing 002 adds — would never be scanned
+   * by a suite that only visits addresses.
+   */
+  for (const width of WIDTHS) {
+    test(`the open conference menu is clean at ${width.px}px (${width.layout})`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: width.px, height: 900 })
+      await page.goto('/')
+      await signIn(page, ADA)
+
+      const trigger = page.getByRole('button', { name: /change conference/i })
+      await expect(trigger).toBeVisible()
+      await trigger.click()
+      await expect(page.getByRole('menu')).toBeVisible()
+
+      const { violations } = await scan(page)
+      expect(
+        blocking(violations),
+        `conference menu at ${width.px}px:\n${describeViolations(blocking(violations))}`,
+      ).toEqual([])
+    })
+  }
+
+  test('Agenda with a full programme is clean', async ({ page }) => {
+    // Track chips are the one place 002 adds colour-coded content, and contrast against a tinted
+    // chip is exactly what a static check cannot see.
+    await page.goto('/')
+    await signIn(page, ADA)
+    await page.goto('/agenda')
+    await expect(page.getByRole('heading', { name: 'Agenda', level: 1 })).toBeVisible()
+
+    const { violations } = await scan(page)
+    expect(blocking(violations), describeViolations(blocking(violations))).toEqual([])
+  })
+
   test('the not-found view is clean', async ({ page }) => {
     await page.goto('/')
     await signIn(page, ADA)

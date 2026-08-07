@@ -19,6 +19,17 @@ interface Props {
    * supplies every other platform capability.
    */
   readonly onRecover: () => void
+  /**
+   * T014 (002) — an alternative, **contained** fallback.
+   *
+   * Home wraps each card in one of these (FR-163), and a card that throws must take down its
+   * own region and nothing else. The default fallback below is a full-screen takeover, which is
+   * right for the application root and exactly wrong for one card among several: it would blank
+   * the dashboard, which is the failure the composition contract exists to prevent.
+   *
+   * Supplied by the shell rather than by each card, so a card author cannot forget it.
+   */
+  readonly renderFallback?: (error: Error) => ReactNode
 }
 
 interface State {
@@ -41,6 +52,9 @@ export class ErrorBoundary extends Component<Props, State> {
   override render(): ReactNode {
     const { error } = this.state
     if (!error) return this.props.children
+
+    // A contained fallback replaces the full-screen one entirely — it does not nest inside it.
+    if (this.props.renderFallback) return this.props.renderFallback(error)
 
     return (
       <main className="flex min-h-screen items-center justify-center bg-surface px-4">

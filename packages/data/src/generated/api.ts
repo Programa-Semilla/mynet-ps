@@ -269,11 +269,304 @@ export interface paths {
                             location: string;
                             startsOn: string;
                             endsOn: string;
+                            timezone: string;
                         }[];
                     };
                 };
                 /** @description Default Response */
                 401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspace/active-event": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The attendee's active conference, recorded or derived
+         * @description Returns the attendee's explicitly chosen conference, or — while they have never chosen — the one derived from their registrations: in progress at the venue today, else next to start, else most recently ended (FR-102, FR-103). An attendee registered for no conferences receives 204 with no body, which is a valid answer and not an error (FR-105). Carries the venue timezone so the client can compute "day N of M" itself; that counter is never stored and never sent (FR-121).
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** Format: uuid */
+                            id: string;
+                            name: string;
+                            location: string;
+                            startsOn: string;
+                            endsOn: string;
+                            /** @description IANA zone of the venue, e.g. Europe/Madrid (FR-120). */
+                            timezone: string;
+                        };
+                    };
+                };
+                /** @description Registered for no conferences (FR-105). An empty body, not an error and not a fabricated event — the client renders an explicit empty state. */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+            };
+        };
+        /**
+         * Record the attendee's chosen conference
+         * @description Records an explicit choice, which is then honoured indefinitely — it is never re-derived when the chosen conference ends (FR-104). Idempotent: selecting the already-active conference succeeds and changes nothing observable. Refuses a conference the attendee is not registered for identically to one that does not exist (FR-148).
+         */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        eventId: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description The newly active conference, echoed in full so the client can reconcile a concurrent switch without a second request (research D9). */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** Format: uuid */
+                            id: string;
+                            name: string;
+                            location: string;
+                            startsOn: string;
+                            endsOn: string;
+                            timezone: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Not registered for that conference, **or** no such conference. Deliberately indistinguishable (FR-148). */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/events/{eventId}/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The conference's programme, chronological
+         * @description Every session for the named conference in start order, each with its track, its room and its speakers. An event with no programme returns an empty array — a valid answer, not a failure (FR-139). Times are absolute instants; no relative wording is sent, because "starts in 15 minutes" is only true at the moment it is computed (FR-124).
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    eventId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** Format: uuid */
+                            id: string;
+                            title: string;
+                            summary: null | string;
+                            /** Format: date-time */
+                            startsAt: string;
+                            /** Format: date-time */
+                            endsAt: string;
+                            track: {
+                                /** Format: uuid */
+                                id: string;
+                                name: string;
+                                /** @description A theme token NAME, e.g. track-design. Never a colour value — the palette lives in the client theme and nowhere else (FR-136). */
+                                colorToken: string;
+                            };
+                            room: {
+                                /** Format: uuid */
+                                id: string;
+                                name: string;
+                            };
+                            /** @description Empty when the session has none (FR-138). An empty list rather than null, so a client cannot confuse "no speaker" with "not loaded". */
+                            speakers: {
+                                /** Format: uuid */
+                                id: string;
+                                name: string;
+                                title: null | string;
+                                company: null | string;
+                            }[];
+                        }[];
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Not registered for that conference, **or** no such conference. The two are deliberately indistinguishable — identical status and identical body — so that an attendee cannot enumerate conferences by watching which refusal comes back (FR-148). */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/events/{eventId}/tracks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The conference's tracks, for coding and legends
+         * @description Each track with its name and its theme token name. Never a colour value (FR-136, research D7). The name is what makes colour never the sole carrier of meaning — a track is always rendered in text as well.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    eventId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** Format: uuid */
+                            id: string;
+                            name: string;
+                            colorToken: string;
+                        }[];
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Not registered for that conference, **or** no such conference. The two are deliberately indistinguishable — identical status and identical body — so that an attendee cannot enumerate conferences by watching which refusal comes back (FR-148). */
+                404: {
                     headers: {
                         [name: string]: unknown;
                     };

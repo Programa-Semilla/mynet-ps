@@ -13,8 +13,9 @@ import { CalendarDays, Compass, Home, MessageSquare, Users, type LucideIcon } fr
  * Order is deliberate and matches the prototype: Home first because it is the entry view, then
  * the attendee's own time (Agenda), then other people (Discover, Messages, Network).
  *
- * These carry **no product content in this slice** (FR-023). Each destination renders an
- * identifiable region with a heading and an honest statement that its content is not built yet.
+ * **Home and Agenda carry product content from 002.** Discover, Messages and Network remain
+ * placeholders: each renders an identifiable region with a heading and `purpose` as an honest
+ * statement that its content is not built yet, until the feature that owns it lands.
  */
 
 export interface Destination {
@@ -38,9 +39,18 @@ export const DESTINATIONS: readonly Destination[] = [
     icon: Home,
   },
   {
+    /*
+      T085 (002) — Agenda now has content, so its `purpose` had to stop promising something it
+      does not yet do. The destination renders the conference programme, read-only; saving a
+      session, personal notes and Q&A arrive with feature 005, and "your personalised schedule"
+      described that later state rather than this one.
+
+      `purpose` is shown on placeholder destinations, so for Agenda it is now only a description
+      — but leaving it stale would make the next reader think saving was already built.
+    */
     path: '/agenda',
     label: 'Agenda',
-    purpose: 'Your personalised schedule, in chronological order.',
+    purpose: 'The conference programme, in chronological order.',
     icon: CalendarDays,
   },
   {

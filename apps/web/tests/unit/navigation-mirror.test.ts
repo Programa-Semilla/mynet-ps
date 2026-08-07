@@ -21,3 +21,29 @@ describe('the end-to-end destination list mirrors the application', () => {
     expect(E2E_DESTINATIONS.map((d) => d.label)).toEqual(APP_DESTINATIONS.map((d) => d.label))
   })
 })
+
+/**
+ * T066 (002) — **no destination address names a conference** (FR-119).
+ *
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ * The active conference travels in requests, never in the address. That is what lets a switch
+ * leave the browser address untouched, and it is why an address is safe to share: a link cannot
+ * carry one attendee's conference into somebody else's session, and the router needs no scoping
+ * rules of its own.
+ *
+ * Asserted here rather than observed once, because the tempting change — adding `/:eventId` to
+ * make a destination "linkable to a conference" — looks reasonable in isolation and would
+ * silently undo it.
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ */
+describe('destination addresses stay conference-neutral (FR-119)', () => {
+  it.each(APP_DESTINATIONS.map((d) => [d.label, d.path] as const))(
+    '%s has no event segment or query parameter',
+    (_label, path) => {
+      expect(path).not.toMatch(/:eventId|:event\b/)
+      expect(path).not.toContain('?')
+      // No dynamic segment of any kind: the five destinations are fixed addresses.
+      expect(path).not.toMatch(/:/)
+    },
+  )
+})

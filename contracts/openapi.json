@@ -282,7 +282,8 @@
                       "name",
                       "location",
                       "startsOn",
-                      "endsOn"
+                      "endsOn",
+                      "timezone"
                     ],
                     "additionalProperties": false,
                     "properties": {
@@ -301,6 +302,9 @@
                       },
                       "endsOn": {
                         "type": "string"
+                      },
+                      "timezone": {
+                        "type": "string"
                       }
                     }
                   }
@@ -313,6 +317,473 @@
             "content": {
               "application/json": {
                 "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspace/active-event": {
+      "get": {
+        "summary": "The attendee's active conference, recorded or derived",
+        "tags": [
+          "workspace"
+        ],
+        "description": "Returns the attendee's explicitly chosen conference, or — while they have never chosen — the one derived from their registrations: in progress at the venue today, else next to start, else most recently ended (FR-102, FR-103). An attendee registered for no conferences receives 204 with no body, which is a valid answer and not an error (FR-105). Carries the venue timezone so the client can compute \"day N of M\" itself; that counter is never stored and never sent (FR-121).",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "id",
+                    "name",
+                    "location",
+                    "startsOn",
+                    "endsOn",
+                    "timezone"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "location": {
+                      "type": "string"
+                    },
+                    "startsOn": {
+                      "type": "string"
+                    },
+                    "endsOn": {
+                      "type": "string"
+                    },
+                    "timezone": {
+                      "type": "string",
+                      "description": "IANA zone of the venue, e.g. Europe/Madrid (FR-120)."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "204": {
+            "description": "Registered for no conferences (FR-105). An empty body, not an error and not a fabricated event — the client renders an explicit empty state."
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "Record the attendee's chosen conference",
+        "tags": [
+          "workspace"
+        ],
+        "description": "Records an explicit choice, which is then honoured indefinitely — it is never re-derived when the chosen conference ends (FR-104). Idempotent: selecting the already-active conference succeeds and changes nothing observable. Refuses a conference the attendee is not registered for identically to one that does not exist (FR-148).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "eventId"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "eventId": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The newly active conference, echoed in full so the client can reconcile a concurrent switch without a second request (research D9).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "The newly active conference, echoed in full so the client can reconcile a concurrent switch without a second request (research D9).",
+                  "type": "object",
+                  "required": [
+                    "id",
+                    "name",
+                    "location",
+                    "startsOn",
+                    "endsOn",
+                    "timezone"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "location": {
+                      "type": "string"
+                    },
+                    "startsOn": {
+                      "type": "string"
+                    },
+                    "endsOn": {
+                      "type": "string"
+                    },
+                    "timezone": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not registered for that conference, **or** no such conference. Deliberately indistinguishable (FR-148).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Not registered for that conference, **or** no such conference. Deliberately indistinguishable (FR-148).",
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/events/{eventId}/sessions": {
+      "get": {
+        "summary": "The conference's programme, chronological",
+        "tags": [
+          "catalog"
+        ],
+        "description": "Every session for the named conference in start order, each with its track, its room and its speakers. An event with no programme returns an empty array — a valid answer, not a failure (FR-139). Times are absolute instants; no relative wording is sent, because \"starts in 15 minutes\" is only true at the moment it is computed (FR-124).",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "eventId",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "id",
+                      "title",
+                      "summary",
+                      "startsAt",
+                      "endsAt",
+                      "track",
+                      "room",
+                      "speakers"
+                    ],
+                    "additionalProperties": false,
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "title": {
+                        "type": "string"
+                      },
+                      "summary": {
+                        "type": [
+                          "null",
+                          "string"
+                        ]
+                      },
+                      "startsAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "endsAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "track": {
+                        "type": "object",
+                        "required": [
+                          "id",
+                          "name",
+                          "colorToken"
+                        ],
+                        "additionalProperties": false,
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "colorToken": {
+                            "type": "string",
+                            "description": "A theme token NAME, e.g. track-design. Never a colour value — the palette lives in the client theme and nowhere else (FR-136)."
+                          }
+                        }
+                      },
+                      "room": {
+                        "type": "object",
+                        "required": [
+                          "id",
+                          "name"
+                        ],
+                        "additionalProperties": false,
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "name": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "speakers": {
+                        "type": "array",
+                        "description": "Empty when the session has none (FR-138). An empty list rather than null, so a client cannot confuse \"no speaker\" with \"not loaded\".",
+                        "items": {
+                          "type": "object",
+                          "required": [
+                            "id",
+                            "name",
+                            "title",
+                            "company"
+                          ],
+                          "additionalProperties": false,
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "name": {
+                              "type": "string"
+                            },
+                            "title": {
+                              "type": [
+                                "null",
+                                "string"
+                              ]
+                            },
+                            "company": {
+                              "type": [
+                                "null",
+                                "string"
+                              ]
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not registered for that conference, **or** no such conference. The two are deliberately indistinguishable — identical status and identical body — so that an attendee cannot enumerate conferences by watching which refusal comes back (FR-148).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Not registered for that conference, **or** no such conference. The two are deliberately indistinguishable — identical status and identical body — so that an attendee cannot enumerate conferences by watching which refusal comes back (FR-148).",
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/events/{eventId}/tracks": {
+      "get": {
+        "summary": "The conference's tracks, for coding and legends",
+        "tags": [
+          "catalog"
+        ],
+        "description": "Each track with its name and its theme token name. Never a colour value (FR-136, research D7). The name is what makes colour never the sole carrier of meaning — a track is always rendered in text as well.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "eventId",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "id",
+                      "name",
+                      "colorToken"
+                    ],
+                    "additionalProperties": false,
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "colorToken": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not registered for that conference, **or** no such conference. The two are deliberately indistinguishable — identical status and identical body — so that an attendee cannot enumerate conferences by watching which refusal comes back (FR-148).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Not registered for that conference, **or** no such conference. The two are deliberately indistinguishable — identical status and identical body — so that an attendee cannot enumerate conferences by watching which refusal comes back (FR-148).",
                   "type": "object",
                   "properties": {
                     "code": {

@@ -62,6 +62,76 @@ test.describe('responsive layout', () => {
     }
   })
 
+  /**
+   * T080 (002) — **the top bar now carries a conference switcher as well** (FR-020, SC-006).
+   *
+   * ─────────────────────────────────────────────────────────────────────────────────────────
+   * At 320px that row holds the product name, the conference name, the attendee's name and the
+   * sign-out control. It is the tightest row in the product, and the one most likely to push
+   * the page sideways — which is why the switcher truncates and the attendee's name is hidden
+   * below the tablet band rather than everything being allowed to shrink equally.
+   * ─────────────────────────────────────────────────────────────────────────────────────────
+   */
+  test('the top bar with a conference switcher does not scroll sideways at any width', async ({
+    page,
+  }) => {
+    await signedIn(page)
+
+    for (const width of SCROLL_WIDTHS) {
+      await page.setViewportSize({ width, height: 900 })
+      await page.goto('/')
+      await expect(page.getByRole('heading', { name: `Hello, ${ADA.displayName}` })).toBeVisible()
+
+      const { overflow, widest } = await horizontalOverflow(page)
+      expect(
+        overflow,
+        `the top bar overflows by ${overflow}px at ${width}px. Widest: ${JSON.stringify(widest)}`,
+      ).toBeLessThanOrEqual(0)
+    }
+  })
+
+  test('the open conference menu does not scroll sideways either', async ({ page }) => {
+    await signedIn(page)
+
+    // The mobile presentation is a full-width overlay, which is exactly the shape that overflows
+    // if it is given a fixed width instead of being allowed to fit its viewport.
+    for (const width of [320, 375, 768, 1280]) {
+      await page.setViewportSize({ width, height: 900 })
+      await page.goto('/')
+
+      const trigger = page.getByRole('button', { name: /change conference/i })
+      await expect(trigger).toBeVisible()
+      await trigger.click()
+      await expect(page.getByRole('menu')).toBeVisible()
+
+      const { overflow, widest } = await horizontalOverflow(page)
+      expect(
+        overflow,
+        `the conference menu overflows by ${overflow}px at ${width}px. Widest: ${JSON.stringify(widest)}`,
+      ).toBeLessThanOrEqual(0)
+
+      await page.keyboard.press('Escape')
+    }
+  })
+
+  test('Agenda does not scroll sideways with a full programme at any width', async ({ page }) => {
+    await signedIn(page)
+
+    // Agenda carries the longest rows in the product — time, title, track chip, room and
+    // speakers on one line — so it is where a min-width mistake shows first.
+    for (const width of SCROLL_WIDTHS) {
+      await page.setViewportSize({ width, height: 900 })
+      await page.goto('/agenda')
+      await expect(page.getByRole('heading', { name: 'Agenda', level: 1 })).toBeVisible()
+
+      const { overflow, widest } = await horizontalOverflow(page)
+      expect(
+        overflow,
+        `Agenda overflows by ${overflow}px at ${width}px. Widest: ${JSON.stringify(widest)}`,
+      ).toBeLessThanOrEqual(0)
+    }
+  })
+
   test('the sign-in screen does not scroll sideways either', async ({ page }) => {
     for (const width of SCROLL_WIDTHS) {
       await page.setViewportSize({ width, height: 900 })

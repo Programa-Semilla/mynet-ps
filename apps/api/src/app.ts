@@ -11,21 +11,36 @@
  */
 import fastifyCookie from '@fastify/cookie'
 import fastifyCors from '@fastify/cors'
-import Fastify, { type FastifyInstance } from 'fastify'
+import Fastify, { type FastifyInstance, type RouteOptions } from 'fastify'
 
 import { loadConfig } from './config.js'
 import { closeDb } from './db/client.js'
 import maintenance from './maintenance.js'
 import authContext from './plugins/auth-context.js'
 import errors from './plugins/errors.js'
+import eventAccess from './plugins/event-access.js'
 import swagger from './plugins/swagger.js'
-import { meRoutes } from './routes/auth/me.js'
-import { signInRoutes } from './routes/auth/sign-in.js'
-import { signOutRoutes } from './routes/auth/sign-out.js'
-import { eventRoutes } from './routes/events.js'
-import { healthRoutes } from './routes/health.js'
+import { ROUTES } from './routes/index.js'
 
-export const buildApp = async (): Promise<FastifyInstance> => {
+export interface BuildAppOptions {
+  /**
+   * Observes every route as it registers — the seam the route audit uses (002, T068, FR-149).
+   *
+   * ─────────────────────────────────────────────────────────────────────────────────────────
+   * A test seam in production code, and worth justifying rather than hiding. Fastify's
+   * `onRoute` hook only sees routes registered *after* it is added, so an audit that built the
+   * app and then asked what it contained would be too late. The alternative — parsing
+   * `printRoutes()` output — would make the guarantee depend on a human-readable format that
+   * carries no compatibility promise.
+   *
+   * The audit's whole value is that it inspects the **real** application rather than a
+   * reconstruction of it, so this stays.
+   * ─────────────────────────────────────────────────────────────────────────────────────────
+   */
+  readonly onRoute?: (route: RouteOptions) => void
+}
+
+export const buildApp = async (options: BuildAppOptions = {}): Promise<FastifyInstance> => {
   const config = loadConfig()
 
   const app = Fastify({
@@ -72,7 +87,10 @@ export const buildApp = async (): Promise<FastifyInstance> => {
   await app.register(fastifyCors, {
     origin: config.webOrigin,
     credentials: true,
-    methods: ['GET', 'POST'],
+    // PUT is here for `PUT /workspace/active-event` (002, T056). Without it the browser's
+    // preflight refuses the switch and the client sees an opaque network failure — which the
+    // integration suite cannot catch, because `fastify.inject()` performs no preflight.
+    methods: ['GET', 'POST', 'PUT'],
   })
 
   // 3. Error handling. Registered before routes so that a failure *inside* route
@@ -88,6 +106,11 @@ export const buildApp = async (): Promise<FastifyInstance> => {
   //    attach it as a preHandler.
   await app.register(authContext)
 
+  // 5a. Event access. Decorates the instance with `requireEventAccess`, which produces the
+  //     `EventScope` every per-event query demands. Must follow auth-context: it verifies a
+  //     registration for `request.attendee`, so identity has to be bound first (002, FR-146).
+  await app.register(eventAccess)
+
   // 6. Retention sweeps. Registered here rather than in `server.ts` so that the integration
   //    harness tears the timers down with the app rather than leaking them between suites.
   await app.register(maintenance)
@@ -99,12 +122,17 @@ export const buildApp = async (): Promise<FastifyInstance> => {
     await closeDb()
   })
 
-  // 8. Routes.
-  await app.register(healthRoutes)
-  await app.register(signInRoutes)
-  await app.register(signOutRoutes)
-  await app.register(meRoutes)
-  await app.register(eventRoutes)
+  // 7a. The audit observer, if one was supplied. Added here — after the plugins, before the
+  //     routes — because `onRoute` only sees what registers after it.
+  if (options.onRoute) app.addHook('onRoute', options.onRoute)
+
+  // 8. Routes, from the append-only registry in `routes/index.ts` (T002, FR-181). A feature
+  //    adding routes appends there and leaves this file — and the ordering above — alone.
+  //    Sequential rather than concurrent: registration order decides the order paths appear in
+  //    the generated contract, and `Promise.all` would make that order non-deterministic.
+  for (const route of ROUTES) {
+    await app.register(route)
+  }
 
   return app
 }

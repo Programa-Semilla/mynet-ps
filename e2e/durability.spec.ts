@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 
 import { redeployApi } from './support/api-process.js'
-import { ADA, expectOwnWorkspace, signIn } from './support/attendees.js'
+import { ADA, expectOwnWorkspace, signIn, switchToAnotherConference } from './support/attendees.js'
 
 /**
  * T065a — attendee data is durable (FR-033, SC-003).
@@ -68,6 +68,42 @@ test.describe('durability', () => {
     // mean every deployment logged the whole conference out mid-event.
     await expect(page.getByRole('heading', { name: `Hello, ${ADA.displayName}` })).toBeVisible()
     await expect(page.getByLabel('Password')).toHaveCount(0)
+  })
+
+  /**
+   * T054 (002) — **the conference choice survives a change of device** (FR-100, SC-103).
+   *
+   * ─────────────────────────────────────────────────────────────────────────────────────────
+   * This is the point of the whole active-event design, and the one property that would be
+   * satisfied by a `localStorage` write right up until the attendee picked up their phone.
+   *
+   * A fresh browser context is the test: new storage, new cookies, nothing carried over except
+   * the credentials. If the choice comes back, it came from the database.
+   * ─────────────────────────────────────────────────────────────────────────────────────────
+   */
+  test('an explicit conference choice survives signing in from a clean browser', async ({
+    browser,
+    page,
+  }) => {
+    await page.goto('/')
+    await signIn(page, ADA)
+
+    // Switch away from whatever is currently active, to something explicitly selected.
+    const chosen = await switchToAnotherConference(page, ADA)
+
+    // A genuinely separate context — not a reload, and not a new tab sharing storage.
+    const clean = await browser.newContext()
+    const cleanPage = await clean.newPage()
+    await cleanPage.goto('/')
+    await signIn(cleanPage, ADA)
+
+    await expect(
+      cleanPage.getByRole('button', { name: /change conference/i }),
+      'The chosen conference must come back on a different device. If it does not, the choice ' +
+        'is living in the browser rather than in the database (SC-103).',
+    ).toHaveAccessibleName(new RegExp(chosen))
+
+    await clean.close()
   })
 
   test('no attendee data is left behind in the browser after signing out', async ({ page }) => {

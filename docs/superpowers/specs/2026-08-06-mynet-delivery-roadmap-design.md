@@ -5,6 +5,37 @@
 **Constitution**: v2.0.0
 **Supersedes**: nothing. First roadmap-level design for MyNet.
 
+> ## Departure recorded: 002 absorbed 003 (2026-08-06)
+>
+> **Feature 002 absorbed phase 003 entirely.** The constitution requires a feature whose scope,
+> dependencies or migration number departs from this roadmap to say so in its specification, and
+> `specs/002-event-context-and-catalog/spec.md` does. This note records the knock-on effects here,
+> because the roadmap is what the next session reads to know what has been decided.
+>
+> **Why.** Owner decision in `brainstorm/02-event-context-and-catalog.md`. Without real per-event
+> content, 002's `EventScope` would have had nothing to carry and its Home card contract would have
+> had one consumer — both proven by shape rather than by use, which is the
+> `substitutability-proven-without-the-application` finding from the 001 review repeated on a
+> surface seven features inherit. Keeping the boundary was explored across four rounds; each
+> smaller version left either the predicate or the contract unvalidated, or split the catalog's
+> schema from its readers so that 003 would have altered a table it did not design.
+>
+> **Consequences, all four:**
+>
+> 1. **003 is retired.** There is no Session Catalog phase; it shipped inside 002.
+> 2. **Migration `0002` transferred to 002**, which emitted both `0001_event_context.sql` and
+>    `0002_session_catalog.sql`. Numbers `0003` onward are unchanged, so no later reservation moved.
+> 3. **005 now depends on 002** rather than on 003.
+> 4. **The first free parallel pair is now 005 ∥ 006**, not 003 ∥ 004. 004 has no partner and runs
+>    alone.
+>
+> **What this costs.** 002 became by far the largest feature in the plan — 89 tasks, six tables,
+> five endpoints, two migrations and a new destination — and the plan lost its first opportunity to
+> run two branches at once. Both were accepted deliberately; see `plan.md`'s Complexity Tracking.
+>
+> The tables below are left as originally approved rather than rewritten, so the departure stays
+> visible as a departure. Read them with this note.
+
 ---
 
 ## Purpose

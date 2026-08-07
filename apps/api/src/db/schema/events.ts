@@ -19,6 +19,38 @@ export const events = pgTable(
     location: text('location').notNull(),
     startsOn: date('starts_on').notNull(),
     endsOn: date('ends_on').notNull(),
+
+    /**
+     * T006 (002) — the IANA zone of the **venue**, e.g. `Europe/Madrid` (FR-120, research D5).
+     *
+     * ─────────────────────────────────────────────────────────────────────────────────────
+     * On the event and not on each session, because the timezone is a property of where the
+     * conference is held rather than of each item on its programme; sessions inherit it. The
+     * limit of that assumption is recorded in the spec — a satellite session in another city
+     * would break it, and none is in scope.
+     *
+     * This is what makes "day N of M" correct for an attendee reading from another timezone.
+     * A device-local computation is right for the venue's own visitors and wrong for everyone
+     * else, which is the whole reason FR-120 exists.
+     *
+     * **No default, deliberately** (research D11). The migration adds the column with
+     * `DEFAULT 'UTC'` so existing rows stay valid and then drops the default in the same
+     * migration — a column that keeps a silent default is how a wrong day number ships
+     * unnoticed.
+     *
+     * **The real zones come from the seed, not from the migration.** An earlier version of this
+     * comment claimed the migration back-filled them; it does not, and the distinction matters:
+     * a database migrated but not re-seeded keeps every conference at `'UTC'`, with a wrong day
+     * number and nothing to detect it. `db:migrate` is always followed by `db:seed` in this
+     * project's own setup, quickstart and end-to-end harness, which is what closes the gap
+     * today.
+     *
+     * Validity is enforced at the seed boundary, not by a CHECK: `pg_timezone_names` is not
+     * usable in one, and a wrong-but-valid zone would satisfy such a constraint anyway.
+     * ─────────────────────────────────────────────────────────────────────────────────────
+     */
+    timezone: text('timezone').notNull(),
+
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [

@@ -65,6 +65,28 @@ export class ApiError extends RequestRefusedError {
 export class HttpClient {
   readonly #options: HttpClientOptions
 
+  /**
+   * ═════════════════════════════════════════════════════════════════════════════════════════
+   * **In-flight GETs to the same path share one request.**
+   *
+   * Home renders four independent cards, and by design no card may know another exists
+   * (FR-164). Two of them need the conference programme and two need the attendee's
+   * conferences, so one Home render issued five requests where three would do — two of them
+   * byte-identical duplicates, each costing a session lookup, a registration check and two
+   * queries on the server, and each downloading the whole programme again.
+   *
+   * Coalescing here rather than in the cards is what keeps the card contract intact: a card
+   * still calls its own repository and still knows nothing about its siblings. The entry is
+   * removed the moment the request settles, so this is **not a cache** — it holds nothing
+   * between renders, and a later read still goes to the network. Introducing a cache would
+   * mean a staleness policy, which is an open question this feature deliberately does not
+   * answer.
+   *
+   * GET only: a coalesced write would silently drop one of two deliberate actions.
+   * ═════════════════════════════════════════════════════════════════════════════════════════
+   */
+  readonly #inFlight = new Map<string, Promise<unknown>>()
+
   constructor(options: HttpClientOptions) {
     this.#options = options
   }
@@ -98,6 +120,29 @@ export class HttpClient {
   }
 
   async request<T>(path: string, init: RequestInit = {}): Promise<T> {
+    const method = init.method ?? 'GET'
+
+    // Only reads are shared, only while one is actually outstanding, and only when the request
+    // carries no options of its own. Sharing a request whose caller passed a `signal` or custom
+    // headers would let one caller's abort or timeout reject another caller who never asked for
+    // it — a cross-caller failure that would read as a random network error.
+    const shareable = method === 'GET' && Object.keys(init).every((key) => key === 'method')
+
+    if (shareable) {
+      const existing = this.#inFlight.get(path)
+      if (existing) return existing as Promise<T>
+
+      const pending = this.#send<T>(path, init).finally(() => {
+        this.#inFlight.delete(path)
+      })
+      this.#inFlight.set(path, pending)
+      return pending
+    }
+
+    return this.#send<T>(path, init)
+  }
+
+  async #send<T>(path: string, init: RequestInit = {}): Promise<T> {
     // FR-053 — refuse rather than queue, and refuse *before* attempting, so the failure is
     // reported as connectivity rather than as an ambiguous network error. Never queued
     // silently, never shown as succeeded.

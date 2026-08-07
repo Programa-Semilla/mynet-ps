@@ -7,6 +7,7 @@ import { useLocation } from 'react-router'
 import { PRODUCT_NAME } from '../app/branding.js'
 import { destinationFor } from '../app/navigation.js'
 import { useAuth } from '../auth/useAuth.js'
+import { EventSwitcher } from './EventSwitcher.js'
 
 /**
  * T061, T073 — the contextual top bar (FR-016, FR-032).
@@ -66,22 +67,40 @@ export const TopBar = () => {
 
   return (
     <>
-      <header className="flex items-center justify-between gap-3 border-b border-border-subtle bg-surface-raised px-4 py-3 tablet:px-6">
+      <header className="flex items-center justify-between gap-2 border-b border-border-subtle bg-surface-raised px-4 py-3 tablet:gap-3 tablet:px-6">
         {/*
         Two labels, one visible at a time — the same CSS-only band selection the navigation uses,
         so neither is announced twice.
+
+        `shrink` on both, because at 320px this label, the conference switcher, the attendee's
+        name and the sign-out control share one row. Something has to give, and it must be a
+        label rather than a control (FR-020, SC-006).
       */}
-        <span className="font-display text-lg font-semibold text-text-primary tablet:hidden">
+        <span className="shrink truncate font-display text-lg font-semibold text-text-primary tablet:hidden">
           {PRODUCT_NAME}
         </span>
-        <span className="hidden font-display text-lg font-semibold text-text-primary tablet:inline">
+        <span className="hidden shrink truncate font-display text-lg font-semibold text-text-primary tablet:inline">
           {current?.label ?? 'Not found'}
         </span>
 
         {attendee && (
-          <div className="flex min-w-0 items-center gap-3">
-            {/* Truncates rather than wrapping or pushing the button off-screen at 320px (FR-020). */}
-            <span className="truncate text-sm text-text-body">{attendee.displayName}</span>
+          <div className="flex min-w-0 shrink items-center gap-2 tablet:gap-3">
+            {/*
+              002 — the conference switcher, at all three widths (FR-110, FR-111, T059). It
+              carries its own loading, single-conference and failure presentations; the top bar
+              only decides where it sits.
+            */}
+            <EventSwitcher />
+
+            {/*
+              Truncates rather than wrapping or pushing the button off-screen at 320px (FR-020).
+              Hidden below the tablet band now that the conference name shares this row — the
+              attendee's own name is the least load-bearing thing here, and it is already on
+              Home in the greeting.
+            */}
+            <span className="hidden truncate text-sm text-text-body tablet:inline">
+              {attendee.displayName}
+            </span>
             <button
               type="button"
               onClick={() => void onSignOut()}

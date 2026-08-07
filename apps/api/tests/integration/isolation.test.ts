@@ -1,6 +1,8 @@
 import type { FastifyInstance } from 'fastify'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
+import { buildApp } from '../../src/app.js'
+
 import {
   ADA,
   clearThrottle,
@@ -197,5 +199,162 @@ describe('attendee data isolation', () => {
   it('refuses an unauthenticated request outright', async () => {
     const response = await app.inject({ method: 'GET', url: '/events' })
     expect(response.statusCode).toBe(401)
+  })
+
+  /**
+   * T070 (002) — **event isolation** (FR-145–FR-150, SC-105).
+   *
+   * ═════════════════════════════════════════════════════════════════════════════════════════
+   * 001 proved an attendee cannot reach another attendee's data. 002 introduced an explicit
+   * event identifier in the path, which is the first thing in this product a client can name
+   * that it might not be entitled to — so this is where that trade gets paid for.
+   *
+   * **Every route accepting an event identifier is covered**, discovered from the real route
+   * table rather than listed by hand, so a route added later without a test here still fails.
+   * ═════════════════════════════════════════════════════════════════════════════════════════
+   */
+  describe('event isolation (002)', () => {
+    /** Every per-event route the application actually declares, as URL templates. */
+    const EVENT_ROUTES = ['/events/{id}/sessions', '/events/{id}/tracks'] as const
+
+    const NONEXISTENT = '00000000-0000-0000-0000-000000000000'
+
+    let adaEventIds: string[]
+    let graceOnlyEventId: string
+
+    beforeAll(async () => {
+      const ada = await app.inject({
+        method: 'GET',
+        url: '/events',
+        headers: { cookie: cookieHeader(adaCookie) },
+      })
+      const grace = await app.inject({
+        method: 'GET',
+        url: '/events',
+        headers: { cookie: cookieHeader(graceCookie) },
+      })
+
+      const adaEvents = ada.json() as Array<{ id: string; name: string }>
+      const graceEvents = grace.json() as Array<{ id: string; name: string }>
+
+      adaEventIds = adaEvents.map((e) => e.id)
+      const graceOnly = graceEvents.find((e) => !adaEventIds.includes(e.id))
+      if (!graceOnly) throw new Error('Seed must give Grace an event Ada does not have.')
+      graceOnlyEventId = graceOnly.id
+    })
+
+    it('covers every route the application declares with an event identifier (SC-105)', async () => {
+      // Discovered rather than assumed: if a feature adds a third per-event route and does not
+      // add it here, this fails and says so.
+      const declared: string[] = []
+      const probe = await buildApp({
+        onRoute: (route) => {
+          if (/:eventId/.test(route.url)) declared.push(route.url)
+        },
+      })
+      await probe.close()
+
+      const covered = EVENT_ROUTES.map((template) => template.replace('{id}', ':eventId'))
+      expect(
+        [...new Set(declared)].sort(),
+        'A per-event route exists that this isolation suite does not exercise. Add it to ' +
+          'EVENT_ROUTES — an uncovered route is an untested scoping boundary (SC-105).',
+      ).toEqual(covered.sort())
+    })
+
+    it.each(EVENT_ROUTES)(
+      '%s — refuses another attendee’s conference IDENTICALLY to a nonexistent one (FR-148)',
+      async (template) => {
+        // ───────────────────────────────────────────────────────────────────────────────────
+        // **Refusal parity is the assertion that matters here.** A 403 for "exists but not
+        // yours" and a 404 for "no such conference" would let Ada enumerate every conference in
+        // the product by watching which refusal came back. Status *and* body must match.
+        // ───────────────────────────────────────────────────────────────────────────────────
+        const unregistered = await app.inject({
+          method: 'GET',
+          url: template.replace('{id}', graceOnlyEventId),
+          headers: { cookie: cookieHeader(adaCookie) },
+        })
+        const nonexistent = await app.inject({
+          method: 'GET',
+          url: template.replace('{id}', NONEXISTENT),
+          headers: { cookie: cookieHeader(adaCookie) },
+        })
+
+        expect(unregistered.statusCode).toBe(nonexistent.statusCode)
+        expect(unregistered.json()).toEqual(nonexistent.json())
+        expect(unregistered.statusCode).toBe(404)
+      },
+    )
+
+    it.each(EVENT_ROUTES)('%s — a malformed identifier refuses the same way', async (template) => {
+      const malformed = await app.inject({
+        method: 'GET',
+        url: template.replace('{id}', 'not-a-uuid'),
+        headers: { cookie: cookieHeader(adaCookie) },
+      })
+      const nonexistent = await app.inject({
+        method: 'GET',
+        url: template.replace('{id}', NONEXISTENT),
+        headers: { cookie: cookieHeader(adaCookie) },
+      })
+
+      expect(malformed.statusCode).toBe(nonexistent.statusCode)
+      expect(malformed.json()).toEqual(nonexistent.json())
+    })
+
+    it.each(EVENT_ROUTES)('%s — refuses without a session at all', async (template) => {
+      const response = await app.inject({
+        method: 'GET',
+        url: template.replace('{id}', adaEventIds[0] ?? NONEXISTENT),
+      })
+
+      expect(response.statusCode).toBe(401)
+    })
+
+    it.each(EVENT_ROUTES)(
+      '%s — serves the conference the attendee IS registered for',
+      async (template) => {
+        // The other half: the guard must not be so enthusiastic that it refuses legitimate reads.
+        // A test suite that only asserted refusals would pass against a route that refused
+        // everything.
+        const response = await app.inject({
+          method: 'GET',
+          url: template.replace('{id}', adaEventIds[0] ?? ''),
+          headers: { cookie: cookieHeader(adaCookie) },
+        })
+
+        expect(response.statusCode).toBe(200)
+      },
+    )
+
+    it('does not let a smuggled attendee identifier widen event access', async () => {
+      const response = await app.inject({
+        method: 'GET',
+        url: `/events/${graceOnlyEventId}/sessions?attendeeId=${graceOnlyEventId}`,
+        headers: { cookie: cookieHeader(adaCookie), 'x-attendee-id': graceOnlyEventId },
+      })
+
+      expect(response.statusCode).toBe(404)
+    })
+
+    it('refuses Ada’s attempt to make Grace’s conference active (FR-101)', async () => {
+      const put = await app.inject({
+        method: 'PUT',
+        url: '/workspace/active-event',
+        headers: { cookie: cookieHeader(adaCookie) },
+        payload: { eventId: graceOnlyEventId },
+      })
+
+      expect(put.statusCode).toBe(404)
+
+      // And Ada's own active conference is untouched by the attempt.
+      const active = await app.inject({
+        method: 'GET',
+        url: '/workspace/active-event',
+        headers: { cookie: cookieHeader(adaCookie) },
+      })
+      expect(adaEventIds).toContain((active.json() as { id: string }).id)
+    })
   })
 })

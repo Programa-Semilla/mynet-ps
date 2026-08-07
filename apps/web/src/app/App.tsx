@@ -2,6 +2,7 @@ import { PlatformProvider, type PlatformServices } from '@mynet/platform'
 import { BrowserRouter } from 'react-router'
 
 import { AuthProvider } from '../auth/useAuth.js'
+import { ActiveEventProvider } from './active-event.js'
 import { AppRoutes } from './routes.js'
 
 /**
@@ -19,7 +20,14 @@ export const App = ({ services }: { services: PlatformServices }) => (
   <PlatformProvider services={services}>
     <BrowserRouter>
       <AuthProvider>
-        <AppRoutes />
+        {/*
+          002 — the active conference is resolved once, above the router, so a switch reaches
+          every conference-scoped surface at once and none is left showing the previous one
+          (FR-113, SC-102). Below AuthProvider because it makes an authenticated request.
+        */}
+        <ActiveEventProvider>
+          <AppRoutes />
+        </ActiveEventProvider>
       </AuthProvider>
     </BrowserRouter>
   </PlatformProvider>

@@ -7,7 +7,7 @@
 import { spawn } from 'node:child_process'
 import { connect } from 'node:net'
 
-/** Matches `SEED_PASSWORD` in apps/api/src/db/seed.ts. */
+/** Matches `SEED_PASSWORD` in apps/api/src/db/seed/attendees.ts. */
 const SEED_PASSWORD = 'correct-horse-battery-staple'
 
 export const renderBanner = ({ branch, instance, hostPort }) => `
