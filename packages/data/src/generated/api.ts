@@ -362,6 +362,170 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/events/{eventId}/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The conference's programme, chronological
+         * @description Every session for the named conference in start order, each with its track, its room and its speakers. An event with no programme returns an empty array — a valid answer, not a failure (FR-139). Times are absolute instants; no relative wording is sent, because "starts in 15 minutes" is only true at the moment it is computed (FR-124).
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    eventId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** Format: uuid */
+                            id: string;
+                            title: string;
+                            summary: null | string;
+                            /** Format: date-time */
+                            startsAt: string;
+                            /** Format: date-time */
+                            endsAt: string;
+                            track: {
+                                /** Format: uuid */
+                                id: string;
+                                name: string;
+                                /** @description A theme token NAME, e.g. track-design. Never a colour value — the palette lives in the client theme and nowhere else (FR-136). */
+                                colorToken: string;
+                            };
+                            room: {
+                                /** Format: uuid */
+                                id: string;
+                                name: string;
+                            };
+                            /** @description Empty when the session has none (FR-138). An empty list rather than null, so a client cannot confuse "no speaker" with "not loaded". */
+                            speakers: {
+                                /** Format: uuid */
+                                id: string;
+                                name: string;
+                                title: null | string;
+                                company: null | string;
+                            }[];
+                        }[];
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Not registered for that conference, **or** no such conference. The two are deliberately indistinguishable — identical status and identical body — so that an attendee cannot enumerate conferences by watching which refusal comes back (FR-148). */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/events/{eventId}/tracks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The conference's tracks, for coding and legends
+         * @description Each track with its name and its theme token name. Never a colour value (FR-136, research D7). The name is what makes colour never the sole carrier of meaning — a track is always rendered in text as well.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    eventId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** Format: uuid */
+                            id: string;
+                            name: string;
+                            colorToken: string;
+                        }[];
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Not registered for that conference, **or** no such conference. The two are deliberately indistinguishable — identical status and identical body — so that an attendee cannot enumerate conferences by watching which refusal comes back (FR-148). */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {

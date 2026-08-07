@@ -23,6 +23,7 @@ export {
   useAuthGateway,
   useCalendar,
   useCamera,
+  useCatalogRepository,
   useConnectivity,
   useContactShare,
   useEventsRepository,

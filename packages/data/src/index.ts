@@ -8,8 +8,13 @@ export type {
   ActiveEventRepository,
   Attendee,
   AttendeeRepository,
+  CatalogRepository,
   Event,
   EventsRepository,
+  Room,
+  Session,
+  Speaker,
+  Track,
 } from './interfaces/index.js'
 
 export {

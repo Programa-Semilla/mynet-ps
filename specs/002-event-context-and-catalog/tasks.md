@@ -109,31 +109,31 @@ track and speakers, and Agenda lists every session for the active event chronolo
 
 ### Tests for User Story 2
 
-- [ ] T030 [P] [US2] Integration test in `apps/api/tests/integration/catalog.test.ts`: sessions returned in `starts_at` order with track, room and speakers; an event with no programme returns `[]` rather than an error (FR-139)
-- [ ] T031 [P] [US2] Component test in `apps/web/tests/up-next.test.tsx`: no session remaining today says so rather than showing a past one; simultaneous starts resolve deterministically; a session with no speaker renders with no empty region and no placeholder name (FR-138, FR-140)
-- [ ] T032 [P] [US2] Component test in `apps/web/tests/agenda.test.tsx`: chronological order, track named in text as well as coded, empty state, and **no** save/add/remove control present or promised (US2 scenario 6)
+- [X] T030 [P] [US2] Integration test in `apps/api/tests/integration/catalog.test.ts`: sessions returned in `starts_at` order with track, room and speakers; an event with no programme returns `[]` rather than an error (FR-139)
+- [X] T031 [P] [US2] Component test in `apps/web/tests/up-next.test.tsx`: no session remaining today says so rather than showing a past one; simultaneous starts resolve deterministically; a session with no speaker renders with no empty region and no placeholder name (FR-138, FR-140)
+- [X] T032 [P] [US2] Component test in `apps/web/tests/agenda.test.tsx`: chronological order, track named in text as well as coded, empty state, and **no** save/add/remove control present or promised (US2 scenario 6)
 
 ### Implementation for User Story 2
 
-- [ ] T033 [US2] `apps/api/src/db/schema/catalog.ts` — `tracks`, `rooms`, `speakers`, `sessions`, `session_speakers` per data-model.md, including `CHECK (ends_at > starts_at)`, the `(event_id, starts_at)` index, and the `(event_id, name)` uniqueness on tracks and rooms. State each table's per-event scoping rule in a comment
-- [ ] T034 [US2] Register in `apps/api/src/db/schema/index.ts`
-- [ ] T035 [US2] Generate `apps/api/migrations/0002_session_catalog.sql`
-- [ ] T036 [US2] `apps/api/src/plugins/event-access.ts` — the branded `EventScope`, its **sole** construction site, and the `requireEventAccess` preHandler. Refuse an unregistered event identically to a nonexistent one, from a single join that produces no row in both cases (FR-148, research D2)
-- [ ] T037 [US2] `apps/api/src/db/queries/catalog.ts` — every function takes `EventScope`, never a bare string. A handler that skipped verification cannot call these (FR-147)
-- [ ] T038 [US2] `GET /events/:eventId/sessions` in `apps/api/src/routes/events/catalog.ts` with a full `schema` block. Absolute instants only; speakers an empty array rather than null (FR-124, FR-138)
-- [ ] T039 [US2] `GET /events/:eventId/tracks` in the same file — `name` and `colorToken`, **never** a colour value
-- [ ] T040 [US2] Register both in `apps/api/src/routes/index.ts`
-- [ ] T041 [P] [US2] `packages/data/src/interfaces/catalog.ts` — `Session`, `Track`, `Room`, `Speaker`, `CatalogRepository`
-- [ ] T042 [P] [US2] `HttpCatalogRepository` in `packages/data/src/http/catalog-repository.ts`
-- [ ] T043 [US2] Wire it at `apps/web/src/app/services.ts`
-- [ ] T044 [US2] Track colour tokens in `apps/web/src/theme/tokens.css`, plus a token-name→class mapping with a **defined neutral fallback** so a seed typo degrades rather than breaks (research D7). Verify contrast the way the existing tokens do
-- [ ] T045 [US2] `apps/api/src/db/seed/catalog.ts` — two fully disjoint programmes and one event left deliberately empty. No session title, track, room or speaker may appear in both, and session counts must differ (SC-107). The empty event is the fixture FR-139 needs (research D12)
-- [ ] T046 [US2] `apps/web/src/app/home/cards/UpNext.tsx` — `scope: 'event'`, slot `primary`
-- [ ] T047 [US2] `apps/web/src/app/home/cards/RestOfDay.tsx` — `scope: 'event'`, slot `primary`
-- [ ] T048 [US2] Register both cards in `apps/web/src/app/home/registry.ts`
-- [ ] T049 [US2] `apps/web/src/app/destinations/Agenda.tsx` — the programme, chronological, read-only, grouped by venue-local day
-- [ ] T050 [US2] Point `/agenda` at the real destination in `apps/web/src/app/routes.tsx`, replacing the placeholder
-- [ ] T051 [US2] Run `pnpm contract:generate`; commit `contracts/openapi.json` and the regenerated `packages/data/src/generated/api.ts`
+- [X] T033 [US2] `apps/api/src/db/schema/catalog.ts` — `tracks`, `rooms`, `speakers`, `sessions`, `session_speakers` per data-model.md, including `CHECK (ends_at > starts_at)`, the `(event_id, starts_at)` index, and the `(event_id, name)` uniqueness on tracks and rooms. State each table's per-event scoping rule in a comment
+- [X] T034 [US2] Register in `apps/api/src/db/schema/index.ts`
+- [X] T035 [US2] Generate `apps/api/migrations/0002_session_catalog.sql`
+- [X] T036 [US2] `apps/api/src/plugins/event-access.ts` — the branded `EventScope`, its **sole** construction site, and the `requireEventAccess` preHandler. Refuse an unregistered event identically to a nonexistent one, from a single join that produces no row in both cases (FR-148, research D2)
+- [X] T037 [US2] `apps/api/src/db/queries/catalog.ts` — every function takes `EventScope`, never a bare string. A handler that skipped verification cannot call these (FR-147)
+- [X] T038 [US2] `GET /events/:eventId/sessions` in `apps/api/src/routes/events/catalog.ts` with a full `schema` block. Absolute instants only; speakers an empty array rather than null (FR-124, FR-138)
+- [X] T039 [US2] `GET /events/:eventId/tracks` in the same file — `name` and `colorToken`, **never** a colour value
+- [X] T040 [US2] Register both in `apps/api/src/routes/index.ts`
+- [X] T041 [P] [US2] `packages/data/src/interfaces/catalog.ts` — `Session`, `Track`, `Room`, `Speaker`, `CatalogRepository`
+- [X] T042 [P] [US2] `HttpCatalogRepository` in `packages/data/src/http/catalog-repository.ts`
+- [X] T043 [US2] Wire it at `apps/web/src/app/services.ts`
+- [X] T044 [US2] Track colour tokens in `apps/web/src/theme/tokens.css`, plus a token-name→class mapping with a **defined neutral fallback** so a seed typo degrades rather than breaks (research D7). Verify contrast the way the existing tokens do
+- [X] T045 [US2] `apps/api/src/db/seed/catalog.ts` — two fully disjoint programmes and one event left deliberately empty. No session title, track, room or speaker may appear in both, and session counts must differ (SC-107). The empty event is the fixture FR-139 needs (research D12)
+- [X] T046 [US2] `apps/web/src/app/home/cards/UpNext.tsx` — `scope: 'event'`, slot `primary`
+- [X] T047 [US2] `apps/web/src/app/home/cards/RestOfDay.tsx` — `scope: 'event'`, slot `primary`
+- [X] T048 [US2] Register both cards in `apps/web/src/app/home/registry.ts`
+- [X] T049 [US2] `apps/web/src/app/destinations/Agenda.tsx` — the programme, chronological, read-only, grouped by venue-local day
+- [X] T050 [US2] Point `/agenda` at the real destination in `apps/web/src/app/routes.tsx`, replacing the placeholder
+- [X] T051 [US2] Run `pnpm contract:generate`; commit `contracts/openapi.json` and the regenerated `packages/data/src/generated/api.ts`
 
 **Checkpoint**: the product answers "what is happening next?" — the first of Principle III's questions.
 

@@ -1,4 +1,6 @@
 import { greetingDayContextCard } from './cards/GreetingDayContext.js'
+import { restOfDayCard } from './cards/RestOfDay.js'
+import { upNextCard } from './cards/UpNext.js'
 import type { HomeCard } from './contract.js'
 
 /**
@@ -38,4 +40,6 @@ export const HOME_CARDS: readonly HomeCard[] = [
   // Cards are appended here. 002 contributes the greeting, up-next, rest-of-day and
   // your-conferences cards; features 004 onward add theirs the same way.
   greetingDayContextCard,
+  upNextCard,
+  restOfDayCard,
 ]

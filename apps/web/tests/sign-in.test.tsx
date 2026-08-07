@@ -51,6 +51,7 @@ const renderSignIn = (overrides: Partial<PlatformServices> = {}) => {
         getActive: async () => null,
         setActive: async () => Promise.reject(new Error('not signed in')),
       },
+      catalog: { listSessions: async () => [], listTracks: async () => [] },
     },
     auth: { signIn, signOut: async () => {} },
     ...overrides,

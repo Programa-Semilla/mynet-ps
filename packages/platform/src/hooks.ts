@@ -44,6 +44,9 @@ export const useEventsRepository = (): PlatformServices['repositories']['events'
 export const useActiveEventRepository = (): PlatformServices['repositories']['activeEvent'] =>
   usePlatform().repositories.activeEvent
 
+export const useCatalogRepository = (): PlatformServices['repositories']['catalog'] =>
+  usePlatform().repositories.catalog
+
 export const useAuthGateway = (): PlatformServices['auth'] => usePlatform().auth
 
 /**

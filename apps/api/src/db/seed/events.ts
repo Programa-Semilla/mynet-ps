@@ -107,6 +107,10 @@ export const eventSeed: SeedModule = {
 
     for (const event of inserted) {
       context.eventIds.set(event.name, event.id)
+      context.eventDates.set(event.name, {
+        startsOn: event.startsOn,
+        timezone: event.timezone,
+      })
     }
 
     await db.insert(registrations).values(

@@ -18,6 +18,7 @@ import { closeDb } from './db/client.js'
 import maintenance from './maintenance.js'
 import authContext from './plugins/auth-context.js'
 import errors from './plugins/errors.js'
+import eventAccess from './plugins/event-access.js'
 import swagger from './plugins/swagger.js'
 import { ROUTES } from './routes/index.js'
 
@@ -83,6 +84,11 @@ export const buildApp = async (): Promise<FastifyInstance> => {
   // 5. Authenticated context. Decorates the instance with `requireAttendee`; routes below
   //    attach it as a preHandler.
   await app.register(authContext)
+
+  // 5a. Event access. Decorates the instance with `requireEventAccess`, which produces the
+  //     `EventScope` every per-event query demands. Must follow auth-context: it verifies a
+  //     registration for `request.attendee`, so identity has to be bound first (002, FR-146).
+  await app.register(eventAccess)
 
   // 6. Retention sweeps. Registered here rather than in `server.ts` so that the integration
   //    harness tears the timers down with the app rather than leaking them between suites.

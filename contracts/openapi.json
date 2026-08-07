@@ -410,6 +410,284 @@
           }
         }
       }
+    },
+    "/events/{eventId}/sessions": {
+      "get": {
+        "summary": "The conference's programme, chronological",
+        "tags": [
+          "catalog"
+        ],
+        "description": "Every session for the named conference in start order, each with its track, its room and its speakers. An event with no programme returns an empty array — a valid answer, not a failure (FR-139). Times are absolute instants; no relative wording is sent, because \"starts in 15 minutes\" is only true at the moment it is computed (FR-124).",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "eventId",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "id",
+                      "title",
+                      "summary",
+                      "startsAt",
+                      "endsAt",
+                      "track",
+                      "room",
+                      "speakers"
+                    ],
+                    "additionalProperties": false,
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "title": {
+                        "type": "string"
+                      },
+                      "summary": {
+                        "type": [
+                          "null",
+                          "string"
+                        ]
+                      },
+                      "startsAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "endsAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "track": {
+                        "type": "object",
+                        "required": [
+                          "id",
+                          "name",
+                          "colorToken"
+                        ],
+                        "additionalProperties": false,
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "colorToken": {
+                            "type": "string",
+                            "description": "A theme token NAME, e.g. track-design. Never a colour value — the palette lives in the client theme and nowhere else (FR-136)."
+                          }
+                        }
+                      },
+                      "room": {
+                        "type": "object",
+                        "required": [
+                          "id",
+                          "name"
+                        ],
+                        "additionalProperties": false,
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "name": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "speakers": {
+                        "type": "array",
+                        "description": "Empty when the session has none (FR-138). An empty list rather than null, so a client cannot confuse \"no speaker\" with \"not loaded\".",
+                        "items": {
+                          "type": "object",
+                          "required": [
+                            "id",
+                            "name",
+                            "title",
+                            "company"
+                          ],
+                          "additionalProperties": false,
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "name": {
+                              "type": "string"
+                            },
+                            "title": {
+                              "type": [
+                                "null",
+                                "string"
+                              ]
+                            },
+                            "company": {
+                              "type": [
+                                "null",
+                                "string"
+                              ]
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not registered for that conference, **or** no such conference. The two are deliberately indistinguishable — identical status and identical body — so that an attendee cannot enumerate conferences by watching which refusal comes back (FR-148).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Not registered for that conference, **or** no such conference. The two are deliberately indistinguishable — identical status and identical body — so that an attendee cannot enumerate conferences by watching which refusal comes back (FR-148).",
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/events/{eventId}/tracks": {
+      "get": {
+        "summary": "The conference's tracks, for coding and legends",
+        "tags": [
+          "catalog"
+        ],
+        "description": "Each track with its name and its theme token name. Never a colour value (FR-136, research D7). The name is what makes colour never the sole carrier of meaning — a track is always rendered in text as well.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "eventId",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "id",
+                      "name",
+                      "colorToken"
+                    ],
+                    "additionalProperties": false,
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "colorToken": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not registered for that conference, **or** no such conference. The two are deliberately indistinguishable — identical status and identical body — so that an attendee cannot enumerate conferences by watching which refusal comes back (FR-148).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Not registered for that conference, **or** no such conference. The two are deliberately indistinguishable — identical status and identical body — so that an attendee cannot enumerate conferences by watching which refusal comes back (FR-148).",
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "tags": [

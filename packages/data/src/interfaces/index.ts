@@ -21,6 +21,7 @@
  */
 export type { Attendee, AttendeeRepository } from './attendee.js'
 export type { ActiveEventRepository, Event, EventsRepository } from './events.js'
+export type { CatalogRepository, Room, Session, Speaker, Track } from './catalog.js'
 
 export {
   NotAuthenticatedError,
@@ -30,6 +31,7 @@ export {
 } from './errors.js'
 
 import type { AttendeeRepository } from './attendee.js'
+import type { CatalogRepository } from './catalog.js'
 import type { ActiveEventRepository, EventsRepository } from './events.js'
 
 /**
@@ -43,4 +45,5 @@ export interface Repositories {
   readonly attendee: AttendeeRepository
   readonly events: EventsRepository
   readonly activeEvent: ActiveEventRepository
+  readonly catalog: CatalogRepository
 }

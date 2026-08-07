@@ -3,6 +3,7 @@ import type { FastifyInstance } from 'fastify'
 import { meRoutes } from './auth/me.js'
 import { signInRoutes } from './auth/sign-in.js'
 import { signOutRoutes } from './auth/sign-out.js'
+import { catalogRoutes } from './events/catalog.js'
 import { eventRoutes } from './events.js'
 import { healthRoutes } from './health.js'
 import { activeEventRoutes } from './workspace/active-event.js'
@@ -39,4 +40,7 @@ export const ROUTES: readonly RoutePlugin[] = [
   eventRoutes,
   // 002 — event context.
   activeEventRoutes,
+  // 002 — the session catalog. Every route here declares `:eventId` and carries
+  // `requireEventAccess`; the audit in T068 fails the build if one ever does not.
+  catalogRoutes,
 ]

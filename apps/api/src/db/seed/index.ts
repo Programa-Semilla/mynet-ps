@@ -1,6 +1,7 @@
 import type { Database } from '../client.js'
 import { closeDb, getDb } from '../client.js'
 import { attendeeSeed, SEED_ATTENDEES, SEED_PASSWORD } from './attendees.js'
+import { catalogSeed } from './catalog.js'
 import { eventSeed } from './events.js'
 
 /**
@@ -34,6 +35,13 @@ export interface SeedContext {
   readonly attendeeIds: Map<string, string>
   /** Event name → event id. */
   readonly eventIds: Map<string, string>
+  /**
+   * Event name → its first day and venue zone.
+   *
+   * The catalog authors sessions in venue-local terms — "day 2, 09:30" — and needs both to
+   * resolve them to the absolute instants FR-124 requires.
+   */
+  readonly eventDates: Map<string, { startsOn: string; timezone: string }>
 }
 
 export interface SeedModule {
@@ -45,7 +53,7 @@ export interface SeedModule {
 }
 
 /** Insert order. Reverse is delete order. Append only. */
-export const SEED_MODULES: readonly SeedModule[] = [attendeeSeed, eventSeed]
+export const SEED_MODULES: readonly SeedModule[] = [attendeeSeed, eventSeed, catalogSeed]
 
 export const seed = async (): Promise<void> => {
   const db = getDb()
@@ -53,6 +61,7 @@ export const seed = async (): Promise<void> => {
   const context: SeedContext = {
     attendeeIds: new Map(),
     eventIds: new Map(),
+    eventDates: new Map(),
   }
 
   // Idempotent: re-seeding a local database is routine, and failing on the second run would

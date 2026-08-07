@@ -17,3 +17,6 @@ export * from './sign-in-attempts.js'
 
 // 002 — event context. `active_event_selections` is cross-event; see the file for why.
 export * from './active-event.js'
+
+// 002 — the session catalog. Every table in it is per-event; see the file for why.
+export * from './catalog.js'
