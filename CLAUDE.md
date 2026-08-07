@@ -50,15 +50,22 @@ threads, no appointments. Audience Q&A arrives in 009, as a third section on the
 
 **005 stores the product's first attendee-authored free text** — personal session notes — on a
 narrow declared retention commitment: deleted with the account (a schema-level `ON DELETE CASCADE`,
-asserted by an integration test), **no export path**. The full retention, deletion and export
-obligation remains open and still blocks 004.
+asserted by an integration test), **no export path**. That commitment is **superseded by v2.3.0**,
+which makes deletion and export self-serve and complete. Worth knowing when reading the cascade:
+until 004 ships a delete-account route, it has nothing that can trigger it.
 
-**Next in the queue is 006, Discover**, which 005 was built alongside: migration `0005` is reserved
-for it, and the three shared registries 005 touched were each *appended to* so the two never
-contended. **004, attendee profiles, remains blocked** on three recorded decisions — the attendee
-identity model, data retention/deletion/export obligations, and avatar handling. `0003` stays
-reserved for it, which is why 005 claimed `0004` and left a gap. See `brainstorm/00-overview.md`
-for the queue.
+**004 was unblocked on 2026-08-07** by brainstorm #04, ratified in constitution **v2.3.0**. All three
+entries that blocked it are closed — identity model, retention obligations, avatar handling — so 004
+and 006 are both available. `0003` stays reserved for 004, which is why 005 claimed `0004` and left
+a gap, though 004's scope has grown enough that one migration may not be sufficient. See
+`brainstorm/00-overview.md` for the queue.
+
+**004 now departs substantially from the delivery roadmap**, and its specification must say so. The
+roadmap scopes it as profile fields plus an edit surface, treating the identity model as an input.
+As decided it also carries self sign-up, event join by code, email verification, password recovery, a
+transactional mail provider, avatar upload behind a new `StorageService`, account deletion, personal-
+data export, a retention purge, and a discoverability toggle. A phase split is the first thing to
+settle once the spec exists.
 
 ```
 GroundZero/
@@ -79,7 +86,7 @@ specs/             # Feature specifications
 docs/superpowers/  # Design documents and implementation plans
 ```
 
-Project governance lives in `.specify/memory/constitution.md` (**v2.2.0**). It is authoritative for
+Project governance lives in `.specify/memory/constitution.md` (**v2.3.0**). It is authoritative for
 how work is done here and supersedes tool defaults, habit, and any conflicting statement in this
 file.
 
@@ -116,6 +123,30 @@ These were decided explicitly and are **not** open for re-inference.
    loading, empty, and failure states; a failing card must not blank the dashboard; no card depends
    on another's presence or data. Features contribute a card, never edit another feature's card.
 10. **Features run mostly sequentially**, in parallel only where they touch disjoint files.
+
+**2026-08-07** (brainstorm #04, ratified in constitution v2.3.0) — these close the three entries that
+blocked 004:
+
+11. **A person becomes an attendee by signing themselves up.** Self-serve account creation — email,
+    display name, password — and registration for a conference by entering an access code carried on
+    the seeded event row. This does **not** breach the organizer exclusion, and the reasoning is not
+    to be re-derived: of the four candidate models, *event invitation* and *organizer-provisioned*
+    both need an issuer who is not an actor here, and *ticket holder* needs an integration nobody has
+    decided on. Self sign-up is the only model leaving the attendee as sole actor. Password recovery
+    is consequently in scope.
+12. **Retention, deletion and export are self-serve and complete.** Hard deletion with cascade and no
+    tombstone; machine-readable export covering every field collected; a retention clock for
+    personal-data records no cascade can reach (`sign_in_attempts` has no foreign key, by design).
+    Built to the strict standard so that settling jurisdiction is not a precondition.
+13. **Attendee avatars are uploaded.** Resizing and **EXIF stripping are mandatory** — phone
+    photographs carry GPS coordinates. The prototype's Unsplash photographs are of real people and
+    must not ship as seeded attendee faces.
+14. **Transactional account mail is in scope**, distinct from the excluded engagement notifications.
+15. **Image bytes go through a `StorageService`** platform interface — a seventh alongside the six
+    device capabilities — never a storage SDK called from feature code.
+16. **A profile is visible to co-attendees at the same event**, enforced server-side by the existing
+    event-scoping predicate, with one discoverability toggle. All-or-nothing by design; per-field
+    permissions were considered and rejected.
 
 ## Branching and change flow
 
@@ -202,7 +233,8 @@ owner decision, classify every statement before relying on it:
 
 - **Real product with durable server-side state.** Project-owned API over managed PostgreSQL, with real authentication. Schema changes are versioned, reviewed migrations committed to the repository.
 - **Attendee data is personal data.** Every record is attributable to one identity; every read path is scoped by identity; authorization is enforced server-side, never by client-side filtering. Secrets never reach the client bundle. See constitution Principle VIII.
-- **Still out of product scope**: organizer administration and payment processing. Notification delivery and calendar integration stay out until a recorded decision brings them in — their interfaces exist but must not be wired to real delivery. Seed data must not become a route around the organizer exclusion: no admin interface, no privileged role, no content import path.
+- **Still out of product scope**: organizer administration and payment processing. **Engagement** notification delivery and calendar integration stay out until a recorded decision brings them in — their interfaces exist but must not be wired to real delivery, and the notification bell must not be reproduced. **Transactional account mail is in scope** (v2.3.0): address verification and password reset, and nothing else. Seed data must not become a route around the organizer exclusion: no admin interface, no privileged role, no content import path.
+- **Deletion and export are per-feature duties** (v2.3.0). Deletion is self-serve, hard, and cascading — no soft delete, no tombstone. Export is self-serve and machine-readable and must cover every field collected. Personal-data records no cascade can reach must expire on a stated clock. Every feature storing attendee data declares how its records are covered, in the change that introduces them.
 - **Event scoping is hybrid** (standing decision 7). Conference content is per-event; relationships persist across events. Every new table states which rule applies and why. The predicate is enforced server-side, alongside identity binding — an attendee must not reach another event's content by manipulating a request.
 - **Home is composed, not aggregated** (standing decision 9). Contribute a card; never edit another feature's card.
 - **Data access goes through repository interfaces.** Components never call the network or know transport details. See constitution Principle V.
@@ -277,26 +309,31 @@ state).
 decision 7), **attendee profile view** (a profile detail view ships with Discover), and **repository
 shape** (the API lives here, at `apps/api`).
 
+**Resolved 2026-08-07, ratified in v2.3.0** — the three entries that blocked 004, closed as client
+and owner decisions. See standing decisions 11–16 above and the constitution's "Resolved in 2.3.0".
+**Attendee identity model** (self sign-up with an event join code), **retention, deletion and export**
+(full self-serve), and **avatar handling** (real upload).
+
 ### Require a client decision
 
 Each entry names the feature it blocks, because when to ask matters as much as what to ask.
 
-- **Attendee identity model.** How a person becomes an attendee — self sign-up, event invitation, ticket holder, organizer-provisioned — is unspecified, and it determines the authentication design. **Blocks the attendee profile feature.**
-- **Data retention, deletion, and export obligations** for personal data are recognised (constitution Principle VIII) but unspecified. **Blocks 004, the attendee profile feature.** Corrected 2026-08-07: 004 is *not* the first to store substantial personal data. It has no parallel partner and is blocked on other grounds, so **005 shipped first** and stores the first attendee-authored free text as personal session notes. 005 shipped on a narrow declared commitment — deleted with the account, no export — enforced by a schema-level `ON DELETE CASCADE` and asserted in `apps/api/tests/integration/agenda-deletion.test.ts`. The full obligation is still open.
 - **The connection model behind Network contacts.** The prototype derives contacts from the existence of a conversation. There is no connect or accept action, so there is no defined relationship to store. **Blocks the Network feature entirely.**
 - **Exchanged digital cards.** Requirements place them in Network; the prototype shows a transient 2-second confirmation and records nothing. What a card exchange creates, and whether it is mutual, is undefined. **Blocks the Network feature entirely.**
 - **Audience-question attribution.** Whether a Q&A question is attributed to its author or anonymous. It decides whether Q&A is a personal-data surface under Principle VIII. **Blocks the Q&A feature.**
 - **Desktop and tablet layouts are unvalidated by the client.** The responsive shell exists, but the approved prototype is mobile-only: a fixed 390×844 phone frame with a simulated iOS status bar, centered on a navy page. Every desktop layout built before this is answered is unreviewed design, so the cost compounds with each feature.
 - **Real brand mark and application icons.** No logo exists in this repository. Long lead time — it blocks release readiness rather than any single feature.
 - **`requirements.md` is now knowingly out of step** with the constitution on product name, delivery mode, persistence, authentication, and routing. Whether it is amended or the divergence is simply recorded is undecided.
-- **Notifications.** The prototype header shows a notification bell with an unread dot, but notifications are out of product scope. The bell must not be reproduced until a decision brings notifications in.
+- **Notifications.** The prototype header shows a notification bell with an unread dot, but **engagement** notifications are out of product scope. The bell must not be reproduced until a decision brings notifications in. This does *not* cover transactional account mail, which v2.3.0 brought into scope.
 - **What "PS" denotes** in the repository name `mynet-ps`.
 - **Stack guidance is not where the brief says it is.** `GroundZero/README.md` designates `requirements.md` as authoritative for the technology stack, but `requirements.md` contains no stack section. The recommendation exists only in `README.md`.
 
 ### Require an owner or planning decision
 
-- **API hosting and the managed PostgreSQL provider.**
+- **API hosting, the managed PostgreSQL provider, and object storage.** The object-storage provider behind `StorageService` folds into this entry rather than standing alone. No feature is blocked on it — `StorageService` carries a local implementation for development, test and preview — but the production path is unproven until it is answered.
 - **Authentication ownership** — self-implemented versus a delegated provider.
+- **The transactional email provider.** v2.3.0 settled that account mail is sent — verification and password reset — not by whom. Needed by 004; brings one external dependency and one secret.
+- **Nobody moderates uploaded avatar images.** Public self sign-up plus image upload, in a product with no administrative actor by construction, and the organizer-administration exclusion is exactly what forecloses the usual answer. Cheapest to settle before the first publicly reachable preview.
 - **Attendee avatar handling** — seeded imagery versus real upload. Upload pulls in object storage and `CameraService` and opens a new personal-data surface. Deferring it is the working assumption, not a decision. **Blocks the attendee profile feature.**
 - **Preview environments must never point at production data**, and preview access control is undecided. Cloudflare Pages previews are publicly reachable by default.
 - **Server-side branch protection is unconfigured** — a configuration task, not a limitation. Corrected 2026-08-07: the repo is **public** and organisation-owned (`Programa-Semilla/mynet-ps`), and the protection endpoints return **404 (no rule set)**, not 403. Protection is free on public repositories. Enforcement is meanwhile client-side and bypassable — materially more serious now that real attendee data is in scope.

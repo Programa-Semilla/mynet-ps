@@ -15,6 +15,7 @@ win and this is stale.
 | — | 2026-08-06 | delivery decomposition | recorded, ratified in constitution v2.1.0 | `docs/superpowers/specs/2026-08-06-mynet-delivery-roadmap-design.md` |
 | 02 | 2026-08-06 | event-context-and-catalog | shipped (PR #6) | `specs/002-event-context-and-catalog/` |
 | 03 | 2026-08-07 | agenda-and-saved-sessions | active | — |
+| 04 | 2026-08-07 | attendee-identity-and-profile | active | — |
 
 ## Delivery queue
 
@@ -26,7 +27,7 @@ the index, and it now differs from the roadmap in the ways #02 records.
 |---|-------|--------|------------|
 | 002 | Event Context, Session Catalog & Home Composition | **shipped** — 89/89 tasks, squash-merged to `develop` ([#6](https://github.com/Programa-Semilla/mynet-ps/pull/6)) | — |
 | 003 | ~~Session Catalog~~ | **absorbed into 002** (#02); migration `0002` transfers | — |
-| 004 | Attendee Profile & Own-Profile Editing | **next up**, no parallel partner — still blocked | identity model; retention obligations; avatar handling |
+| 004 | Attendee Identity, Personal Data & Profile | **unblocked 2026-08-07** by #04 — all three entries closed; scope now well beyond the roadmap's | — |
 | 005 | Agenda | **shipped** — 94/94 tasks, squash-merged to `develop` ([#8](https://github.com/Programa-Semilla/mynet-ps/pull/8)) | 002 ✓ |
 | 006 | Discover | **next up** — migration `0005` reserved; 005's shared-file appends keep it uncontended | 004 |
 | 007 | Messages | queued | 004 |
@@ -56,15 +57,6 @@ not scope into this phase, which is what closes two idea-inbox entries at once.
 
 Each names the phase it blocks — when to ask matters as much as what to ask.
 
-- **Attendee identity model** — self sign-up, event invitation, ticket holder, or
-  organizer-provisioned. Determines the authentication design. *Blocks 004* (from #01 revisit)
-- **Data retention, deletion, and export obligations** for personal data. *Blocks 004* (from #01
-  revisit) — **but it bites a phase earlier than recorded.** That entry assumed 004 ran first. It is
-  not running first, and 005's durable personal notes are attendee-authored free text, more
-  open-ended than anything a profile form collects. #03 decided not to stall on it: 005 declares a
-  **narrow commitment** — notes and saves are deleted with the account, no export path ships — as a
-  declared limit under Principle IX. The full obligation is still unanswered and still blocks 004
-  (revised 2026-08-07 by #03)
 - **The connection model behind Network contacts** — the prototype derives contacts from
   conversations, with no connect or accept action, so there is no relationship to store.
   *Blocks 008 entirely* (from #01 revisit)
@@ -91,9 +83,16 @@ Each names the phase it blocks — when to ask matters as much as what to ask.
 
 - **API hosting and the managed PostgreSQL provider** (from #01 revisit)
 - **Authentication ownership** — self-implemented or a delegated provider (from #01 revisit)
-- **Attendee avatar handling** — seeded imagery or real upload. Upload pulls in object storage and
-  `CameraService` and opens a new personal-data surface. Deferring is the working assumption, not a
-  decision. *Blocks 004* (added 2026-08-06)
+- **The transactional email provider.** #04 settled that verification and password-reset mail is
+  sent and that it is distinct from the excluded notification delivery; by whom is undecided.
+  *Needed by 004* (added 2026-08-07 by #04)
+- **The object storage provider** for avatar images. #04 put a `StorageService` interface in front of
+  it with a local implementation for development, test and preview, so 004 is testable without it —
+  but the production path stays unproven until this is answered. **Folds into API hosting above**
+  rather than standing alone (added 2026-08-07 by #04)
+- **Nobody moderates uploaded avatar images.** Public sign-up plus image upload, with no admin actor
+  and no moderation surface, and the organizer exclusion is what forecloses the usual answer.
+  Cheapest to settle before the first public preview (added 2026-08-07 by #04)
 - **Preview environments must never point at production data**; preview access control undecided
   (from #01)
 - **Repository visibility.** The repository is **public** and owned by the `Programa-Semilla`
@@ -141,6 +140,32 @@ From #03, and now answered by the delivered feature.
   already contains two sessions starting at 11:00, so the first viewport is already featuring one
   for reasons the attendee cannot see. 005 works around it rather than fixing it; the recorded
   alternative is preference through `contract.ts` (#03 approach B).
+
+### Design questions carried into 004's specification
+
+From #04. None blocks the specification; all are for `/speckit-specify` and its review gate.
+
+- **Which jurisdiction's data-protection regime applies.** #04 deliberately built to the strict
+  standard so this does not gate 004, but the retention *window* and any lawful-basis wording depend
+  on it.
+- **How long sign-in attempts are retained** before the purge clears them. `sign_in_attempts` has no
+  foreign key to `attendees`, by design, so it is the one personal-data table a deletion cascade
+  cannot reach and a clock is the only thing that can.
+- **Sign-up is an unauthenticated write endpoint**, and the existing throttle covers sign-in only.
+- **The event join code would be world-readable.** The repository is public and the code would live
+  in committed seed data, so anyone reading the repository could join any conference. Move it out of
+  the seed, generate it at deploy time, or accept it as non-secret.
+- **Whether deleting an account frees its email address for re-registration.** Hard deletion plus a
+  globally unique email means it does, which is probably right and is currently unstated.
+- **Hard deletion gets harder in 007 and 009.** Notes and saves are private, so cascading them is
+  clean. A deleted attendee's messages sit in someone else's thread and their audience questions sit
+  on a session other people upvoted. An argument for settling the shape now, while the only affected
+  data is the attendee's own.
+- **Whether `CameraService` is wired for direct capture**, or upload is file-picker only.
+- **How 004 splits into reviewable phases.** As decided it carries sign-up, event join, verification,
+  recovery, a mail provider, profile authoring, avatar upload behind a new platform interface,
+  account deletion, export, a retention purge and a discoverability toggle. The reserved migration
+  `0003` is unlikely to be sufficient. First thing to settle once the specification exists.
 
 ### Design questions carried into 002's specification — all settled
 
@@ -197,6 +222,31 @@ All from #02, and all now answered by the delivered feature.
 - **Attendee profile view** — a profile detail view is delivered in 006, closing the gap where
   `requirements.md` says a profile can be opened and the prototype has no such screen.
 - **Repository shape** — the API lives in this repository, at `apps/api` inside the pnpm workspace.
+
+**2026-08-07, by brainstorm #04 — awaiting ratification in a constitution amendment**
+
+The project owner confirmed he speaks for the client on the two client-owned entries, so these are
+binding rather than provisional. They close the last three entries blocking 004.
+
+- **Attendee identity model** — **self sign-up with an event join code**, delivered entirely within
+  004. A person creates their own account and registers for a conference with a code carried on the
+  seeded event row. No issuer, no privileged role, no import path, so the attendee remains the only
+  actor. Three of the register's four candidates — event invitation, organizer-provisioned, ticket
+  holder — were never available under Principle III. *Closes entry 5.*
+- **Transactional account mail is in scope**, and is distinct from notification delivery, which stays
+  excluded. The notification bell remains forbidden.
+- **Data retention, deletion and export** — **full self-serve.** Hard deletion with cascade and no
+  tombstone, machine-readable export, and a retention clock for the one table a cascade cannot reach.
+  Built to the strict standard so that settling jurisdiction is not a precondition. This also gives
+  005's `ON DELETE CASCADE` something to trigger it — it has been unreachable since it shipped, as
+  no delete-account route exists. *Closes entry 6.*
+- **Attendee avatar handling** — **real upload**, with resizing and EXIF stripping mandatory rather
+  than optional, since phone photographs carry GPS coordinates. *Closes entry 13.*
+- **Image bytes live behind a `StorageService`** platform interface joining the existing six, with a
+  local implementation for development, test and preview, so 004 needs no provisioning.
+- **Profile visibility** — visible to attendees registered for the same event, enforced by the
+  existing `EventScope` predicate, with a single discoverability toggle rather than per-field
+  permissions.
 
 **Settled by delivering 001**
 
