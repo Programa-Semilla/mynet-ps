@@ -13,28 +13,35 @@ win and this is stale.
 |---|------|-------|--------|----------|
 | 01 | 2026-08-04 (revisited same day) | foundation-slice | shipped (PR #2) | `specs/001-production-foundation/` |
 | — | 2026-08-06 | delivery decomposition | recorded, ratified in constitution v2.1.0 | `docs/superpowers/specs/2026-08-06-mynet-delivery-roadmap-design.md` |
+| 02 | 2026-08-06 | event-context-and-catalog | active | — |
 
 ## Delivery queue
 
-Nine phases after the foundation. Full detail, dependency reasoning, and reserved migration numbers
-are in the roadmap; this is the index.
+Eight phases after the foundation — the roadmap's nine, less 003, absorbed into 002 by brainstorm
+#02. Full detail, dependency reasoning, and reserved migration numbers are in the roadmap; this is
+the index, and it now differs from the roadmap in the ways #02 records.
 
 | # | Phase | Status | Blocked by |
 |---|-------|--------|------------|
-| 002 | Event Context & Home Composition | **next** | — |
-| 003 | Session Catalog | queued (∥ 004) | 002 |
-| 004 | Attendee Profile & Own-Profile Editing | queued (∥ 003) | identity model; retention obligations; avatar handling |
-| 005 | Agenda | queued (∥ 006) | 003 |
+| 002 | Event Context, Session Catalog & Home Composition | **brainstormed** (#02), ready to spec | — |
+| 003 | ~~Session Catalog~~ | **absorbed into 002** (#02); migration `0002` transfers | — |
+| 004 | Attendee Profile & Own-Profile Editing | queued, no parallel partner | identity model; retention obligations; avatar handling |
+| 005 | Agenda | queued (∥ 006) | 002 |
 | 006 | Discover | queued (∥ 005) | 004 |
 | 007 | Messages | queued | 004 |
 | 008 | Network & Appointments | queued (∥ 009) | connection model; card-exchange semantics |
 | 009 | Session Q&A | queued (∥ 008) | question attribution |
 | 010 | Launch Readiness | queued | brand assets; client validation of desktop |
 
-**002 carries the most leverage and the most risk in the queue.** It is not only the event switcher:
-it commits to the Home card composition contract that all seven later phases build against, and it
-performs the interface, route, and seed splits that make the parallel pairs possible. A mistake there
-is inherited everywhere and has no cheap correction.
+**002 carries the most leverage and the most risk in the queue, and #02 enlarged it further.** It is
+not only the event switcher: it commits to the Home card composition contract and the per-event
+scoping predicate that every later phase builds against, performs the interface, route, and seed
+splits that make the remaining parallel pairs possible, and — after #02 — carries the whole session
+catalog as well. A mistake there is inherited everywhere and has no cheap correction.
+
+Numbers are **not** reassigned: 004–010 keep theirs, and 003 stays in the table struck through so
+that the roadmap and this index can still be read against each other. The first free parallel pair is
+now 005 ∥ 006 rather than 003 ∥ 004.
 
 ## Open Threads
 
@@ -55,7 +62,10 @@ Each names the phase it blocks — when to ask matters as much as what to ask.
   a personal-data surface under Principle VIII. *Blocks 009* (added 2026-08-06)
 - **Desktop and tablet layouts have never been validated by the client**; the approved prototype is
   mobile-only at a fixed 390×844. Every desktop layout built before this is answered is unreviewed
-  design, so the cost compounds per phase. *Worth asking after 002 or 003* (from #01)
+  design, so the cost compounds per phase. **Now more urgent than when it was written**: absorbing
+  the catalog means 002 builds the Home dashboard *and* the catalog screens before any desktop review
+  happens, and the roadmap's gate — scheduled for "after 002–003" — now fires after 002 alone.
+  *Worth pulling forward* (from #01, escalated by #02)
 - **Real brand mark and application icons** — no logo exists in the repository. *Blocks 010, long
   lead time* (from #01)
 - **`GroundZero/requirements.md` is knowingly out of step** with the constitution on product name,
@@ -87,6 +97,27 @@ Each names the phase it blocks — when to ask matters as much as what to ask.
   is public, and `branches/develop/protection` returns **404 — no rule set**. Branch protection is
   free on public repositories, so this is a configuration task rather than an accepted risk
   (corrected 2026-08-06)
+
+### Design questions carried into 002's specification
+
+Not client or owner decisions — these are for `/speckit-specify` and its review gate to settle. All
+from #02.
+
+- **Which 002 card exercises the attendee-scoped path?** All three cards the phase contributes are
+  event-scoped, so the other half of the card contract risks being proven by test doubles only —
+  the weakness the session kept flagging
+- **The clock story**, inherited from the absorbed 003: server time or client time for relative
+  displays like "starts in 15m", and defined behaviour when they disagree
+- **Do sessions carry their own timezone or inherit the event's?**
+- **One migration or two**, now that `0001` and `0002` both belong to 002
+- **What happens when two cards claim the `lead` slot** — compile-time impossibility, startup
+  assertion, or last-registration-wins
+- **Offline reading of catalog content.** Responses are never cached today, so offline shows only
+  the shell. An agenda readable on a conference floor with no signal is the first real demand for a
+  staleness policy — the same conversation as the `interface-evolution-for-offline-data` inbox entry,
+  arriving from the product side
+- **Whether the enlarged 002 still wants one pull request.** Reaffirmed after the catalog was
+  absorbed; the `spex-collab` phase-split hook will ask again against a concrete task list
 
 ## Resolved
 
@@ -123,7 +154,12 @@ Each names the phase it blocks — when to ask matters as much as what to ask.
 Seven entries in `brainstorm/idea-inbox.md`, all from the 001 deep review: session topology and
 CSRF, security response headers, the production deployment path, readiness versus liveness, throttle
 clock provenance, interface evolution for offline data, and substitutability proven without the
-application.
+application. The delivery-queue seed for phase 002 was consumed by #02 and removed.
+
+Two of the seven now bear directly on 002 rather than waiting for a deployment conversation:
+`interface-evolution-for-offline-data`, because the catalog is the first content anyone would want
+to read on a conference floor with no signal, and `substitutability-proven-without-the-application`,
+whose lesson shaped three of #02's decisions.
 
 Two of them — **session topology and CSRF** and **security response headers** — are the same
 decision seen from two sides, and both are cheapest to settle before the first preview environment is

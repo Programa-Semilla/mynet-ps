@@ -5,22 +5,6 @@ delivery queue in `brainstorm/00-overview.md`.
 
 An entry is removed once a brainstorm document has been written from it.
 
-### phase-002-event-context-and-home-composition
-
-- **Source**: delivery roadmap
-- **Date**: 2026-08-06
-- **Reference**: `docs/superpowers/specs/2026-08-06-mynet-delivery-roadmap-design.md`
-- **Summary**: The next phase in the delivery queue, and the one everything else waits on. Makes
-  the active event durable per-attendee state, establishes the per-event scoping predicate
-  server-side, puts the event switcher at all three widths, derives "day N of M" from the event
-  dates and the clock, and defines the Home card composition contract.
-
-> Most of this phase's design time belongs to the card contract rather than to the switcher. Seven
-> later phases build against it: what a card may assume about the active event, how it loads and
-> fails without taking Home down with it, and what it is forbidden from doing. The phase also
-> performs the interface, route, and seed splits into per-domain files that make the roadmap's
-> three parallel pairs possible. None of it has a cheap correction once inherited.
-
 ### session-topology-and-csrf
 
 - **Source**: deep-review
