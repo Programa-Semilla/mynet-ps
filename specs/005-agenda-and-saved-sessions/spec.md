@@ -432,16 +432,17 @@ Numbering continues from 002, which ended at FR-183.
 - **FR-208**: A note MUST be durable server-side state attributed to exactly one attendee and one
   session, and MUST NOT be readable by any other attendee.
 - **FR-209**: A note MUST persist without any explicit save action, written after the attendee pauses
-  typing. The pause MUST be short enough that a note survives an unexpected loss of the page —
-  **no longer than three seconds** — and long enough that ordinary typing does not write on every
-  keystroke.
+  typing. The pause MUST be short enough that a note survives an unexpected loss of the page and
+  long enough that ordinary typing does not write on every keystroke: **no shorter than 500
+  milliseconds and no longer than three seconds**.
 - **FR-210**: The panel MUST show the note's persistence status, and MUST NOT report a note saved
   before the server has confirmed the write.
 - **FR-211**: A failed note write MUST leave the attendee's text on screen, state that it is unsaved,
   distinguish absence of connection from a server fault, and offer a retry.
 - **FR-212**: Clearing a note's text entirely MUST remove the note.
-- **FR-213**: A note MUST have a stated maximum length, communicated to the attendee before the limit
-  is reached rather than by rejecting a write.
+- **FR-213**: A note MUST NOT exceed **10,000 characters**. The attendee MUST be told they are
+  approaching the limit before reaching it, and MUST NOT learn of it through a rejected write. The
+  limit MUST be enforced server-side as well as presented client-side.
 - **FR-214**: Where two writes to the same note conflict, the last confirmed write MUST win. This
   feature MUST NOT implement optimistic update or conflict merging.
 
@@ -458,12 +459,19 @@ Numbering continues from 002, which ended at FR-183.
   say a connection is needed and that nothing is cached — never present an empty programme.
 - **FR-220**: The cache MUST be scoped per conference, so switching conference never shows one
   conference's content under another's name.
-- **FR-221**: A server refusal on authorization grounds MUST invalidate the cached content for that
-  conference; the cache MUST NOT allow reading content the server would now refuse.
+- **FR-221**: Cached content MUST have a **maximum age of 24 hours from retrieval**. Beyond it the
+  content MUST be refused with the same wording as a conference never read, rather than shown with
+  an old stamp. A server refusal on authorization grounds MUST **additionally** invalidate that
+  conference's cached content immediately. Together these bound the window in which an attendee
+  whose registration has been withdrawn can still read that conference's content offline — where no
+  server is present to refuse, the age limit is the only thing that revokes access.
 - **FR-222**: Repeated reads of the same conference's programme MUST be served from the cache rather
   than re-fetched and re-processed per caller, **without any card depending on another card's
   presence or data**. FR-164 is unchanged, and each card MUST still own its loading, empty and
-  failure states independently.
+  failure states independently. Specifically: removing any one card MUST leave the others working
+  unchanged, and **when a shared read fails, each card MUST render its own failure state
+  independently** — a shared read MUST NOT let one card's failure suppress another card's rendering,
+  nor make one card wait on another card's retry.
 
 ### The Home card
 
@@ -538,7 +546,10 @@ Numbering continues from 002, which ended at FR-183.
   remain readable, and **every** attempted write is refused with an explanation rather than appearing
   to succeed.
 - **SC-204**: Every surface served from cache states its retrieval time; **no** cached surface is
-  presented as if it were live.
+  presented as if it were live, and **no** cached content older than its stated lifetime is served
+  at all.
+- **SC-212**: With one card's read deliberately failing, **100% of the remaining cards still
+  render** — including when those cards read the same conference programme through the shared cache.
 - **SC-205**: **No request an attendee can construct** reaches another attendee's saved sessions or
   notes, or any conference they are not registered for — asserted by automated tests over every
   route this feature introduces, with a failing audit blocking merge.
@@ -577,7 +588,7 @@ attendees (006), message composition (007), card-sharing feedback and meeting sc
 
 | Obligation | Declaration |
 |---|---|
-| **Offline behaviour** (Principle VI) | **Works offline**: the installed shell and navigation, as 001 established; and — new in this feature — the active conference's programme, the attendee's saved set for it, and their notes for it, once each has been read with a connection. Every cached surface states when it was retrieved. **Does not work offline**: a conference whose content has never been read, which says so explicitly rather than showing an empty programme; and all conference-scoped surfaces belonging to features other than this one, unchanged from 002. **An action attempted offline**: saving, unsaving and note writes are each refused with an explanation, leave displayed state unchanged, and are **never queued and never shown as having succeeded**. A note's text remains on screen so nothing the attendee wrote is lost. **No write queue, no optimistic update and no conflict merging is introduced** — each would require its own recorded decision. **No upper bound on cache age is set in this feature**; content is served with its retrieval time however old it is, and the bound is recorded as an open question. |
+| **Offline behaviour** (Principle VI) | **Works offline**: the installed shell and navigation, as 001 established; and — new in this feature — the active conference's programme, the attendee's saved set for it, and their notes for it, once each has been read with a connection. Every cached surface states when it was retrieved. **Does not work offline**: a conference whose content has never been read, which says so explicitly rather than showing an empty programme; and all conference-scoped surfaces belonging to features other than this one, unchanged from 002. **An action attempted offline**: saving, unsaving and note writes are each refused with an explanation, leave displayed state unchanged, and are **never queued and never shown as having succeeded**. A note's text remains on screen so nothing the attendee wrote is lost. **No write queue, no optimistic update and no conflict merging is introduced** — each would require its own recorded decision. **Cache lifetime is 24 hours from retrieval** (FR-221), as the constitution requires this be specified per feature rather than assumed. Beyond it, content is refused exactly as a conference never read. This is also the only mechanism that revokes access offline, where no server is present to refuse — an authorization refusal invalidates the cache immediately when online, and the age limit bounds the window when not. Whether 24 hours is the right value is recorded as an open question; the *absence* of a value is not deferred. |
 | **Desktop layout** (Principle IV) | Persistent left rail and top bar unchanged. Agenda keeps its single chronological column with venue-day structure, gaining the filter above the programme and a save control on each session row. The session detail panel renders as a centred overlay above the programme, which stays visible behind it. Home gains one card in the declared registry order; no existing card moves. |
 | **Tablet layout** (Principle IV) | Reduced rail unchanged. The filter stays above the programme and the programme stacks as in 002. The detail panel remains an overlay, wider relative to the viewport than at desktop. Home's columns are unchanged apart from the appended card. |
 | **Mobile layout** (Principle IV) | Compact header and bottom navigation unchanged. The filter is a touch-sized control that does not require horizontal scrolling at 320px. Save controls meet touch-target sizing without crowding the session time, title and track on a narrow row. The detail panel is a **full-width overlay** with a clear close control and Escape dismissal. Home is a single column in declared order. |
@@ -587,7 +598,7 @@ attendees (006), message composition (007), card-sharing feedback and meeting sc
 | **Identity scoping & server-side authorization** (Principle VIII) | Applies, and more heavily than in any prior feature. **Rule**: every saved-session and note operation is bound to the authenticated attendee at the request boundary **and** to a conference for which that attendee holds a registration. **Enforcement**: identity comes from the sign-in session, never from a client-supplied identifier; registration is verified server-side before any read or write, as a precondition rather than an optional step, in the proof-carrying form 002 established; the route audit fails the build when a conference-accepting route lacks it; refusals disclose nothing about the existence of a record, a session or a conference; isolation is asserted by automated tests against real seeded rows exercising the server directly. **New personal data is stored**: saved sessions, and — significantly — attendee-authored free-text notes, this product's first. See the retention position below. |
 | **Event scoping** (Constraints — data scoping) | **Saved sessions — per-event.** A saved session references a session, and sessions exist only within one conference; the set must swap when the attendee switches, and a save made at one conference is meaningless at another. **Session notes — per-event**, for exactly the same reason: a note is written against a session, not against a person or a topic. Neither is cross-event, and neither could be without inventing a cross-conference notion of "the same session" that the product does not have — 002 already records that the same human speaking at two conferences is two unrelated records. **No existing table's scoping changes.** |
 | **Register position** (Governance) | **Blocks this feature**: none, after a recorded narrowing. The register entry *"data retention, deletion and export obligations"* names 004 as the blocked feature, "the first to store substantial personal data" — but 004 is not running first and **this feature is**, storing attendee-authored free text. Brainstorm #03 decided not to stall the only unblocked phase: this feature declares a **narrow commitment** — saved sessions and notes are **deleted with the attendee's account**, and **no export path ships in 005** — as a declared limit under Principle IX rather than a silent omission. **Resolved by this feature**: none; the full retention, deletion and export obligation remains open and still blocks 004. **Escalated by this feature**: client validation of desktop and tablet layouts, which now covers Home, the programme, a filter and an overlay panel before any review has taken place. **Closed as idea-inbox entries, by decision**: `interface-evolution-for-offline-data`, `home-card-duplicate-reads`, `destination-owns-its-element`. **Newly recorded**: an upper bound on cache staleness (see Open Questions). |
-| **Reserved migration number** (Branching — parallel work) | **`0004`**, as reserved by the delivery roadmap for phase 005. One migration, carrying both new tables. `0005` remains reserved for 006, which may proceed in parallel. |
+| **Reserved migration number** (Branching — parallel work) | **`0004`**, as reserved by the delivery roadmap for phase 005. One migration, carrying both new tables. `0005` remains reserved for 006, which may proceed in parallel, and `0004` MUST NOT be renamed to resolve any conflict with it. Per Principle VII, `0004` MUST be verified in CI — applying forward against a real database instance, with the integration suite run against the result — before it reaches any environment holding real data. |
 
 ---
 
@@ -609,9 +620,12 @@ challenge them.
 - **The cache is client-side and per conference**, seeded by ordinary reads rather than by
   pre-fetching. Nothing is fetched that the attendee did not ask for, which keeps the cache honest
   about what it can serve.
-- **Cached content has no expiry in this feature.** It is served with its retrieval time however old
-  it is. An upper bound is a judgement about what is worse than nothing, and it is recorded as an
-  open question rather than guessed at.
+- **Cached content expires 24 hours after retrieval.** The constitution requires what may be cached
+  and *for how long* to be specified per feature, so a value is set rather than deferred. 24 hours
+  was chosen because it spans a conference day and an overnight — an attendee offline through an
+  evening still reads their agenda in the morning — while keeping the offline access-revocation
+  window to a single day. Whether it is the right value is an open question; whether there is a
+  value is not.
 - **The staleness stamp is expressed as a time, not as a coloured badge**, so it is readable without
   relying on colour and does not require its own legend.
 - **The detail panel presents Overview and Speaker info as distinct sections** rather than one body,
@@ -679,10 +693,11 @@ Recorded rather than resolved, per Principle I.
    commitment — deleted with the account, no export — because it stores the product's first
    attendee-authored free text and the register's entry was written expecting 004 to arrive first.
    The whole obligation is unanswered and still blocks 004.
-3. **An upper bound on cache staleness.** This feature stamps cached content with its retrieval time
-   and sets no expiry. A programme cached a week ago may be worse than no programme, but where the
-   line falls is a judgement about the product rather than a technical default, and it is not taken
-   here.
+3. **Whether 24 hours is the right cache lifetime.** A value is set rather than deferred, because
+   the constitution requires it and because offline it is the only thing that revokes access after a
+   registration is withdrawn (FR-221). Whether a conference day plus an overnight is the right span
+   — against a multi-day conference with poor signal throughout, or against a shorter window for
+   tighter revocation — is a product judgement worth revisiting once the feature is in use.
 4. **Whether a session should be unsavable from the detail panel as well as from its row.** Two save
    affordances for one session may read as redundant or as convenient; this is a presentation
    question best answered against the built screen.
