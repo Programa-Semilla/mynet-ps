@@ -1,8 +1,8 @@
 import { OfflineError } from '@mynet/data'
 import { useAuthGateway } from '@mynet/platform'
-import { LogOut } from 'lucide-react'
+import { LogOut, UserRound } from 'lucide-react'
 import { useState } from 'react'
-import { useLocation } from 'react-router'
+import { Link, useLocation } from 'react-router'
 
 import { PRODUCT_NAME } from '../app/branding.js'
 import { destinationFor } from '../app/navigation.js'
@@ -93,14 +93,39 @@ export const TopBar = () => {
             <EventSwitcher />
 
             {/*
-              Truncates rather than wrapping or pushing the button off-screen at 320px (FR-020).
-              Hidden below the tablet band now that the conference name shares this row — the
-              attendee's own name is the least load-bearing thing here, and it is already on
-              Home in the greeting.
+              ─────────────────────────────────────────────────────────────────────────────
+              T075 (004) — **the attendee's own name is how they reach their profile**, and
+              that is what keeps the profile from becoming a sixth destination.
+
+              The five destinations are fixed (spec, "Where this feature's surfaces live"), so
+              the profile needed somewhere in the shell that was not the rail. The attendee's
+              own name is the obvious place: it already identifies them, it is already here at
+              every width the rail is, and "click your own name to see your profile" needs no
+              explaining. Open Question 8 records that exactly where these surfaces hang off the
+              existing five is a presentation question, so this is a decision to be reviewed
+              rather than one to be inherited.
+
+              At mobile widths the name is hidden — the conference switcher, the sign-out control
+              and this label share one row at 320px, and something has to give (FR-020, SC-006).
+              An icon-only link takes its place there rather than the profile becoming
+              unreachable on a phone.
+              ─────────────────────────────────────────────────────────────────────────────
             */}
-            <span className="hidden truncate text-sm text-text-body tablet:inline">
+            <Link
+              to="/profile"
+              className="hidden truncate text-sm text-text-body underline decoration-transparent hover:decoration-inherit tablet:inline"
+            >
               {attendee.displayName}
-            </span>
+            </Link>
+            <Link
+              to="/profile"
+              // The accessible name carries what the icon cannot, so the control is not "link"
+              // to a screen reader (FR-021, SC-310).
+              aria-label={`Your profile, ${attendee.displayName}`}
+              className="inline-flex shrink-0 items-center rounded-sm border border-border-subtle p-1.5 text-text-primary tablet:hidden"
+            >
+              <UserRound aria-hidden="true" size={16} strokeWidth={1.75} />
+            </Link>
             <button
               type="button"
               onClick={() => void onSignOut()}

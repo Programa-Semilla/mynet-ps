@@ -25,3 +25,17 @@ export * from './catalog.js'
 // state why in the file. Attendee state *about* conference content, never conference content —
 // which is why they are not in `catalog.js` and why the catalog gains no write path (FR-191).
 export * from './agenda.js'
+
+// 004 — the attendee's own description of themselves. Both tables cross-event, and the file
+// states why, along with the recorded consequence that they are cross-event rows *read* through
+// a per-event condition (FR-357, research D5).
+export * from './profiles.js'
+
+// 004 — verification and password-reset material. Cross-event: properties of the account.
+// Two tables of identical shape, deliberately not one with a discriminator — see the file.
+export * from './identity-tokens.js'
+
+// 004 — the development/test/preview backing store for `StorageService`. Not a domain table:
+// only `storage/db-adapter.ts` touches it, and it deliberately holds no foreign key, which is
+// the single case FR-370's structural guard exists to catch (research D3, D10).
+export * from './stored-objects.js'

@@ -119,3 +119,57 @@ An entry is removed once a brainstorm document has been written from it.
 - **Summary**: Two integration files cache event ids and cookies in `beforeAll` while a third mutates event dates in `beforeEach`. This is correct only because `fileParallelism` is false and the seed regenerates every UUID.
 
 > Either condition changing alone would break the cached files with confusing 404s rather than a message naming the cause. The coupling is implicit and worth making explicit before the suite grows.
+
+### verification-proves-reachability-not-ownership
+
+- **Source**: deep-review
+- **Date**: 2026-08-07
+- **Reference**: spec/004-attendee-identity-and-profile
+- **Summary**: Signing up with an address you do not own, then having the victim click the link, verifies the *attacker's* account — while FR-303's disclosure has told the victim the address is already taken, so they cannot register it themselves.
+
+> FR-325a and SC-304a rest the whole defence of this on verification, and the code implements verification exactly as specified — the residual is in the threat model rather than the implementation. The mitigation is copy the product does not have: `MailService` takes only `to` and `link`, so nothing in the message can warn a recipient that clicking confirms an account they did not create, and there is no path for a non-owner to contest an address. Intersects register entry 19 (nobody moderates the product) and is cheapest to settle before the first publicly reachable preview.
+
+### platform-registry-mirroring-cost
+
+- **Source**: deep-review
+- **Date**: 2026-08-07
+- **Reference**: spec/004-attendee-identity-and-profile
+- **Summary**: `PlatformServices.repositories` hand-mirrors each repository interface with `unknown` returns so `@mynet/platform` need not depend on `@mynet/data`. 004 added fifteen methods under that scheme and six `as` casts in feature code.
+
+> 004 followed the established convention correctly, so this is not a defect. It is worth recording because the cost is now visible: a second declaration of every repository's method list that the compiler does not check against the first, and one call site re-declaring a result shape inline rather than importing it. The dependency being avoided is a *type-only* one, which `import type` erases entirely at build time — so a devDependency plus `import type` would delete every cast and leave the runtime graph unchanged. 006 through 009 each add a repository under the same rule.
+
+### identity-repository-spans-two-subjects
+
+- **Source**: deep-review
+- **Date**: 2026-08-07
+- **Reference**: spec/004-attendee-identity-and-profile
+- **Summary**: `IdentityRepository` carries `joinConference` and `withdrawFromConference` while the read side of the same concept, `listRegistered`, lives on `EventsRepository` — so a component that lists-and-leaves holds both repositories.
+
+> The placement is defensible while registration is a lifecycle event, and the interface's own framing ("becoming an attendee, recovering an account, and leaving") is coherent. Worth noting because the interface now spans two subjects — account credentials and event membership — and 006's directory plus 008's appointments will both want registration-shaped reads. If a third registration verb appears, consider a `RegistrationRepository`; the per-domain interface split makes that a new file plus one line.
+
+### join-code-lookup-cannot-use-its-index
+
+- **Source**: deep-review
+- **Date**: 2026-08-07
+- **Reference**: spec/004-attendee-identity-and-profile
+- **Summary**: `joinConference` matches on `lower(btrim(e.join_code))`, but `events_join_code_unique` indexes the raw column, so the lookup cannot use it and sequentially scans `events`.
+
+> Not a defect today: `events` is seeded conference content and will hold a handful of rows for the foreseeable future. Recorded because the normalisation choice is deliberate and permanent while the index that would serve it does not exist — if the events table ever grows (multi-tenant, historical conferences retained), this becomes an unindexed scan on an attacker-driven route. A functional expression index on `lower(btrim(join_code))` would make it a seek and would also align the uniqueness constraint with the comparison semantics the code actually uses.
+
+### avatar-serving-has-no-revalidation-story
+
+- **Source**: deep-review
+- **Date**: 2026-08-07
+- **Reference**: spec/004-attendee-identity-and-profile
+- **Summary**: Avatar bytes are served as base64 inside JSON with no `cache-control`, no `ETag` and no conditional-request handling, and the client refetches on every mount into a `data:` URL the browser cannot cache.
+
+> Harmless at one avatar per profile page. It becomes load-bearing in 006, which is the feature that consumes the co-attendee avatar route for a directory — N base64-inflated round trips per listing render, each a `stored_objects` read plus the full three-condition visibility query, with nothing the browser can revalidate. The base64-over-JSON decision itself is well argued and is not what is in question; the missing revalidation story is. Worth deciding while the only consumer is a single-avatar page: an `ETag` plus `cache-control: private, max-age=0, must-revalidate` keeps the visibility check server-side on every request while making the repeat cost a 304.
+
+### dialog-component-tests-cannot-see-modality
+
+- **Source**: deep-review
+- **Date**: 2026-08-07
+- **Reference**: spec/004-attendee-identity-and-profile
+- **Summary**: Every component query for the deletion confirmation uses `getByRole('dialog', { hidden: true })`, which proves the component mounted the dialog but not that `showModal()` ran or that it is `open`.
+
+> Informational rather than a defect: the real guarantees — visible dialog, Escape dismissal, focus restoration to the opener — are correctly proved in a browser by the e2e accessibility and journey specs, and `tests/setup.ts` documents at length why the jsdom shim must not be trusted for modality. Worth revisiting because 005's session-panel component tests asserted the shim's `data-modal` marker to distinguish `showModal` from `show`, and 004's dialog — the more consequential one, since it guards account deletion — does not.

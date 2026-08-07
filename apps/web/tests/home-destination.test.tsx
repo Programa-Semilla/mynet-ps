@@ -1,5 +1,6 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { ActiveEventProvider } from '../src/app/active-event.js'
@@ -35,9 +36,16 @@ describe('the Home destination', () => {
   const renderHome = (repositories: Parameters<typeof testServices>[0] = {}) =>
     render(
       <WithServices services={testServices(repositories)}>
-        <ActiveEventProvider>
-          <Home />
-        </ActiveEventProvider>
+        {/*
+          004 — the registered-for-nothing state now offers a way to join (T049, FR-308), and a
+          link needs a router. Before self sign-up existed the notice could only describe what
+          would eventually appear, because registration was something a seed script did to you.
+        */}
+        <MemoryRouter>
+          <ActiveEventProvider>
+            <Home />
+          </ActiveEventProvider>
+        </MemoryRouter>
       </WithServices>,
     )
 
@@ -86,9 +94,22 @@ describe('the Home destination', () => {
       renderHome({ activeEvent: { getActive: async () => null, setActive: async () => SUMMIT } })
 
       // The whole chain: the repository maps 204 to null, the provider maps null to `none`,
-      // and Home renders a statement of what will appear.
+      // and Home renders — since 004 — an invitation to act rather than a statement of what
+      // will eventually appear.
       expect(await screen.findByText(/not registered for any conferences yet/i)).toBeInTheDocument()
-      expect(screen.getByText(/will appear here/i)).toBeInTheDocument()
+
+      // ───────────────────────────────────────────────────────────────────────────────────────
+      // **T049 (004), FR-308 — a way to join, not an instruction to wait.**
+      //
+      // This assertion used to read `getByText(/will appear here/i)`, which was accurate while
+      // registration was something a seed script did to you. Self sign-up makes that wrong in
+      // the way that matters: the person reading this can act, and the old wording told them to
+      // wait for somebody who does not exist.
+      // ───────────────────────────────────────────────────────────────────────────────────────
+      expect(screen.getByRole('link', { name: /join a conference/i })).toHaveAttribute(
+        'href',
+        '/join',
+      )
 
       // A valid answer, not a failure — it must not be announced as one.
       expect(screen.queryByRole('alert')).not.toBeInTheDocument()

@@ -1,6 +1,7 @@
+import { sql } from 'drizzle-orm'
 import type { FastifyInstance } from 'fastify'
 
-import { buildApp } from '../../src/app.js'
+import { buildApp, type BuildAppOptions } from '../../src/app.js'
 import { SESSION_COOKIE } from '../../src/auth/cookie.js'
 import { closeDb, getDb } from '../../src/db/client.js'
 import { runMigrations } from '../../src/db/migrate.js'
@@ -30,6 +31,17 @@ import { seed } from '../../src/db/seed/index.js'
  */
 process.env['AUTH_MAX_SERVED_DELAY_MS'] ??= '20'
 
+/**
+ * Likewise for the reset-request timing pad (FR-327). The suite drives that route several
+ * hundred times across the throttle, lockout and non-disclosure files, and paying the real
+ * 600ms pad on each tripled the integration run for a property no test here asserts — a timing
+ * oracle is not observable through `fastify.inject()`, which does not measure elapsed time.
+ *
+ * Production cannot take this value: `loadConfig` refuses to start below a floor when
+ * `NODE_ENV=production`, so the guarantee holds where it is real and costs nothing here.
+ */
+process.env['AUTH_RESET_BRANCH_BUDGET_MS'] ??= '1'
+
 export { IDENTIFIER_FREE_ATTEMPTS, SOURCE_FREE_ATTEMPTS } from '../../src/auth/throttle.js'
 
 export const SEED_PASSWORD = 'correct-horse-battery-staple'
@@ -58,19 +70,52 @@ const requireDatabaseUrl = (): string => {
   return url
 }
 
-export const setupTestApp = async (): Promise<FastifyInstance> => {
+/**
+ * 004 — the development mail sink, shared by the harness and the assertions.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ * A test that needs a verification or reset **link** has nowhere else to read one: the token's
+ * plaintext exists for exactly one moment, inside the route, and only its hash is stored
+ * (FR-323, FR-333). That is the property under test, so reading the link out of the database
+ * is not an option — there is nothing there to read.
+ *
+ * Injected per file rather than reached for globally, so one suite's sends are never visible to
+ * another's assertions.
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ */
+export { SinkMailService } from '../../src/mail/sink-adapter.js'
+export type { SentMessage } from '../../src/mail/sink-adapter.js'
+
+export const setupTestApp = async (
+  ports: BuildAppOptions['ports'] = {},
+): Promise<FastifyInstance> => {
   requireDatabaseUrl()
   await runMigrations()
-  return buildApp()
+  return buildApp({ ports })
 }
 
-/** Truncates everything and re-seeds. Called per test file, not per test, for speed. */
+/**
+ * Truncates everything and re-seeds. Called per test file, not per test, for speed.
+ *
+ * 004 — `seed()` clears and re-inserts `attendees`, and every table this feature adds cascades
+ * from it, so accounts created by a sign-up test and the profiles, tokens and registrations
+ * hanging off them all disappear here without this function naming any of them. That is the
+ * cascade doing the same job the delete route asks of it, which is a small daily proof that it
+ * works.
+ *
+ * `stored_objects` is the exception, for exactly the reason it is the exception everywhere
+ * else: no foreign key reaches it (research D3, D10). It is cleared explicitly.
+ */
 export const resetDatabase = async (): Promise<void> => {
   const db = getDb()
   await db.delete(signInAttempts)
   await db.delete(authSessions)
+  await db.execute(sql`DELETE FROM stored_objects`)
   await seed()
 }
+
+/** Test seam: the seeded conferences' join codes, so a test never hard-codes one. */
+export { SEED_EVENTS } from '../../src/db/seed/events.js'
 
 /** Clears only the throttle table, so an earlier test's failures do not delay a later one. */
 export const clearThrottle = async (): Promise<void> => {

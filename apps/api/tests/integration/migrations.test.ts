@@ -31,6 +31,27 @@ import { setupTestApp, teardown } from './helpers.js'
  * pass against a table that acquired its constraints some other way; this cannot.
  * ═════════════════════════════════════════════════════════════════════════════════════════
  */
+/**
+ * The constraint a write actually tripped over.
+ *
+ * Asserted on the driver's `constraint_name` rather than by matching the message, because
+ * Drizzle wraps the `PostgresError` in an `Error` whose message is the failed SQL and its
+ * parameters — for an over-length note, that message is the 10,001-character body itself.
+ * The field is also the stronger assertion: it names *which* constraint refused, so a write
+ * rejected by the primary key could not pass as the length check doing its job.
+ *
+ * Hoisted to module scope by 004, so the `0003` block can make the same assertion about the
+ * profile CHECK constraints without a second copy that could drift from this one.
+ */
+const refusedBy = async (statement: Promise<unknown>): Promise<string | undefined> => {
+  try {
+    await statement
+    return undefined
+  } catch (error) {
+    return (error as { cause?: { constraint_name?: string } }).cause?.constraint_name
+  }
+}
+
 describe('migration 0004 — saved sessions and notes', () => {
   let app: FastifyInstance
 
@@ -130,24 +151,6 @@ describe('migration 0004 — saved sessions and notes', () => {
     expect(bodyLength?.definition).toContain('length(body) <= 10000')
   })
 
-  /**
-   * The constraint a write actually tripped over.
-   *
-   * Asserted on the driver's `constraint_name` rather than by matching the message, because
-   * Drizzle wraps the `PostgresError` in an `Error` whose message is the failed SQL and its
-   * parameters — for an over-length note, that message is the 10,001-character body itself.
-   * The field is also the stronger assertion: it names *which* constraint refused, so a write
-   * rejected by the primary key could not pass as the length check doing its job.
-   */
-  const refusedBy = async (statement: Promise<unknown>): Promise<string | undefined> => {
-    try {
-      await statement
-      return undefined
-    } catch (error) {
-      return (error as { cause?: { constraint_name?: string } }).cause?.constraint_name
-    }
-  }
-
   it('refuses an empty note at the database, not merely in the editor (FR-212)', async () => {
     // The behavioural half, because the CHECK's *purpose* is to refuse a write that reached it
     // — reading the definition proves it exists, not that it bites.
@@ -228,20 +231,15 @@ describe('migration 0004 — saved sessions and notes', () => {
   it('records exactly one migration for this feature, under its reserved number', async () => {
     // ───────────────────────────────────────────────────────────────────────────────────────
     // The roadmap reserves `0004` for 005 and `0005` for 006, which may be in flight in
-    // parallel. `0003` is deliberately skipped — it belongs to 004, which has not shipped —
-    // and neither number may be renamed to resolve a conflict with the other.
+    // parallel. Neither number may be renamed to resolve a conflict with the other.
+    //
+    // **`0003` was asserted absent until 004 shipped, and is now asserted present.** That
+    // change is the point of the assertion rather than a weakening of it: 005 wrote it so that
+    // 004 claiming its reserved number would be a deliberate edit in a reviewed diff, and not
+    // something that happened quietly. This is that edit.
     // ───────────────────────────────────────────────────────────────────────────────────────
-    const { readFile } = await import('node:fs/promises')
-    const { fileURLToPath, URL: NodeURL } = await import('node:url')
+    const tags = await journalTags()
 
-    const journalPath = fileURLToPath(
-      new NodeURL('../../migrations/meta/_journal.json', import.meta.url),
-    )
-    const journal = JSON.parse(await readFile(journalPath, 'utf8')) as {
-      entries: Array<{ idx: number; tag: string }>
-    }
-
-    const tags = journal.entries.map((entry) => entry.tag)
     expect(tags.filter((tag) => tag.startsWith('0004_'))).toEqual(['0004_saved_sessions_and_notes'])
     expect(
       tags.filter((tag) => tag.startsWith('0005_')),
@@ -249,7 +247,254 @@ describe('migration 0004 — saved sessions and notes', () => {
     ).toEqual([])
     expect(
       tags.filter((tag) => tag.startsWith('0003_')),
-      '0003 belongs to 004',
-    ).toEqual([])
+      '0003 belongs to 004, and 004 has claimed it',
+    ).toEqual(['0003_attendee_identity_and_profile'])
+  })
+})
+
+const journalTags = async (): Promise<string[]> => {
+  const { readFile } = await import('node:fs/promises')
+  const { fileURLToPath, URL: NodeURL } = await import('node:url')
+
+  const journalPath = fileURLToPath(
+    new NodeURL('../../migrations/meta/_journal.json', import.meta.url),
+  )
+  const journal = JSON.parse(await readFile(journalPath, 'utf8')) as {
+    entries: Array<{ idx: number; tag: string; when: number }>
+  }
+
+  return journal.entries.map((entry) => entry.tag)
+}
+
+/**
+ * T013 (004) — **migration `0003` applies forward against a real database** (Principle VII,
+ * FR-396).
+ *
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ * `setupTestApp()` runs every committed migration, so arriving at these assertions proves the
+ * forward application. What they add is that `0003` produced **the structure the schema
+ * declares** — a migration can apply cleanly and still be missing a constraint, and every
+ * guarantee below is one this feature leans on somewhere else:
+ *
+ *   - the cascades from `attendees` ARE the deletion commitment (FR-366), and the structural
+ *     guard in `tests/unit/deletion-coverage.test.ts` reads the *schema* rather than the
+ *     database — so this is what proves the two agree;
+ *   - `join_code`'s UNIQUE constraint is what stops two conferences sharing a code and joining
+ *     resolving to whichever row the planner returned first (D7);
+ *   - the profile CHECK constraints are FR-337 at the last line of defence, independent of the
+ *     route schema and of the editor;
+ *   - **both temporary defaults are dropped**, which is the pattern `events.timezone`
+ *     established in 002: a column that keeps a silent default is how a wrong value ships
+ *     unnoticed.
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ */
+describe('migration 0003 — attendee identity, personal data and profile', () => {
+  let app: FastifyInstance
+
+  beforeAll(async () => {
+    app = await setupTestApp()
+  })
+
+  afterAll(async () => {
+    await teardown(app)
+  })
+
+  const constraintsOn = async (table: string) =>
+    getDb().execute<{ conname: string; contype: string; definition: string }>(sql`
+      SELECT c.conname, c.contype::text AS contype, pg_get_constraintdef(c.oid) AS definition
+      FROM pg_constraint c
+      JOIN pg_class t ON t.oid = c.conrelid
+      JOIN pg_namespace n ON n.oid = t.relnamespace
+      WHERE n.nspname = 'public' AND t.relname = ${table}
+      ORDER BY c.conname
+    `)
+
+  it('applies before 0004 on a fresh database and after it on an existing one', async () => {
+    // The journal's ordering and its timestamps carry different jobs, and getting either wrong
+    // is silent — see `migrations/meta/README.md`. Array position decides what a FRESH database
+    // does; `when` decides what a database that already holds 0004 receives. A 0003 stamped
+    // earlier than 0004 would be skipped on every existing developer clone with no error at all.
+    const { readFile } = await import('node:fs/promises')
+    const { fileURLToPath, URL: NodeURL } = await import('node:url')
+    const journal = JSON.parse(
+      await readFile(
+        fileURLToPath(new NodeURL('../../migrations/meta/_journal.json', import.meta.url)),
+        'utf8',
+      ),
+    ) as { entries: Array<{ idx: number; tag: string; when: number }> }
+
+    const positions = journal.entries.map((entry) => entry.tag)
+    expect(positions.indexOf('0003_attendee_identity_and_profile')).toBeLessThan(
+      positions.indexOf('0004_saved_sessions_and_notes'),
+    )
+
+    const three = journal.entries.find((entry) => entry.idx === 3)
+    const four = journal.entries.find((entry) => entry.idx === 4)
+    expect(
+      three?.when,
+      'A 0003 stamped earlier than 0004 is silently skipped on every database that already ' +
+        'applied 0004 — no error, just a schema missing six tables (migrations/meta/README.md).',
+    ).toBeGreaterThan(four?.when ?? 0)
+  })
+
+  it('created every table this feature adds', async () => {
+    const rows = await getDb().execute<{ relname: string }>(sql`
+      SELECT c.relname
+      FROM pg_class c
+      JOIN pg_namespace n ON n.oid = c.relnamespace
+      WHERE n.nspname = 'public'
+        AND c.relkind = 'r'
+        AND c.relname IN ('attendee_profiles', 'attendee_interests', 'attendee_verifications',
+                          'attendee_password_resets', 'stored_objects')
+      ORDER BY c.relname
+    `)
+
+    expect(rows.map((row) => row.relname)).toEqual([
+      'attendee_interests',
+      'attendee_password_resets',
+      'attendee_profiles',
+      'attendee_verifications',
+      'stored_objects',
+    ])
+  })
+
+  it.each([
+    'attendee_profiles',
+    'attendee_interests',
+    'attendee_verifications',
+    'attendee_password_resets',
+  ])('cascades %s from attendees — the deletion commitment, at schema level', async (table) => {
+    const toAttendees = (await constraintsOn(table)).filter(
+      (row) => row.contype === 'f' && row.definition.includes('REFERENCES attendees'),
+    )
+
+    expect(toAttendees).toHaveLength(1)
+    expect(
+      toAttendees[0]?.definition,
+      `${table} must go with the account (FR-366). A schema-level cascade is what makes that ` +
+        'something a future deletion path cannot forget.',
+    ).toContain('ON DELETE CASCADE')
+  })
+
+  it('gives stored_objects NO foreign key, which is the design rather than the gap', async () => {
+    // research D3: a key-value store must not know what its callers store, and the production
+    // adapter is a bucket that cannot have one. This is the single case FR-370's guard covers
+    // by explicit deletion instead — asserted here so removing the guard's justification would
+    // also have to remove this.
+    const keys = (await constraintsOn('stored_objects')).filter((row) => row.contype === 'f')
+    expect(keys).toEqual([])
+  })
+
+  it('makes join_code unique, so a code cannot resolve to two conferences', async () => {
+    const unique = (await constraintsOn('events')).filter(
+      (row) => row.contype === 'u' && row.definition.includes('join_code'),
+    )
+
+    expect(
+      unique,
+      'Without UNIQUE, two conferences could seed one code and joining would ' +
+        'resolve to whichever row the planner returned first (research D7).',
+    ).toHaveLength(1)
+  })
+
+  it('drops both temporary defaults in the same migration', async () => {
+    const rows = await getDb().execute<{ table_name: string; column_default: string | null }>(sql`
+      SELECT table_name, column_default
+      FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND ((table_name = 'events' AND column_name = 'join_code')
+          OR (table_name = 'sign_in_attempts' AND column_name = 'action'))
+      ORDER BY table_name
+    `)
+
+    expect(rows).toHaveLength(2)
+    for (const row of rows) {
+      expect(
+        row.column_default,
+        `${row.table_name} kept its temporary default. A column that keeps one is how a wrong ` +
+          'value ships unnoticed — the reason 002 established this pattern for events.timezone.',
+      ).toBeNull()
+    }
+  })
+
+  it('leaves no seeded conference at a placeholder join code', async () => {
+    // The other half of T013: `db:migrate` followed by `db:seed` must leave nothing at the
+    // migration's placeholder. A placeholder is a random uuid, so this checks for the shape
+    // rather than for a literal — an unseeded database has three of them and cannot be joined.
+    const rows = await getDb().execute<{ name: string; join_code: string }>(sql`
+      SELECT name, join_code FROM events ORDER BY name
+    `)
+
+    expect(rows.length).toBeGreaterThan(0)
+    for (const row of rows) {
+      expect(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(row.join_code),
+        `"${row.name}" still carries the migration's placeholder code, so it cannot be joined ` +
+          '(FR-317). Run `pnpm db:seed` after `pnpm db:migrate` — always, for this reason.',
+      ).toBe(false)
+    }
+  })
+
+  it('bounds every free-text profile field at the column (FR-337)', async () => {
+    const checks = (await constraintsOn('attendee_profiles')).filter((row) => row.contype === 'c')
+    const named = new Set(checks.map((row) => row.conname))
+
+    for (const constraint of [
+      'attendee_profiles_company_length',
+      'attendee_profiles_role_length',
+      'attendee_profiles_headline_length',
+      'attendee_profiles_networking_intent',
+      'attendee_profiles_availability',
+    ]) {
+      expect(
+        named,
+        'The column must constrain the profile independently of the route schema and of the ' +
+          'editor. Client-side presentation of a limit is never its enforcement (Principle VIII).',
+      ).toContain(constraint)
+    }
+  })
+
+  it('refuses an over-length company at the database, not merely in the editor', async () => {
+    const constraint = await refusedBy(
+      getDb().execute(sql`
+        INSERT INTO attendee_profiles (attendee_id, company)
+        SELECT id, ${'x'.repeat(121)} FROM attendees LIMIT 1
+        ON CONFLICT (attendee_id) DO UPDATE SET company = excluded.company
+      `),
+    )
+
+    expect(constraint).toBe('attendee_profiles_company_length')
+  })
+
+  it('refuses a networking intent outside the stated options (FR-339)', async () => {
+    const constraint = await refusedBy(
+      getDb().execute(sql`
+        INSERT INTO attendee_profiles (attendee_id, networking_intent)
+        SELECT id, 'whatever-i-like' FROM attendees LIMIT 1
+        ON CONFLICT (attendee_id) DO UPDATE SET networking_intent = excluded.networking_intent
+      `),
+    )
+
+    expect(
+      constraint,
+      '006 filters a directory on this value, and free text cannot be filtered on meaningfully.',
+    ).toBe('attendee_profiles_networking_intent')
+  })
+
+  it('leads both sign_in_attempts indexes with `action` (FR-307a)', async () => {
+    // Without `action` leading, every count still scans four actions' rows to answer a question
+    // about one — and worse, an index that does not lead with the filtered column is the shape
+    // that makes a per-action counter look implemented while performing like a shared one.
+    const rows = await getDb().execute<{ indexname: string; indexdef: string }>(sql`
+      SELECT indexname, indexdef FROM pg_indexes
+      WHERE schemaname = 'public' AND tablename = 'sign_in_attempts'
+      ORDER BY indexname
+    `)
+
+    const identifier = rows.find((row) => row.indexname === 'sign_in_attempts_identifier_idx')
+    const source = rows.find((row) => row.indexname === 'sign_in_attempts_source_idx')
+
+    expect(identifier?.indexdef).toContain('(action, identifier_hash, occurred_at)')
+    expect(source?.indexdef).toContain('(action, source_hash, occurred_at)')
   })
 })

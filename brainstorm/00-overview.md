@@ -1,6 +1,6 @@
 # Brainstorm Overview
 
-Last updated: 2026-08-07
+Last updated: 2026-08-07 (004 shipped)
 
 The authoritative registers live elsewhere — open questions in `.specify/memory/constitution.md`,
 delivery sequence in `docs/superpowers/specs/2026-08-06-mynet-delivery-roadmap-design.md`. This file
@@ -14,8 +14,8 @@ win and this is stale.
 | 01 | 2026-08-04 (revisited same day) | foundation-slice | shipped (PR #2) | `specs/001-production-foundation/` |
 | — | 2026-08-06 | delivery decomposition | recorded, ratified in constitution v2.1.0 | `docs/superpowers/specs/2026-08-06-mynet-delivery-roadmap-design.md` |
 | 02 | 2026-08-06 | event-context-and-catalog | shipped (PR #6) | `specs/002-event-context-and-catalog/` |
-| 03 | 2026-08-07 | agenda-and-saved-sessions | active | — |
-| 04 | 2026-08-07 | attendee-identity-and-profile | active | — |
+| 03 | 2026-08-07 | agenda-and-saved-sessions | shipped (PR #8) | `specs/005-agenda-and-saved-sessions/` |
+| 04 | 2026-08-07 | attendee-identity-and-profile | shipped (PR #12) | `specs/004-attendee-identity-and-profile/` |
 
 ## Delivery queue
 
@@ -27,10 +27,10 @@ the index, and it now differs from the roadmap in the ways #02 records.
 |---|-------|--------|------------|
 | 002 | Event Context, Session Catalog & Home Composition | **shipped** — 89/89 tasks, squash-merged to `develop` ([#6](https://github.com/Programa-Semilla/mynet-ps/pull/6)) | — |
 | 003 | ~~Session Catalog~~ | **absorbed into 002** (#02); migration `0002` transfers | — |
-| 004 | Attendee Identity, Personal Data & Profile | **unblocked 2026-08-07** by #04 — all three entries closed; scope now well beyond the roadmap's | — |
+| 004 | Attendee Identity, Personal Data & Profile | **shipped** — 131/131 tasks, squash-merged to `develop` ([#12](https://github.com/Programa-Semilla/mynet-ps/pull/12)); scope well beyond the roadmap's | — |
 | 005 | Agenda | **shipped** — 94/94 tasks, squash-merged to `develop` ([#8](https://github.com/Programa-Semilla/mynet-ps/pull/8)) | 002 ✓ |
-| 006 | Discover | **next up** — migration `0005` reserved; 005's shared-file appends keep it uncontended | 004 |
-| 007 | Messages | queued | 004 |
+| 006 | Discover | **active — next to spec.** Migration `0005` reserved; 005's shared-file appends keep it uncontended | 004 ✓ |
+| 007 | Messages | queued | 004 ✓ |
 | 008 | Network & Appointments | queued (∥ 009) | connection model; card-exchange semantics |
 | 009 | Session Q&A | queued (∥ 008) | question attribution |
 | 010 | Launch Readiness | queued | brand assets; client validation of desktop |
@@ -162,10 +162,11 @@ From #04. None blocks the specification; all are for `/speckit-specify` and its 
   on a session other people upvoted. An argument for settling the shape now, while the only affected
   data is the attendee's own.
 - **Whether `CameraService` is wired for direct capture**, or upload is file-picker only.
-- **How 004 splits into reviewable phases.** As decided it carries sign-up, event join, verification,
-  recovery, a mail provider, profile authoring, avatar upload behind a new platform interface,
-  account deletion, export, a retention purge and a discoverability toggle. The reserved migration
-  `0003` is unlikely to be sufficient. First thing to settle once the specification exists.
+- ~~**How 004 splits into reviewable phases.**~~ **Settled by delivery: it did not split.** 004
+  shipped as one PR of 131 tasks ([#12](https://github.com/Programa-Semilla/mynet-ps/pull/12)),
+  and the reserved migration `0003` *was* sufficient — the expectation that it would not be was
+  wrong. Worth remembering when sizing 006: the pessimism here was about task count, and task count
+  turned out not to be what made a split necessary or unnecessary.
 
 ### Design questions carried into 002's specification — all settled
 

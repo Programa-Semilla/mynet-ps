@@ -61,6 +61,20 @@ export const useSessionNotesRepository = (): PlatformServices['repositories']['s
   usePlatform().repositories.sessionNotes
 
 /**
+ * 004 — becoming an attendee, recovering an account, and leaving.
+ *
+ * Two hooks rather than one, matching the two interfaces, for the reason the agenda pair
+ * records: a surface that only edits a profile should not also be handed the ability to delete
+ * the account. `ProfileEdit` reaches for `useProfileRepository`; only `Account` reaches for
+ * `useIdentityRepository`.
+ */
+export const useIdentityRepository = (): PlatformServices['repositories']['identity'] =>
+  usePlatform().repositories.identity
+
+export const useProfileRepository = (): PlatformServices['repositories']['profile'] =>
+  usePlatform().repositories.profile
+
+/**
  * 005 — when the content on screen was retrieved, or `null` when it is live (FR-216).
  *
  * A component calls this to render the staleness stamp. It learns nothing about caching from

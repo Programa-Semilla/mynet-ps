@@ -5,7 +5,7 @@ import { and, desc, eq, gte, sql } from 'drizzle-orm'
 import { loadConfig } from '../config.js'
 import { getDb } from '../db/client.js'
 import { authSessions } from '../db/schema/auth-sessions.js'
-import { signInAttempts } from '../db/schema/sign-in-attempts.js'
+import { signInAttempts, type ThrottleAction } from '../db/schema/sign-in-attempts.js'
 
 /**
  * T037 — database-backed sign-in throttling (FR-031a–d, research.md D9).
@@ -22,14 +22,41 @@ import { signInAttempts } from '../db/schema/sign-in-attempts.js'
  * typing their address wrong enough times. Delay escalates to a ceiling and stops. The
  * correct credential always works, however many failures preceded it.
  * ─────────────────────────────────────────────────────────────────────────────────────────
+ *
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ * **T021–T023 (004) — FOUR ACTIONS NOW, AND THE NO-LOCKOUT GUARANTEE DOES NOT TRANSFER FOR
+ * FREE** (FR-307, FR-307a, FR-314, FR-331, research D2).
+ *
+ * 001 built this for one action, and its guarantee rests on two mechanisms: the delay is
+ * measured as *outstanding time* rather than as a streak, and **the credential is verified
+ * before the throttle is consulted**, so a correct password is never refused.
+ *
+ * The second mechanism does not transfer. Sign-up, join-code entry and reset-request have no
+ * credential to verify first, so the throttle must gate them — and for reset-request that is a
+ * genuine new lockout surface, because an attacker spamming reset requests at a victim's
+ * address would otherwise deny that victim their own recovery path. **The person an
+ * identifier-keyed denial harms is always the victim, never the attacker.**
+ *
+ * Three things answer that, and all three are in this file:
+ *
+ *   1. **Separate counters per action** (`action` on the attempt row). Exhausting one action's
+ *      allowance cannot consume another's, so a sign-up storm aimed at an address cannot slow
+ *      that address's *sign-ins*. `sign_in`'s own thresholds are byte-for-byte what 001 set,
+ *      because FR-307a requires the existing behaviour to be unchanged by this feature.
+ *   2. **Per-action thresholds** (`THRESHOLDS` below), with reset-request weighted toward the
+ *      source dimension — the dimension an attacker actually occupies.
+ *   3. **A delay-only mode.** An action may be configured so its delay is always fully
+ *      servable in-request, which makes a denial *unrepresentable* rather than merely avoided
+ *      by a route that remembers not to raise one.
+ * ═════════════════════════════════════════════════════════════════════════════════════════
  */
 
 /** Rolling window over which failures are counted. */
 const WINDOW_MS = 60 * 60 * 1000
 
 /**
- * Identifier thresholds. Escalation starts after 3 consecutive failures and grows to a
- * ceiling that caps sustained guessing at roughly 10 attempts per hour (research.md D9).
+ * Identifier thresholds for sign-in. Escalation starts after 3 consecutive failures and grows
+ * to a ceiling that caps sustained guessing at roughly 10 attempts per hour (research.md D9).
  */
 export const IDENTIFIER_FREE_ATTEMPTS = 3
 const IDENTIFIER_MAX_DELAY_MS = 6 * 60 * 1000
@@ -42,10 +69,155 @@ const IDENTIFIER_MAX_DELAY_MS = 6 * 60 * 1000
 export const SOURCE_FREE_ATTEMPTS = 30
 const SOURCE_MAX_DELAY_MS = 60 * 1000
 
+interface DimensionThreshold {
+  readonly freeAttempts: number
+  readonly ceilingMs: number
+}
+
+interface ActionThreshold {
+  readonly identifier: DimensionThreshold
+  readonly source: DimensionThreshold
+  /**
+   * T023 — when false, this action's delay is **clamped to what can be served in-request**, so
+   * `serveDelay` always reports nothing outstanding and the caller has no remainder to refuse
+   * on.
+   *
+   * ───────────────────────────────────────────────────────────────────────────────────────
+   * **This is how "may delay but MUST NOT deny" becomes structural** rather than a rule the
+   * reset route has to remember. A future edit to `routes/auth/reset.ts` cannot reintroduce a
+   * denial by mistake, because there is no non-zero remainder for it to act on.
+   *
+   * It matters twice over for reset-request. It stops an attacker denying a victim their
+   * recovery path (FR-331), **and** it keeps the throttle from becoming the account-existence
+   * oracle FR-327 exists to close — a `429` where an unknown address gets a `202` would
+   * distinguish the two exactly as well as a different message would.
+   * ───────────────────────────────────────────────────────────────────────────────────────
+   */
+  readonly mayDeny: boolean
+}
+
+/**
+ * T022 — per-action thresholds (FR-307a, research D2).
+ *
+ * Every entry states what it is defending, because a number without a threat is a number
+ * somebody will later "tune".
+ */
+const THRESHOLDS: Record<ThrottleAction, ActionThreshold> = {
+  /**
+   * **Unchanged from 001, deliberately and as a requirement** (FR-307a). Password guessing,
+   * bounded to roughly ten attempts an hour per address while a venue full of legitimate
+   * attendees behind one address stays usable.
+   */
+  sign_in: {
+    identifier: { freeAttempts: IDENTIFIER_FREE_ATTEMPTS, ceilingMs: IDENTIFIER_MAX_DELAY_MS },
+    source: { freeAttempts: SOURCE_FREE_ATTEMPTS, ceilingMs: SOURCE_MAX_DELAY_MS },
+    mayDeny: true,
+  },
+
+  /**
+   * Account-creation spam, and address enumeration through FR-303's deliberate disclosure —
+   * a refused sign-up says the address is already registered, so unlimited attempts would be a
+   * membership oracle. Rate limiting is what actually defends that (FR-303, FR-307).
+   *
+   * The source allowance matches sign-in's: conference-day sign-ups arrive in a burst from one
+   * venue address, and treating that as an attack would refuse the very journey US1 exists for.
+   */
+  sign_up: {
+    identifier: { freeAttempts: 3, ceilingMs: IDENTIFIER_MAX_DELAY_MS },
+    source: { freeAttempts: SOURCE_FREE_ATTEMPTS, ceilingMs: SOURCE_MAX_DELAY_MS },
+    mayDeny: true,
+  },
+
+  /**
+   * Join-code enumeration (FR-314). The identifier here is the **signed-in attendee**, not an
+   * address — this action is authenticated — so a denial can only ever inconvenience the person
+   * doing the guessing, which is why it may deny.
+   *
+   * Slightly more generous than sign-in on the identifier: a code is read off a badge or a
+   * slide and mistyped honestly more often than a password the browser fills in.
+   */
+  join_code: {
+    identifier: { freeAttempts: 5, ceilingMs: IDENTIFIER_MAX_DELAY_MS },
+    source: { freeAttempts: 50, ceilingMs: SOURCE_MAX_DELAY_MS },
+    mayDeny: true,
+  },
+
+  /**
+   * Personal-data export (FR-379).
+   *
+   * Authenticated, so the identifier is the attendee themselves and a denial can only ever
+   * inconvenience the person asking. Deliberately tight: an export embeds the avatar and reads
+   * every table holding anything about one person, so it is the most expensive request in the
+   * product — and nobody has a reason to want several a minute. Somebody who genuinely needs a
+   * second copy waits a moment for it.
+   */
+  export: {
+    identifier: { freeAttempts: 3, ceilingMs: IDENTIFIER_MAX_DELAY_MS },
+    source: { freeAttempts: 20, ceilingMs: SOURCE_MAX_DELAY_MS },
+    mayDeny: true,
+  },
+
+  /**
+   * Token submission — verification and reset completion (FR-387).
+   *
+   * **Keyed on the submitted token, never on an address**, which is what makes `mayDeny: true`
+   * safe here where it is deliberately unsafe for `reset_request` below. A refusal keyed on a
+   * token can only fall on somebody who holds that token; there is no third party a denial
+   * could harm, so the reasoning that forces `reset_request` to delay-only does not apply.
+   *
+   * These are not guessing defences — the tokens are 256-bit and the search space is not
+   * walkable — they bound the free unauthenticated *write* each submission performs against the
+   * token tables. Generous on the identifier because a person clicking a stale link twice is
+   * ordinary; tight on the source because nobody legitimately submits many distinct tokens.
+   */
+  verify_token: {
+    identifier: { freeAttempts: 5, ceilingMs: IDENTIFIER_MAX_DELAY_MS },
+    source: { freeAttempts: 30, ceilingMs: SOURCE_MAX_DELAY_MS },
+    mayDeny: true,
+  },
+
+  reset_submit: {
+    identifier: { freeAttempts: 5, ceilingMs: IDENTIFIER_MAX_DELAY_MS },
+    source: { freeAttempts: 30, ceilingMs: SOURCE_MAX_DELAY_MS },
+    mayDeny: true,
+  },
+
+  /**
+   * Avatar upload (FR-347, FR-348).
+   *
+   * Authenticated, so the identifier is the uploader and a denial can only inconvenience the
+   * person uploading. Tight for the same reason `export` is: this request decodes a full
+   * raster, runs an entropy analysis over it to choose the crop, and re-encodes — the most
+   * expensive work the API does per request. Nobody changes their photograph several times a
+   * minute, and `limitInputPixels` bounds one upload while this bounds the rate.
+   */
+  avatar_upload: {
+    identifier: { freeAttempts: 5, ceilingMs: IDENTIFIER_MAX_DELAY_MS },
+    source: { freeAttempts: 30, ceilingMs: SOURCE_MAX_DELAY_MS },
+    mayDeny: true,
+  },
+
+  /**
+   * **The one that cannot deny** (FR-331, FR-327, research D2).
+   *
+   * Weighted toward the source: the identifier allowance is deliberately small because it only
+   * ever buys a short in-request delay, and the source allowance is where the real bound sits —
+   * the source is the dimension an attacker occupies and a victim does not.
+   */
+  reset_request: {
+    identifier: { freeAttempts: 1, ceilingMs: IDENTIFIER_MAX_DELAY_MS },
+    source: { freeAttempts: 20, ceilingMs: SOURCE_MAX_DELAY_MS },
+    mayDeny: false,
+  },
+}
+
 export interface AttemptKey {
   readonly identifierHash: string
   readonly sourceHash: string
 }
+
+/** Every counted key now carries the action it belongs to (FR-307a). */
+export type ActionKey = AttemptKey & { readonly action: ThrottleAction }
 
 /**
  * Keyed hash, so the table can count per identifier while holding no readable address.
@@ -66,9 +238,35 @@ export const hashAttemptValue = (value: string): string =>
 export const recordAttempt = async ({
   identifierHash,
   sourceHash,
+  action,
   succeeded,
-}: AttemptKey & { succeeded: boolean }): Promise<void> => {
-  await getDb().insert(signInAttempts).values({ identifierHash, sourceHash, succeeded })
+}: ActionKey & { succeeded: boolean }): Promise<void> => {
+  await getDb().insert(signInAttempts).values({ identifierHash, sourceHash, action, succeeded })
+}
+
+/**
+ * 004 review — **for the actions whose cost is paid on every request, not only on failure.**
+ *
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ * `succeeded` has a specific meaning to `countFailures`: `false` extends the identifier streak,
+ * `true` ends it. Three call sites pass a bare `false` on their **success** path, which reads
+ * as a copy-paste bug and is not one — for `export`, `avatar_upload` and verification resend the
+ * server does the expensive work whether or not the caller is pleased with the result, so every
+ * request has to count or the limit does not bind at all.
+ *
+ * Spelling that as `recordRequest` rather than `succeeded: false` is the point. Somebody
+ * "fixing" the literal to `true` would make those three limits unreachable — the streak would
+ * reset on every success — and no test would fail. A named function states the policy where the
+ * boolean could only misstate a fact.
+ *
+ * These actions therefore escalate toward their ceiling under sustained use and eventually
+ * answer 429 with retry-after guidance. That is a delay with a stated wait, never a permanent
+ * refusal: the next window clears it, and for `export` in particular a personal-data right is
+ * deferred by minutes and never denied.
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ */
+export const recordRequest = async (key: ActionKey): Promise<void> => {
+  await recordAttempt({ ...key, succeeded: false })
 }
 
 interface FailureStreak {
@@ -78,7 +276,7 @@ interface FailureStreak {
 }
 
 /**
- * Failures for one key within the rolling window.
+ * Failures for one key **within one action**, inside the rolling window.
  *
  * `resetOnSuccess` is the difference between the two dimensions, and it is not cosmetic:
  *
@@ -90,10 +288,14 @@ interface FailureStreak {
  *   reaches its threshold. Source throttling is the only bound on a spray across thousands of
  *   identifiers (each of which gets three free attempts of its own), so it must not be
  *   resettable by the attacker at will (FR-031a).
+ *
+ * The `action` filter is 004's addition and is the whole of FR-307a: without it a storm against
+ * one action lands in every other action's counter.
  */
 const countFailures = async (
   column: typeof signInAttempts.identifierHash | typeof signInAttempts.sourceHash,
   value: string,
+  action: ThrottleAction,
   { resetOnSuccess }: { resetOnSuccess: boolean },
 ): Promise<FailureStreak> => {
   const since = new Date(Date.now() - WINDOW_MS)
@@ -101,7 +303,13 @@ const countFailures = async (
   const rows = await getDb()
     .select({ succeeded: signInAttempts.succeeded, occurredAt: signInAttempts.occurredAt })
     .from(signInAttempts)
-    .where(and(eq(column, value), gte(signInAttempts.occurredAt, since)))
+    .where(
+      and(
+        eq(signInAttempts.action, action),
+        eq(column, value),
+        gte(signInAttempts.occurredAt, since),
+      ),
+    )
     .orderBy(desc(signInAttempts.occurredAt))
     .limit(200)
 
@@ -148,8 +356,7 @@ const delayFor = (failures: number, freeAttempts: number, ceilingMs: number): nu
  */
 const outstandingDelay = (
   streak: FailureStreak,
-  freeAttempts: number,
-  ceilingMs: number,
+  { freeAttempts, ceilingMs }: DimensionThreshold,
 ): number => {
   const required = delayFor(streak.count, freeAttempts, ceilingMs)
   if (required === 0 || !streak.lastFailureAt) return 0
@@ -162,7 +369,7 @@ const outstandingDelay = (
  * How long a **failed** attempt must be held before it is answered, in milliseconds.
  *
  * ─────────────────────────────────────────────────────────────────────────────────────────
- * **This is only ever consulted after a credential has already been rejected.**
+ * **For `sign_in` this is only ever consulted after a credential has already been rejected.**
  *
  * That ordering is the whole of FR-031b. When the throttle gated the request *before*
  * verification, an attacker could hold any account they could name permanently unreachable:
@@ -174,6 +381,9 @@ const outstandingDelay = (
  * With verification first, the correct credential is never refused, however many failures
  * precede it, and SC-003a's "accounts an attacker can render permanently inaccessible" is zero
  * by construction rather than by clamping.
+ *
+ * **The other three actions have no credential to verify first**, which is why they need
+ * `mayDeny` (research D2). See `THRESHOLDS`.
  * ─────────────────────────────────────────────────────────────────────────────────────────
  *
  * The larger of the two dimensions wins, so a well-behaved attendee behind a hostile shared
@@ -183,16 +393,28 @@ const outstandingDelay = (
 export const failureDelayMs = async ({
   identifierHash,
   sourceHash,
-}: AttemptKey): Promise<number> => {
+  action,
+}: ActionKey): Promise<number> => {
+  const thresholds = THRESHOLDS[action]
+
   const [identifier, source] = await Promise.all([
-    countFailures(signInAttempts.identifierHash, identifierHash, { resetOnSuccess: true }),
-    countFailures(signInAttempts.sourceHash, sourceHash, { resetOnSuccess: false }),
+    countFailures(signInAttempts.identifierHash, identifierHash, action, { resetOnSuccess: true }),
+    countFailures(signInAttempts.sourceHash, sourceHash, action, { resetOnSuccess: false }),
   ])
 
-  return Math.max(
-    outstandingDelay(identifier, IDENTIFIER_FREE_ATTEMPTS, IDENTIFIER_MAX_DELAY_MS),
-    outstandingDelay(source, SOURCE_FREE_ATTEMPTS, SOURCE_MAX_DELAY_MS),
+  const delayMs = Math.max(
+    outstandingDelay(identifier, thresholds.identifier),
+    outstandingDelay(source, thresholds.source),
   )
+
+  // T023 — a delay-only action's cost is capped at what `serveDelay` will actually sleep, so
+  // there is never a remainder for a caller to turn into a refusal. The clamp lives here rather
+  // than at the call site precisely so no call site can forget it.
+  if (!thresholds.mayDeny) {
+    return Math.min(delayMs, loadConfig().auth.maxServedDelayMs)
+  }
+
+  return delayMs
 }
 
 /**
@@ -201,6 +423,9 @@ export const failureDelayMs = async ({
  *
  * Returns the number of seconds still outstanding after sleeping, or 0 when the delay has been
  * served in full. A caller that receives a non-zero value should refuse with `too_many_attempts`.
+ *
+ * **A delay-only action can never produce a non-zero return here**, because `failureDelayMs`
+ * has already clamped its result to this same bound.
  */
 export const serveDelay = async (delayMs: number): Promise<number> => {
   if (delayMs <= 0) return 0
@@ -216,12 +441,42 @@ export const serveDelay = async (delayMs: number): Promise<number> => {
 }
 
 /**
+ * 004 review — **flattens a timing difference between two branches of one handler** (FR-327).
+ *
+ * An identical status and an identical body are not an identical response if one branch takes
+ * measurably longer than the other. Where the expensive branch cannot be faked — reset-request
+ * cannot issue a token for an account that does not exist — the remaining defence is to make the
+ * cheap branch cost the same.
+ *
+ * Sleeps until `budgetMs` have elapsed since `startedAt`, and returns immediately if the work
+ * already took longer. Overrunning is safe for non-disclosure in the direction that matters: the
+ * pad is sized above the expensive branch's normal cost, so an overrun means something
+ * exceptional happened rather than that an account was found.
+ *
+ * Takes an `hrtime.bigint()` reading rather than `Date.now()` — a monotonic clock cannot be
+ * moved by an NTP step mid-request, which would otherwise pad by an arbitrary amount or not
+ * at all.
+ */
+export const padElapsedTo = async (startedAt: bigint, budgetMs: number): Promise<void> => {
+  const elapsedMs = Number(process.hrtime.bigint() - startedAt) / 1_000_000
+  const remaining = budgetMs - elapsedMs
+  if (remaining <= 0) return
+
+  await new Promise((resolve) => setTimeout(resolve, remaining))
+}
+
+/**
  * Deletes attempt rows past their usefulness.
  *
  * Retention beyond the counting window is pointless and adds risk: these are keyed hashes of
  * every address ever typed at the service, including addresses belonging to people who are not
  * attendees (FR-042, Principle VIII). The margin over `WINDOW_MS` exists only so that a clock
  * skew or a slow sweep cannot delete rows the throttle is still counting.
+ *
+ * **Two hours, and FR-382 forbids lengthening it.** This is the one personal-data record no
+ * deletion cascade reaches — deliberately, because deleting a departing attendee's rows would
+ * let an attacker clear their own trail by registering and deleting an account (research D10).
+ * The sweep is therefore not a second line of defence here; it is the only one.
  */
 export const pruneAttempts = async (): Promise<void> => {
   await getDb()
@@ -243,3 +498,5 @@ export const pruneSessions = async (): Promise<void> => {
           or ${authSessions.revokedAt} < now() - interval '30 days'`,
     )
 }
+
+export type { ThrottleAction }

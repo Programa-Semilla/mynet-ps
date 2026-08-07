@@ -1,6 +1,7 @@
 import { RequestRefusedError } from '@mynet/data'
 import { useAuthGateway } from '@mynet/platform'
 import { useId, useState, type FormEvent } from 'react'
+import { Link } from 'react-router'
 
 import { PRODUCT_NAME, PRODUCT_TAGLINE } from '../app/branding.js'
 import { useAuth } from './useAuth.js'
@@ -150,10 +151,27 @@ export const SignInScreen = () => {
         </form>
 
         {/*
-          No "forgot password" link. There is no recovery flow in this slice, and offering one
-          that does not exist would be worse than its absence. Accounts are provisioned
-          administratively — an interim assumption pending spec Open Question 1.
+          ─────────────────────────────────────────────────────────────────────────────────
+          T050 (004) — the two exits this screen could not offer until now.
+
+          Until 004 there was no way to create an account and no way to recover one: accounts
+          were provisioned by a seed script, and the note that stood here said so. Self sign-up
+          (FR-300) and password recovery (FR-326) are what replace it, and they arrived together
+          on purpose — an account nobody can recover is one forgotten password from being
+          permanently lost, and there is no organizer to appeal to.
+          ─────────────────────────────────────────────────────────────────────────────────
         */}
+        <p className="mt-6 text-sm text-text-body">
+          New here?{' '}
+          <Link to="/sign-up" className="font-medium text-accent-strong underline">
+            Create an account
+          </Link>
+        </p>
+        <p className="mt-2 text-sm text-text-body">
+          <Link to="/reset-password-request" className="font-medium text-accent-strong underline">
+            Forgot your password?
+          </Link>
+        </p>
       </div>
     </main>
   )

@@ -8,7 +8,12 @@ import {
   createFreshnessRegistry,
 } from '../src/http/cached.js'
 import type { CachedEntry, LocalCache } from '../src/http/cache-store.js'
-import { OfflineError, RequestRefusedError } from '../src/interfaces/errors.js'
+import {
+  NotAuthenticatedError,
+  OfflineError,
+  RequestRefusedError,
+  SessionExpiredError,
+} from '../src/interfaces/errors.js'
 
 /**
  * T056, T057 (005) — the caching decorator: scoping, lifetime, and invalidation
@@ -184,6 +189,60 @@ describe('the caching decorator', () => {
     await expect(subject.listSaved('summit')).rejects.toBeInstanceOf(RequestRefusedError)
     expect(entries.has(cacheKey('ada', 'summit', 'saved'))).toBe(false)
   })
+
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════════════════
+   * **004 — THE CASE THAT WAS ACTUALLY BROKEN, AND WHICH NOTHING ASSERTED.**
+   *
+   * `isRefusal` originally recognised only `RequestRefusedError`. The test above therefore
+   * proves the branch works for the one error class that never reached it in the failing
+   * scenario. The scenario the spec names as an Edge Case is different: *an attendee deletes
+   * their account while signed in on a second device*, and that device's next read comes back
+   * **401**, not 404.
+   *
+   * With `NotAuthenticatedError` and `SessionExpiredError` outside `isRefusal`, a 401 fell
+   * through to the offline fallback and the second device was served its cached programme,
+   * saved sessions and notes — for an account that no longer exists. That is the cache acting
+   * as an authorization bypass, which is exactly what the widening closed and what these two
+   * cases now hold closed.
+   *
+   * Reverting `isRefusal` to `error instanceof RequestRefusedError` must turn these red.
+   * ═══════════════════════════════════════════════════════════════════════════════════════
+   */
+  it.each([
+    ['NotAuthenticatedError', () => new NotAuthenticatedError()],
+    ['SessionExpiredError', () => new SessionExpiredError()],
+  ])(
+    'PURGES and re-throws on %s — a 401 is a refusal, not an outage (FR-330, FR-369)',
+    async (_name, makeError) => {
+      const { store, entries } = memoryStore()
+      let refuse = false
+      const { repository } = repositoryThat({
+        listSaved: async () => {
+          if (refuse) throw makeError()
+          return ['a']
+        },
+      })
+
+      const subject = cached(repository, store, { attendeeId: 'ada' }, READS)
+      await subject.listSaved('summit')
+      expect(entries.has(cacheKey('ada', 'summit', 'saved'))).toBe(true)
+
+      // The account was deleted, or every session revoked by a password reset, on another device.
+      refuse = true
+
+      // It must REJECT rather than resolve. Resolving would hand this device the cached copy of
+      // an account the server has stopped recognising.
+      await expect(subject.listSaved('summit')).rejects.toBeInstanceOf(makeError().constructor)
+
+      // And the bytes must be gone, not merely unserved — the next read has nothing to fall back
+      // to even if it arrives while offline.
+      expect(
+        entries.has(cacheKey('ada', 'summit', 'saved')),
+        'a 401 must purge the conference; leaving it cached is the authorization bypass',
+      ).toBe(false)
+    },
+  )
 
   it('purges only the refused conference, not every conference (research D10)', async () => {
     const { store, entries } = memoryStore()

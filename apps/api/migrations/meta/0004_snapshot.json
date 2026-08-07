@@ -1,5 +1,5 @@
 {
-  "id": "7cb4671a-8cf0-4dd9-a81c-aab37b4ebf93",
+  "id": "c5b2f585-fc49-43a0-b1a5-67994145223b",
   "prevId": "ece28c2a-34ef-43f1-927d-ed7135629784",
   "version": "7",
   "dialect": "postgresql",
@@ -278,6 +278,25 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true
+        },
+        "email_verified_at": {
+          "name": "email_verified_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "discoverable": {
+          "name": "discoverable",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "avatar_object_key": {
+          "name": "avatar_object_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
         },
         "created_at": {
           "name": "created_at",
@@ -889,6 +908,12 @@
           "primaryKey": false,
           "notNull": true
         },
+        "join_code": {
+          "name": "join_code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -900,7 +925,15 @@
       "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
+      "uniqueConstraints": {
+        "events_join_code_unique": {
+          "name": "events_join_code_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "join_code"
+          ]
+        }
+      },
       "policies": {},
       "checkConstraints": {
         "events_ends_on_after_starts_on": {
@@ -1001,6 +1034,152 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.attendee_password_resets": {
+      "name": "attendee_password_resets",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "attendee_id": {
+          "name": "attendee_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "token_hash": {
+          "name": "token_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "consumed_at": {
+          "name": "consumed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "attendee_password_resets_attendee_id_attendees_id_fk": {
+          "name": "attendee_password_resets_attendee_id_attendees_id_fk",
+          "tableFrom": "attendee_password_resets",
+          "tableTo": "attendees",
+          "columnsFrom": [
+            "attendee_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "attendee_password_resets_token_hash_unique": {
+          "name": "attendee_password_resets_token_hash_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "token_hash"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.attendee_verifications": {
+      "name": "attendee_verifications",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "attendee_id": {
+          "name": "attendee_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "token_hash": {
+          "name": "token_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "consumed_at": {
+          "name": "consumed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "attendee_verifications_attendee_id_attendees_id_fk": {
+          "name": "attendee_verifications_attendee_id_attendees_id_fk",
+          "tableFrom": "attendee_verifications",
+          "tableTo": "attendees",
+          "columnsFrom": [
+            "attendee_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "attendee_verifications_token_hash_unique": {
+          "name": "attendee_verifications_token_hash_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "token_hash"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.sign_in_attempts": {
       "name": "sign_in_attempts",
       "schema": "",
@@ -1019,6 +1198,12 @@
         },
         "source_hash": {
           "name": "source_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "action": {
+          "name": "action",
           "type": "text",
           "primaryKey": false,
           "notNull": true
@@ -1042,6 +1227,12 @@
           "name": "sign_in_attempts_identifier_idx",
           "columns": [
             {
+              "expression": "action",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
               "expression": "identifier_hash",
               "isExpression": false,
               "asc": true,
@@ -1063,6 +1254,12 @@
           "name": "sign_in_attempts_source_idx",
           "columns": [
             {
+              "expression": "action",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
               "expression": "source_hash",
               "isExpression": false,
               "asc": true,
@@ -1081,6 +1278,187 @@
           "with": {}
         }
       },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.attendee_interests": {
+      "name": "attendee_interests",
+      "schema": "",
+      "columns": {
+        "attendee_id": {
+          "name": "attendee_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "interest": {
+          "name": "interest",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "attendee_interests_attendee_id_attendees_id_fk": {
+          "name": "attendee_interests_attendee_id_attendees_id_fk",
+          "tableFrom": "attendee_interests",
+          "tableTo": "attendees",
+          "columnsFrom": [
+            "attendee_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "attendee_interests_attendee_id_interest_pk": {
+          "name": "attendee_interests_attendee_id_interest_pk",
+          "columns": [
+            "attendee_id",
+            "interest"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "attendee_interests_length": {
+          "name": "attendee_interests_length",
+          "value": "(length(\"interest\") > 0 AND length(\"interest\") <= 60)"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.attendee_profiles": {
+      "name": "attendee_profiles",
+      "schema": "",
+      "columns": {
+        "attendee_id": {
+          "name": "attendee_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "company": {
+          "name": "company",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "role": {
+          "name": "role",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "headline": {
+          "name": "headline",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "networking_intent": {
+          "name": "networking_intent",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "availability": {
+          "name": "availability",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "attendee_profiles_attendee_id_attendees_id_fk": {
+          "name": "attendee_profiles_attendee_id_attendees_id_fk",
+          "tableFrom": "attendee_profiles",
+          "tableTo": "attendees",
+          "columnsFrom": [
+            "attendee_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "attendee_profiles_company_length": {
+          "name": "attendee_profiles_company_length",
+          "value": "(\"company\" IS NULL OR (length(\"company\") > 0 AND length(\"company\") <= 120))"
+        },
+        "attendee_profiles_role_length": {
+          "name": "attendee_profiles_role_length",
+          "value": "(\"role\" IS NULL OR (length(\"role\") > 0 AND length(\"role\") <= 120))"
+        },
+        "attendee_profiles_headline_length": {
+          "name": "attendee_profiles_headline_length",
+          "value": "(\"headline\" IS NULL OR (length(\"headline\") > 0 AND length(\"headline\") <= 200))"
+        },
+        "attendee_profiles_networking_intent": {
+          "name": "attendee_profiles_networking_intent",
+          "value": "(\"networking_intent\" IS NULL OR \"networking_intent\" IN ('open_to_meetings', 'open_to_messages', 'not_networking'))"
+        },
+        "attendee_profiles_availability": {
+          "name": "attendee_profiles_availability",
+          "value": "(\"availability\" IS NULL OR \"availability\" IN ('available', 'busy'))"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.stored_objects": {
+      "name": "stored_objects",
+      "schema": "",
+      "columns": {
+        "key": {
+          "name": "key",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "content_type": {
+          "name": "content_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "bytes": {
+          "name": "bytes",
+          "type": "bytea",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},

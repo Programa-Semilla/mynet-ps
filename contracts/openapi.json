@@ -1339,6 +1339,1599 @@
           }
         }
       }
+    },
+    "/auth/sign-up": {
+      "post": {
+        "summary": "Create an account and sign in",
+        "tags": [
+          "auth"
+        ],
+        "description": "Self-serve account creation (FR-300). On success the attendee is signed in without a second credential entry (FR-306) and the session is set as an HttpOnly cookie — there is no body, so the token cannot leak into one. A 409 states plainly that the address is already registered: that disclosure is a decision (FR-303), because it cannot be hidden alongside auto-sign-in, and rate limiting is what actually defends enumeration.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "email",
+                  "displayName",
+                  "password"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "format": "email",
+                    "maxLength": 320
+                  },
+                  "displayName": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120
+                  },
+                  "password": {
+                    "type": "string",
+                    "minLength": 12,
+                    "maxLength": 1024,
+                    "description": "At least 12 characters. Length only — no character-class rules, which push people toward weaker passwords than a long passphrase. Stated before submission and enforced by a disabled confirmation, so a 400 here means the form was bypassed (FR-304)."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Created and signed in. The session is in the cookie."
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "fields": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": true
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The address already has an account (FR-303). Deliberately disclosed, and offering both exits — sign in, or reset.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "The address already has an account (FR-303). Deliberately disclosed, and offering both exits — sign in, or reset.",
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Throttled on the `sign_up` counter, which is separate from sign-in's.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Throttled on the `sign_up` counter, which is separate from sign-in's.",
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "retryAfterSeconds": {
+                      "type": "number"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/events/join": {
+      "post": {
+        "summary": "Register for a conference by entering its join code",
+        "tags": [
+          "events"
+        ],
+        "description": "The code resolves the conference; the attendee comes from the session. Entering the code of a conference already registered is IDEMPOTENT and is not an error (FR-312) — it answers 200 saying so. An unrecognised code answers 404 in one wording that does not distinguish between causes of rejection (FR-313), and the route is rate-limited on its own counter so it cannot be used to enumerate codes (FR-314).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "joinCode"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "joinCode": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120,
+                    "description": "Compared after trimming and lower-casing, because a code read off a badge or a slide arrives with arbitrary case and stray whitespace (research D7)."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "event",
+                    "alreadyRegistered"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "event": {
+                      "type": "object",
+                      "required": [
+                        "id",
+                        "name",
+                        "location",
+                        "startsOn",
+                        "endsOn",
+                        "timezone"
+                      ],
+                      "additionalProperties": false,
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "location": {
+                          "type": "string"
+                        },
+                        "startsOn": {
+                          "type": "string"
+                        },
+                        "endsOn": {
+                          "type": "string"
+                        },
+                        "timezone": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "alreadyRegistered": {
+                      "type": "boolean",
+                      "description": "True when the attendee was already registered. Not an error (FR-312) — a person who taps twice on a slow connection has done nothing wrong."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unrecognised code. One wording for every cause of rejection (FR-313), including a conference seeded with no code, which is unjoinable by design (FR-317).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Unrecognised code. One wording for every cause of rejection (FR-313), including a conference seeded with no code, which is unjoinable by design (FR-317).",
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Throttled on the `join_code` counter, so the surface cannot enumerate codes (FR-314).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Throttled on the `join_code` counter, so the surface cannot enumerate codes (FR-314).",
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "retryAfterSeconds": {
+                      "type": "number"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/verify": {
+      "post": {
+        "summary": "Complete email verification from a link",
+        "tags": [
+          "auth"
+        ],
+        "description": "Unauthenticated by necessity: the link is followed out of a mail client, which carries no session. A consumed, expired or unknown token is refused IDENTICALLY (410) — the caller learns only that the link no longer works, which is all they are owed (FR-321).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "token"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "token": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 512
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Verified. If discoverability is on, the attendee becomes visible to co-attendees for the first time (FR-359)."
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "Expired, already used, or unknown — one refusal for all three (FR-321).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Expired, already used, or unknown — one refusal for all three (FR-321).",
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Throttled (FR-387). Keyed on the submitted token, never on an address.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Throttled (FR-387). Keyed on the submitted token, never on an address.",
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "retryAfterSeconds": {
+                      "type": "number"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/verify/resend": {
+      "post": {
+        "summary": "Send a fresh verification message to the signed-in attendee",
+        "tags": [
+          "auth"
+        ],
+        "description": "Authenticated, deliberately: it sends to the address on the account rather than to an address in the request, so it cannot be aimed at anybody. Rate-limited (FR-322). Answers 202 whether or not a message was sent — an already-verified account produces the same response, so nothing here reports verification state to a caller who could be anyone holding a session.",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Accepted. A send failure does not surface here (FR-318a)."
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/reset-request": {
+      "post": {
+        "summary": "Request a password reset link",
+        "tags": [
+          "auth"
+        ],
+        "description": "ALWAYS answers 202, whether or not an account exists for the address (FR-327). This is the one non-disclosure guarantee that survives 004 — sign-up deliberately discloses (FR-303) because it cannot avoid it, and this path genuinely can. There is NO 429: a throttled request answers 202 like every other, because a 429 where an unknown address got a 202 would be exactly the account-existence oracle this route exists to close.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "email"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "format": "email",
+                    "maxLength": 320
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Accepted. Identical whether or not an account exists, and identical whether or not the request was throttled."
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "fields": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": true
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/reset": {
+      "post": {
+        "summary": "Set a new password from a reset link",
+        "tags": [
+          "auth"
+        ],
+        "description": "Unauthenticated by necessity — the person cannot sign in, which is why they are here. On success EVERY existing session for that attendee is revoked, on every device (FR-330): a reset is what somebody does when they believe their account is compromised, and leaving the compromiser signed in would defeat the point. The attendee then signs in with the new password.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "token",
+                  "password"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "token": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 512
+                  },
+                  "password": {
+                    "type": "string",
+                    "minLength": 12,
+                    "maxLength": 1024,
+                    "description": "The same policy sign-up states, enforced identically (FR-304)."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Password changed, and every session revoked. Sign in again."
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "fields": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": true
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "Expired, already used, or unknown — one refusal for all three.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Expired, already used, or unknown — one refusal for all three.",
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Throttled (FR-387). Keyed on the submitted token, never on an address.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Throttled (FR-387). Keyed on the submitted token, never on an address.",
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "retryAfterSeconds": {
+                      "type": "number"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/profile": {
+      "get": {
+        "summary": "The signed-in attendee's own profile",
+        "tags": [
+          "profile"
+        ],
+        "description": "Never 404s. An attendee who has written nothing reads as a profile whose every field is null — \"you have not written one yet\" is not an error, and a 404 here would make the client render a failure for the ordinary condition of a new account (FR-341). The owner reads their own profile regardless of any visibility setting (FR-340).",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "displayName",
+                    "email",
+                    "company",
+                    "role",
+                    "headline",
+                    "networkingIntent",
+                    "availability",
+                    "interests",
+                    "discoverable",
+                    "emailVerified",
+                    "hasAvatar"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "displayName": {
+                      "type": "string"
+                    },
+                    "email": {
+                      "type": "string"
+                    },
+                    "company": {
+                      "type": [
+                        "null",
+                        "string"
+                      ]
+                    },
+                    "role": {
+                      "type": [
+                        "null",
+                        "string"
+                      ]
+                    },
+                    "headline": {
+                      "type": [
+                        "null",
+                        "string"
+                      ]
+                    },
+                    "networkingIntent": {
+                      "type": [
+                        "null",
+                        "string"
+                      ],
+                      "enum": [
+                        "open_to_meetings",
+                        "open_to_messages",
+                        "not_networking",
+                        null
+                      ]
+                    },
+                    "availability": {
+                      "type": [
+                        "null",
+                        "string"
+                      ],
+                      "enum": [
+                        "available",
+                        "busy",
+                        null
+                      ]
+                    },
+                    "interests": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "discoverable": {
+                      "type": "boolean",
+                      "description": "The attendee's own setting. NOT the same as being visible: an unverified attendee with this on still appears to nobody (FR-359)."
+                    },
+                    "emailVerified": {
+                      "type": "boolean",
+                      "description": "Present so the profile can state plainly what verification adds (FR-325b). Never returned about anybody else — FR-361 forbids a requester learning another attendee's verification state."
+                    },
+                    "hasAvatar": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "Replace the signed-in attendee's profile",
+        "tags": [
+          "profile"
+        ],
+        "description": "WHOLE-PROFILE SEMANTICS: the client sends the complete profile and an omitted field CLEARS it. That gives \"field absent\" exactly one meaning, and removes the partial-update path in which a cleared field and an unmentioned one look the same. Interests are replaced rather than merged, for the same reason — removing one is expressed by sending the set without it.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "company": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "maxLength": 120
+                  },
+                  "role": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "maxLength": 120
+                  },
+                  "headline": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "maxLength": 200
+                  },
+                  "networkingIntent": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "enum": [
+                      "open_to_meetings",
+                      "open_to_messages",
+                      "not_networking",
+                      null
+                    ]
+                  },
+                  "availability": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "enum": [
+                      "available",
+                      "busy",
+                      null
+                    ]
+                  },
+                  "interests": {
+                    "type": "array",
+                    "maxItems": 12,
+                    "items": {
+                      "type": "string",
+                      "maxLength": 60
+                    },
+                    "description": "Bounded in count HERE and in the query layer, because a per-row CHECK cannot see a set. Each value is bounded in length by the column as well (FR-337)."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "displayName",
+                    "email",
+                    "company",
+                    "role",
+                    "headline",
+                    "networkingIntent",
+                    "availability",
+                    "interests",
+                    "discoverable",
+                    "emailVerified",
+                    "hasAvatar"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "displayName": {
+                      "type": "string"
+                    },
+                    "email": {
+                      "type": "string"
+                    },
+                    "company": {
+                      "type": [
+                        "null",
+                        "string"
+                      ]
+                    },
+                    "role": {
+                      "type": [
+                        "null",
+                        "string"
+                      ]
+                    },
+                    "headline": {
+                      "type": [
+                        "null",
+                        "string"
+                      ]
+                    },
+                    "networkingIntent": {
+                      "type": [
+                        "null",
+                        "string"
+                      ],
+                      "enum": [
+                        "open_to_meetings",
+                        "open_to_messages",
+                        "not_networking",
+                        null
+                      ]
+                    },
+                    "availability": {
+                      "type": [
+                        "null",
+                        "string"
+                      ],
+                      "enum": [
+                        "available",
+                        "busy",
+                        null
+                      ]
+                    },
+                    "interests": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "discoverable": {
+                      "type": "boolean",
+                      "description": "The attendee's own setting. NOT the same as being visible: an unverified attendee with this on still appears to nobody (FR-359)."
+                    },
+                    "emailVerified": {
+                      "type": "boolean",
+                      "description": "Present so the profile can state plainly what verification adds (FR-325b). Never returned about anybody else — FR-361 forbids a requester learning another attendee's verification state."
+                    },
+                    "hasAvatar": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Over a stated limit. Reachable only by a client that bypassed the editor, which surfaces every limit as it is approached (FR-337, FR-338).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Over a stated limit. Reachable only by a client that bypassed the editor, which surfaces every limit as it is approached (FR-337, FR-338).",
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "fields": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": true
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/profile/discoverability": {
+      "put": {
+        "summary": "Turn discoverability on or off",
+        "tags": [
+          "profile"
+        ],
+        "description": "Answers with EFFECTIVE visibility rather than the flag: an unverified attendee with this on still appears to nobody (FR-359), and a response echoing only the setting would tell them the opposite of what is true (FR-362). Takes effect on the next request, with no new sign-in (FR-363).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "discoverable"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "discoverable": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "discoverable",
+                    "emailVerified",
+                    "effectivelyVisible"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "discoverable": {
+                      "type": "boolean",
+                      "description": "The setting, as stored."
+                    },
+                    "emailVerified": {
+                      "type": "boolean",
+                      "description": "The other half of FR-359's condition. Returned about the CALLER only — never about anybody else (FR-361)."
+                    },
+                    "effectivelyVisible": {
+                      "type": "boolean",
+                      "description": "Whether co-attendees can actually find them: the setting AND a verified address. This is the field the surface must show."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/profile/avatar": {
+      "get": {
+        "summary": "The signed-in attendee's own avatar",
+        "tags": [
+          "profile"
+        ],
+        "description": "Answers 204 with no body when there is none — the ordinary state of a new account, and what makes the client render the non-photographic fallback rather than a broken image (FR-351).",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "contentType",
+                    "base64"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "contentType": {
+                      "type": "string"
+                    },
+                    "base64": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "204": {
+            "description": "No avatar. The fallback renders."
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "Upload an image as the avatar, replacing any previous one",
+        "tags": [
+          "profile"
+        ],
+        "description": "The bytes are decoded, resized to a bounded square and RE-ENCODED server-side, so metadata absence is a property of the operation rather than a list of tags to maintain (FR-349, research D8). The type is determined by INSPECTING the bytes, never by the declared content type or a filename. Over the size limit is refused before anything is stored (FR-347).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "image"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "image": {
+                    "type": "string",
+                    "description": "The image, base64-encoded. See the file header for why not raw bytes."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Stored, replacing any previous object."
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Over the size limit, refused before any bytes are stored (FR-347).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Over the size limit, refused before any bytes are stored (FR-347).",
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "maxBytes": {
+                      "type": "number"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Not a decodable image of an accepted type — determined by inspection (FR-347).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Not a decodable image of an accepted type — determined by inspection (FR-347).",
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Throttled on the `avatar_upload` counter. Authenticated, so a denial can only ever fall on the uploader.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Throttled on the `avatar_upload` counter. Authenticated, so a denial can only ever fall on the uploader.",
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "retryAfterSeconds": {
+                      "type": "number"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Remove the avatar. Idempotent",
+        "tags": [
+          "profile"
+        ],
+        "description": "Succeeds whether or not there was one. The bytes are deleted and the non-photographic fallback returns (FR-346, FR-351).",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Default Response"
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/events/{eventId}/attendees/{attendeeId}": {
+      "get": {
+        "summary": "Another attendee's profile, within a conference you share",
+        "tags": [
+          "profile"
+        ],
+        "description": "Carries both guards. The READER's registration is proven by the branded EventScope the route audit guarantees is present; the TARGET must additionally be registered for the same conference, be discoverable, and have a verified address — all three evaluated server-side before any field is returned (FR-390).",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "eventId",
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "attendeeId",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "attendeeId",
+                    "displayName",
+                    "interests",
+                    "hasAvatar"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "attendeeId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "displayName": {
+                      "type": "string"
+                    },
+                    "company": {
+                      "type": [
+                        "null",
+                        "string"
+                      ]
+                    },
+                    "role": {
+                      "type": [
+                        "null",
+                        "string"
+                      ]
+                    },
+                    "headline": {
+                      "type": [
+                        "null",
+                        "string"
+                      ]
+                    },
+                    "networkingIntent": {
+                      "type": [
+                        "null",
+                        "string"
+                      ],
+                      "enum": [
+                        "open_to_meetings",
+                        "open_to_messages",
+                        "not_networking",
+                        null
+                      ]
+                    },
+                    "availability": {
+                      "type": [
+                        "null",
+                        "string"
+                      ],
+                      "enum": [
+                        "available",
+                        "busy",
+                        null
+                      ]
+                    },
+                    "interests": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "hasAvatar": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No conference in common, **or** no such attendee, **or** discoverability off, **or** the address unverified. All four are deliberately indistinguishable — identical status and identical body — so a requester cannot learn who exists, who is hiding, or whose address is verified (FR-361).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "No conference in common, **or** no such attendee, **or** discoverability off, **or** the address unverified. All four are deliberately indistinguishable — identical status and identical body — so a requester cannot learn who exists, who is hiding, or whose address is verified (FR-361).",
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/events/{eventId}/attendees/{attendeeId}/avatar": {
+      "get": {
+        "summary": "Another attendee's avatar, under the same conditions as their profile",
+        "tags": [
+          "profile"
+        ],
+        "description": "THE SAME THREE CONDITIONS as the profile, reusing the same query rather than repeating the predicate — serving a hidden attendee's photograph would be the profile withheld and the face given away. 204 when they have none, so the client renders the fallback (FR-351).",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "eventId",
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "attendeeId",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "contentType",
+                    "base64"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "contentType": {
+                      "type": "string"
+                    },
+                    "base64": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "204": {
+            "description": "No avatar. The fallback renders."
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No conference in common, **or** no such attendee, **or** discoverability off, **or** the address unverified. All four are deliberately indistinguishable — identical status and identical body — so a requester cannot learn who exists, who is hiding, or whose address is verified (FR-361).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "No conference in common, **or** no such attendee, **or** discoverability off, **or** the address unverified. All four are deliberately indistinguishable — identical status and identical body — so a requester cannot learn who exists, who is hiding, or whose address is verified (FR-361).",
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/profile/export": {
+      "get": {
+        "summary": "Everything the product holds about the signed-in attendee",
+        "tags": [
+          "profile"
+        ],
+        "description": "One machine-readable document, with the avatar embedded as base64 rather than referenced by URL — so it stands alone rather than pointing into a system the attendee may be about to delete themselves from (research D11). Contains no credential, verification or reset material (FR-376, FR-391). Rate-limited (FR-379).",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "retryAfterSeconds": {
+                      "type": "number"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/account": {
+      "delete": {
+        "summary": "Delete the account and everything attributable to it",
+        "tags": [
+          "profile"
+        ],
+        "description": "HARD deletion with no tombstone (FR-365). Removes the avatar bytes first and then the attendee row, letting the cascade take the profile, interests, registrations, active-conference selection, saved sessions, notes, verification and reset material, and sign-in sessions. Every session on every device stops working immediately (FR-369). Irreversible by any surface in the product (FR-368).",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Gone. The client is signed out."
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/events/{eventId}/registration": {
+      "delete": {
+        "summary": "Withdraw from a conference, without deleting the account",
+        "tags": [
+          "events"
+        ],
+        "description": "Removes the registration AND that conference's saved sessions and notes — which do NOT cascade from `registrations`, because they reference `sessions` (research D7). The active-conference selection goes with it through the composite foreign key 002 declared, so the attendee falls back to derivation and is left coherent (FR-317d). The profile is untouched: it is cross-event.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "eventId",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Withdrawn. Idempotent from the attendee's side."
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not registered for that conference, or no such conference — indistinguishable (FR-148).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Not registered for that conference, or no such conference — indistinguishable (FR-148).",
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "tags": [

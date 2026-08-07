@@ -1,7 +1,9 @@
 import 'fastify'
 import type { FastifyReply, FastifyRequest } from 'fastify'
 
+import type { MailService } from '../mail/service.js'
 import type { EventScope } from '../plugins/event-access.js'
+import type { StorageService } from '../storage/service.js'
 
 /**
  * The authenticated request context (tasks.md → Shared Interfaces).
@@ -43,5 +45,21 @@ declare module 'fastify' {
      * `request.eventScope`, or refuses indistinguishably from a nonexistent event (FR-148).
      */
     requireEventAccess: (request: FastifyRequest, reply: FastifyReply) => Promise<void>
+    /**
+     * 004 — durable binary content, behind a project-owned port (FR-352, research D3).
+     *
+     * A route reads bytes through this and never through a storage vendor's SDK; the lint rule
+     * in `packages/config/eslint.config.js` is what makes that a boundary rather than a
+     * sentence. Server-side, deliberately not a seventh `DeviceServices` member — see
+     * `storage/service.ts`.
+     */
+    storage: StorageService
+    /**
+     * 004 — transactional account mail, and nothing else (FR-394, FR-395).
+     *
+     * Two methods, one per message this product may send. There is deliberately no generic
+     * `send`, which is what keeps the engagement-notification exclusion structural.
+     */
+    mail: MailService
   }
 }

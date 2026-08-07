@@ -20,6 +20,20 @@ export type {
   Track,
 } from './interfaces/index.js'
 
+// 004 — identity and the attendee's own profile. Appended, never merged into the list above:
+// the per-domain split (FR-180) is what lets 004 and 006 add interfaces without contending.
+export type {
+  Availability,
+  Discoverability,
+  IdentityRepository,
+  JoinResult,
+  NetworkingIntent,
+  OwnProfile,
+  PersonalDataExport,
+  ProfileDraft,
+  ProfileRepository,
+} from './interfaces/index.js'
+
 export {
   NotAuthenticatedError,
   OfflineError,

@@ -19,6 +19,7 @@ import maintenance from './maintenance.js'
 import authContext from './plugins/auth-context.js'
 import errors from './plugins/errors.js'
 import eventAccess from './plugins/event-access.js'
+import ports, { type PortOverrides } from './plugins/ports.js'
 import swagger from './plugins/swagger.js'
 import { ROUTES } from './routes/index.js'
 
@@ -38,12 +39,45 @@ export interface BuildAppOptions {
    * ─────────────────────────────────────────────────────────────────────────────────────────
    */
   readonly onRoute?: (route: RouteOptions) => void
+  /**
+   * 004 — substitutes for the storage and mail ports (FR-352, FR-394).
+   *
+   * Absent in production and in nearly every test: the default adapters need no provisioning,
+   * which is exactly why FR-352 requires one. This exists for the tests that must observe what
+   * an adapter was *asked* to do — that a send failure does not fail account creation
+   * (FR-318a), for instance, which needs a mail service that fails on purpose.
+   */
+  readonly ports?: PortOverrides
 }
 
 export const buildApp = async (options: BuildAppOptions = {}): Promise<FastifyInstance> => {
   const config = loadConfig()
 
   const app = Fastify({
+    /**
+     * ─────────────────────────────────────────────────────────────────────────────────────
+     * **Fastify 5 disables both of these by default (`0`), and 004 is what makes that matter.**
+     *
+     * This feature adds the product's first publicly reachable write routes. One of them
+     * (`PUT /profile/avatar`) raises the body limit to hold a 5 MiB image as base64, and two
+     * of them deliberately hold the connection open while sleeping (`serveDelay`,
+     * `padElapsedTo`). With no `requestTimeout`, a client dribbling that 10 MB body one byte at
+     * a time occupies a handler indefinitely; with no `connectionTimeout`, a connection that
+     * never sends a request is never reclaimed.
+     *
+     * `reset_request` compounds it: that action is `mayDeny: false` *by design*, so it can
+     * never refuse — every request against it is guaranteed to be served, and to sleep first.
+     * The throttle's own comment notes the cost to the attacker; this is the symmetric cost to
+     * the service, and nothing else bounds it.
+     *
+     * `requestTimeout` must stay comfortably above `AUTH_MAX_SERVED_DELAY_MS` plus
+     * `AUTH_RESET_BRANCH_BUDGET_MS`, or the throttle's own sleep would trip it and turn a
+     * deliberate delay into a 503.
+     * ─────────────────────────────────────────────────────────────────────────────────────
+     */
+    requestTimeout: 30_000,
+    connectionTimeout: 10_000,
+    keepAliveTimeout: 30_000,
     logger: {
       level: config.isProduction ? 'info' : 'warn',
       // FR-060 — server records carry no credentials, session tokens, or message content.
@@ -116,6 +150,13 @@ export const buildApp = async (options: BuildAppOptions = {}): Promise<FastifyIn
   //     `EventScope` every per-event query demands. Must follow auth-context: it verifies a
   //     registration for `request.attendee`, so identity has to be bound first (002, FR-146).
   await app.register(eventAccess)
+
+  // 5b. The two ports 004 introduces — durable binary content and transactional account mail
+  //     (FR-352, FR-394). Appended after the guards and before maintenance: nothing in steps
+  //     1–5a depends on them, and the sweep in step 6 does not use them either, so this is the
+  //     first position that disturbs no existing ordering. Overridable so a test can substitute
+  //     an adapter without reaching past the interface.
+  await app.register(ports, options.ports ?? {})
 
   // 6. Retention sweeps. Registered here rather than in `server.ts` so that the integration
   //    harness tears the timers down with the app rather than leaking them between suites.

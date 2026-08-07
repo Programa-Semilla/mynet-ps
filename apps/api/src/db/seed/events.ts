@@ -28,6 +28,29 @@ import type { SeedContext, SeedModule } from './index.js'
  * a device-local computation — the bug FR-120 exists to prevent — produces a visibly wrong
  * answer on a real fixture rather than only in a contrived test.
  */
+/**
+ * T036 (004) — the join codes, **committed in the open on purpose** (FR-311, FR-317a, D7).
+ *
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ * These are real codes in a public repository, and that is a decision rather than a leak.
+ * `schema/events.ts` carries the full reasoning; the short version is that a code buys
+ * registration and nothing else — every profile still sits behind both a shared registration
+ * (FR-357) and its owner's discoverability setting (FR-359), and a registration is evidence of
+ * presence, never of vetting (FR-317b).
+ *
+ * **This is the only place a join code is ever written.** No attendee action and no product
+ * surface creates, changes or deletes one (FR-311).
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ *
+ * Written the way a code is printed on a badge or shown on a slide — short, unambiguous, and
+ * with no character a person would have to guess the case of. The comparison trims and
+ * lower-cases, so `pds-2026` and ` PDS-2026 ` both work.
+ *
+ * **This is what makes a conference joinable at all.** The migration adds `join_code` with a
+ * random placeholder and drops the default; until this seed runs, every code is an unguessable
+ * value and no conference can be joined (FR-317) — which is the intended failure for a database
+ * that was migrated but not re-seeded, not an oversight.
+ */
 export const SEED_EVENTS = [
   {
     name: 'Product & Design Summit',
@@ -35,6 +58,7 @@ export const SEED_EVENTS = [
     startsOn: '2026-09-14',
     endsOn: '2026-09-17',
     timezone: 'Europe/Madrid',
+    joinCode: 'PDS-2026',
   },
   {
     name: 'Frontend Horizons',
@@ -42,6 +66,7 @@ export const SEED_EVENTS = [
     startsOn: '2026-10-05',
     endsOn: '2026-10-07',
     timezone: 'Europe/Lisbon',
+    joinCode: 'FH-2026',
   },
   {
     name: 'Systems & Scale',
@@ -49,6 +74,7 @@ export const SEED_EVENTS = [
     startsOn: '2026-11-11',
     endsOn: '2026-11-13',
     timezone: 'Europe/Berlin',
+    joinCode: 'SS-2026',
   },
 ] as const
 
@@ -66,6 +92,11 @@ const SEED_REGISTRATIONS: readonly { attendee: string; event: string }[] = [
   // assert on.
   { attendee: 'grace@example.com', event: 'Product & Design Summit' },
   { attendee: 'grace@example.com', event: 'Systems & Scale' },
+  // 004 — Alan attends the shared conference too, so he is a co-attendee of both. He has no
+  // profile and is unverified, which makes him the fixture for two states at once: the empty
+  // profile a reviewer sees at first run, and an attendee who appears to nobody however the
+  // discoverability setting reads (FR-359, research D6).
+  { attendee: 'alan@example.com', event: 'Product & Design Summit' },
 ]
 
 /**
@@ -88,6 +119,31 @@ const assertKnownTimeZone = (timezone: string, eventName: string): void => {
   }
 }
 
+/**
+ * T036 (004) — join codes must stay distinct **after normalisation**, which the column's UNIQUE
+ * constraint cannot check.
+ *
+ * The constraint compares `text` exactly, so `PDS-2026` and `pds-2026` are two perfectly legal
+ * rows — while the lookup lower-cases before comparing and would match both. Joining would then
+ * resolve to whichever row the planner returned first, which is the precise failure D7 cites
+ * UNIQUE as preventing. The constraint covers the transcription slip; this covers the case slip.
+ */
+const assertJoinCodesDistinctWhenNormalised = (): void => {
+  const seen = new Map<string, string>()
+  for (const event of SEED_EVENTS) {
+    const normalised = event.joinCode.trim().toLowerCase()
+    const existing = seen.get(normalised)
+    if (existing) {
+      throw new Error(
+        `Seed: "${event.name}" and "${existing}" declare join codes that differ only in case or ` +
+          'whitespace. Codes are compared after trim().toLowerCase(), so joining would resolve to ' +
+          'whichever row the planner returned first (data-model.md, research D7).',
+      )
+    }
+    seen.set(normalised, event.name)
+  }
+}
+
 export const eventSeed: SeedModule = {
   name: 'events',
 
@@ -101,6 +157,8 @@ export const eventSeed: SeedModule = {
     for (const event of SEED_EVENTS) {
       assertKnownTimeZone(event.timezone, event.name)
     }
+
+    assertJoinCodesDistinctWhenNormalised()
 
     // ─────────────────────────────────────────────────────────────────────────────────────
     // …and against **PostgreSQL's** zone database, which is the one that actually consumes it.

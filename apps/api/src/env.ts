@@ -14,6 +14,15 @@
  * at anything else.
  * ─────────────────────────────────────────────────────────────────────────────────────────
  *
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ * **This file loads variables; it does not declare or validate them.** A feature adding a
+ * setting adds it to `config.ts` — that file opens by stating "every secret this project holds
+ * is read here and nowhere else", and a second validation site would make that sentence false
+ * on the day somebody trusted it. T003 (004) is discharged there rather than here, and the
+ * pointer lives in this file because this is where a reader looking for "where do environment
+ * variables go" arrives first.
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ *
  * Imported for its side effect by `config.ts`, which every entry point already goes through —
  * the server, the migration runner, the seed script, and the integration harness. There is
  * deliberately no `dotenv` dependency: Node has done this natively since 20.12, and FR-003

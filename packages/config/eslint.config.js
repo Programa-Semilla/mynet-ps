@@ -121,6 +121,101 @@ export default tseslint.config(
     },
   },
 
+  /**
+   * T017 (004) — **the `StorageService` boundary, made machine-checked** (FR-352, FR-393).
+   *
+   * ═════════════════════════════════════════════════════════════════════════════════════════
+   * FR-352 says image bytes are read and written **only** through a project-owned interface and
+   * that no feature code may call a storage vendor's API directly. Without this rule that is a
+   * sentence in a specification, not a boundary — exactly as the branded `EventScope` needed
+   * `mynet/event-scope-brand` to close its assertion escape hatch, and as SC-008 needed
+   * `mynet/no-direct-platform-access` to be a count rather than a habit.
+   *
+   * Two groups, and they defend against different mistakes:
+   *
+   *   1. **The vendor SDKs.** Register entry 11 has not chosen one, so this list is what the
+   *      plausible candidates are called today and **must be extended in the same change that
+   *      answers that entry**. An unlisted vendor would pass, which is the honest limit of a
+   *      name-matching rule — the same limit `mynet/event-scope-brand` states about a
+   *      determined author.
+   *
+   *   2. **`db/schema/stored-objects.js`** — and this is the one that bites *now*. The
+   *      development, test and preview backend is a table, so the way this boundary actually
+   *      gets breached today is a handler importing that table and reading avatar bytes with a
+   *      `SELECT` instead of `storage.get()`. That would work perfectly until the day the
+   *      production adapter is a bucket and the table is empty. This is the current vendor, and
+   *      it is restricted like one.
+   *
+   * `apps/api/src/storage/` is the single exempted directory: implementing the interface is
+   * precisely where the real call belongs, which is the same exemption `packages/platform/web`
+   * and `packages/data/http` already carry on the client side.
+   * ═════════════════════════════════════════════════════════════════════════════════════════
+   */
+  {
+    name: 'mynet/storage-boundary',
+    files: ['apps/api/**/*.{ts,tsx,mts,cts}'],
+    ignores: [
+      'apps/api/src/storage/**',
+      // The schema barrel re-exports every table by design, and the deletion-coverage guard
+      // depends on it listing all of them — a table that could hide from the registry could
+      // hide from the guard. Re-exporting is not consuming; the third pattern below is what
+      // stops a consumer reaching the table *through* the barrel.
+      'apps/api/src/db/schema/index.ts',
+      // `import * as schema` — the registry as a whole, handed to Drizzle so relational queries
+      // resolve. It consumes the barrel, not the table: a namespace import cannot be narrowed
+      // by `importNames`, so the rule cannot tell this apart from reaching for `storedObjects`
+      // and this is the one file where the whole registry is legitimately the point.
+      'apps/api/src/db/client.ts',
+    ],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: [
+                '@aws-sdk/client-s3',
+                '@aws-sdk/client-s3/**',
+                '@aws-sdk/s3-request-presigner',
+                '@google-cloud/storage',
+                '@azure/storage-blob',
+                '@supabase/storage-js',
+                'firebase-admin/storage',
+                '@cloudflare/workers-types',
+                'minio',
+              ],
+              message:
+                'Storage vendor SDKs are reachable only from apps/api/src/storage/, which is the ' +
+                'one place StorageService is implemented (FR-352, FR-393, research D3). Call ' +
+                '`app.storage` instead. If this import is a NEW vendor being adopted, add it to ' +
+                "this list in the same change — a boundary that only names yesterday's vendors " +
+                'is a boundary that passes while checking nothing.',
+            },
+            {
+              group: ['**/schema/stored-objects.js', '**/schema/stored-objects.ts'],
+              message:
+                '`stored_objects` is the internal backing table of ONE StorageService adapter, ' +
+                'not a domain table (research D3). Reading avatar bytes with a SELECT works today ' +
+                'and stops working the day the production adapter is a bucket and the table is ' +
+                'empty. Use `app.storage.get()` / `.put()` / `.delete()` (FR-352).',
+            },
+            {
+              // The barrel is exempted above so it can re-export the table for the registry and
+              // the deletion guard. Without this, that exemption would be a way in: an import of
+              // `storedObjects` from `schema/index.js` reaches exactly what the pattern above
+              // forbids, by a different path.
+              group: ['**/db/schema/index.js', '**/db/schema/index.ts', '**/schema/index.js'],
+              importNames: ['storedObjects', 'StoredObject'],
+              message:
+                'Reaching `storedObjects` through the schema barrel is the same breach as ' +
+                'importing its module directly — see above. Use `app.storage` (FR-352).',
+            },
+          ],
+        },
+      ],
+    },
+  },
+
   {
     name: 'mynet/client',
     files: ['apps/web/**/*.{ts,tsx}'],

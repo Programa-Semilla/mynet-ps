@@ -975,6 +975,1165 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/sign-up": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create an account and sign in
+         * @description Self-serve account creation (FR-300). On success the attendee is signed in without a second credential entry (FR-306) and the session is set as an HttpOnly cookie — there is no body, so the token cannot leak into one. A 409 states plainly that the address is already registered: that disclosure is a decision (FR-303), because it cannot be hidden alongside auto-sign-in, and rate limiting is what actually defends enumeration.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** Format: email */
+                        email: string;
+                        displayName: string;
+                        /** @description At least 12 characters. Length only — no character-class rules, which push people toward weaker passwords than a long passphrase. Stated before submission and enforced by a disabled confirmation, so a 400 here means the form was bypassed (FR-304). */
+                        password: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Created and signed in. The session is in the cookie. */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Default Response */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                            fields?: {
+                                [key: string]: unknown;
+                            }[];
+                        };
+                    };
+                };
+                /** @description The address already has an account (FR-303). Deliberately disclosed, and offering both exits — sign in, or reset. */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Throttled on the `sign_up` counter, which is separate from sign-in's. */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                            retryAfterSeconds?: number;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/events/join": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Register for a conference by entering its join code
+         * @description The code resolves the conference; the attendee comes from the session. Entering the code of a conference already registered is IDEMPOTENT and is not an error (FR-312) — it answers 200 saying so. An unrecognised code answers 404 in one wording that does not distinguish between causes of rejection (FR-313), and the route is rate-limited on its own counter so it cannot be used to enumerate codes (FR-314).
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** @description Compared after trimming and lower-casing, because a code read off a badge or a slide arrives with arbitrary case and stray whitespace (research D7). */
+                        joinCode: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            event: {
+                                /** Format: uuid */
+                                id: string;
+                                name: string;
+                                location: string;
+                                startsOn: string;
+                                endsOn: string;
+                                timezone: string;
+                            };
+                            /** @description True when the attendee was already registered. Not an error (FR-312) — a person who taps twice on a slow connection has done nothing wrong. */
+                            alreadyRegistered: boolean;
+                        };
+                    };
+                };
+                /** @description Unrecognised code. One wording for every cause of rejection (FR-313), including a conference seeded with no code, which is unjoinable by design (FR-317). */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Throttled on the `join_code` counter, so the surface cannot enumerate codes (FR-314). */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                            retryAfterSeconds?: number;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Complete email verification from a link
+         * @description Unauthenticated by necessity: the link is followed out of a mail client, which carries no session. A consumed, expired or unknown token is refused IDENTICALLY (410) — the caller learns only that the link no longer works, which is all they are owed (FR-321).
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        token: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Verified. If discoverability is on, the attendee becomes visible to co-attendees for the first time (FR-359). */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Default Response */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Expired, already used, or unknown — one refusal for all three (FR-321). */
+                410: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Throttled (FR-387). Keyed on the submitted token, never on an address. */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                            retryAfterSeconds?: number;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/verify/resend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Send a fresh verification message to the signed-in attendee
+         * @description Authenticated, deliberately: it sends to the address on the account rather than to an address in the request, so it cannot be aimed at anybody. Rate-limited (FR-322). Answers 202 whether or not a message was sent — an already-verified account produces the same response, so nothing here reports verification state to a caller who could be anyone holding a session.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Accepted. A send failure does not surface here (FR-318a). */
+                202: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/reset-request": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Request a password reset link
+         * @description ALWAYS answers 202, whether or not an account exists for the address (FR-327). This is the one non-disclosure guarantee that survives 004 — sign-up deliberately discloses (FR-303) because it cannot avoid it, and this path genuinely can. There is NO 429: a throttled request answers 202 like every other, because a 429 where an unknown address got a 202 would be exactly the account-existence oracle this route exists to close.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** Format: email */
+                        email: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Accepted. Identical whether or not an account exists, and identical whether or not the request was throttled. */
+                202: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Default Response */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                            fields?: {
+                                [key: string]: unknown;
+                            }[];
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/reset": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Set a new password from a reset link
+         * @description Unauthenticated by necessity — the person cannot sign in, which is why they are here. On success EVERY existing session for that attendee is revoked, on every device (FR-330): a reset is what somebody does when they believe their account is compromised, and leaving the compromiser signed in would defeat the point. The attendee then signs in with the new password.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        token: string;
+                        /** @description The same policy sign-up states, enforced identically (FR-304). */
+                        password: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Password changed, and every session revoked. Sign in again. */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Default Response */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                            fields?: {
+                                [key: string]: unknown;
+                            }[];
+                        };
+                    };
+                };
+                /** @description Expired, already used, or unknown — one refusal for all three. */
+                410: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Throttled (FR-387). Keyed on the submitted token, never on an address. */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                            retryAfterSeconds?: number;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/profile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The signed-in attendee's own profile
+         * @description Never 404s. An attendee who has written nothing reads as a profile whose every field is null — "you have not written one yet" is not an error, and a 404 here would make the client render a failure for the ordinary condition of a new account (FR-341). The owner reads their own profile regardless of any visibility setting (FR-340).
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            displayName: string;
+                            email: string;
+                            company: null | string;
+                            role: null | string;
+                            headline: null | string;
+                            /** @enum {null|string} */
+                            networkingIntent: "open_to_meetings" | "open_to_messages" | "not_networking" | null;
+                            /** @enum {null|string} */
+                            availability: "available" | "busy" | null;
+                            interests: string[];
+                            /** @description The attendee's own setting. NOT the same as being visible: an unverified attendee with this on still appears to nobody (FR-359). */
+                            discoverable: boolean;
+                            /** @description Present so the profile can state plainly what verification adds (FR-325b). Never returned about anybody else — FR-361 forbids a requester learning another attendee's verification state. */
+                            emailVerified: boolean;
+                            hasAvatar: boolean;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+            };
+        };
+        /**
+         * Replace the signed-in attendee's profile
+         * @description WHOLE-PROFILE SEMANTICS: the client sends the complete profile and an omitted field CLEARS it. That gives "field absent" exactly one meaning, and removes the partial-update path in which a cleared field and an unmentioned one look the same. Interests are replaced rather than merged, for the same reason — removing one is expressed by sending the set without it.
+         */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        company?: string | null;
+                        role?: string | null;
+                        headline?: string | null;
+                        /** @enum {string|null} */
+                        networkingIntent?: "open_to_meetings" | "open_to_messages" | "not_networking" | null;
+                        /** @enum {string|null} */
+                        availability?: "available" | "busy" | null;
+                        /** @description Bounded in count HERE and in the query layer, because a per-row CHECK cannot see a set. Each value is bounded in length by the column as well (FR-337). */
+                        interests?: string[];
+                    };
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            displayName: string;
+                            email: string;
+                            company: null | string;
+                            role: null | string;
+                            headline: null | string;
+                            /** @enum {null|string} */
+                            networkingIntent: "open_to_meetings" | "open_to_messages" | "not_networking" | null;
+                            /** @enum {null|string} */
+                            availability: "available" | "busy" | null;
+                            interests: string[];
+                            /** @description The attendee's own setting. NOT the same as being visible: an unverified attendee with this on still appears to nobody (FR-359). */
+                            discoverable: boolean;
+                            /** @description Present so the profile can state plainly what verification adds (FR-325b). Never returned about anybody else — FR-361 forbids a requester learning another attendee's verification state. */
+                            emailVerified: boolean;
+                            hasAvatar: boolean;
+                        };
+                    };
+                };
+                /** @description Over a stated limit. Reachable only by a client that bypassed the editor, which surfaces every limit as it is approached (FR-337, FR-338). */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                            fields?: {
+                                [key: string]: unknown;
+                            }[];
+                        };
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/profile/discoverability": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Turn discoverability on or off
+         * @description Answers with EFFECTIVE visibility rather than the flag: an unverified attendee with this on still appears to nobody (FR-359), and a response echoing only the setting would tell them the opposite of what is true (FR-362). Takes effect on the next request, with no new sign-in (FR-363).
+         */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        discoverable: boolean;
+                    };
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @description The setting, as stored. */
+                            discoverable: boolean;
+                            /** @description The other half of FR-359's condition. Returned about the CALLER only — never about anybody else (FR-361). */
+                            emailVerified: boolean;
+                            /** @description Whether co-attendees can actually find them: the setting AND a verified address. This is the field the surface must show. */
+                            effectivelyVisible: boolean;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/profile/avatar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The signed-in attendee's own avatar
+         * @description Answers 204 with no body when there is none — the ordinary state of a new account, and what makes the client render the non-photographic fallback rather than a broken image (FR-351).
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            contentType: string;
+                            base64: string;
+                        };
+                    };
+                };
+                /** @description No avatar. The fallback renders. */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+            };
+        };
+        /**
+         * Upload an image as the avatar, replacing any previous one
+         * @description The bytes are decoded, resized to a bounded square and RE-ENCODED server-side, so metadata absence is a property of the operation rather than a list of tags to maintain (FR-349, research D8). The type is determined by INSPECTING the bytes, never by the declared content type or a filename. Over the size limit is refused before anything is stored (FR-347).
+         */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** @description The image, base64-encoded. See the file header for why not raw bytes. */
+                        image: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Stored, replacing any previous object. */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Over the size limit, refused before any bytes are stored (FR-347). */
+                413: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                            maxBytes?: number;
+                        };
+                    };
+                };
+                /** @description Not a decodable image of an accepted type — determined by inspection (FR-347). */
+                415: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Throttled on the `avatar_upload` counter. Authenticated, so a denial can only ever fall on the uploader. */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                            retryAfterSeconds?: number;
+                        };
+                    };
+                };
+            };
+        };
+        post?: never;
+        /**
+         * Remove the avatar. Idempotent
+         * @description Succeeds whether or not there was one. The bytes are deleted and the non-photographic fallback returns (FR-346, FR-351).
+         */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/events/{eventId}/attendees/{attendeeId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Another attendee's profile, within a conference you share
+         * @description Carries both guards. The READER's registration is proven by the branded EventScope the route audit guarantees is present; the TARGET must additionally be registered for the same conference, be discoverable, and have a verified address — all three evaluated server-side before any field is returned (FR-390).
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    eventId: string;
+                    attendeeId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** Format: uuid */
+                            attendeeId: string;
+                            displayName: string;
+                            company?: null | string;
+                            role?: null | string;
+                            headline?: null | string;
+                            /** @enum {null|string} */
+                            networkingIntent?: "open_to_meetings" | "open_to_messages" | "not_networking" | null;
+                            /** @enum {null|string} */
+                            availability?: "available" | "busy" | null;
+                            interests: string[];
+                            hasAvatar: boolean;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description No conference in common, **or** no such attendee, **or** discoverability off, **or** the address unverified. All four are deliberately indistinguishable — identical status and identical body — so a requester cannot learn who exists, who is hiding, or whose address is verified (FR-361). */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/events/{eventId}/attendees/{attendeeId}/avatar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Another attendee's avatar, under the same conditions as their profile
+         * @description THE SAME THREE CONDITIONS as the profile, reusing the same query rather than repeating the predicate — serving a hidden attendee's photograph would be the profile withheld and the face given away. 204 when they have none, so the client renders the fallback (FR-351).
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    eventId: string;
+                    attendeeId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            contentType: string;
+                            base64: string;
+                        };
+                    };
+                };
+                /** @description No avatar. The fallback renders. */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description No conference in common, **or** no such attendee, **or** discoverability off, **or** the address unverified. All four are deliberately indistinguishable — identical status and identical body — so a requester cannot learn who exists, who is hiding, or whose address is verified (FR-361). */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/profile/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Everything the product holds about the signed-in attendee
+         * @description One machine-readable document, with the avatar embedded as base64 rather than referenced by URL — so it stands alone rather than pointing into a system the attendee may be about to delete themselves from (research D11). Contains no credential, verification or reset material (FR-376, FR-391). Rate-limited (FR-379).
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                            retryAfterSeconds?: number;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/account": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete the account and everything attributable to it
+         * @description HARD deletion with no tombstone (FR-365). Removes the avatar bytes first and then the attendee row, letting the cascade take the profile, interests, registrations, active-conference selection, saved sessions, notes, verification and reset material, and sign-in sessions. Every session on every device stops working immediately (FR-369). Irreversible by any surface in the product (FR-368).
+         */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Gone. The client is signed out. */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/events/{eventId}/registration": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Withdraw from a conference, without deleting the account
+         * @description Removes the registration AND that conference's saved sessions and notes — which do NOT cascade from `registrations`, because they reference `sessions` (research D7). The active-conference selection goes with it through the composite foreign key 002 declared, so the attendee falls back to derivation and is left coherent (FR-317d). The profile is untouched: it is cross-event.
+         */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    eventId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Withdrawn. Idempotent from the attendee's side. */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Not registered for that conference, or no such conference — indistinguishable (FR-148). */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {

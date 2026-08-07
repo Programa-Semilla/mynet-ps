@@ -51,6 +51,50 @@ export const events = pgTable(
      */
     timezone: text('timezone').notNull(),
 
+    /**
+     * T006 (004) — the value an attendee types to register for this conference (FR-311, D7).
+     *
+     * ═════════════════════════════════════════════════════════════════════════════════════
+     * **THIS IS NOT A CREDENTIAL, AND IT MUST NEVER BE TREATED AS ONE** (FR-317a).
+     *
+     * That is a decision, taken on 2026-08-07 and recorded here because this is where a later
+     * reader arrives. Real codes are committed in the seed, and this repository is public
+     * (register entry 16) — which is **accepted rather than worked around**.
+     *
+     * It is stored in plain text for two reasons that both follow from that. Hashing it would
+     * imply a confidentiality property the specification explicitly disclaims, and it would
+     * defeat the `UNIQUE` constraint below, which is what stops two conferences seeding the
+     * same code and joining resolving to whichever row the planner returned first.
+     *
+     * **What possessing a code gets you: registration, and nothing else.** No capability over
+     * this conference's content, none over its attendees, and no visibility into any profile
+     * — every profile sits behind *both* the shared-registration condition (FR-357) and its
+     * owner's discoverability setting (FR-359). What the code prevents is a person landing in
+     * a conference they have no business being in by guessing a URL. It is not what keeps
+     * anyone's data private.
+     *
+     * A registration is therefore evidence of **presence, not of vetting** (FR-317b). No
+     * requirement, now or later, may read holding one as identity assurance. Open Question 10
+     * records the trigger for revisiting this: if a future feature ever makes registration
+     * itself confer access to something private, the reasoning above stops holding.
+     *
+     * **Written by the seed only.** No attendee action and no product surface creates,
+     * changes or deletes one, and the route audit's no-write-path assertions cover the
+     * conference content around it.
+     * ═════════════════════════════════════════════════════════════════════════════════════
+     *
+     * **No default, deliberately** — the same treatment `timezone` above received, and for the
+     * same reason. The migration adds the column with a temporary placeholder so existing rows
+     * stay valid and **drops that default in the same migration**; the real codes come from
+     * the seed. A database migrated but not re-seeded therefore has placeholder codes and no
+     * conference can be joined, which is the intended failure: a column that keeps a silent
+     * default is how a wrong value ships unnoticed.
+     *
+     * Compared after `trim().toLowerCase()`, following `normaliseEmail`'s precedent, because a
+     * code read off a badge or a slide arrives with arbitrary case and stray whitespace.
+     */
+    joinCode: text('join_code').notNull().unique(),
+
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [

@@ -39,6 +39,21 @@ export const SUMMIT = {
   timezone: 'Europe/Madrid',
 } as const
 
+/** A profile nobody has written yet — the ordinary state of a new account (FR-341). */
+export const EMPTY_PROFILE = {
+  displayName: 'Ada Lovelace',
+  email: 'ada@example.com',
+  company: null,
+  role: null,
+  headline: null,
+  networkingIntent: null,
+  availability: null,
+  interests: [],
+  discoverable: true,
+  emailVerified: false,
+  hasAvatar: false,
+} as const
+
 type DeepPartial<T> = { [K in keyof T]?: T[K] }
 
 export const testServices = (
@@ -68,6 +83,37 @@ export const testServices = (
       listNotes: async () => [],
       writeNote: async () => ({ sessionId: '', body: '', updatedAt: '' }),
       deleteNote: async () => {},
+    },
+    // 004 — an attendee who has authored nothing, which is what a newly created account is and
+    // what the third seeded attendee stays as. A test that wants a populated profile says so.
+    //
+    // Every method resolves rather than throwing: a component test asserting a disabled
+    // confirmation must not be able to pass because the repository blew up first.
+    identity: {
+      signUp: async () => {},
+      joinConference: async () => ({ event: SUMMIT, alreadyRegistered: false }),
+      withdrawFromConference: async () => {},
+      verifyEmail: async () => {},
+      resendVerification: async () => {},
+      requestPasswordReset: async () => {},
+      resetPassword: async () => {},
+      exportPersonalData: async () => ({}),
+      deleteAccount: async () => {},
+    },
+    profile: {
+      getOwn: async () => EMPTY_PROFILE,
+      saveOwn: async (draft) => ({ ...EMPTY_PROFILE, ...(draft as object) }),
+      setDiscoverable: async (discoverable) => ({
+        discoverable,
+        emailVerified: false,
+        // FR-359 — unverified means invisible whatever the flag says. The default double
+        // deliberately reproduces that, so a test that assumes turning it on makes you visible
+        // fails here rather than in production.
+        effectivelyVisible: false,
+      }),
+      readOwnAvatar: async () => null,
+      uploadAvatar: async () => {},
+      removeAvatar: async () => {},
     },
     ...overrides,
   },

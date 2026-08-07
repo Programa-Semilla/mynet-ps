@@ -198,7 +198,27 @@ export class HttpClient {
     this.#options.onReachability?.(true)
 
     if (response.ok) {
-      return response.status === 204 ? (undefined as T) : ((await response.json()) as T)
+      // ─────────────────────────────────────────────────────────────────────────────────────
+      // **Any empty body resolves to `undefined`, not only a 204.**
+      //
+      // This read `response.status === 204 ? undefined : await response.json()`, which was
+      // correct for every route that existed when it was written — 204 was the only bodyless
+      // success in the API. 004 added `202 Accepted` for the two routes that answer *"we have
+      // accepted this and will say nothing more"*: a reset request, which must answer
+      // identically whether or not an account exists (FR-327), and a verification resend.
+      //
+      // `response.json()` on an empty body throws a `SyntaxError`, which is neither an
+      // `OfflineError` nor a `RequestRefusedError` — so it reached the generic branch in every
+      // caller and told the attendee **"Could not reach MyNet"** about a request that had
+      // succeeded. On the password-recovery path that is the worst possible wrong answer: it
+      // sends somebody to fix their connection while their reset link sits in their inbox.
+      //
+      // Found by `e2e/password-recovery.spec.ts`. Nothing else could have: the integration
+      // suite drives `fastify.inject()` and parses responses itself, so it never runs this
+      // line, and the component suite substitutes the repository above it.
+      // ─────────────────────────────────────────────────────────────────────────────────────
+      const body = await response.text()
+      return (body.length === 0 ? undefined : JSON.parse(body)) as T
     }
 
     const body = await safeJson(response)
