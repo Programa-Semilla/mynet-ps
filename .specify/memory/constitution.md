@@ -33,7 +33,8 @@ Corrected sections (factual errors, verified 2026-08-07):
 Added register entries:
   - 16. Repository visibility — public and organisation-owned, previously unrecorded anywhere in
     this constitution. Changes the Principle VIII threat model; interacts with entry 14.
-  - 17. The pipeline runs red and most Principle VII checks have never executed. Features 001 and
+  - 17. (Substantially closed 2026-08-07 — the correctness gates now run; the preview path remains
+    unprovisioned.) The pipeline runs red and most Principle VII checks have never executed. Features 001 and
     002 merged in this state. Must be waived or closed before 005 merges.
 
 Templates and dependent artifacts:
@@ -697,6 +698,33 @@ decision cited in an amendment.
     clause added to Principle VII in 2.2.0 this MUST be waived or closed, and it MUST be closed
     before phase 005 merges, because 005's personal-data guarantees are enforced only by the
     integration suite. *Added 2026-08-07*.
+
+    **Substantially closed 2026-08-07**, in two changes, and the remainder is narrower than the
+    entry above describes. 005 gave the `unit` Vitest project the configuration
+    `event-scope-audit.test.ts` needed, and `test-unit` passed in CI for the first time — so
+    FR-230's route audit, the thing that fails the build when a conference-accepting route lacks
+    its guard, now actually executes. PR #9 then found the real cause of the rest: the four
+    database gates were bound to `db-branch`, so **one unset repository secret skipped every check
+    that tests correctness**. They never needed a vendor — Principle VII asks for a real database,
+    not a particular one — and they now run on per-job PostgreSQL service containers, which is
+    stricter isolation than the shared branches they replace and depends on no secret at all. Run
+    `31192787746` records `migrations`, `test-integration`, `test-accessibility` and `test-e2e`
+    all passing for the first time.
+
+    A second fault was found in the same change and is worth recording, because it would have
+    outlived the first: `AUTH_PASSWORD_PEPPER` and `AUTH_ATTEMPT_HASH_KEY` were **never set in the
+    workflow**, so these jobs would have failed one line further on even had the Neon secret been
+    present. It was invisible only because `db-branch` failed first.
+
+    **What remains open** is the preview path alone — `db-branch`, `schema-diff`, `deploy-api` and
+    `deploy-preview` — which needs `NEON_API_KEY`, `NEON_PROJECT_ID`, `FLY_API_TOKEN` and the three
+    Cloudflare values, plus a `preview-base` branch in the Neon project. The aggregate `verify`
+    check stays red until those exist, which is the honest signal for missing provisioning. **No
+    check was weakened to reach this state**; four that were skipped were made to run, which is the
+    opposite of the shortcut FR-071 forbids.
+
+    005 merged under a recorded waiver naming the then-unsatisfied checks (PR #8), before PR #9
+    landed. *Annotated 2026-08-07.*
 
 **Runtime guidance**: `CLAUDE.md` provides durable project context for AI-assisted sessions. It MUST
 stay consistent with this constitution and MUST NOT contain implementation plans, session tasks,
