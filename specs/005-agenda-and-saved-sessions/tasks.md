@@ -19,6 +19,14 @@ scoping, server-side authorization, and migration verification. This feature doe
 
 **Organization**: grouped by user story so each is independently implementable and testable.
 
+**Before starting any task**, read two sections of [plan.md](./plan.md): **Global Constraints**
+(values every task inherits — the note limit, the cache lifetime, the debounce band, the narrowest
+width) and **Interfaces** (the function names and types crossing task boundaries). A task's
+implementer sees only their own task; those two sections are how they learn what the neighbouring
+ones agreed.
+
+**Requirement coverage** is tabulated at the end of this file. Every FR and SC maps to a task.
+
 ## Format: `[ID] [P?] [Story] Description`
 
 - **[P]**: parallelizable — different files, no dependency on an incomplete task
@@ -253,12 +261,94 @@ no other feature's card file was touched.
 ## Phase 9: Polish & Cross-Cutting Concerns
 
 - [ ] T083 [P] Accessibility sweep across Agenda, the filter, the save control and the panel — labels, visible focus, keyboard operability, Escape — via `pnpm test:a11y` (Principle IV, Principle IX)
-- [ ] T084 [P] Responsive verification of `apps/web/src/app/destinations/Agenda.tsx` and `apps/web/src/app/agenda/SessionPanel.tsx` at 320px, tablet and desktop, in `apps/web/tests/component/agenda-responsive.test.tsx`: no horizontal scrolling of Agenda, filter or panel; panel full-width at mobile; touch targets not crowding the row (SC-211)
-- [ ] T085 [P] Confirm every Feature Declarations row in `spec.md` traces to at least one task above; an obligation without a task is presumed unmet (Principle IX)
-- [ ] T086 [P] Run `quickstart.md` end to end and correct any step that does not match the built feature
-- [ ] T087 Verify `pnpm verify:clean` passes against a clean database
-- [ ] T088 **Confirm the CI position before opening the PR.** Register entry 17 requires the red pipeline waived or closed before 005 merges. If `NEON_API_KEY` is still unset, `test-integration` — which is where T069–T071 live — will be *skipped*, and a skip is not a pass under Principle VII. Check with `gh pr checks <n>` and record a waiver naming the unsatisfied checks on the PR, or stop
-- [ ] T089 Update `brainstorm/00-overview.md`: mark 005 shipped, move its settled design questions to resolved, and record what the feature closed
+- [ ] T084 [P] **Guard FR-191**: a unit test in `apps/api/tests/unit/catalog-read-only.test.ts` asserting `CatalogRepository` exposes no create, update or delete method, by name-shape over the interface. The catalog is declared read-only *in perpetuity* because a catalog write is organizer administration (Principle III); nothing else in this feature would catch a later contributor adding `saveSession` to it because it seemed the natural home
+- [ ] T085 [P] **SC-206 — the complete keyboard-only journey**, in `e2e/agenda-keyboard-journey.spec.ts`: open the programme → open a session → save it → write a note → close the panel → filter to Saved, using **only** the keyboard, with focus visible at every step and correctly restored after the panel closes. T083 sweeps controls; it cannot catch a break in the handoff *between* two controls, which is where a journey actually fails
+- [ ] T086 [P] **SC-209 — four-state coverage for every surface this feature adds**, in `apps/web/tests/component/agenda-states.test.tsx`: the filter, the saved list, the panel, the speaker section, the note editor and the Home card each render a visible, meaningful state when loading, populated, empty and failed
+- [ ] T087 [P] Responsive verification at **320 px** in `apps/web/tests/component/agenda-responsive-mobile.test.tsx`: no horizontal scrolling of Agenda, filter or panel; panel is a full-width overlay; save controls meet touch sizing without crowding the row's time, title and track (SC-211, FR-199)
+- [ ] T088 [P] Responsive verification at **tablet width** in `apps/web/tests/component/agenda-responsive-tablet.test.tsx`: reduced rail, programme stacks, panel overlay wider relative to the viewport (SC-211)
+- [ ] T089 [P] Responsive verification at **desktop width** in `apps/web/tests/component/agenda-responsive-desktop.test.tsx`: persistent rail, single chronological column with venue-day structure, panel as a centred overlay with the programme visible behind it (SC-211)
+- [ ] T090 [P] Confirm every Feature Declarations row in `spec.md` traces to at least one task above; an obligation without a task is presumed unmet (Principle IX)
+- [ ] T091 [P] Run `quickstart.md` end to end and correct any step that does not match the built feature (SC-200, SC-207)
+- [ ] T092 Verify `pnpm verify:clean` passes against a clean database
+- [ ] T093 **Confirm the CI position before opening the PR.** Register entry 17 requires the red pipeline waived or closed before 005 merges. If `NEON_API_KEY` is still unset, `test-integration` — which is where T069–T071 live — will be *skipped*, and a skip is not a pass under Principle VII. Check with `gh pr checks <n>` and record a waiver naming the unsatisfied checks on the PR, or stop
+- [ ] T094 Update `brainstorm/00-overview.md`: mark 005 shipped, move its settled design questions to resolved, and record what the feature closed
+
+---
+
+## Requirement coverage
+
+Every FR and SC, and the task that carries it. This table is what makes the matrix checkable
+mechanically rather than by reading intent — with 54 requirements, that is the difference between
+noticing a dropped one and not.
+
+| Requirements | Tasks |
+|---|---|
+| FR-184, FR-186, FR-196 | T019, T024 |
+| FR-185, FR-188 | T025, T029, T030 |
+| FR-187 | T019 |
+| FR-189 | T020, T024 |
+| FR-190 | T069 |
+| **FR-191** | **T084** |
+| FR-192 | T018, T026 |
+| FR-193, FR-197 | T021, T026 |
+| FR-194 | T021 |
+| FR-195 | T022, T027 |
+| FR-198, FR-205 | T035, T043 |
+| FR-199 | T036, T087 |
+| FR-200 | T039 |
+| FR-201 | T033, T040 |
+| FR-202 | T031, T032, T038 |
+| FR-203 | T041 |
+| FR-204 | T034, T042 |
+| FR-206 | T040, T052 |
+| FR-207 | T054 |
+| FR-208 | T069 |
+| FR-209 | T050 |
+| FR-210 | T045, T050 |
+| FR-211 | T046, T051 |
+| FR-212 | T047 |
+| FR-213 | T044, T053 |
+| FR-214 | T048, T050 |
+| FR-215 | T063, T068 |
+| FR-216 | T066 |
+| FR-217 | T059 |
+| FR-218 | T067 |
+| FR-219 | T060 |
+| FR-220 | T057, T063 |
+| FR-221 | T056, T064 |
+| FR-222 | T058, T063 |
+| FR-223 | T081 |
+| FR-224, FR-225 | T076, T080 |
+| FR-226 | T079, T081 |
+| FR-227 | T073 |
+| FR-228 | T013, T070 |
+| FR-229 | T007 |
+| FR-230 | T001, T002, T072 |
+| FR-231 | T008, T070 |
+| FR-232 | T074 |
+| FR-233 | T016, T017, T018 |
+| FR-234 | T009 |
+| FR-235 | T010, T014 |
+| FR-236 | T023 |
+| FR-237 | T028 |
+| SC-200 | T091 |
+| SC-201 | T029 |
+| SC-202 | T055 |
+| SC-203 | T068 |
+| SC-204 | T066 |
+| SC-205 | T069, T070 |
+| **SC-206** | **T085** |
+| SC-207 | T041, T043 |
+| SC-208 | T081 |
+| **SC-209** | **T086** |
+| SC-210 | T082 |
+| SC-211 | T087, T088, T089 |
+| SC-212 | T058, T078 |
+
+**Feature Declarations rows** (Principle IX) → Offline: T056–T068 · Desktop: T089 · Tablet: T088 ·
+Mobile: T087 · Empty/loading/failure: T086 · Accessibility: T083, T085 · Validation checklist:
+T090 · Identity scoping and server-side authorization: T069–T075 · Event scoping: T070 · Register
+position: T093 · Reserved migration: T003, T005, T006.
 
 ---
 
@@ -335,7 +425,7 @@ the per-phase commits do not survive into `develop` — the same limitation 002 
 
 - **T023 changes a shipped test.** 002's US2 scenario 6 asserts the absence of a save control. It is
   planned work, not a surprise failure (FR-236).
-- **T088 gates the merge.** The isolation suite in US5 is the personal-data guarantee, and it lives
+- **T093 gates the merge.** The isolation suite in US5 is the personal-data guarantee, and it lives
   in the layer that CI currently skips. Under constitution v2.2.0 a skipped check has not passed.
 
 ---

@@ -50,6 +50,70 @@ cache
 **Scale/Scope**: 54 functional requirements, 6 user stories, 2 tables, 1 migration, ~5 endpoints,
 1 new destination route, 1 Home card
 
+## Global Constraints
+
+**Every task inherits this section.** These values are decided, not discretionary — an implementer
+handed one task in isolation needs them without reading the whole spec. Copied verbatim from
+`spec.md` and `research.md`.
+
+| Constraint | Value | Source |
+|---|---|---|
+| Note maximum length | **10,000 characters** — enforced at the column, the route schema, *and* surfaced in the editor before it is reached | FR-213, research D9 |
+| Cache lifetime | **24 hours from retrieval.** Beyond it, content is refused exactly as a conference never read | FR-221, research D10 |
+| Cache key | **`(attendeeId, eventId, resource)`** where `resource ∈ {programme, saved, notes}` | research D10 |
+| Autosave debounce | **1200 ms**, and it MUST stay within **500 ms–3 s** | FR-209, research D5 |
+| Narrowest supported width | **320 px** — no content or primary action may require horizontal scrolling | FR-197, SC-211 |
+| Reserved migration | **`0004`**, exactly one. Never renamed to resolve a conflict; `0005` belongs to 006 | Roadmap, FR/plan |
+| Panel mechanism | Native **`<dialog>` + `showModal()`**, overlay at every width, full-width at mobile | FR-199, research D3 |
+| Forbidden by governance | No write method on `CatalogRepository`; no optimistic update; no write queue; no conflict merging; **`SecureStorage` is not a cache** | FR-191, FR-214, FR-217, constitution |
+
+## Interfaces
+
+Names and types crossing task boundaries, so a task's implementer learns them without reading
+neighbouring tasks. Full detail in [data-model.md](./data-model.md) and
+[contracts/agenda-api.md](./contracts/agenda-api.md).
+
+**Query layer** — `apps/api/src/queries/agenda.ts`. Every function takes `EventScope` first:
+
+```
+listSavedSessionIds(scope: EventScope): Promise<string[]>
+saveSession(scope: EventScope, sessionId: string): Promise<void>
+unsaveSession(scope: EventScope, sessionId: string): Promise<void>
+listNotes(scope: EventScope): Promise<Array<{ sessionId: string; body: string; updatedAt: string }>>
+upsertNote(scope: EventScope, sessionId: string, body: string): Promise<{ updatedAt: string }>
+deleteNote(scope: EventScope, sessionId: string): Promise<void>
+```
+
+**Repository interfaces** — `packages/data/src/interfaces/agenda.ts`. No method accepts an attendee
+identifier; identity comes from the session:
+
+```
+SavedSessionRepository.listSaved(eventId: string): Promise<string[]>
+SavedSessionRepository.save(eventId: string, sessionId: string): Promise<void>
+SavedSessionRepository.unsave(eventId: string, sessionId: string): Promise<void>
+SessionNotesRepository.listNotes(eventId: string): Promise<SessionNote[]>
+SessionNotesRepository.writeNote(eventId: string, sessionId: string, body: string): Promise<SessionNote>
+SessionNotesRepository.deleteNote(eventId: string, sessionId: string): Promise<void>
+```
+
+**Cache decorator** — `packages/data/src/http/cached.ts`:
+
+```
+cached<T extends object>(repo: T, store: LocalCache, scope: { attendeeId: string }): T
+LocalCache.read<T>(key: string): Promise<{ payload: T; retrievedAt: string } | null>
+LocalCache.write<T>(key: string, payload: T): Promise<void>
+LocalCache.purge(keyPrefix: string): Promise<void>
+```
+
+**Note autosave status** — `apps/web/src/app/agenda/useNoteAutosave.ts`:
+
+```
+type NoteStatus = 'idle' | 'saving' | 'saved' | 'failed'
+```
+
+`'saved'` is entered **only** from a resolved write. Entering it from a keystroke makes this
+optimistic and incurs two decisions the constitution requires be recorded separately.
+
 ## Constitution Check
 
 *GATE: evaluated against v2.2.0 before Phase 0, re-checked after Phase 1.*
