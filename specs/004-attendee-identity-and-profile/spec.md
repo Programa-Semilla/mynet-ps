@@ -677,15 +677,28 @@ unauthenticated caller and as a different signed-in attendee, and confirm each i
 
 ### The retention clock
 
+*Corrected during planning, 2026-08-07.* An earlier draft of this section required a retention clock
+to be built and assumed a 90-day window. **Both were wrong about the code that already exists.**
+`apps/api/src/maintenance.ts` runs an hourly sweep that deletes `sign_in_attempts` older than **two
+hours** and `auth_sessions` older than 30 days, and it has been running since 001. Requiring a
+90-day window would have *lengthened* retention of pseudonymous personal data forty-fold — a
+regression dressed as a requirement. The requirements below are rewritten to protect what exists and
+extend it, rather than to rebuild it.
+
 - **FR-381**: Personal-data records that no deletion cascade can reach MUST be removed on a stated
-  schedule.
-- **FR-382**: `sign_in_attempts` MUST be purged on that schedule. It deliberately has no foreign key
-  to `attendees` — so that attempts against addresses belonging to nobody are still recorded — and is
-  therefore pseudonymous rather than anonymous and unreachable by cascade.
-- **FR-383**: The retention window MUST be a stated value, not an implicit one, and purging MUST NOT
-  interfere with the correctness of throttling within the active window.
+  schedule. **This obligation is already discharged for the records that exist today** by the hourly
+  maintenance sweep, and this feature MUST NOT weaken it.
+- **FR-382**: The existing two-hour window on `sign_in_attempts` MUST NOT be lengthened. It is tied
+  to the throttle's one-hour counting window plus margin, which is the shortest window that keeps
+  throttling correct — and the shortest correct window is the right one for a table of keyed hashes
+  of every address ever typed at the service, including addresses belonging to people who are not
+  attendees.
+- **FR-383**: Any record this feature adds that holds personal data and cannot be reached by the
+  deletion cascade MUST be added to the same sweep in the same change, with a stated window.
+  Purging MUST NOT interfere with the correctness of throttling within the active window.
 - **FR-384**: Verification and reset material MUST be removed once expired or used, and MUST NOT
-  accumulate.
+  accumulate. These records *are* cascade-reachable, being attributable to one attendee, so the
+  sweep is a second line rather than the only one.
 
 ### Identity scoping and server-side authorization
 
@@ -806,10 +819,10 @@ is safe. **Remaining open and unchanged**: entry 17's preview path, entries 1–
 Reasonable defaults taken where brainstorm #04 did not decide, recorded so the review gate can
 challenge them.
 
-- **The retention window for sign-in attempts is 90 days.** The constitution requires a stated value
-  rather than an implicit one. 90 days is long enough to investigate a slow credential-stuffing
-  campaign and short enough that a pseudonymous record of who tried to sign in does not accumulate
-  indefinitely. Whether 90 is right is open; whether there is a value is not.
+- **The retention window for sign-in attempts stays at the existing two hours.** *Revised during
+  planning* — an earlier draft assumed 90 days and assumed nothing swept. The sweep exists and has
+  since 001; two hours is the throttle's counting window plus margin, and lengthening it would
+  retain pseudonymous personal data for no purpose any requirement names.
 - **Verification and reset links expire in 24 hours and 1 hour respectively.** A verification link is
   followed at leisure; a reset link is a live credential and should be short.
 - **Deleting an account frees its email address for re-registration.** Hard deletion plus a unique
@@ -918,8 +931,9 @@ Recorded rather than resolved, per Principle I.
 6. **Whether `CameraService` should be wired for direct capture.** This feature assumes the platform
    file input suffices, which on mobile already offers the camera. If a dedicated capture flow is
    wanted, the interface exists and is unused.
-7. **Whether 90 days is the right retention window** for sign-in attempts, and whether 24 hours and
-   1 hour are right for verification and reset links.
+7. **Whether 24 hours and 1 hour are the right lifetimes** for verification and reset links. The
+   sign-in-attempt window is no longer open: it is two hours, it already exists, and FR-382 forbids
+   lengthening it.
 8. **Where the account surfaces belong in the shell's navigation.** The profile, discoverability,
    export and deletion actions are not a sixth destination, and exactly where they hang off the
    existing five is a presentation question better answered against the built shell.
