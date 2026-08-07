@@ -5,12 +5,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Status of this repository
 
 The production foundation has shipped, event context and the session catalog shipped on top of it
-(feature 002, [#6](https://github.com/Programa-Semilla/mynet-ps/pull/6)), and **Agenda is now a
-personal schedule rather than a read-only programme** — feature 005, squash-merged to `develop` in
-[#8](https://github.com/Programa-Semilla/mynet-ps/pull/8).
+(feature 002, [#6](https://github.com/Programa-Semilla/mynet-ps/pull/6)), Agenda became a personal
+schedule rather than a read-only programme (feature 005, squash-merged to `develop` in
+[#8](https://github.com/Programa-Semilla/mynet-ps/pull/8)), and **a person can now become an
+attendee under their own power, describe themselves, and leave** — feature 004.
 
-An attendee signs in and arrives at the conference happening now, greeted by name and told which day
-of it today is in the venue's timezone. Home shows what is next, what remains of the day, and **what
+An attendee **creates their own account**, joins a conference with its code, and arrives at the
+conference happening now, greeted by name and told which day of it today is in the venue's
+timezone. Home shows what is next, what remains of the day, and **what
 is next from the sessions they chose**. Agenda carries the whole programme with an All/Saved filter,
 a save control on every session, and an addressable **session detail panel** with overview, speaker
 info and durable **personal notes**. The conference switcher is in the top bar at all three widths,
@@ -45,19 +47,51 @@ Three things 002 established that every later feature inherits:
 - **Three shared files were split per domain** so later features append rather than edit:
   repository interfaces, API route registration, and the seed.
 
+Five things 004 established that every later feature inherits:
+
+- **A person becomes an attendee by signing themselves up**, and every consequence of that is now
+  built: email verification, password recovery, account deletion, personal-data export, and
+  withdrawal from a single conference. There is still no organizer, no privileged role and no
+  administrative interface — a join code on a seeded row is seed data, not an administrator.
+- **Two structural guards fail a *future* feature's build**, and they are the reason 006–009 cannot
+  quietly regress the personal-data commitments. `tests/unit/deletion-coverage.test.ts` fails when a
+  table storing attendee data has neither a cascade from `attendees` nor a declared retention rule;
+  `tests/unit/export-coverage.test.ts` fails when a column is collected without export coverage.
+  Both derive their expectations from the Drizzle schema, so **a new table or column fails by
+  existing**. Adding one to an allow-list requires writing down why.
+- **Two new ports, both server-side.** `StorageService` (durable binary content) and `MailService`
+  (transactional account mail, two methods, no generic `send`). Both have implementations needing no
+  provisioning, so register entries 11 and 18 block production rather than development. A lint rule
+  keeps storage vendors — and today's backing table — out of everything but `apps/api/src/storage/`.
+- **Throttling is per action.** `sign_in_attempts.action` separates five counters, and reset-request
+  is configured so it **may delay but can never deny** — the person an identifier-keyed denial harms
+  is always the victim. 001's no-lockout guarantee rested on verifying the credential before
+  consulting the throttle, and three of the new actions have no credential to verify first.
+- **Verification gates exactly one thing: discoverability.** An unverified attendee uses the product
+  fully and appears to nobody. **006 may assume every profile it can read carries a verified
+  address** (FR-325c) — verification is a precondition of being readable at all, so a directory
+  never has to check it, and no later feature may rely on verification state for anything else.
+
 **Still carrying no product content**: Discover, Messages and Network. No attendee cards, no
 threads, no appointments. Audience Q&A arrives in 009, as a third section on the panel 005 built.
+006 is what reads the profiles 004 authors; `GET /events/:eventId/attendees/:attendeeId` already
+exists and applies all three visibility conditions in one query.
 
-**005 stores the product's first attendee-authored free text** — personal session notes — on a
-narrow declared retention commitment: deleted with the account (a schema-level `ON DELETE CASCADE`,
-asserted by an integration test), **no export path**. That commitment is **superseded by v2.3.0**,
-which makes deletion and export self-serve and complete. Worth knowing when reading the cascade:
-until 004 ships a delete-account route, it has nothing that can trigger it.
+**005 stored the product's first attendee-authored free text** — personal session notes — on a
+narrow declared retention commitment: deleted with the account, **no export path**. That commitment
+was superseded by v2.3.0 and is now **fully discharged**: 004's `DELETE /account` is what finally
+gives 005's cascade something to fire, and `GET /profile/export` is the export path it lacked.
 
-**004 was unblocked on 2026-08-07** by brainstorm #04, ratified in constitution **v2.3.0**. All three
-entries that blocked it are closed — identity model, retention obligations, avatar handling — so 004
-and 006 are both available. `0003` stays reserved for 004, which is why 005 claimed `0004` and left
-a gap, though 004's scope has grown enough that one migration may not be sufficient. See
+**One record is deliberately not deleted with an account**: `sign_in_attempts`. It has no foreign
+key by design, and removing a departing attendee's rows would let an attacker clear their own trail
+by registering and deleting an account. It expires on the existing two-hour sweep instead, which
+FR-382 forbids lengthening — an earlier draft of 004's spec assumed 90 days and would have
+*lengthened* retention of pseudonymous data forty-fold.
+
+**004 shipped on 2026-08-07**, unblocked by brainstorm #04 and ratified in constitution **v2.3.0**.
+It claimed migration **`0003`** — exactly one, as reserved — which is why the journal lists `0003`
+before `0004` while carrying a later timestamp; `apps/api/migrations/meta/README.md` explains why
+both halves are load-bearing and what a regenerating feature must not "fix". 006 is next. See
 `brainstorm/00-overview.md` for the queue.
 
 **004 now departs substantially from the delivery roadmap**, and its specification must say so. The

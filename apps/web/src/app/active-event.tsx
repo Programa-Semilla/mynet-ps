@@ -2,6 +2,7 @@ import { OfflineError, type Event } from '@mynet/data'
 import { useActiveEventRepository } from '@mynet/platform'
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
+import { Link } from 'react-router'
 
 import { useAuth } from '../auth/useAuth.js'
 import type { ActiveEventState } from './home/HomeShell.js'
@@ -282,10 +283,27 @@ export const NoConferencesNotice = () => (
     <h2 className="mb-1 font-display text-lg font-medium text-text-primary">
       You are not registered for any conferences yet
     </h2>
-    <p className="text-sm text-text-body">
-      When you are registered for one, it will appear here — with what is happening next, the
+    <p className="mb-4 text-sm text-text-body">
+      Join one with its code and this becomes your workspace for it — what is happening next, the
       day&apos;s programme, and the people worth meeting.
     </p>
+    {/*
+      ─────────────────────────────────────────────────────────────────────────────────────
+      T049 (004) — **an invitation to join, not a statement that one will appear** (FR-308).
+
+      This notice used to read "when you are registered for one, it will appear here", which was
+      accurate for as long as registration was something a seed script did to you. Self sign-up
+      makes it wrong in the way that matters: the person reading it *can* act, and the sentence
+      told them to wait. FR-308 requires the product to present a way to join rather than an
+      empty conference, and this control is that way.
+      ─────────────────────────────────────────────────────────────────────────────────────
+    */}
+    <Link
+      to="/join"
+      className="inline-flex items-center rounded-sm bg-accent-strong px-4 py-2 text-sm font-medium text-text-inverse"
+    >
+      Join a conference
+    </Link>
   </div>
 )
 

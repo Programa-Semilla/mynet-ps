@@ -197,14 +197,112 @@ describe('event scope route audit', () => {
     ).toEqual([])
   })
 
-  it('keeps every route free of an attendee identifier (FR-106)', () => {
-    // 001's rule, still binding. An event identifier says which conference; nothing may say
-    // which person.
-    const withAttendeeParam = routes
-      .filter((route) => /:attendeeId|\{attendeeId\}|:userId/.test(route.url))
+  /**
+   * ═════════════════════════════════════════════════════════════════════════════════════════
+   * **T117 (004) — 001's rule NARROWED, not abandoned, and the narrowing is the interesting
+   * part.**
+   *
+   * 001 asserted that no route names an attendee identifier at all, and that was right while no
+   * route needed to: an event identifier says *which conference*, and nothing said *which
+   * person*. 004 adds the product's first route that must —
+   * `GET /events/:eventId/attendees/:attendeeId`, which 006's directory consumes.
+   *
+   * The rule's **purpose** was that nothing may *act on* somebody else, and that purpose is
+   * intact. The narrowing is to reads only, and it is narrow in three ways at once:
+   *
+   *   - **reads only.** A write naming an attendee is still forbidden outright, which is what
+   *     the assertion below actually checks.
+   *   - **under the event guard**, so the reader's own registration is proven by the branded
+   *     `EventScope` before the identifier is looked at.
+   *   - **behind three server-side conditions** that the identifier cannot influence: it can
+   *     only narrow a set already bounded by shared registration, discoverability and
+   *     verification (FR-357, FR-359).
+   *
+   * Recorded here rather than silently deleted, because "the audit stopped asserting this" and
+   * "the rule was deliberately narrowed" look identical in a diff.
+   * ═════════════════════════════════════════════════════════════════════════════════════════
+   */
+  it('lets NO route WRITE against an attendee identifier (FR-106, narrowed by 004)', () => {
+    const naming = routes.filter((route) =>
+      /:attendeeId|\{attendeeId\}|:userId|:personId/.test(route.url),
+    )
+
+    const writes = naming
+      .filter((route) => methodsOf(route).some((method) => WRITE_METHODS.includes(method)))
+      .map((route) => `${methodsOf(route).join('/')} ${route.url}`)
+
+    expect(
+      writes,
+      'A write route naming an attendee is a route that can act on somebody else. Identity is ' +
+        'bound at the request boundary from the sign-in session and nowhere else (FR-385).',
+    ).toEqual([])
+  })
+
+  it('guards every read that names an attendee with the event access predicate', () => {
+    // The narrowing is only safe because these routes carry the guard. Without it the
+    // identifier would be reachable from outside any conference the reader belongs to.
+    const unguarded = routes
+      .filter((route) => /:attendeeId|\{attendeeId\}/.test(route.url))
+      .filter((route) => !preHandlersOf(route).includes(requireEventAccess))
       .map((route) => route.url)
 
-    expect(withAttendeeParam).toEqual([])
+    expect(unguarded).toEqual([])
+  })
+
+  /**
+   * ═════════════════════════════════════════════════════════════════════════════════════════
+   * **T117 (004) — the unauthenticated routes are an ENUMERATED ALLOW-LIST** (FR-387).
+   *
+   * 004 adds the product's first deliberately unauthenticated **write** routes. Before it,
+   * every route but `/health` and sign-in required a session, so "is this route authenticated"
+   * needed no policing — the answer was always yes.
+   *
+   * Now it does. FR-387 requires them to be *enumerable*, and this is what makes that true: a
+   * route registered without `requireAttendee` and without an entry below fails the build.
+   * Without it, dropping the guard from a route would be a silent change that no test noticed —
+   * which on `/profile` or `/account` would be the whole of Principle VIII undone by one
+   * deleted line.
+   * ═════════════════════════════════════════════════════════════════════════════════════════
+   */
+  it('exposes exactly the unauthenticated routes it declares, and no others (FR-387)', () => {
+    /** Each entry states why it cannot require a session. The list must stay this short. */
+    const DELIBERATELY_UNAUTHENTICATED = new Map([
+      ['GET /health', 'Liveness. Touches no attendee data and no database row.'],
+      ['POST /auth/sign-in', 'Obtaining a session is what it is for (001).'],
+      ['POST /auth/sign-up', 'A person creating an account does not have one yet (FR-300).'],
+      [
+        'POST /auth/verify',
+        'Followed out of a mail client, often in a different browser from the one that signed ' +
+          'up — which carries no session (FR-319).',
+      ],
+      [
+        'POST /auth/reset-request',
+        'Requested by somebody who cannot sign in, which is why they are here (FR-326).',
+      ],
+      ['POST /auth/reset', 'Followed out of a mail client, like verification (FR-328).'],
+    ])
+
+    const unauthenticated = routes
+      .filter((route) => !preHandlersOf(route).includes(requireAttendee))
+      .flatMap((route) => methodsOf(route).map((method) => `${method} ${route.url}`))
+      // Fastify registers a HEAD for every GET; it inherits the GET's guards and is not a
+      // separate surface.
+      .filter((label) => !label.startsWith('HEAD '))
+
+    const undeclared = unauthenticated.filter((label) => !DELIBERATELY_UNAUTHENTICATED.has(label))
+
+    expect(
+      undeclared,
+      'These routes require no session and are not declared as deliberately unauthenticated ' +
+        '(FR-387). If that is intended, add an entry above saying why — and make sure the route ' +
+        'is rate-limited under its own action counter. If it is not, the route is missing ' +
+        '`app.requireAttendee`.',
+    ).toEqual([])
+
+    // An allow-list that outlives its routes is a hole waiting for a name collision.
+    for (const declared of DELIBERATELY_UNAUTHENTICATED.keys()) {
+      expect(unauthenticated, `${declared} is declared but no longer exists`).toContain(declared)
+    }
   })
 })
 

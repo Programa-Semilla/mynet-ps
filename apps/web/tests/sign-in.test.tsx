@@ -2,6 +2,7 @@ import type { PlatformServices } from '@mynet/platform'
 import { PlatformProvider } from '@mynet/platform'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { MemoryRouter } from 'react-router'
 import { describe, expect, it, vi } from 'vitest'
 
 import { SignInScreen } from '../src/auth/SignInScreen.js'
@@ -65,6 +66,28 @@ const renderSignIn = (overrides: Partial<PlatformServices> = {}) => {
         writeNote: async () => Promise.reject(new Error('not signed in')),
         deleteNote: async () => Promise.reject(new Error('not signed in')),
       },
+      // 004 — signed out. The three unauthenticated methods resolve, because they are exactly
+      // the ones reachable from this screen: creating an account and recovering one are what a
+      // signed-out person is here to do. Everything else rejects like the rest of the registry.
+      identity: {
+        signUp: async () => {},
+        requestPasswordReset: async () => {},
+        resetPassword: async () => {},
+        verifyEmail: async () => {},
+        joinConference: async () => Promise.reject(new Error('not signed in')),
+        withdrawFromConference: async () => Promise.reject(new Error('not signed in')),
+        resendVerification: async () => Promise.reject(new Error('not signed in')),
+        exportPersonalData: async () => Promise.reject(new Error('not signed in')),
+        deleteAccount: async () => Promise.reject(new Error('not signed in')),
+      },
+      profile: {
+        getOwn: async () => Promise.reject(new Error('not signed in')),
+        saveOwn: async () => Promise.reject(new Error('not signed in')),
+        setDiscoverable: async () => Promise.reject(new Error('not signed in')),
+        readOwnAvatar: async () => Promise.reject(new Error('not signed in')),
+        uploadAvatar: async () => Promise.reject(new Error('not signed in')),
+        removeAvatar: async () => Promise.reject(new Error('not signed in')),
+      },
     },
     freshness: { lastRetrieved: () => null },
     auth: { signIn, signOut: async () => {} },
@@ -74,7 +97,14 @@ const renderSignIn = (overrides: Partial<PlatformServices> = {}) => {
   render(
     <PlatformProvider services={services}>
       <AuthProvider>
-        <SignInScreen />
+        {/*
+          004 — the screen now links to sign-up (T050), so it needs a router context. It had
+          none before because it offered no navigation at all: until self sign-up existed there
+          was nowhere for a signed-out person to go.
+        */}
+        <MemoryRouter>
+          <SignInScreen />
+        </MemoryRouter>
       </AuthProvider>
     </PlatformProvider>,
   )
@@ -166,8 +196,30 @@ describe('SignInScreen', () => {
     expect(alert.textContent).not.toContain('boom')
   })
 
-  it('never renders a password recovery affordance that does not exist', () => {
+  /**
+   * ───────────────────────────────────────────────────────────────────────────────────────
+   * **This assertion was inverted by 004, and the inversion is the point of having had it.**
+   *
+   * It used to read "never renders a password recovery affordance that does not exist" —
+   * correct while accounts came from a seed script and there was genuinely nothing behind the
+   * link. Offering a recovery flow that did not exist would have been worse than its absence.
+   *
+   * 004 makes the flow exist, because self sign-up made it mandatory: an account nobody can
+   * recover is one forgotten password from being permanently lost, and Principle III leaves no
+   * organizer to appeal to. So the affordance appears, and the assertion now checks it goes
+   * somewhere real rather than that it is missing.
+   * ───────────────────────────────────────────────────────────────────────────────────────
+   */
+  it('offers both exits a signed-out person may need (FR-300, FR-326)', () => {
     renderSignIn()
-    expect(screen.queryByText(/forgot.*password/i)).not.toBeInTheDocument()
+
+    expect(screen.getByRole('link', { name: /create an account/i })).toHaveAttribute(
+      'href',
+      '/sign-up',
+    )
+    expect(screen.getByRole('link', { name: /forgot your password/i })).toHaveAttribute(
+      'href',
+      '/reset-password-request',
+    )
   })
 })

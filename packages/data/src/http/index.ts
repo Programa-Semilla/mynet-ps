@@ -13,6 +13,9 @@ export { HttpActiveEventRepository } from './active-event-repository.js'
 export { HttpCatalogRepository } from './catalog-repository.js'
 // 005 — the attendee's own agenda.
 export { HttpSavedSessionRepository, HttpSessionNotesRepository } from './agenda-repository.js'
+// 004 — identity and the attendee's own profile.
+export { HttpIdentityRepository } from './identity-repository.js'
+export { HttpProfileRepository } from './profile-repository.js'
 // 005 — the caching decorator. Applied at the composition root, so no component learns that a
 // cache exists (research D1, Principle V).
 export {

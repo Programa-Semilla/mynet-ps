@@ -1,6 +1,7 @@
 import {
   attendeePrefix,
   cached,
+  conferencePrefix,
   createFreshnessRegistry,
   HttpActiveEventRepository,
   HttpAttendeeRepository,
@@ -8,6 +9,8 @@ import {
   HttpCatalogRepository,
   HttpClient,
   HttpEventsRepository,
+  HttpIdentityRepository,
+  HttpProfileRepository,
   HttpSavedSessionRepository,
   HttpSessionNotesRepository,
   type CacheScope,
@@ -138,6 +141,18 @@ export const createServices = (): PlatformServices => {
       catalog,
       savedSessions,
       sessionNotes,
+      // ─────────────────────────────────────────────────────────────────────────────────────
+      // 004 — **deliberately NOT decorated with `cached`**, and the absence is a declaration
+      // rather than an omission (spec, Offline behaviour).
+      //
+      // Nothing this feature stores is readable offline. The profile is small, it is only
+      // meaningful when editable, and caching it would put a second copy of personal data on
+      // the device in exchange for no offline capability worth having. Every write here — sign
+      // up, join, save, upload, export, delete — is refused offline and **never queued**,
+      // which is 005's rule unchanged.
+      // ─────────────────────────────────────────────────────────────────────────────────────
+      identity: purgingIdentity(new HttpIdentityRepository(http), store, identity),
+      profile: new HttpProfileRepository(http),
     },
     freshness: {
       lastRetrieved: (eventId, content) =>
@@ -241,6 +256,78 @@ const purgingOnSignOut = (
       identity.forget()
     }
     await auth.signOut()
+  },
+})
+
+/**
+ * 004 — **deleting an account and leaving a conference purge the device too** (FR-365, FR-366,
+ * FR-317c).
+ *
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ * **THE SERVER-SIDE DELETE IS ONLY HALF OF "NO COPY IS KEPT".**
+ *
+ * `WebLocalCache` has no eviction: `write` puts an entry and only `purge` ever removes one. The
+ * 24-hour lifetime stops a stale entry being *served*; it does not delete the bytes. So without
+ * this, an attendee who deletes their account leaves their saved sessions, their **notes** —
+ * the product's first attendee-authored free text — and, under the `anonymous` prefix, their
+ * name and email on the device, indefinitely. The confirmation dialog they read first says in
+ * bold that no copy is kept and there is nothing to restore.
+ *
+ * `purgingOnSignOut` above cannot cover this: deletion calls `markSignedOut()`, which only
+ * resets React state, and never reaches `auth.signOut()`. Withdrawal is missed for a different
+ * reason — `identity` is deliberately not wrapped by `cached`, so the decorator's per-conference
+ * purge never fires for it either.
+ *
+ * Both live here rather than in the components because cache correctness is the composition
+ * root's job, not feature code's (Principle V, research D1). A component that forgot to purge
+ * would still type-check.
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ *
+ * **Delegates every method explicitly rather than spreading**, for the reason stated at length
+ * in `attendeeIdentity().watching` above: the wrapped object's methods live on a prototype, so a
+ * spread would silently drop them while the type signature still claimed otherwise. This
+ * interface has nine methods, so that failure would be near-total rather than subtle.
+ */
+const purgingIdentity = (
+  identity: PlatformServices['repositories']['identity'],
+  store: LocalCache,
+  scope: { current: () => string; forget: () => void },
+): PlatformServices['repositories']['identity'] => ({
+  signUp: (account) => identity.signUp(account),
+  joinConference: (joinCode) => identity.joinConference(joinCode),
+  verifyEmail: (token) => identity.verifyEmail(token),
+  resendVerification: () => identity.resendVerification(),
+  requestPasswordReset: (email) => identity.requestPasswordReset(email),
+  resetPassword: (token, password) => identity.resetPassword(token, password),
+  exportPersonalData: () => identity.exportPersonalData(),
+
+  /**
+   * Purges only the conference that was left, keeping every other conference's cached content
+   * — the attendee is still registered for those. Ordered **after** the request: unlike signing
+   * out, a failed withdrawal means the attendee is still registered, and discarding their
+   * offline copy of a conference they still hold would be a loss with nothing gained.
+   */
+  withdrawFromConference: async (eventId) => {
+    await identity.withdrawFromConference(eventId)
+    await store.purge(conferencePrefix(scope.current(), eventId))
+  },
+
+  /**
+   * Purges in a `finally`, matching sign-out: an attendee whose account was deleted server-side
+   * but whose response was lost to a flaky connection has still had their account deleted, and
+   * the local copy must not be what survives it.
+   */
+  deleteAccount: async () => {
+    const attendeeId = scope.current()
+    try {
+      await identity.deleteAccount()
+    } finally {
+      await store.purge(attendeePrefix(attendeeId))
+      // Identity is cached before the attendee is known, so it lives under `anonymous` — the
+      // same reason sign-out clears both prefixes.
+      await store.purge(attendeePrefix('anonymous'))
+      scope.forget()
+    }
   },
 })
 

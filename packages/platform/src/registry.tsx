@@ -52,6 +52,36 @@ export interface PlatformServices {
       writeNote(eventId: string, sessionId: string, body: string): Promise<unknown>
       deleteNote(eventId: string, sessionId: string): Promise<void>
     }
+    /**
+     * 004 — becoming an attendee, recovering an account, and leaving (FR-300–FR-379).
+     *
+     * ─────────────────────────────────────────────────────────────────────────────────────
+     * **Not one method here takes an attendee identifier**, and on this interface that matters
+     * more than anywhere else in the registry: `deleteAccount` and `exportPersonalData` mean
+     * *the signed-in attendee's*, and there is no parameter in which a caller could name
+     * anybody else (FR-378, FR-385).
+     * ─────────────────────────────────────────────────────────────────────────────────────
+     */
+    readonly identity: {
+      signUp(account: { email: string; displayName: string; password: string }): Promise<void>
+      joinConference(joinCode: string): Promise<unknown>
+      withdrawFromConference(eventId: string): Promise<void>
+      verifyEmail(token: string): Promise<void>
+      resendVerification(): Promise<void>
+      requestPasswordReset(email: string): Promise<void>
+      resetPassword(token: string, password: string): Promise<void>
+      exportPersonalData(): Promise<unknown>
+      deleteAccount(): Promise<void>
+    }
+    /** 004 — the attendee's own profile, and only ever their own (FR-334–FR-363). */
+    readonly profile: {
+      getOwn(): Promise<unknown>
+      saveOwn(draft: unknown): Promise<unknown>
+      setDiscoverable(discoverable: boolean): Promise<unknown>
+      readOwnAvatar(): Promise<string | null>
+      uploadAvatar(image: Blob): Promise<void>
+      removeAvatar(): Promise<void>
+    }
   }
   /**
    * 005 — **when the content currently on screen was retrieved** (FR-216, SC-204).

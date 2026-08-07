@@ -27,6 +27,18 @@ export type { CatalogRepository, Room, Session, Speaker, Track } from './catalog
 // **Appended, never moved back into this barrel** (FR-235) — the per-domain split is what lets
 // 005 and 006 add interfaces in parallel without contending over these lines.
 export type { SavedSessionRepository, SessionNote, SessionNotesRepository } from './agenda.js'
+// 004 — becoming an attendee, recovering an account, and leaving. **Appended, never merged into
+// this barrel** (FR-180): the per-domain split is what lets 004 and 006 add interfaces without
+// contending over anything but these two lines.
+export type { IdentityRepository, JoinResult, PersonalDataExport } from './identity.js'
+export type {
+  Availability,
+  Discoverability,
+  NetworkingIntent,
+  OwnProfile,
+  ProfileDraft,
+  ProfileRepository,
+} from './profile.js'
 
 export {
   NotAuthenticatedError,
@@ -39,6 +51,8 @@ import type { SavedSessionRepository, SessionNotesRepository } from './agenda.js
 import type { AttendeeRepository } from './attendee.js'
 import type { CatalogRepository } from './catalog.js'
 import type { ActiveEventRepository, EventsRepository } from './events.js'
+import type { IdentityRepository } from './identity.js'
+import type { ProfileRepository } from './profile.js'
 
 /**
  * Every repository, in one shape (research.md D10).
@@ -55,4 +69,10 @@ export interface Repositories {
   // 005 — appended, not inserted. Two members, one per domain interface.
   readonly savedSessions: SavedSessionRepository
   readonly sessionNotes: SessionNotesRepository
+  // 004 — appended likewise. **Neither is cached**, and that is a declaration rather than an
+  // omission: the specification states that nothing this feature stores is available offline,
+  // and caching a profile would put a second copy of personal data on the device for no offline
+  // capability worth having.
+  readonly identity: IdentityRepository
+  readonly profile: ProfileRepository
 }

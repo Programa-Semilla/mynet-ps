@@ -1,7 +1,9 @@
+import { sql as sqlTag } from 'drizzle-orm'
 import type { FastifyInstance } from 'fastify'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { buildApp } from '../../src/app.js'
+import { getDb } from '../../src/db/client.js'
 
 import {
   ADA,
@@ -9,6 +11,7 @@ import {
   cookieHeader,
   GRACE,
   resetDatabase,
+  SEED_EVENTS,
   SEED_PASSWORD,
   sessionCookieFrom,
   setupTestApp,
@@ -239,8 +242,23 @@ describe('attendee data isolation', () => {
       readonly payload?: Record<string, unknown>
       /** What a legitimate request answers, so the "not over-refusing" half stays strict. */
       readonly ok: number
-      /** Undoes a write, so one route's coverage test does not become another's fixture. */
-      readonly undo?: { readonly method: 'DELETE'; readonly template: string }
+      /**
+       * Undoes a write, so one route's coverage test does not become another's fixture.
+       *
+       * **004 widened this from `DELETE` alone**, because withdrawing from a conference is the
+       * first per-event write whose inverse is not a delete: it is undone by re-joining, which
+       * is a `POST` to a different address carrying a code. Narrowing the type to `DELETE`
+       * would have forced `DELETE /events/:eventId/registration` to be either omitted from the
+       * coverage list — defeating SC-105 — or exercised and left to break every later test in
+       * this file.
+       */
+      readonly undo?: {
+        readonly method: 'DELETE' | 'POST'
+        readonly template: string
+        readonly payload?: Record<string, unknown>
+      }
+      /** Substituted into `:attendeeId`. Only the co-attendee routes need one (004). */
+      readonly attendeeId?: 'grace'
     }
 
     const EVENT_ROUTES: readonly EventRoute[] = [
@@ -265,6 +283,46 @@ describe('attendee data isolation', () => {
         undo: { method: 'DELETE', template: '/events/:eventId/agenda/notes/:sessionId' },
       },
       { template: '/events/:eventId/agenda/notes/:sessionId', method: 'DELETE', ok: 204 },
+      // ─────────────────────────────────────────────────────────────────────────────────────
+      // 004 — reading a co-attendee, and leaving a conference.
+      //
+      // The first two are the product's first routes naming an attendee identifier. They are
+      // reads, they carry the event guard, and the identifier can only narrow a set already
+      // bounded by three server-side conditions — see `routes/events/attendees.ts`. Their
+      // presence here is what proves the *event* half of that is enforced identically to every
+      // other per-event route.
+      //
+      // Grace is the target because she shares Ada's first conference, is verified, and is
+      // discoverable: all three conditions hold, so a legitimate read genuinely succeeds and
+      // the "not over-refusing" assertion stays strict.
+      // ─────────────────────────────────────────────────────────────────────────────────────
+      {
+        template: '/events/:eventId/attendees/:attendeeId',
+        method: 'GET',
+        attendeeId: 'grace',
+        ok: 200,
+      },
+      {
+        template: '/events/:eventId/attendees/:attendeeId/avatar',
+        method: 'GET',
+        attendeeId: 'grace',
+        // Grace has no photograph — the seed ships none (FR-354) — so the honest legitimate
+        // answer is "no avatar", which is what makes the client render the fallback (FR-351).
+        ok: 204,
+      },
+      {
+        template: '/events/:eventId/registration',
+        method: 'DELETE',
+        ok: 204,
+        // Undone by re-joining, which is why `undo` had to widen. Without this, the legitimate
+        // exercise would withdraw Ada from her own conference and every later assertion in this
+        // file would be testing an attendee who is not registered for anything.
+        undo: {
+          method: 'POST',
+          template: '/events/join',
+          payload: { joinCode: SEED_EVENTS[0].joinCode },
+        },
+      },
     ]
 
     const NONEXISTENT = '00000000-0000-0000-0000-000000000000'
@@ -273,14 +331,24 @@ describe('attendee data isolation', () => {
     let graceOnlyEventId: string
     /** A session that really is in Ada's first conference, for the `:sessionId` routes. */
     let adaSessionId: string
+    /** 004 — a real co-attendee in Ada's first conference, for the `:attendeeId` routes. */
+    let graceId: string
 
     /**
      * Fills a template. `:sessionId` is substituted with a real session only where the request
      * is meant to succeed — every refusal case is refused by the *event* guard before the
      * session is ever looked at, which is itself the property being asserted.
      */
-    const urlFor = (template: string, eventId: string, sessionId: string): string =>
-      template.replace(':eventId', eventId).replace(':sessionId', sessionId)
+    const urlFor = (
+      template: string,
+      eventId: string,
+      sessionId: string,
+      attendeeId = NONEXISTENT,
+    ): string =>
+      template
+        .replace(':eventId', eventId)
+        .replace(':sessionId', sessionId)
+        .replace(':attendeeId', attendeeId)
 
     beforeAll(async () => {
       const ada = await app.inject({
@@ -310,6 +378,18 @@ describe('attendee data isolation', () => {
       const first = (programme.json() as Array<{ id: string }>)[0]
       if (!first) throw new Error("Seed must give Ada's first conference a programme.")
       adaSessionId = first.id
+
+      // 004 — the co-attendee routes need a real target. Grace shares Ada's first conference.
+      const graceProfile = await app.inject({
+        method: 'GET',
+        url: '/profile',
+        headers: { cookie: cookieHeader(graceCookie) },
+      })
+      if (graceProfile.statusCode !== 200) throw new Error('Grace must have a readable profile.')
+      const graceRows = await getDb().execute<{ id: string }>(
+        sqlTag`SELECT id FROM attendees WHERE email = 'grace@example.com'`,
+      )
+      graceId = graceRows[0]?.id as string
     })
 
     it('covers every route the application declares with an event identifier (SC-105)', async () => {
@@ -345,13 +425,13 @@ describe('attendee data isolation', () => {
         // ───────────────────────────────────────────────────────────────────────────────────
         const unregistered = await app.inject({
           method: route.method,
-          url: urlFor(route.template, graceOnlyEventId, NONEXISTENT),
+          url: urlFor(route.template, graceOnlyEventId, NONEXISTENT, graceId),
           headers: { cookie: cookieHeader(adaCookie) },
           ...(route.payload ? { payload: route.payload } : {}),
         })
         const nonexistent = await app.inject({
           method: route.method,
-          url: urlFor(route.template, NONEXISTENT, NONEXISTENT),
+          url: urlFor(route.template, NONEXISTENT, NONEXISTENT, graceId),
           headers: { cookie: cookieHeader(adaCookie) },
           ...(route.payload ? { payload: route.payload } : {}),
         })
@@ -367,13 +447,13 @@ describe('attendee data isolation', () => {
       async (route) => {
         const malformed = await app.inject({
           method: route.method,
-          url: urlFor(route.template, 'not-a-uuid', NONEXISTENT),
+          url: urlFor(route.template, 'not-a-uuid', NONEXISTENT, graceId),
           headers: { cookie: cookieHeader(adaCookie) },
           ...(route.payload ? { payload: route.payload } : {}),
         })
         const nonexistent = await app.inject({
           method: route.method,
-          url: urlFor(route.template, NONEXISTENT, NONEXISTENT),
+          url: urlFor(route.template, NONEXISTENT, NONEXISTENT, graceId),
           headers: { cookie: cookieHeader(adaCookie) },
           ...(route.payload ? { payload: route.payload } : {}),
         })
@@ -386,7 +466,7 @@ describe('attendee data isolation', () => {
     it.each(EVENT_ROUTES)('$method $template — refuses without a session at all', async (route) => {
       const response = await app.inject({
         method: route.method,
-        url: urlFor(route.template, adaEventIds[0] ?? NONEXISTENT, adaSessionId),
+        url: urlFor(route.template, adaEventIds[0] ?? NONEXISTENT, adaSessionId, graceId),
         ...(route.payload ? { payload: route.payload } : {}),
       })
 
@@ -402,7 +482,7 @@ describe('attendee data isolation', () => {
         const eventId = adaEventIds[0] ?? ''
         const response = await app.inject({
           method: route.method,
-          url: urlFor(route.template, eventId, adaSessionId),
+          url: urlFor(route.template, eventId, adaSessionId, graceId),
           headers: { cookie: cookieHeader(adaCookie) },
           ...(route.payload ? { payload: route.payload } : {}),
         })
@@ -413,8 +493,9 @@ describe('attendee data isolation', () => {
         if (route.undo) {
           await app.inject({
             method: route.undo.method,
-            url: urlFor(route.undo.template, eventId, adaSessionId),
+            url: urlFor(route.undo.template, eventId, adaSessionId, graceId),
             headers: { cookie: cookieHeader(adaCookie) },
+            ...(route.undo.payload ? { payload: route.undo.payload } : {}),
           })
         }
       },

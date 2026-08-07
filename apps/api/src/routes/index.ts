@@ -1,12 +1,19 @@
 import type { FastifyInstance } from 'fastify'
 
+import { accountRoutes } from './account.js'
 import { meRoutes } from './auth/me.js'
 import { signInRoutes } from './auth/sign-in.js'
 import { signOutRoutes } from './auth/sign-out.js'
+import { resetRoutes } from './auth/reset.js'
+import { signUpRoutes } from './auth/sign-up.js'
+import { verifyRoutes } from './auth/verify.js'
 import { agendaRoutes } from './events/agenda.js'
+import { attendeeProfileRoutes } from './events/attendees.js'
 import { catalogRoutes } from './events/catalog.js'
+import { joinRoutes } from './events/join.js'
 import { eventRoutes } from './events.js'
 import { healthRoutes } from './health.js'
+import { profileRoutes } from './profile.js'
 import { activeEventRoutes } from './workspace/active-event.js'
 
 /**
@@ -49,4 +56,28 @@ export const ROUTES: readonly RoutePlugin[] = [
   // behavioural reason, because the generated contract lists paths in observation order — and
   // the per-domain split is what lets 005 and 006 proceed in parallel without contending here.
   agendaRoutes,
+  // 004 — a person becomes an attendee and reaches a conference under their own power.
+  // **Appended, never inserted**, for the reason above: the generated contract lists paths in
+  // observation order, so reordering rewrites `contracts/openapi.json` for no behavioural
+  // reason and turns a genuine contract diff into noise.
+  //
+  // `signUpRoutes` is the product's first deliberately unauthenticated **write** route, and
+  // `joinRoutes` deliberately carries no `:eventId` — see each file for why.
+  signUpRoutes,
+  joinRoutes,
+  // 004 — verification and recovery. Appended after US1's two, in the order the phases landed,
+  // so the generated contract's path order follows the order the routes were written.
+  verifyRoutes,
+  resetRoutes,
+  // 004 — the attendee's own profile. No identifier in any address here: the session decides
+  // whose profile it is, which is what makes FR-335 structural (see the file).
+  profileRoutes,
+  // 004 — reading a CO-ATTENDEE's profile. Under `:eventId` and carrying `requireEventAccess`,
+  // so the reader's registration is proven by the branded EventScope; the target's three
+  // conditions are one WHERE in the query (research D5). The route audit fails the build if the
+  // guard is ever dropped.
+  attendeeProfileRoutes,
+  // 004 — the personal-data export, and (from US7) deletion. Both bound to the session with no
+  // identifier in the address, which is FR-378's refusal expressed as an absence.
+  accountRoutes,
 ]

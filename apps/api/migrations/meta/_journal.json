@@ -24,6 +24,13 @@
       "breakpoints": true
     },
     {
+      "idx": 3,
+      "version": "7",
+      "when": 1786125355089,
+      "tag": "0003_attendee_identity_and_profile",
+      "breakpoints": true
+    },
+    {
       "idx": 4,
       "version": "7",
       "when": 1786107373908,

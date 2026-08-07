@@ -1,5 +1,9 @@
 import type { CachedEntry, LocalCache } from './cache-store.js'
-import { RequestRefusedError } from '../interfaces/errors.js'
+import {
+  NotAuthenticatedError,
+  RequestRefusedError,
+  SessionExpiredError,
+} from '../interfaces/errors.js'
 
 /**
  * T063, T064 (005) — the caching decorator (FR-215–FR-222, research D1, D10).
@@ -131,6 +135,39 @@ export const createFreshnessRegistry = (): FreshnessRegistry => {
   }
 }
 
+/**
+ * Whether the server **answered and said no** — as opposed to not answering at all.
+ *
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ * **THE CACHE MUST NEVER SERVE A COPY OF SOMETHING THE SERVER HAS BEGUN REFUSING.**
+ *
+ * This predicate existed as a bare `instanceof RequestRefusedError`, and that missed the two
+ * refusals that matter most: `NotAuthenticatedError` and `SessionExpiredError` extend `Error`
+ * directly rather than `RequestRefusedError`, because 001 needed the client to tell "signed out
+ * for inactivity" from "never signed in" and gave each its own type.
+ *
+ * The consequence was a genuine authorization bypass, and 004 is the feature that made it
+ * reachable. A `401` fell through to the "offline, or a server fault" branch and the decorator
+ * **served the cached identity from disk** — so after a password reset revoked every session
+ * (FR-330), or after an account was deleted on another device (FR-369), the client kept
+ * rendering a signed-in shell for up to the cache lifetime. FR-369's edge case names that
+ * outcome exactly: *it must not present a signed-in shell for an attendee who no longer
+ * exists.*
+ *
+ * Found by `e2e/password-recovery.spec.ts`. Nothing else could have: 005's own cache tests
+ * exercise `RequestRefusedError`, which was never the broken case, and the API-side tests prove
+ * the server revokes — which it does. The gap was entirely on this side of the wire.
+ *
+ * `SessionExpiredError` is included for the same reason and not merely for symmetry: an idle
+ * session that the server has stopped honouring is a session, and reading a cached workspace
+ * after it ends is reading data the server would refuse.
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ */
+const isRefusal = (error: unknown): boolean =>
+  error instanceof RequestRefusedError ||
+  error instanceof NotAuthenticatedError ||
+  error instanceof SessionExpiredError
+
 export interface CacheOptions {
   readonly now?: Clock
   readonly freshness?: FreshnessRegistry
@@ -201,7 +238,7 @@ export const cached = <T extends object>(
             // never serve content the server has begun refusing — a withdrawn registration
             // must not remain readable because it happens to be stored locally.
             // ───────────────────────────────────────────────────────────────────────────────
-            if (error instanceof RequestRefusedError && eventId) await purgeConference(eventId)
+            if (isRefusal(error) && eventId) await purgeConference(eventId)
             throw error
           }
         }
@@ -232,7 +269,7 @@ export const cached = <T extends object>(
             freshness?.record(key, null)
             return fresh
           } catch (error) {
-            if (error instanceof RequestRefusedError) {
+            if (isRefusal(error)) {
               // Refused: drop this conference and re-throw. Serving the cached copy here would
               // turn the cache into an authorization bypass.
               await purgeConference(eventId)

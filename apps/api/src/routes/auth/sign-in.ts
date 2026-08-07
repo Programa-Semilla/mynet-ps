@@ -148,12 +148,17 @@ export const signInRoutes = async (app: FastifyInstance): Promise<void> => {
       if (!attendee || !verified) {
         // FR-031c — records the hashed identifier only. There is no parameter for the
         // credential, so it cannot be written here even by mistake.
-        await recordAttempt({ identifierHash, sourceHash, succeeded: false })
+        // 004 — `action` scopes the count to sign-in alone (FR-307a). Without it, a sign-up or
+        // join-code storm aimed at this address would inflate the streak read below and slow
+        // its rightful owner's sign-ins, which is FR-031b's lockout arriving by a new route.
+        await recordAttempt({ identifierHash, sourceHash, action: 'sign_in', succeeded: false })
 
         // FR-031a — the escalating delay, applied to the *failure*. Served in-request up to a
         // bound; anything beyond becomes retry-after guidance. Both branches are reached
         // identically whether or not the identifier exists, so FR-031d still holds.
-        const outstanding = await serveDelay(await failureDelayMs({ identifierHash, sourceHash }))
+        const outstanding = await serveDelay(
+          await failureDelayMs({ identifierHash, sourceHash, action: 'sign_in' }),
+        )
         if (outstanding > 0) {
           throw tooManyAttempts(outstanding)
         }
@@ -162,7 +167,7 @@ export const signInRoutes = async (app: FastifyInstance): Promise<void> => {
       }
 
       // A correct credential is never throttled. This is the line SC-003a rests on.
-      await recordAttempt({ identifierHash, sourceHash, succeeded: true })
+      await recordAttempt({ identifierHash, sourceHash, action: 'sign_in', succeeded: true })
 
       // FR-026 — an opaque high-entropy token; only its hash is stored.
       const { token, tokenHash } = issueToken()

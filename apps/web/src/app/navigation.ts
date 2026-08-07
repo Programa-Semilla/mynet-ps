@@ -1,8 +1,45 @@
 import { CalendarDays, Compass, Home, MessageSquare, Users, type LucideIcon } from 'lucide-react'
-import { createElement, type ReactElement } from 'react'
+import { createElement, lazy, type ReactElement } from 'react'
 
 import { SessionPanel } from './agenda/SessionPanel.js'
 import { Agenda } from './destinations/Agenda.js'
+
+/**
+ * T130 (004) — **the standalone surfaces are code-split, and the asset budget is why.**
+ *
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ * 004 adds twelve screens. Imported eagerly, every one of them lands in the initial shell
+ * chunk, and `scripts/asset-budget.mjs` failed by 5.1 KB gzipped — which is the budget doing
+ * exactly its job. Its own message says the alternative out loud: *do not raise it to make a
+ * red build green.*
+ *
+ * Splitting is the honest fix rather than a way round the gate, because **none of these is
+ * needed to render the workspace**. Signing up, verifying an address, recovering a password,
+ * joining a conference, editing a profile and closing an account are each reached deliberately,
+ * once, by somebody who has decided to do that thing — and paying for all twelve on every cold
+ * load of Home is the cost the budget exists to notice.
+ *
+ * The five **destinations** stay eager. Home and Agenda are the workspace; a spinner between
+ * the rail and the thing it navigates to would be a worse product for a saving the budget does
+ * not need.
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ */
+const SignUp = lazy(() => import('./auth/SignUp.js').then((m) => ({ default: m.SignUp })))
+const Verify = lazy(() => import('./auth/Verify.js').then((m) => ({ default: m.Verify })))
+const ResetRequest = lazy(() =>
+  import('./auth/ResetRequest.js').then((m) => ({ default: m.ResetRequest })),
+)
+const ResetPassword = lazy(() =>
+  import('./auth/ResetPassword.js').then((m) => ({ default: m.ResetPassword })),
+)
+const JoinConference = lazy(() =>
+  import('./join/JoinConference.js').then((m) => ({ default: m.JoinConference })),
+)
+const Profile = lazy(() => import('./profile/Profile.js').then((m) => ({ default: m.Profile })))
+const ProfileEdit = lazy(() =>
+  import('./profile/ProfileEdit.js').then((m) => ({ default: m.ProfileEdit })),
+)
+const Account = lazy(() => import('./profile/Account.js').then((m) => ({ default: m.Account })))
 
 /**
  * The five destinations, declared once (FR-012, FR-013).
@@ -22,7 +59,31 @@ import { Agenda } from './destinations/Agenda.js'
  * statement that its content is not built yet, until the feature that owns it lands.
  */
 
-export interface Destination {
+/**
+ * T048 (004) — what every addressable surface must state, destination or not.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ * 004 adds the product's first addresses that are **not** destinations: creating an account,
+ * joining a conference, verifying an address, recovering a password, the profile, and the
+ * account actions. The five destinations are fixed and this feature adds none (spec, "Where
+ * this feature's surfaces live"), so they cannot go in `DESTINATIONS` — but `TopBar` and
+ * `RouteAnnouncer` still have to be able to name them, or a screen-reader user arriving at
+ * `/join` is told "Page not found" while looking at a working form.
+ *
+ * That is not hypothetical: 005 hit exactly this when it added the first *nested* address, and
+ * the note on `destinationFor` below records what it cost.
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ */
+export interface Addressable {
+  /** Distinct, stable, shareable address (FR-013). */
+  readonly path: string
+  /** The accessible name of every control that navigates here (FR-021). */
+  readonly label: string
+  /** Announced with the label on arrival, so the change is described rather than silent. */
+  readonly purpose: string
+}
+
+export interface Destination extends Addressable {
   /** Distinct, stable, shareable address (FR-013). */
   readonly path: string
   /** The accessible name of every control that navigates here (FR-021). */
@@ -133,6 +194,101 @@ export const DESTINATIONS: readonly Destination[] = [
 /** Home is the default destination (FR-012). */
 export const HOME = DESTINATIONS[0] as Destination
 
+/** An address that is not one of the five destinations. */
+export interface StandaloneRoute extends Addressable {
+  readonly element: ReactElement
+}
+
+/**
+ * T048 (004) — addresses reachable **without a session** (FR-300, FR-326).
+ *
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ * **These sit OUTSIDE `RequireAuth`, and that is the whole point of the list existing.**
+ *
+ * A person creating an account does not have a session — that is what they are here to obtain.
+ * Rendering the sign-in screen at `/sign-up`, which is what the guard does to every address it
+ * wraps, would make self sign-up unreachable.
+ *
+ * The list is short and it must stay short: every entry is a surface anybody on the internet
+ * can reach, and each one the server treats as a separately rate-limited action (FR-387).
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ */
+export const PUBLIC_ROUTES: readonly StandaloneRoute[] = [
+  {
+    path: '/sign-up',
+    label: 'Create an account',
+    purpose: 'Create a MyNet account with your email address.',
+    element: createElement(SignUp),
+  },
+  // T065 (004) — the three addresses a transactional message points at, or leads to. Each is
+  // reached out of a mail client, often in a different browser from the one that signed up,
+  // so none of them may assume a session (FR-319, FR-326).
+  {
+    path: '/verify',
+    label: 'Verify your email address',
+    purpose: 'Confirm the address on your account, which is what makes you visible to others.',
+    element: createElement(Verify),
+  },
+  {
+    path: '/reset-password-request',
+    label: 'Reset your password',
+    purpose: 'Ask for a link to set a new password.',
+    element: createElement(ResetRequest),
+  },
+  {
+    path: '/reset-password',
+    label: 'Set a new password',
+    purpose: 'Choose a new password from your reset link.',
+    element: createElement(ResetPassword),
+  },
+]
+
+/**
+ * T048 (004) — addresses **inside** the authenticated shell that are not destinations.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ * They render within `AppShell`, so the rail, the top bar and the conference switcher stay
+ * where they are — an attendee joining a second conference or editing their profile has not
+ * left the workspace. They are deliberately **not a sixth destination** (spec: the five are
+ * fixed), which is why they are declared here rather than appended to `DESTINATIONS`.
+ *
+ * Where they hang off the existing five is Open Question 8, recorded rather than resolved.
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ */
+export const SHELL_ROUTES: readonly StandaloneRoute[] = [
+  {
+    path: '/join',
+    label: 'Join a conference',
+    purpose: 'Register for a conference by entering its join code.',
+    element: createElement(JoinConference),
+  },
+  // T075 (004) — the attendee's own profile, reachable from the shell **without becoming a
+  // sixth destination**. The five are fixed (spec, "Where this feature's surfaces live"), and
+  // exactly where these hang off them is Open Question 8 — recorded rather than resolved,
+  // because it is a presentation question better answered against the built shell.
+  {
+    path: '/profile',
+    label: 'Your profile',
+    purpose: 'What other attendees see about you, and what you have chosen to share.',
+    element: createElement(Profile),
+  },
+  {
+    path: '/profile/edit',
+    label: 'Edit your profile',
+    purpose: 'Change your company, role, headline, interests and availability.',
+    element: createElement(ProfileEdit),
+  },
+  {
+    // Separate from the profile deliberately: describing yourself and deciding whether the
+    // account exists are not the same kind of act, and a surface that treats them alike invites
+    // the second by accident (Desktop layout declaration).
+    path: '/account',
+    label: 'Your account',
+    purpose: 'Who can find you, and what happens to what the product holds about you.',
+    element: createElement(Account),
+  },
+]
+
 /**
  * The destination a given address resolves to, or undefined for a not-found address.
  *
@@ -156,11 +312,22 @@ export const HOME = DESTINATIONS[0] as Destination
  * wins so a future destination nested under another still resolves to the nearer one.
  * ─────────────────────────────────────────────────────────────────────────────────────────
  */
-export const destinationFor = (pathname: string): Destination | undefined => {
+export const destinationFor = (pathname: string): Addressable | undefined => {
   const exact = DESTINATIONS.find((destination) => destination.path === pathname)
   if (exact) return exact
 
-  return DESTINATIONS.filter(
+  const nested = DESTINATIONS.filter(
     (destination) => destination.path !== HOME.path && pathname.startsWith(`${destination.path}/`),
   ).sort((a, b) => b.path.length - a.path.length)[0]
+  if (nested) return nested
+
+  // ───────────────────────────────────────────────────────────────────────────────────────
+  // T048 (004) — the addresses that are not destinations, checked last.
+  //
+  // Last, because a destination must always win: `/agenda` resolving to anything but Agenda
+  // would be worse than the bug this fixes. Exact match only — none of these has nested
+  // addresses today, and inventing a prefix rule for a case that does not exist would be the
+  // kind of anticipation that later reads as a rule somebody relied on.
+  // ───────────────────────────────────────────────────────────────────────────────────────
+  return [...SHELL_ROUTES, ...PUBLIC_ROUTES].find((route) => route.path === pathname)
 }

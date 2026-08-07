@@ -1,10 +1,11 @@
+import { Suspense } from 'react'
 import { Route, Routes } from 'react-router'
 
 import { AppShell } from '../shell/AppShell.js'
 import { NotFound } from '../shell/NotFound.js'
 import { Home } from './destinations/Home.js'
 import { DestinationPlaceholder } from './destinations/Placeholder.js'
-import { DESTINATIONS, HOME } from './navigation.js'
+import { DESTINATIONS, HOME, PUBLIC_ROUTES, SHELL_ROUTES } from './navigation.js'
 import { RequireAuth } from './RequireAuth.js'
 
 /**
@@ -35,6 +36,18 @@ import { RequireAuth } from './RequireAuth.js'
  */
 export const AppRoutes = () => (
   <Routes>
+    {/*
+      T048 (004) — the addresses reachable **without a session**, outside the guard.
+
+      A person creating an account or following a reset link does not have one, so wrapping
+      these in `RequireAuth` would render the sign-in screen at every one of them and make self
+      sign-up unreachable. They are declared in `navigation.ts` for the same reason destinations
+      are: this file names no address, so 006–009 extend that file and never this one.
+    */}
+    {PUBLIC_ROUTES.map((route) => (
+      <Route key={route.path} path={route.path} element={<Loadable>{route.element}</Loadable>} />
+    ))}
+
     <Route element={<RequireAuth />}>
       <Route element={<AppShell />}>
         {DESTINATIONS.map((destination) => {
@@ -75,9 +88,47 @@ export const AppRoutes = () => (
           )
         })}
 
+        {/*
+          004 — addresses inside the shell that are not destinations: joining a conference, the
+          profile, and the account actions. Rendered generically, so this file still names none
+          of them, and the rail, top bar and conference switcher stay in place around them.
+        */}
+        {SHELL_ROUTES.map((route) => (
+          <Route
+            key={route.path}
+            path={route.path.slice(1)}
+            element={<Loadable>{route.element}</Loadable>}
+          />
+        ))}
+
         {/* FR-015 — inside the shell, so the navigation stays available. Never a blank screen. */}
         <Route path="*" element={<NotFound />} />
       </Route>
     </Route>
   </Routes>
+)
+
+/**
+ * The boundary the code-split standalone surfaces need (T130).
+ *
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ * `navigation.ts` declares these with `lazy`, so React needs somewhere to suspend while the
+ * chunk arrives. The fallback is announced rather than silent — a blank region during a slow
+ * chunk fetch is indistinguishable from a broken navigation, and a screen-reader user gets
+ * nothing at all from an empty `<div>`.
+ *
+ * Only the standalone routes are wrapped. The five destinations are imported eagerly and never
+ * suspend, so wrapping them would add a boundary that can never be reached.
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ */
+const Loadable = ({ children }: { children: React.ReactNode }) => (
+  <Suspense
+    fallback={
+      <p role="status" aria-live="polite" className="px-4 py-6 text-sm text-text-muted tablet:px-6">
+        Loading…
+      </p>
+    }
+  >
+    {children}
+  </Suspense>
 )

@@ -10,7 +10,7 @@
  * three can share.
  */
 import { spawn } from 'node:child_process'
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, openSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { fileURLToPath, URL } from 'node:url'
 
@@ -18,6 +18,25 @@ import { API_ORIGIN } from './env.js'
 
 const API_DIR = fileURLToPath(new URL('../../apps/api', import.meta.url))
 const PID_FILE = fileURLToPath(new URL('../../test-results/.api-pid', import.meta.url))
+
+/**
+ * 004 — where the API's output goes, so a spec can read a verification or reset link.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ * **The plaintext of a link exists for exactly one moment, inside one request.** Only its
+ * SHA-256 is stored (FR-323, FR-333), which is the property under test — so reading a link out
+ * of the database is not an option, because there is nothing there to read.
+ *
+ * The development mail sink writes each link to the process output, and quickstart.md already
+ * tells a reader to look for it there. `stdio` was `'ignore'`, which sent it nowhere; pointing
+ * it at a file is what makes that instruction literally true, for the end-to-end suite and for
+ * a person following Scenario 2 by hand.
+ *
+ * It is a *development* path in both senses: `SinkMailService` refuses to construct under
+ * `NODE_ENV=production` precisely because a reset link in a log is a credential in a log.
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ */
+export const API_LOG = fileURLToPath(new URL('../../test-results/api.log', import.meta.url))
 
 /** Polls `/health` until the API answers, or gives up. */
 const waitForHealth = async (timeoutMs = 60_000): Promise<void> => {
@@ -57,10 +76,14 @@ export const apiIsUp = async (): Promise<boolean> => {
 export const startApi = async (): Promise<void> => {
   mkdirSync(dirname(PID_FILE), { recursive: true })
 
+  // Truncated per run, so one run's links cannot be read by the next.
+  writeFileSync(API_LOG, '', 'utf8')
+  const log = openSync(API_LOG, 'a')
+
   const child = spawn('node', ['--import', 'tsx', 'src/server.ts'], {
     cwd: API_DIR,
     detached: true,
-    stdio: 'ignore',
+    stdio: ['ignore', log, log],
     env: process.env,
   })
 
