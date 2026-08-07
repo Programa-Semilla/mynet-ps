@@ -409,6 +409,117 @@
             }
           }
         }
+      },
+      "put": {
+        "summary": "Record the attendee's chosen conference",
+        "tags": [
+          "workspace"
+        ],
+        "description": "Records an explicit choice, which is then honoured indefinitely — it is never re-derived when the chosen conference ends (FR-104). Idempotent: selecting the already-active conference succeeds and changes nothing observable. Refuses a conference the attendee is not registered for identically to one that does not exist (FR-148).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "eventId"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "eventId": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The newly active conference, echoed in full so the client can reconcile a concurrent switch without a second request (research D9).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "The newly active conference, echoed in full so the client can reconcile a concurrent switch without a second request (research D9).",
+                  "type": "object",
+                  "required": [
+                    "id",
+                    "name",
+                    "location",
+                    "startsOn",
+                    "endsOn",
+                    "timezone"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "location": {
+                      "type": "string"
+                    },
+                    "startsOn": {
+                      "type": "string"
+                    },
+                    "endsOn": {
+                      "type": "string"
+                    },
+                    "timezone": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not registered for that conference, **or** no such conference. Deliberately indistinguishable (FR-148).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Not registered for that conference, **or** no such conference. Deliberately indistinguishable (FR-148).",
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/events/{eventId}/sessions": {

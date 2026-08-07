@@ -70,6 +70,46 @@ test.describe('durability', () => {
     await expect(page.getByLabel('Password')).toHaveCount(0)
   })
 
+  /**
+   * T054 (002) — **the conference choice survives a change of device** (FR-100, SC-103).
+   *
+   * ─────────────────────────────────────────────────────────────────────────────────────────
+   * This is the point of the whole active-event design, and the one property that would be
+   * satisfied by a `localStorage` write right up until the attendee picked up their phone.
+   *
+   * A fresh browser context is the test: new storage, new cookies, nothing carried over except
+   * the credentials. If the choice comes back, it came from the database.
+   * ─────────────────────────────────────────────────────────────────────────────────────────
+   */
+  test('an explicit conference choice survives signing in from a clean browser', async ({
+    browser,
+    page,
+  }) => {
+    await page.goto('/')
+    await signIn(page, ADA)
+
+    // Switch away from whatever derivation chose, to something explicitly selected.
+    await page.getByRole('button', { name: /change conference/i }).click()
+    await page.getByRole('menuitemradio', { name: new RegExp(ADA.events[1]) }).click()
+    await expect(page.getByRole('button', { name: /change conference/i })).toHaveAccessibleName(
+      new RegExp(ADA.events[1]),
+    )
+
+    // A genuinely separate context — not a reload, and not a new tab sharing storage.
+    const clean = await browser.newContext()
+    const cleanPage = await clean.newPage()
+    await cleanPage.goto('/')
+    await signIn(cleanPage, ADA)
+
+    await expect(
+      cleanPage.getByRole('button', { name: /change conference/i }),
+      'The chosen conference must come back on a different device. If it does not, the choice ' +
+        'is living in the browser rather than in the database (SC-103).',
+    ).toHaveAccessibleName(new RegExp(ADA.events[1]))
+
+    await clean.close()
+  })
+
   test('no attendee data is left behind in the browser after signing out', async ({ page }) => {
     // FR-056 — signing out leaves nothing from that session available on the device. The
     // structural guarantee is that the token lives in an HttpOnly cookie and API responses are

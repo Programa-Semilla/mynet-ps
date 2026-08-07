@@ -151,25 +151,25 @@ surface still shows the previous one; sign out and back in on a different browse
 
 ### Tests for User Story 3
 
-- [ ] T052 [P] [US3] Integration tests in `apps/api/tests/integration/active-event.test.ts`: `PUT` records the selection; an unregistered event is refused identically to a nonexistent one; re-selecting the active event is idempotent; **and an explicit choice survives its event's end date** (FR-104, US3 scenario 3) — an implementation that re-derives once the chosen event ends has taken the alternative brainstorm #02 rejected, and only this case catches it
-- [ ] T053 [P] [US3] Component tests in `apps/web/tests/event-switcher.test.tsx`: offline, the switch is refused with an explanation, the previous event stays active, nothing is queued and nothing reads as succeeded (FR-112); two switches in quick succession settle on the **last** selection, displayed and recorded (FR-118); **a switch leaves the browser address unchanged** (FR-119, US3 scenario 8)
-- [ ] T054 [P] [US3] Extend `e2e/durability.spec.ts`: switch, sign out, sign in from a clean context, the choice persists (SC-103)
+- [X] T052 [P] [US3] Integration tests in `apps/api/tests/integration/active-event.test.ts`: `PUT` records the selection; an unregistered event is refused identically to a nonexistent one; re-selecting the active event is idempotent; **and an explicit choice survives its event's end date** (FR-104, US3 scenario 3) — an implementation that re-derives once the chosen event ends has taken the alternative brainstorm #02 rejected, and only this case catches it
+- [X] T053 [P] [US3] Component tests in `apps/web/tests/event-switcher.test.tsx`: offline, the switch is refused with an explanation, the previous event stays active, nothing is queued and nothing reads as succeeded (FR-112); two switches in quick succession settle on the **last** selection, displayed and recorded (FR-118); **a switch leaves the browser address unchanged** (FR-119, US3 scenario 8)
+- [X] T054 [P] [US3] Extend `e2e/durability.spec.ts`: switch, sign out, sign in from a clean context, the choice persists (SC-103)
 
 ### Implementation for User Story 3
 
-- [ ] T055 [US3] `recordActiveEvent` upsert in `apps/api/src/db/queries/active-event.ts`
-- [ ] T056 [US3] `PUT /workspace/active-event` in `apps/api/src/routes/workspace/active-event.ts` with a full `schema` block — echoes the recorded event so the client can reconcile (research D9)
-- [ ] T057 [US3] `setActive` on `ActiveEventRepository` in `packages/data/src/interfaces/events.ts` and `packages/data/src/http/active-event-repository.ts`
-- [ ] T058 [US3] `apps/web/src/shell/EventSwitcher.tsx` — names the active event and its location; offers only registered events (FR-110, FR-111)
-- [ ] T059 [US3] Mount it in `apps/web/src/shell/TopBar.tsx` at all three widths: menu at desktop and tablet, full-width overlay with touch-sized targets at mobile. Must not force horizontal scrolling at 320px beside the attendee name and sign-out control
-- [ ] T060 [US3] Single registered event: identify it, offer no choice, in `apps/web/src/shell/EventSwitcher.tsx` (FR-114)
-- [ ] T061 [US3] Loading and empty states for the switcher in `apps/web/src/shell/EventSwitcher.tsx` (FR-117) — the failure state is T065; these are the other two the requirement names, and Principle IX presumes an undeclared state unmet
-- [ ] T062 [US3] Accessible label, visible focus, full keyboard operation, clear close, and **Escape dismissal that does not change the selection**, in `apps/web/src/shell/EventSwitcher.tsx` (FR-116)
-- [ ] T063 [US3] Invalidate every conference-scoped surface on a successful switch in `apps/web/src/app/active-event.tsx` — no full page reload, no surface left showing the previous event (FR-113)
-- [ ] T064 [US3] Sequence numbers on switch requests plus echo reconciliation in `apps/web/src/app/active-event.tsx`; re-read when the echo disagrees with the latest selection (FR-118). This reconciles **after** the server confirms — it is not an optimistic update, and the distinction belongs in the comment
-- [ ] T065 [US3] Failure state in `apps/web/src/shell/EventSwitcher.tsx` that leaves the previous event active and says the change did not take effect (FR-115); offline wording distinct from server-fault wording, following the sign-out precedent already in `apps/web/src/shell/TopBar.tsx`
-- [ ] T066 [US3] Confirm no destination address gains an event segment or query parameter — `apps/web/src/app/routes.tsx` keeps its conference-neutral shape (FR-119). The active event travels in requests, never in the address
-- [ ] T067 [US3] Run `pnpm contract:generate`; commit `contracts/openapi.json` and the regenerated `packages/data/src/generated/api.ts`
+- [X] T055 [US3] `recordActiveEvent` upsert in `apps/api/src/db/queries/active-event.ts`
+- [X] T056 [US3] `PUT /workspace/active-event` in `apps/api/src/routes/workspace/active-event.ts` with a full `schema` block — echoes the recorded event so the client can reconcile (research D9)
+- [X] T057 [US3] `setActive` on `ActiveEventRepository` in `packages/data/src/interfaces/events.ts` and `packages/data/src/http/active-event-repository.ts`
+- [X] T058 [US3] `apps/web/src/shell/EventSwitcher.tsx` — names the active event and its location; offers only registered events (FR-110, FR-111)
+- [X] T059 [US3] Mount it in `apps/web/src/shell/TopBar.tsx` at all three widths: menu at desktop and tablet, full-width overlay with touch-sized targets at mobile. Must not force horizontal scrolling at 320px beside the attendee name and sign-out control
+- [X] T060 [US3] Single registered event: identify it, offer no choice, in `apps/web/src/shell/EventSwitcher.tsx` (FR-114)
+- [X] T061 [US3] Loading and empty states for the switcher in `apps/web/src/shell/EventSwitcher.tsx` (FR-117) — the failure state is T065; these are the other two the requirement names, and Principle IX presumes an undeclared state unmet
+- [X] T062 [US3] Accessible label, visible focus, full keyboard operation, clear close, and **Escape dismissal that does not change the selection**, in `apps/web/src/shell/EventSwitcher.tsx` (FR-116)
+- [X] T063 [US3] Invalidate every conference-scoped surface on a successful switch in `apps/web/src/app/active-event.tsx` — no full page reload, no surface left showing the previous event (FR-113)
+- [X] T064 [US3] Sequence numbers on switch requests plus echo reconciliation in `apps/web/src/app/active-event.tsx`; re-read when the echo disagrees with the latest selection (FR-118). This reconciles **after** the server confirms — it is not an optimistic update, and the distinction belongs in the comment
+- [X] T065 [US3] Failure state in `apps/web/src/shell/EventSwitcher.tsx` that leaves the previous event active and says the change did not take effect (FR-115); offline wording distinct from server-fault wording, following the sign-out precedent already in `apps/web/src/shell/TopBar.tsx`
+- [X] T066 [US3] Confirm no destination address gains an event segment or query parameter — `apps/web/src/app/routes.tsx` keeps its conference-neutral shape (FR-119). The active event travels in requests, never in the address
+- [X] T067 [US3] Run `pnpm contract:generate`; commit `contracts/openapi.json` and the regenerated `packages/data/src/generated/api.ts`
 
 **Checkpoint**: the validation-checklist item "navigation and event switching" is discharged in full.
 

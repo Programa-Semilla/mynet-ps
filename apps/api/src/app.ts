@@ -69,7 +69,10 @@ export const buildApp = async (): Promise<FastifyInstance> => {
   await app.register(fastifyCors, {
     origin: config.webOrigin,
     credentials: true,
-    methods: ['GET', 'POST'],
+    // PUT is here for `PUT /workspace/active-event` (002, T056). Without it the browser's
+    // preflight refuses the switch and the client sees an opaque network failure — which the
+    // integration suite cannot catch, because `fastify.inject()` performs no preflight.
+    methods: ['GET', 'POST', 'PUT'],
   })
 
   // 3. Error handling. Registered before routes so that a failure *inside* route

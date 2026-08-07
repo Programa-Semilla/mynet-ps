@@ -25,6 +25,9 @@ import { getDb } from '../client.js'
  * to `Record<string, unknown>`, and only a type alias carries the implicit index signature that
  * satisfies it.
  */
+/** Matched rather than parsed — see the note in `recordActiveEvent`. */
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
 export type EventRow = {
   readonly id: string
   readonly name: string
@@ -102,6 +105,70 @@ export const resolveActiveEvent = async (attendeeId: string): Promise<EventRow |
       e.ends_on ASC,
       e.id ASC
     LIMIT 1
+  `)
+
+  return rows[0] ?? null
+}
+
+/**
+ * T055 (002) — records an explicit choice (FR-104).
+ *
+ * Returns the newly active event, or `null` when the attendee is not registered for it — which
+ * the caller turns into a refusal **indistinguishable from a nonexistent event** (FR-148).
+ *
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ * **The registration check and the write are one statement**, so there is no window between
+ * them in which a registration could be removed. `INSERT … SELECT … WHERE EXISTS` inserts only
+ * if the registration is there; the composite foreign key would refuse the row anyway, but
+ * relying on a constraint violation to express a business outcome means catching an error to
+ * decide a 404, and error-shape parsing is how "not registered" and "database is unwell"
+ * eventually become the same branch.
+ *
+ * **Idempotent** (contracts/README.md): selecting the already-active conference succeeds and
+ * changes nothing observable. `ON CONFLICT` updates the timestamp so a repeat is a no-op rather
+ * than a failure.
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ */
+export const recordActiveEvent = async (
+  attendeeId: string,
+  eventId: string,
+): Promise<EventRow | null> => {
+  // ─────────────────────────────────────────────────────────────────────────────────────────
+  // A malformed identifier is refused **exactly like** a well-formed one that is not the
+  // attendee's. Without this, PostgreSQL's uuid cast raises on `not-a-uuid`, the handler
+  // returns 500, and "malformed" becomes distinguishable from "not registered" — a smaller
+  // leak than existence, but still a difference an attacker can read (FR-148).
+  // ─────────────────────────────────────────────────────────────────────────────────────────
+  if (!UUID.test(eventId)) return null
+
+  const db = getDb()
+
+  const inserted = await db.execute<{ attendeeId: string }>(sql`
+    INSERT INTO active_event_selections (attendee_id, event_id, updated_at)
+    SELECT ${attendeeId}, ${eventId}, now()
+    WHERE EXISTS (
+      SELECT 1 FROM registrations r
+      WHERE r.attendee_id = ${attendeeId} AND r.event_id = ${eventId}
+    )
+    ON CONFLICT (attendee_id) DO UPDATE
+      SET event_id = EXCLUDED.event_id, updated_at = now()
+    RETURNING attendee_id AS "attendeeId"
+  `)
+
+  // No row inserted means no registration — which is also what a nonexistent event produces.
+  // The two are the same answer here, deliberately, so the route cannot tell them apart either.
+  if (inserted.length === 0) return null
+
+  const rows = await db.execute<EventRow>(sql`
+    SELECT
+      e.id,
+      e.name,
+      e.location,
+      e.starts_on AS "startsOn",
+      e.ends_on   AS "endsOn",
+      e.timezone
+    FROM events e
+    WHERE e.id = ${eventId}
   `)
 
   return rows[0] ?? null

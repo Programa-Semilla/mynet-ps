@@ -1,6 +1,7 @@
 import { render, screen, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 
+import { ActiveEventProvider } from '../src/app/active-event.js'
 import { Agenda } from '../src/app/destinations/Agenda.js'
 import { aSession, testServices, WithServices, type TestSession } from './support/services.js'
 
@@ -13,6 +14,9 @@ import { aSession, testServices, WithServices, type TestSession } from './suppor
  * cannot keep — the same reason the top bar carries no notification bell.
  */
 describe('Agenda', () => {
+  // Wrapped in the real provider rather than a stubbed context: Agenda's contract is with the
+  // one active-conference source above the router (FR-113), and a test that bypassed it would
+  // not notice if that wiring broke.
   const renderWith = (sessions: TestSession[]) =>
     render(
       <WithServices
@@ -20,7 +24,9 @@ describe('Agenda', () => {
           catalog: { listSessions: async () => sessions, listTracks: async () => [] },
         })}
       >
-        <Agenda />
+        <ActiveEventProvider>
+          <Agenda />
+        </ActiveEventProvider>
       </WithServices>,
     )
 
@@ -102,7 +108,9 @@ describe('Agenda', () => {
           },
         })}
       >
-        <Agenda />
+        <ActiveEventProvider>
+          <Agenda />
+        </ActiveEventProvider>
       </WithServices>,
     )
 

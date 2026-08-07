@@ -354,7 +354,68 @@ export interface paths {
                 };
             };
         };
-        put?: never;
+        /**
+         * Record the attendee's chosen conference
+         * @description Records an explicit choice, which is then honoured indefinitely — it is never re-derived when the chosen conference ends (FR-104). Idempotent: selecting the already-active conference succeeds and changes nothing observable. Refuses a conference the attendee is not registered for identically to one that does not exist (FR-148).
+         */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        eventId: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description The newly active conference, echoed in full so the client can reconcile a concurrent switch without a second request (research D9). */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** Format: uuid */
+                            id: string;
+                            name: string;
+                            location: string;
+                            startsOn: string;
+                            endsOn: string;
+                            timezone: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Not registered for that conference, **or** no such conference. Deliberately indistinguishable (FR-148). */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+            };
+        };
         post?: never;
         delete?: never;
         options?: never;

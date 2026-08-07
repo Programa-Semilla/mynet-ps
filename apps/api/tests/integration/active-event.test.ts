@@ -56,6 +56,12 @@ describe('active event derivation', () => {
   /** Ada's registrations only — the other seeded attendee's events must not influence hers. */
   const ADA_EVENTS = ['Product & Design Summit', 'Frontend Horizons'] as const
 
+  const eventNamed = async (name: string): Promise<{ id: string }> => {
+    const [row] = await getDb().select().from(events).where(eq(events.name, name))
+    if (!row) throw new Error(`Seed did not produce "${name}".`)
+    return row
+  }
+
   beforeAll(async () => {
     app = await setupTestApp()
   })
@@ -249,6 +255,146 @@ describe('active event derivation', () => {
       const response = await app.inject({ method: 'GET', url: '/workspace/active-event' })
 
       expect(response.statusCode).toBe(401)
+    })
+
+    it('records a choice, and echoes what it recorded (research D9)', async () => {
+      const cookie = await signInAs(ADA)
+      const horizons = await eventNamed('Frontend Horizons')
+
+      const put = await app.inject({
+        method: 'PUT',
+        url: '/workspace/active-event',
+        headers: { cookie: cookieHeader(cookie) },
+        payload: { eventId: horizons.id },
+      })
+
+      expect(put.statusCode).toBe(200)
+      expect((put.json() as { id: string }).id).toBe(horizons.id)
+
+      // And it stuck.
+      const get = await app.inject({
+        method: 'GET',
+        url: '/workspace/active-event',
+        headers: { cookie: cookieHeader(cookie) },
+      })
+      expect((get.json() as { name: string }).name).toBe('Frontend Horizons')
+    })
+
+    it('is idempotent — re-selecting the active conference changes nothing observable', async () => {
+      const cookie = await signInAs(ADA)
+      const horizons = await eventNamed('Frontend Horizons')
+
+      const select = () =>
+        app.inject({
+          method: 'PUT',
+          url: '/workspace/active-event',
+          headers: { cookie: cookieHeader(cookie) },
+          payload: { eventId: horizons.id },
+        })
+
+      const first = await select()
+      const second = await select()
+
+      expect(first.statusCode).toBe(200)
+      expect(second.statusCode).toBe(200)
+      expect(second.json()).toEqual(first.json())
+    })
+
+    it('refuses an unregistered conference identically to a nonexistent one (FR-148)', async () => {
+      const cookie = await signInAs(ADA)
+      // Grace's conference: real, but not Ada's.
+      const systems = await eventNamed('Systems & Scale')
+
+      const unregistered = await app.inject({
+        method: 'PUT',
+        url: '/workspace/active-event',
+        headers: { cookie: cookieHeader(cookie) },
+        payload: { eventId: systems.id },
+      })
+
+      const nonexistent = await app.inject({
+        method: 'PUT',
+        url: '/workspace/active-event',
+        headers: { cookie: cookieHeader(cookie) },
+        payload: { eventId: '00000000-0000-0000-0000-000000000000' },
+      })
+
+      // Identical status AND identical body. Any difference leaks which conferences exist.
+      expect(unregistered.statusCode).toBe(nonexistent.statusCode)
+      expect(unregistered.json()).toEqual(nonexistent.json())
+      expect(unregistered.statusCode).toBe(404)
+    })
+
+    it('refuses a malformed identifier the same way, not with a 500', async () => {
+      const cookie = await signInAs(ADA)
+
+      const malformed = await app.inject({
+        method: 'PUT',
+        url: '/workspace/active-event',
+        headers: { cookie: cookieHeader(cookie) },
+        payload: { eventId: 'not-a-uuid' },
+      })
+
+      expect(malformed.statusCode).toBe(404)
+    })
+
+    it('leaves the active conference unchanged after a refused switch', async () => {
+      const cookie = await signInAs(ADA)
+      const before = await app.inject({
+        method: 'GET',
+        url: '/workspace/active-event',
+        headers: { cookie: cookieHeader(cookie) },
+      })
+
+      const systems = await eventNamed('Systems & Scale')
+      await app.inject({
+        method: 'PUT',
+        url: '/workspace/active-event',
+        headers: { cookie: cookieHeader(cookie) },
+        payload: { eventId: systems.id },
+      })
+
+      const after = await app.inject({
+        method: 'GET',
+        url: '/workspace/active-event',
+        headers: { cookie: cookieHeader(cookie) },
+      })
+
+      expect(after.json()).toEqual(before.json())
+    })
+
+    it('HONOURS AN EXPLICIT CHOICE AFTER ITS CONFERENCE HAS ENDED (FR-104)', async () => {
+      // ─────────────────────────────────────────────────────────────────────────────────────
+      // The one case that catches the alternative brainstorm #02 rejected. An implementation
+      // that re-derives once the chosen conference ends passes every other test in this file:
+      // the tiers are right, the ordering is right, the PUT records. Only this notices, which
+      // is why it is here and why it is spelled out.
+      // ─────────────────────────────────────────────────────────────────────────────────────
+      const cookie = await signInAs(ADA)
+      const horizons = await eventNamed('Frontend Horizons')
+
+      await app.inject({
+        method: 'PUT',
+        url: '/workspace/active-event',
+        headers: { cookie: cookieHeader(cookie) },
+        payload: { eventId: horizons.id },
+      })
+
+      // Now push the chosen conference firmly into the past, and make the other one current.
+      await moveEvent('Frontend Horizons', -60, -58)
+      await moveEvent('Product & Design Summit', -1, 1)
+
+      const after = await app.inject({
+        method: 'GET',
+        url: '/workspace/active-event',
+        headers: { cookie: cookieHeader(cookie) },
+      })
+
+      expect(
+        (after.json() as { name: string }).name,
+        'A chosen conference must stay active after it ends. Falling back to derivation here is ' +
+          'the alternative brainstorm #02 explored and rejected (FR-104).',
+      ).toBe('Frontend Horizons')
     })
 
     it('accepts no attendee identifier by any route (FR-106)', async () => {
