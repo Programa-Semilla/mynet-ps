@@ -282,7 +282,8 @@
                       "name",
                       "location",
                       "startsOn",
-                      "endsOn"
+                      "endsOn",
+                      "timezone"
                     ],
                     "additionalProperties": false,
                     "properties": {
@@ -301,12 +302,93 @@
                       },
                       "endsOn": {
                         "type": "string"
+                      },
+                      "timezone": {
+                        "type": "string"
                       }
                     }
                   }
                 }
               }
             }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspace/active-event": {
+      "get": {
+        "summary": "The attendee's active conference, recorded or derived",
+        "tags": [
+          "workspace"
+        ],
+        "description": "Returns the attendee's explicitly chosen conference, or — while they have never chosen — the one derived from their registrations: in progress at the venue today, else next to start, else most recently ended (FR-102, FR-103). An attendee registered for no conferences receives 204 with no body, which is a valid answer and not an error (FR-105). Carries the venue timezone so the client can compute \"day N of M\" itself; that counter is never stored and never sent (FR-121).",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "id",
+                    "name",
+                    "location",
+                    "startsOn",
+                    "endsOn",
+                    "timezone"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "location": {
+                      "type": "string"
+                    },
+                    "startsOn": {
+                      "type": "string"
+                    },
+                    "endsOn": {
+                      "type": "string"
+                    },
+                    "timezone": {
+                      "type": "string",
+                      "description": "IANA zone of the venue, e.g. Europe/Madrid (FR-120)."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "204": {
+            "description": "Registered for no conferences (FR-105). An empty body, not an error and not a fabricated event — the client renders an explicit empty state."
           },
           "401": {
             "description": "Default Response",

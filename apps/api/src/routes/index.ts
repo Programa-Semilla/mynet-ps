@@ -5,6 +5,7 @@ import { signInRoutes } from './auth/sign-in.js'
 import { signOutRoutes } from './auth/sign-out.js'
 import { eventRoutes } from './events.js'
 import { healthRoutes } from './health.js'
+import { activeEventRoutes } from './workspace/active-event.js'
 
 /**
  * T002 (002) — the route registry, lifted out of step 8 of `app.ts` (FR-181).
@@ -36,4 +37,6 @@ export const ROUTES: readonly RoutePlugin[] = [
   signOutRoutes,
   meRoutes,
   eventRoutes,
+  // 002 — event context.
+  activeEventRoutes,
 ]

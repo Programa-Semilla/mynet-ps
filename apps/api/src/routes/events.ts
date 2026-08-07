@@ -34,7 +34,7 @@ export const eventRoutes = async (app: FastifyInstance): Promise<void> => {
             type: 'array',
             items: {
               type: 'object',
-              required: ['id', 'name', 'location', 'startsOn', 'endsOn'],
+              required: ['id', 'name', 'location', 'startsOn', 'endsOn', 'timezone'],
               additionalProperties: false,
               properties: {
                 id: { type: 'string', format: 'uuid' },
@@ -42,6 +42,14 @@ export const eventRoutes = async (app: FastifyInstance): Promise<void> => {
                 location: { type: 'string' },
                 startsOn: { type: 'string' },
                 endsOn: { type: 'string' },
+                // T011 (002) — the venue's IANA zone. Present on every event, not only the
+                // active one: day context is computed against the venue's clock (FR-120), and
+                // the client carries one `Event` shape.
+                //
+                // `dayNumber` and `totalDays` are **absent by design and must stay absent**
+                // (FR-121). They go stale the moment the clock moves, which is why the
+                // timezone is sent and the count is not.
+                timezone: { type: 'string' },
               },
             },
           },

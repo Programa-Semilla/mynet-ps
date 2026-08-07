@@ -38,11 +38,25 @@ export type EventsResponse =
 export type HealthResponse =
   paths['/health']['get']['responses'][200]['content']['application/json']
 
+/**
+ * Response body of `GET /workspace/active-event` (002, T020).
+ *
+ * The 200 only. The 204 has no body by design — an attendee registered for no conferences
+ * (FR-105) — and there is nothing to bind for it.
+ */
+export type ActiveEventResponse =
+  paths['/workspace/active-event']['get']['responses'][200]['content']['application/json']
+
 // If any line below stops compiling, the client's domain type expects something the contract
 // no longer guarantees. Fix the domain type or the route schema — never this file, and never
 // contracts/openapi.json, which is generated output.
 export type _AttendeeMatchesContract = Satisfies<MeResponse, Attendee>
 export type _EventsMatchContract = Satisfies<EventsResponse[number], Event>
 export type _HealthIsShaped = Satisfies<HealthResponse, { status: 'ok' }>
+
+// 002 — the active conference is the same `Event` the client already knows, including the
+// venue timezone day context needs (FR-120). If the route ever stopped sending `timezone`,
+// this is what would notice.
+export type _ActiveEventMatchesContract = Satisfies<ActiveEventResponse, Event>
 
 export type { components, paths }

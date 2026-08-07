@@ -47,6 +47,10 @@ const renderSignIn = (overrides: Partial<PlatformServices> = {}) => {
       // Signed out: `getCurrent` rejects, which is what puts AuthProvider in 'signed-out'.
       attendee: { getCurrent: async () => Promise.reject(new Error('not signed in')) },
       events: { listRegistered: async () => [] },
+      activeEvent: {
+        getActive: async () => null,
+        setActive: async () => Promise.reject(new Error('not signed in')),
+      },
     },
     auth: { signIn, signOut: async () => {} },
     ...overrides,

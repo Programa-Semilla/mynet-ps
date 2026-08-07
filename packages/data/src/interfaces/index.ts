@@ -20,7 +20,7 @@
  * in each domain file**, not only here. See `attendee.ts` and `events.ts`.
  */
 export type { Attendee, AttendeeRepository } from './attendee.js'
-export type { Event, EventsRepository } from './events.js'
+export type { ActiveEventRepository, Event, EventsRepository } from './events.js'
 
 export {
   NotAuthenticatedError,
@@ -30,7 +30,7 @@ export {
 } from './errors.js'
 
 import type { AttendeeRepository } from './attendee.js'
-import type { EventsRepository } from './events.js'
+import type { ActiveEventRepository, EventsRepository } from './events.js'
 
 /**
  * Every repository, in one shape (research.md D10).
@@ -42,4 +42,5 @@ import type { EventsRepository } from './events.js'
 export interface Repositories {
   readonly attendee: AttendeeRepository
   readonly events: EventsRepository
+  readonly activeEvent: ActiveEventRepository
 }

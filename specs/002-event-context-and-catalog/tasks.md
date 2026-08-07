@@ -50,17 +50,17 @@ one or both.
 
 **⚠️ No user story work begins until this phase is complete.**
 
-- [ ] T006 Add `timezone` (`text NOT NULL`, IANA) to `events` in `apps/api/src/db/schema/events.ts`
-- [ ] T007 Create `apps/api/src/db/schema/active-event.ts` — `active_event_selections` with `attendee_id` as primary key and the composite foreign key `(attendee_id, event_id) → registrations (attendee_id, event_id) ON DELETE CASCADE`. Comment why: this is FR-101 as a database guarantee, and it is what makes a removed registration fall back to derivation with no application logic
-- [ ] T008 Register both in `apps/api/src/db/schema/index.ts`
-- [ ] T009 Generate `apps/api/migrations/0001_event_context.sql`. Add `timezone` with `DEFAULT 'UTC'`, back-fill, then **`DROP DEFAULT` in the same migration** — a column that keeps a silent default is how a wrong day number ships unnoticed (research D11)
-- [ ] T010 Give the three seeded events real IANA zones in `apps/api/src/db/seed/events.ts` — `Europe/Madrid`, `Europe/Lisbon`, `Europe/Berlin`
-- [ ] T011 [P] Add `timezone` to `Event` and declare `ActiveEventRepository` in `packages/data/src/interfaces/events.ts`
-- [ ] T012 [P] Create `apps/web/src/app/home/contract.ts` — `HomeCardSlot` (`lead` | `primary` | `aside`) and the `HomeCard` union discriminated on `scope`, so an event-scoped card's component *requires* the event prop and an attendee-scoped card's *cannot accept* one (FR-158–FR-160)
-- [ ] T013 Create `apps/web/src/app/home/registry.ts` — the append-only array. This is the one shared file the next seven features touch; say so in the file
-- [ ] T014 Create `apps/web/src/app/home/HomeShell.tsx` — groups by slot, orders within slot, and wraps every card in a boundary reusing `apps/web/src/app/ErrorBoundary.tsx`. Containment is the shell's so a card author cannot forget it (FR-163)
-- [ ] T015 Map slots to the three widths in exactly one place inside `HomeShell.tsx` (FR-156): desktop full-width `lead` above a `primary` column and an `aside` column; tablet two columns with `aside` folded below; mobile single column
-- [ ] T016 Replace the body of `apps/web/src/app/destinations/Home.tsx` with `HomeShell` over the registry
+- [X] T006 Add `timezone` (`text NOT NULL`, IANA) to `events` in `apps/api/src/db/schema/events.ts`
+- [X] T007 Create `apps/api/src/db/schema/active-event.ts` — `active_event_selections` with `attendee_id` as primary key and the composite foreign key `(attendee_id, event_id) → registrations (attendee_id, event_id) ON DELETE CASCADE`. Comment why: this is FR-101 as a database guarantee, and it is what makes a removed registration fall back to derivation with no application logic
+- [X] T008 Register both in `apps/api/src/db/schema/index.ts`
+- [X] T009 Generate `apps/api/migrations/0001_event_context.sql`. Add `timezone` with `DEFAULT 'UTC'`, back-fill, then **`DROP DEFAULT` in the same migration** — a column that keeps a silent default is how a wrong day number ships unnoticed (research D11)
+- [X] T010 Give the three seeded events real IANA zones in `apps/api/src/db/seed/events.ts` — `Europe/Madrid`, `Europe/Lisbon`, `Europe/Berlin`
+- [X] T011 [P] Add `timezone` to `Event` and declare `ActiveEventRepository` in `packages/data/src/interfaces/events.ts`
+- [X] T012 [P] Create `apps/web/src/app/home/contract.ts` — `HomeCardSlot` (`lead` | `primary` | `aside`) and the `HomeCard` union discriminated on `scope`, so an event-scoped card's component *requires* the event prop and an attendee-scoped card's *cannot accept* one (FR-158–FR-160)
+- [X] T013 Create `apps/web/src/app/home/registry.ts` — the append-only array. This is the one shared file the next seven features touch; say so in the file
+- [X] T014 Create `apps/web/src/app/home/HomeShell.tsx` — groups by slot, orders within slot, and wraps every card in a boundary reusing `apps/web/src/app/ErrorBoundary.tsx`. Containment is the shell's so a card author cannot forget it (FR-163)
+- [X] T015 Map slots to the three widths in exactly one place inside `HomeShell.tsx` (FR-156): desktop full-width `lead` above a `primary` column and an `aside` column; tablet two columns with `aside` folded below; mobile single column
+- [X] T016 Replace the body of `apps/web/src/app/destinations/Home.tsx` with `HomeShell` over the registry
 
 **Checkpoint**: schema and composition contract exist. User stories can begin.
 
@@ -77,22 +77,22 @@ the venue date has rolled over and Lima's has not — the day number must follow
 
 ### Tests for User Story 1
 
-- [ ] T017 [P] [US1] Integration test in `apps/api/tests/integration/active-event.test.ts`: each derivation tier (in progress, next upcoming, most recently ended), and the total order under a tie — same answer across repeated reads (FR-102, FR-103)
-- [ ] T018 [P] [US1] Unit test in `apps/web/tests/unit/day-context.test.ts`: day number across a venue/device timezone gap, a DST transition inside the range adding no day, a one-day conference reading "day 1 of 1", and the before/during/after cases (FR-121, FR-122, FR-125)
+- [X] T017 [P] [US1] Integration test in `apps/api/tests/integration/active-event.test.ts`: each derivation tier (in progress, next upcoming, most recently ended), and the total order under a tie — same answer across repeated reads (FR-102, FR-103)
+- [X] T018 [P] [US1] Unit test in `apps/web/tests/unit/day-context.test.ts`: day number across a venue/device timezone gap, a DST transition inside the range adding no day, a one-day conference reading "day 1 of 1", and the before/during/after cases (FR-121, FR-122, FR-125)
 
 ### Implementation for User Story 1
 
-- [ ] T019 [US1] Derivation in `apps/api/src/db/queries/active-event.ts` — one SQL query using the database clock, tiering on `(now() AT TIME ZONE events.timezone)::date`, ordering `starts_on`, `ends_on`, `id`. Comment why it is not split across two clocks (research D4)
-- [ ] T020 [US1] `GET /workspace/active-event` in `apps/api/src/routes/workspace/active-event.ts` with a full `schema` block — 200 with the event including `timezone`, 204 when registered for none, 401. No `dayNumber` or `totalDays` in the response, ever (FR-121)
-- [ ] T021 [US1] Register the route in `apps/api/src/routes/index.ts`
-- [ ] T022 [P] [US1] `HttpActiveEventRepository` in `packages/data/src/http/active-event-repository.ts`
-- [ ] T023 [US1] Wire it at the composition root, `apps/web/src/app/services.ts`
-- [ ] T024 [US1] `apps/web/src/app/day-context.ts` — venue-local date via `Intl.DateTimeFormat` with an explicit `timeZone`, counting calendar dates rather than elapsed milliseconds. No new dependency (research D5)
-- [ ] T025 [US1] `apps/web/src/app/active-event.tsx` — resolves the active event above the cards, with loading, registered-for-none, and failure states
-- [ ] T026 [US1] `apps/web/src/app/home/cards/GreetingDayContext.tsx` — `scope: 'event'`, slot `lead`. Greeting names the signed-in attendee; time-of-day wording from the device clock (FR-123). Expose machine-readable times alongside the human wording
-- [ ] T027 [US1] Register the card in `apps/web/src/app/home/registry.ts`
-- [ ] T028 [US1] Explicit empty state for an attendee registered for no conferences in `apps/web/src/app/active-event.tsx` — a statement of what will appear, not an error and not a blank region (FR-105)
-- [ ] T029 [US1] Run `pnpm contract:generate` and commit `contracts/openapi.json` with the regenerated client types
+- [X] T019 [US1] Derivation in `apps/api/src/db/queries/active-event.ts` — one SQL query using the database clock, tiering on `(now() AT TIME ZONE events.timezone)::date`, ordering `starts_on`, `ends_on`, `id`. Comment why it is not split across two clocks (research D4)
+- [X] T020 [US1] `GET /workspace/active-event` in `apps/api/src/routes/workspace/active-event.ts` with a full `schema` block — 200 with the event including `timezone`, 204 when registered for none, 401. No `dayNumber` or `totalDays` in the response, ever (FR-121)
+- [X] T021 [US1] Register the route in `apps/api/src/routes/index.ts`
+- [X] T022 [P] [US1] `HttpActiveEventRepository` in `packages/data/src/http/active-event-repository.ts`
+- [X] T023 [US1] Wire it at the composition root, `apps/web/src/app/services.ts`
+- [X] T024 [US1] `apps/web/src/app/day-context.ts` — venue-local date via `Intl.DateTimeFormat` with an explicit `timeZone`, counting calendar dates rather than elapsed milliseconds. No new dependency (research D5)
+- [X] T025 [US1] `apps/web/src/app/active-event.tsx` — resolves the active event above the cards, with loading, registered-for-none, and failure states
+- [X] T026 [US1] `apps/web/src/app/home/cards/GreetingDayContext.tsx` — `scope: 'event'`, slot `lead`. Greeting names the signed-in attendee; time-of-day wording from the device clock (FR-123). Expose machine-readable times alongside the human wording
+- [X] T027 [US1] Register the card in `apps/web/src/app/home/registry.ts`
+- [X] T028 [US1] Explicit empty state for an attendee registered for no conferences in `apps/web/src/app/active-event.tsx` — a statement of what will appear, not an error and not a blank region (FR-105)
+- [X] T029 [US1] Run `pnpm contract:generate` and commit `contracts/openapi.json` with the regenerated client types
 
 **Checkpoint**: US1 is independently demonstrable and is the MVP.
 

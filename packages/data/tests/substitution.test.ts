@@ -37,6 +37,7 @@ const EVENTS: Event[] = [
     location: 'Barcelona, Spain',
     startsOn: '2026-09-14',
     endsOn: '2026-09-17',
+    timezone: 'Europe/Madrid',
   },
 ]
 

@@ -18,6 +18,7 @@ export { PlatformProvider, PlatformContext } from './registry.js'
 export type { PlatformServices, PlatformProviderProps } from './registry.js'
 
 export {
+  useActiveEventRepository,
   useAttendeeRepository,
   useAuthGateway,
   useCalendar,

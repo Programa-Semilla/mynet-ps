@@ -41,6 +41,9 @@ export const useAttendeeRepository = (): PlatformServices['repositories']['atten
 export const useEventsRepository = (): PlatformServices['repositories']['events'] =>
   usePlatform().repositories.events
 
+export const useActiveEventRepository = (): PlatformServices['repositories']['activeEvent'] =>
+  usePlatform().repositories.activeEvent
+
 export const useAuthGateway = (): PlatformServices['auth'] => usePlatform().auth
 
 /**

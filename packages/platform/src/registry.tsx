@@ -22,6 +22,11 @@ export interface PlatformServices {
   readonly repositories: {
     readonly attendee: { getCurrent(): Promise<unknown> }
     readonly events: { listRegistered(): Promise<unknown[]> }
+    /** 002 — the attendee's active conference, recorded or derived (FR-100–FR-104). */
+    readonly activeEvent: {
+      getActive(): Promise<unknown>
+      setActive(eventId: string): Promise<unknown>
+    }
   }
   /**
    * Session lifecycle. Not a repository — it changes session state rather than reading domain

@@ -269,8 +269,76 @@ export interface paths {
                             location: string;
                             startsOn: string;
                             endsOn: string;
+                            timezone: string;
                         }[];
                     };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspace/active-event": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The attendee's active conference, recorded or derived
+         * @description Returns the attendee's explicitly chosen conference, or — while they have never chosen — the one derived from their registrations: in progress at the venue today, else next to start, else most recently ended (FR-102, FR-103). An attendee registered for no conferences receives 204 with no body, which is a valid answer and not an error (FR-105). Carries the venue timezone so the client can compute "day N of M" itself; that counter is never stored and never sent (FR-121).
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** Format: uuid */
+                            id: string;
+                            name: string;
+                            location: string;
+                            startsOn: string;
+                            endsOn: string;
+                            /** @description IANA zone of the venue, e.g. Europe/Madrid (FR-120). */
+                            timezone: string;
+                        };
+                    };
+                };
+                /** @description Registered for no conferences (FR-105). An empty body, not an error and not a fabricated event — the client renders an explicit empty state. */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
                 };
                 /** @description Default Response */
                 401: {

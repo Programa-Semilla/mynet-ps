@@ -17,24 +17,36 @@ import type { SeedContext, SeedModule } from './index.js'
  * per-PR preview branches only (data-model.md, Seed data).
  */
 
+/**
+ * T010 (002) — each venue's real IANA zone, which is what back-fills `events.timezone` after
+ * the migration drops its temporary `'UTC'` default (research D11).
+ *
+ * **Three different zones, deliberately, and none of them UTC.** They are what makes the day
+ * number falsifiable: `Europe/Lisbon` is an hour behind the other two for most of the year, so
+ * a device-local computation — the bug FR-120 exists to prevent — produces a visibly wrong
+ * answer on a real fixture rather than only in a contrived test.
+ */
 export const SEED_EVENTS = [
   {
     name: 'Product & Design Summit',
     location: 'Barcelona, Spain',
     startsOn: '2026-09-14',
     endsOn: '2026-09-17',
+    timezone: 'Europe/Madrid',
   },
   {
     name: 'Frontend Horizons',
     location: 'Lisbon, Portugal',
     startsOn: '2026-10-05',
     endsOn: '2026-10-07',
+    timezone: 'Europe/Lisbon',
   },
   {
     name: 'Systems & Scale',
     location: 'Berlin, Germany',
     startsOn: '2026-11-11',
     endsOn: '2026-11-13',
+    timezone: 'Europe/Berlin',
   },
 ] as const
 
@@ -54,6 +66,26 @@ const SEED_REGISTRATIONS: readonly { attendee: string; event: string }[] = [
   { attendee: 'grace@example.com', event: 'Systems & Scale' },
 ]
 
+/**
+ * Timezone validity is enforced **here, at the seed boundary** (data-model.md), and not by a
+ * table constraint: PostgreSQL's `pg_timezone_names` is not usable inside a `CHECK`, and a
+ * wrong-but-valid zone would satisfy such a constraint anyway.
+ *
+ * This catches the typo — `Europe/Madird` — which would otherwise reach the client as a zone
+ * `Intl.DateTimeFormat` rejects, turning a seed slip into a runtime failure on Home for every
+ * attendee at that conference.
+ */
+const assertKnownTimeZone = (timezone: string, eventName: string): void => {
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: timezone }).format(new Date())
+  } catch {
+    throw new Error(
+      `Seed: "${eventName}" declares timezone "${timezone}", which this runtime does not recognise. ` +
+        'It must be an IANA zone such as "Europe/Madrid" (data-model.md, events.timezone).',
+    )
+  }
+}
+
 export const eventSeed: SeedModule = {
   name: 'events',
 
@@ -64,6 +96,10 @@ export const eventSeed: SeedModule = {
   },
 
   async run(db, context: SeedContext) {
+    for (const event of SEED_EVENTS) {
+      assertKnownTimeZone(event.timezone, event.name)
+    }
+
     const inserted = await db
       .insert(events)
       .values([...SEED_EVENTS])
