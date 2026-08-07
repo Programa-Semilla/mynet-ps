@@ -106,9 +106,10 @@ git config core.hooksPath .githooks
 ```
 
 `.githooks/pre-commit` and `.githooks/pre-push` block direct commits and pushes to `main` and
-`develop`. They are bypassable with `--no-verify` — server-side GitHub branch protection is not
-yet active because this is a private repository on a free personal account. See
-`.githooks/README.md`.
+`develop`. They are bypassable with `--no-verify` — server-side GitHub branch protection is **not
+configured**. The protection endpoints return 404 (no rule set), not 403; the repository is public
+and organisation-owned, and protection is free on public repositories, so this is a configuration
+task rather than a limitation. See `.githooks/README.md`.
 
 ## Product
 
@@ -253,7 +254,7 @@ shape** (the API lives here, at `apps/api`).
 Each entry names the feature it blocks, because when to ask matters as much as what to ask.
 
 - **Attendee identity model.** How a person becomes an attendee — self sign-up, event invitation, ticket holder, organizer-provisioned — is unspecified, and it determines the authentication design. **Blocks the attendee profile feature.**
-- **Data retention, deletion, and export obligations** for personal data are recognised (constitution Principle VIII) but unspecified. **Blocks the attendee profile feature**, the first to store substantial personal data.
+- **Data retention, deletion, and export obligations** for personal data are recognised (constitution Principle VIII) but unspecified. **Blocks 004, the attendee profile feature.** Corrected 2026-08-07: 004 is *not* the first to store substantial personal data. It has no parallel partner and is blocked on other grounds, so **005 ships first** and stores the first attendee-authored free text as personal session notes. 005 proceeds on a narrow declared commitment — deleted with the account, no export — recorded in its specification. The full obligation is still open.
 - **The connection model behind Network contacts.** The prototype derives contacts from the existence of a conversation. There is no connect or accept action, so there is no defined relationship to store. **Blocks the Network feature entirely.**
 - **Exchanged digital cards.** Requirements place them in Network; the prototype shows a transient 2-second confirmation and records nothing. What a card exchange creates, and whether it is mutual, is undefined. **Blocks the Network feature entirely.**
 - **Audience-question attribution.** Whether a Q&A question is attributed to its author or anonymous. It decides whether Q&A is a personal-data surface under Principle VIII. **Blocks the Q&A feature.**
@@ -270,7 +271,9 @@ Each entry names the feature it blocks, because when to ask matters as much as w
 - **Authentication ownership** — self-implemented versus a delegated provider.
 - **Attendee avatar handling** — seeded imagery versus real upload. Upload pulls in object storage and `CameraService` and opens a new personal-data surface. Deferring it is the working assumption, not a decision. **Blocks the attendee profile feature.**
 - **Preview environments must never point at production data**, and preview access control is undecided. Cloudflare Pages previews are publicly reachable by default.
-- **Server-side branch protection is unavailable** (private repo, free personal account; APIs return 403). Enforcement is client-side and bypassable — materially more serious now that real attendee data is in scope.
+- **Server-side branch protection is unconfigured** — a configuration task, not a limitation. Corrected 2026-08-07: the repo is **public** and organisation-owned (`Programa-Semilla/mynet-ps`), and the protection endpoints return **404 (no rule set)**, not 403. Protection is free on public repositories. Enforcement is meanwhile client-side and bypassable — materially more serious now that real attendee data is in scope.
+- **The repository is public**, and neither the constitution nor this file recorded that until 2026-08-07. It changes the Principle VIII threat model: seed data, migrations, workflow config and the API contract are world-readable, and previews are reachable by anyone who finds them.
+- **The pipeline runs red.** Every PR run of `verify` has concluded in failure, with `migrations`, `test-integration`, `test-accessibility` and `test-e2e` **skipped** — so the checks Principle VII names have never executed. 001 and 002 both merged in this state. Constitution v2.2.0 makes that an explicit governance breach requiring a recorded waiver.
 
 ### Not open questions — settled requirements the prototype failed to meet
 
