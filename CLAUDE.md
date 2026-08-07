@@ -4,8 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Status of this repository
 
-The production foundation has shipped, and **event context and the session catalog have landed on
-top of it** (feature 002). An attendee signs in and arrives at the conference happening now, greeted
+The production foundation has shipped, and **event context and the session catalog have shipped on
+top of it** — feature 002, squash-merged to `develop` in
+[#6](https://github.com/Programa-Semilla/mynet-ps/pull/6). An attendee signs in and arrives at the conference happening now, greeted
 by name and told which day of it today is in the venue's timezone. Home shows what is next and what
 remains of the day; **Agenda carries the conference programme**, read-only and chronological. The
 conference switcher is in the top bar at all three widths, and the choice survives sign-out and a
@@ -25,6 +26,11 @@ Three things 002 established that every later feature inherits:
 **Still carrying no product content**: Discover, Messages and Network. No attendee cards, no
 threads, no appointments. Saved sessions, personal notes and audience Q&A arrive in 005 and 009 —
 Agenda deliberately offers no save control today.
+
+**Next in the queue is 004, attendee profiles**, and it is still blocked on three recorded
+decisions: the attendee identity model, data retention/deletion/export obligations, and avatar
+handling. 005 is now unblocked (it depended on 002), so 005 ∥ 006 is the first free parallel pair
+— 003 having been absorbed into 002. See `brainstorm/00-overview.md` for the queue.
 
 ```
 GroundZero/
