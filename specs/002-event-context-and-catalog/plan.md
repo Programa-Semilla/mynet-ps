@@ -67,6 +67,101 @@ migrations. This is the largest feature in the delivery plan.
 
 ---
 
+## Global Constraints
+
+**Every task inherits this section.** These are project-wide rules copied verbatim from the
+specification and the constitution, gathered here so no task has to re-derive them and no task may
+plead ignorance of them.
+
+1. **No endpoint accepts an attendee identifier** — no path parameter, query parameter, header, or
+   body field. Identity comes from the sign-in session cookie. (001, FR-106, unchanged.)
+2. **Every per-event request names its event, and the server verifies registration before any read.**
+   The verification is a precondition of reading, not a step a reader may omit. (FR-145–FR-147.)
+3. **A refusal discloses nothing about existence.** Not-registered and no-such-event return identical
+   status *and* identical body. (FR-148.)
+4. **No content and no primary action may require horizontal scrolling at any supported width**, from
+   320px upward. (Constitution Principle IV.)
+5. **Colours come only from named tokens** in `apps/web/src/theme/tokens.css`. Hex literals in
+   components are prohibited, and no colour value is ever stored in the database. (Constitution,
+   design tokens; FR-136.)
+6. **Colour is never the sole carrier of meaning** — a track is always named in text as well.
+7. **No new runtime dependency** is added by this feature. Day context uses the platform's own
+   `Intl.DateTimeFormat`. (Constitution: the dependency set is derived from actual need.)
+8. **Nothing is cached for offline use.** Every conference-scoped surface states that it needs a
+   connection, distinguishing that from a server fault. (Spec Feature Declarations, offline row.)
+9. **No optimistic updates and no conflict resolution.** Each would require its own recorded decision
+   under Principle VI. Nothing is shown as saved before the server confirms it.
+10. **No write path to conference content at any privilege**, and no content import path. Both are
+    organizer administration, which Principle III places out of scope. (FR-132, FR-134.)
+11. **Every interactive control** has an accessible label, a visible focus state, and keyboard
+    operability; anything modal has a clear close action and Escape dismissal. (Principle IV.)
+12. **Every surface crossing the network** declares loading, empty, and failure states. An
+    obligation not declared is presumed unmet. (Principle IX.)
+13. **Every new route carries a `schema` block.** A route without one is invisible to the contract
+    generator and therefore silently absent from `contracts/openapi.json`.
+
+### Two requirements verified structurally rather than by a test
+
+Stated plainly, because "no task covers it" and "nothing can cover it" look identical in a coverage
+matrix and are not the same thing.
+
+- **FR-151, authorization is never client-side filtering.** There is no test that proves a negative
+  across a whole codebase. What makes it hold is that the client never receives data it may not see:
+  every per-event response is already filtered by `EventScope` server-side (constraint 2), and the
+  isolation suite asserts the server refuses rather than that the client hides. A component filtering
+  for presentation is fine; it is simply not what is standing between an attendee and someone else's
+  data.
+- **FR-164, no card may depend on another card's presence, ordering, or data.** Enforced by the card
+  contract's shape rather than by assertion: a card receives its declared scope's props and nothing
+  else — no registry handle, no sibling reference, no shared store. There is no expression a card
+  author could write to reach another card, which is why no test tries.
+
+## Shared interfaces
+
+Named here because a task's implementer sees only their own task. Any task consuming another's output
+uses exactly these names and shapes.
+
+```ts
+// apps/api/src/plugins/event-access.ts — T036. The ONLY construction site.
+declare const brand: unique symbol
+export type EventScope = { readonly attendeeId: string; readonly eventId: string; readonly [brand]: true }
+export const requireEventAccess: (request, reply) => Promise<void>   // sets request.eventScope
+
+// apps/api/src/db/queries/active-event.ts — T019, T056
+export const resolveActiveEvent: (attendeeId: string) => Promise<EventRow | null>
+export const recordActiveEvent: (attendeeId: string, eventId: string) => Promise<EventRow | null>
+
+// apps/api/src/db/queries/catalog.ts — T037. Bare strings are not accepted.
+export const listSessions: (scope: EventScope) => Promise<SessionRow[]>
+export const listTracks: (scope: EventScope) => Promise<TrackRow[]>
+
+// packages/data/src/interfaces/events.ts — T011
+export interface ActiveEventRepository {
+  getActive(): Promise<Event | null>          // null === registered for no events
+  setActive(eventId: string): Promise<Event>
+}
+
+// packages/data/src/interfaces/catalog.ts — T041
+export interface CatalogRepository {
+  listSessions(eventId: string): Promise<Session[]>
+  listTracks(eventId: string): Promise<Track[]>
+}
+export interface Session {
+  id; title; summary: string | null; startsAt: string; endsAt: string
+  track: Track; room: Room; speakers: Speaker[]   // [] when none — never null (FR-138)
+}
+export interface Track { id: string; name: string; colorToken: string }   // token NAME, never a colour
+
+// apps/web/src/app/home/contract.ts — T012
+export type HomeCardSlot = 'lead' | 'primary' | 'aside'
+export type HomeCard =
+  | { id: string; title: string; slot: HomeCardSlot; order: number; scope: 'event';    Component: FC<{ event: Event }> }
+  | { id: string; title: string; slot: HomeCardSlot; order: number; scope: 'attendee'; Component: FC }
+```
+
+`Event` gains `timezone: string` (IANA) in T011 and carries **no** `dayNumber` or `totalDays`, now or
+ever (FR-121).
+
 ## Constitution Check
 
 *GATE: must pass before Phase 0 research. Re-checked after Phase 1 design.*
