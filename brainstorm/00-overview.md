@@ -27,8 +27,8 @@ the index, and it now differs from the roadmap in the ways #02 records.
 | 002 | Event Context, Session Catalog & Home Composition | **shipped** — 89/89 tasks, squash-merged to `develop` ([#6](https://github.com/Programa-Semilla/mynet-ps/pull/6)) | — |
 | 003 | ~~Session Catalog~~ | **absorbed into 002** (#02); migration `0002` transfers | — |
 | 004 | Attendee Profile & Own-Profile Editing | **next up**, no parallel partner — still blocked | identity model; retention obligations; avatar handling |
-| 005 | Agenda | **implemented** — 94/94 tasks; merge gated on register entry 17 (see below) | 002 ✓ |
-| 006 | Discover | queued (∥ 005) | 004 |
+| 005 | Agenda | **shipped** — 94/94 tasks, squash-merged to `develop` ([#8](https://github.com/Programa-Semilla/mynet-ps/pull/8)) | 002 ✓ |
+| 006 | Discover | **next up** — migration `0005` reserved; 005's shared-file appends keep it uncontended | 004 |
 | 007 | Messages | queued | 004 |
 | 008 | Network & Appointments | queued (∥ 009) | connection model; card-exchange semantics |
 | 009 | Session Q&A | queued (∥ 008) | question attribution |

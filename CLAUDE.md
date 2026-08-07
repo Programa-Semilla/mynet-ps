@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 The production foundation has shipped, event context and the session catalog shipped on top of it
 (feature 002, [#6](https://github.com/Programa-Semilla/mynet-ps/pull/6)), and **Agenda is now a
 personal schedule rather than a read-only programme** — feature 005, squash-merged to `develop` in
-[#PR_NUMBER](https://github.com/Programa-Semilla/mynet-ps/pull/PR_NUMBER).
+[#8](https://github.com/Programa-Semilla/mynet-ps/pull/8).
 
 An attendee signs in and arrives at the conference happening now, greeted by name and told which day
 of it today is in the venue's timezone. Home shows what is next, what remains of the day, and **what
