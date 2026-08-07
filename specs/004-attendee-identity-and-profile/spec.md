@@ -118,8 +118,8 @@ The five destinations are fixed and this feature adds none.
 Convention says a specification states WHAT and defers HOW, and 002 and 005 both recorded the same
 exception for the same reason. A small number of requirements here are irreducibly structural,
 because they constrain properties the project has already committed to and that later features
-inherit: authorization that cannot be forgotten (FR-385–FR-392), deletion coverage that a later
-feature cannot quietly omit (FR-364–FR-372), export coverage with the same property (FR-373–FR-380),
+inherit: authorization that cannot be forgotten (FR-385–FR-391), deletion coverage that a later
+feature cannot quietly omit (FR-364–FR-371), export coverage with the same property (FR-373–FR-379),
 and a storage boundary that keeps an unprovisioned vendor from blocking the feature (FR-352).
 
 Where a requirement constrains structure it constrains the **property** — "no personal-data table may
@@ -159,11 +159,31 @@ Two questions the brainstorm did not reach, raised because no reasonable default
   a person landing in a conference they have no business being in; it is not what keeps anyone's data
   private, because every profile sits behind both a shared registration and the owner's
   discoverability setting.
-- **What does an unverified email address prevent?** → **Nothing** (FR-324, FR-325). Verification
-  establishes only that the address can receive mail, which is what makes recovery meaningful. This
-  keeps the primary journey in one sitting — which matters while the mail provider is unprovisioned
-  (register entry 18) — and carries the recorded consequence that 006 cannot assume every profile in
-  the directory has a confirmed address.
+- **What does an unverified email address prevent?** → Answered **nothing**, then narrowed at the
+  review below to **discoverability only** (FR-324, FR-325). Verification establishes that the address
+  can receive mail, which is what makes recovery meaningful; the primary journey still completes in
+  one sitting, which matters while the mail provider is unprovisioned (register entry 18).
+
+### Session 2026-08-07 (specification review)
+
+The review gate found two requirement pairs that could not both hold, and one exposure that neither
+question above had surfaced. All three were decided by the project owner.
+
+- **Sign-up cannot both auto-sign-in and hide whether an address is registered.** → **Disclosure is
+  accepted** (FR-303). The two outcomes are distinguishable whatever the wording says, so a
+  non-disclosure requirement would have been satisfied on paper and defeated in practice. Rate
+  limiting is what actually defends enumeration. **The password-reset path keeps its non-disclosure
+  guarantee** (FR-327), where the outcome genuinely is identical either way.
+- **Three separately-sound decisions compounded into an impersonation surface.** A public join code,
+  an unverified address preventing nothing, and profiles visible to co-attendees would together have
+  let anyone sign up **using an address they do not own**, join any conference, and appear in a
+  professional directory as that person. → **Verification now gates discoverability** (FR-325,
+  FR-325a, FR-359). Nothing else is gated, so the one-sitting journey survives. The recorded
+  consequence reverses: **006 may now assume every profile it can read carries a verified address.**
+- **Registration was over-constrained.** A draft requirement forbade treating registration as an
+  authorization event at all, which contradicted FR-357 and 002's shipped event-scoping predicate. →
+  Narrowed: registration is evidence of **presence, not vetting** (FR-317b). It may gate scope; it
+  may never be read as identity assurance.
 
 ---
 
@@ -186,8 +206,8 @@ sign-up and join, and confirm the new attendee reaches Home with the conference 
 1. **Given** no account for an email address, **When** the person submits that address, a display
    name and a valid password, **Then** an account is created and they are signed in.
 2. **Given** an account already exists for an email address, **When** a person submits that address
-   at sign-up, **Then** the outcome discloses nothing about whether the address is registered, and no
-   second account is created.
+   at sign-up, **Then** they are told the address is already registered, no second account is
+   created, and they are offered the sign-in and password-reset paths.
 3. **Given** a signed-in attendee with no conference registration, **When** they enter a valid join
    code, **Then** they are registered for that conference and it becomes their active conference.
 4. **Given** a signed-in attendee, **When** they enter a join code that matches no conference,
@@ -221,7 +241,8 @@ the reset link, set a new password, and sign in with it.
 1. **Given** a newly created account, **When** it is created, **Then** a verification message is sent
    to the address, and the account records that the address is not yet verified.
 2. **Given** an unexpired verification link, **When** the attendee follows it, **Then** the address is
-   marked verified and the link cannot be used a second time.
+   marked verified, the link cannot be used a second time, and — if their discoverability setting is
+   on — they become visible to co-attendees for the first time.
 3. **Given** an expired verification link, **When** it is followed, **Then** it is refused with an
    explanation and the attendee can request a new one.
 4. **Given** any email address, **When** a password reset is requested for it, **Then** the response
@@ -312,9 +333,14 @@ retrieve it, and that the first's own view is unchanged.
    **Then** it is refused, and the refusal discloses nothing about whether that attendee exists.
 3. **Given** an attendee who has turned discoverability off, **When** another attendee at the same
    conference requests their profile, **Then** it is refused identically to the previous case.
-4. **Given** an attendee who has turned discoverability off, **When** they view their own profile,
+4. **Given** an attendee whose address is **not verified**, **When** another attendee at the same
+   conference requests their profile, **Then** it is refused identically again — the requester cannot
+   tell which of the three causes applied.
+5. **Given** an attendee who has turned discoverability off, **When** they view their own profile,
    **Then** it is unchanged and they are told plainly what the setting currently does.
-5. **Given** the setting, **When** it is changed, **Then** it takes effect on the next request without
+6. **Given** an unverified attendee with discoverability on, **When** they view their own profile,
+   **Then** they are told plainly that verifying their address is what will make them visible.
+7. **Given** the setting, **When** it is changed, **Then** it takes effect on the next request without
    requiring a new sign-in.
 
 ---
@@ -402,11 +428,17 @@ unauthenticated caller and as a different signed-in attendee, and confirm each i
 
 ### Edge Cases
 
-- **An address is used to sign up twice.** The second attempt must not reveal that the first exists,
-  and must not create a second account. This is in tension with a helpful error message, and privacy
-  wins.
-- **A person signs up and never verifies.** They use the product fully and indefinitely (FR-324).
-  They will be unable to recover a forgotten password, which is the whole cost of not verifying.
+- **An address is used to sign up twice.** The second attempt is refused, says so plainly, creates no
+  second account, and offers sign-in and reset. The disclosure is accepted — see FR-303.
+- **A person signs up and never verifies.** They use the product fully and indefinitely (FR-324), but
+  never appear to other attendees (FR-359) and cannot recover a forgotten password. Those two are the
+  whole cost of not verifying.
+- **A person signs up with an address belonging to someone else.** They can use the product, but they
+  cannot appear in any conference's directory under it, because discoverability requires verification
+  and they cannot receive the message. The real owner, on trying to sign up, is told the address is
+  already registered and can recover it through the reset path — which does reach them.
+- **An attendee verifies, becomes discoverable, then changes their address.** Out of scope; the spec
+  provides no address-change path, which is recorded in Out of Scope rather than left ambiguous.
 - **A reset link is followed after the account has been deleted.** It must fail as an expired link
   would, disclosing nothing.
 - **An attendee deletes their account while signed in on a second device.** The second session must
@@ -435,8 +467,15 @@ unauthenticated caller and as a different signed-in attendee, and confirm each i
 - **FR-301**: Account creation MUST collect an email address, a display name, and a password, and
   MUST NOT collect any other personal data at that moment.
 - **FR-302**: The email address MUST be unique product-wide, not per conference.
-- **FR-303**: The outcome of a sign-up attempt MUST NOT disclose whether an address already has an
-  account.
+- **FR-303**: A sign-up attempt for an address that already has an account MUST be refused, MUST NOT
+  create a second account, and MUST say plainly that the address is already registered. *Decided at
+  the specification review, 2026-08-07.* **This deliberately discloses registration status**, and the
+  disclosure is accepted rather than overlooked. Non-disclosure is unachievable alongside FR-306: if a
+  new address signs the person in and an existing one does not, the two outcomes are distinguishable
+  whatever the wording says, so a non-disclosure requirement here would have been satisfied on paper
+  and defeated in practice. Enumeration is defended by rate limiting (FR-307), which is what actually
+  defends it. **The password-reset path keeps its non-disclosure guarantee** (FR-327), where the
+  outcome genuinely is identical either way.
 - **FR-304**: Password requirements MUST be stated before submission, and a password failing them
   MUST leave confirmation **disabled** rather than producing a post-submit error.
 - **FR-305**: The password MUST be stored only as an irreversible hash, never in plaintext, and MUST
@@ -444,6 +483,11 @@ unauthenticated caller and as a different signed-in attendee, and confirm each i
 - **FR-306**: A newly created account MUST be signed in on success without a second credential entry.
 - **FR-307**: Account creation MUST be rate-limited by the same defence that protects sign-in,
   counted by both identifier and request source.
+- **FR-307a**: **Each throttled action MUST be counted separately.** This feature adds four throttled
+  unauthenticated actions to a defence built for one — sign-up, join-code entry, reset request, and
+  reset completion — and if they shared a counter, a sign-up or join-code storm aimed at an address
+  would lock its rightful owner out of *signing in*. Exhausting one action's allowance MUST NOT
+  consume another's. The existing sign-in behaviour MUST be unchanged by this feature.
 - **FR-308**: An account MUST be creatable while registered for no conference, and the product MUST
   present a way to join one rather than an empty conference.
 
@@ -473,13 +517,31 @@ unauthenticated caller and as a different signed-in attendee, and confirm each i
   both the shared-registration condition (FR-357) and the owner's discoverability setting (FR-359).
   What the code prevents is a person landing in a conference they have no business being in by
   guessing a URL; it is not what keeps anyone's data private.
-- **FR-317b**: Because FR-317a makes the code non-secret, joining MUST NOT be treated as an
-  authorization event anywhere in the product. No requirement, now or later, may rely on registration
-  alone as evidence of anything beyond the attendee's stated intent to attend.
+- **FR-317b**: Because FR-317a makes the code non-secret, a registration is evidence of **presence,
+  not of vetting**. Registration MAY gate *scope* — which conference's content and which attendees a
+  person can reach — and that is exactly what 002's event-scoping predicate and FR-357 already do.
+  Registration MUST NOT be read as evidence that anyone has checked who the attendee is. No
+  requirement, now or later, may treat holding a registration as identity assurance, as an
+  entitlement, or as a trust signal.
+- **FR-317c**: An attendee MUST be able to withdraw from a conference they have joined, without
+  deleting their account. Withdrawing MUST remove the registration and the attendee's per-conference
+  state for that conference — saved sessions, notes, and the active-conference selection if it names
+  it — and MUST NOT touch their profile, which is cross-event. A registration that can be created by
+  entering a public code and never removed would be the one piece of attendee state with no exit,
+  which sits badly beside self-serve deletion.
+- **FR-317d**: If the withdrawn conference was the active one, the product MUST leave the attendee in
+  a coherent state — another registered conference, or the same invitation to join that FR-308
+  requires — and MUST NOT present an empty or broken conference.
 
 ### Email verification
 
 - **FR-318**: Account creation MUST send a verification message to the address supplied.
+- **FR-318a**: **A failure to send MUST NOT fail account creation.** The account is created, the
+  person is signed in, and the product states that the message could not be sent and offers to try
+  again. Register entry 18 means an unprovisioned or failing mail provider is the *expected* state
+  rather than an exceptional one, and coupling account creation to it would make sign-up unusable
+  exactly when the provider is missing. The consequence is bounded and acceptable: an attendee whose
+  message never arrives is unverified, and FR-359 already withholds discoverability from them.
 - **FR-319**: The account MUST record whether its address has been verified.
 - **FR-320**: A verification link MUST expire after a stated period and MUST be usable once only.
 - **FR-321**: An expired or already-used link MUST be refused with an explanation, and the attendee
@@ -491,11 +553,22 @@ unauthenticated caller and as a different signed-in attendee, and confirm each i
   signs up and uses the product immediately, including joining a conference, authoring a profile, and
   being discoverable. Verification establishes only that the address can receive mail, which is what
   makes password recovery meaningful.
-- **FR-325**: Because verification gates nothing, the product MUST NOT present an unverified account
-  as impaired, blocked, or pending. It MAY invite verification; it MUST NOT obstruct. The recorded
-  consequence is that **006 cannot assume every profile in the directory carries a confirmed
-  address**, and no later feature may rely on verification state as evidence of anything beyond
-  reachability by mail.
+- **FR-325**: **Verification gates exactly one thing: discoverability.** *Revised at the specification
+  review, 2026-08-07.* An unverified attendee uses the product fully — joins conferences, authors a
+  profile, saves sessions, writes notes — but **does not appear to other attendees** until their
+  address is verified. Everything else remains ungated.
+- **FR-325a**: The reason is a compound exposure that neither of the two decisions showed on its own.
+  The join code is public (FR-317a), an unverified address otherwise prevents nothing (FR-324), and
+  profiles are visible to co-attendees (FR-357). Together those would let anyone sign up **using an
+  email address they do not own**, join any conference with a world-readable code, and appear in a
+  professional networking directory as that person. Gating discoverability closes that at its only
+  consequential exit while leaving the one-sitting journey intact.
+- **FR-325b**: The product MUST NOT present an unverified account as impaired, blocked, or pending
+  beyond this. It MUST state plainly that verification is what makes the attendee visible to others,
+  so the gate is discoverable rather than mysterious, and it MUST NOT obstruct any other action.
+- **FR-325c**: The recorded consequence for later features: **006 may assume every profile it can
+  read carries a verified address**, because FR-359 makes verification a precondition of being
+  readable at all. No later feature may rely on verification state for anything beyond that.
 
 ### Password recovery
 
@@ -546,22 +619,27 @@ unauthenticated caller and as a different signed-in attendee, and confirm each i
 - **FR-352**: Image bytes MUST be read and written only through a project-owned storage interface.
   No feature code may call a storage vendor's API directly, and the interface MUST have an
   implementation that works in development, test, and preview with no external provisioning.
-- **FR-353**: The avatar MUST be treated as attendee personal data for the purposes of FR-364–FR-380.
+- **FR-353**: The avatar MUST be treated as attendee personal data for the purposes of FR-364–FR-379,
+  which is to say it is both deleted with the account and present in the export.
 - **FR-354**: The photographs currently used as prototype sample data MUST NOT be shipped as seeded
   attendee avatars.
 
 ### Discoverability and visibility
 
 - **FR-357**: An attendee's profile MUST be readable by attendees registered for a conference they are
-  also registered for, and by nobody else.
+  also registered for, and by nobody else. Registration gates *scope* here and is not read as identity
+  assurance — see FR-317b.
 - **FR-358**: The shared-conference condition MUST be evaluated server-side before any profile data is
   returned; client-side filtering MUST NOT be relied on.
-- **FR-359**: Every attendee MUST have a single discoverability setting that, when off, makes their
-  profile unreadable by other attendees.
+- **FR-359**: A profile MUST be readable by another attendee only when **both** conditions hold: the
+  owner's discoverability setting is on, **and** the owner's email address is verified (FR-325).
+  Either being false makes the profile unreadable by others. The setting is the attendee's choice;
+  verification is the product's precondition.
 - **FR-360**: Discoverability MUST be all-or-nothing. Per-field visibility MUST NOT be introduced
   without a recorded decision.
-- **FR-361**: A refusal caused by discoverability MUST be indistinguishable from a refusal caused by
-  having no conference in common, and neither may disclose whether the attendee exists.
+- **FR-361**: A refusal MUST be identical whichever of the three causes produced it — no conference in
+  common, discoverability off, or address unverified — and none may disclose whether the attendee
+  exists. **The requesting attendee MUST NOT be able to learn another attendee's verification state.**
 - **FR-362**: The current state of the setting and its effect MUST be stated plainly to its owner.
 - **FR-363**: A change to the setting MUST take effect on the next request, without a new sign-in.
 
@@ -661,14 +739,19 @@ unauthenticated caller and as a different signed-in attendee, and confirm each i
 
 - **SC-300**: A person with no prior account can go from arriving to seeing their conference's Home
   in under three minutes, without help from anyone.
-- **SC-301**: A person who has forgotten their password can regain access to their account
-  unaided.
+- **SC-301**: A person **who has verified their address** and has forgotten their password can regain
+  access to their account unaided. Scoped deliberately: FR-324 permits an account to remain
+  unverified indefinitely, and such an account is unrecoverable by construction — which is the stated
+  cost of not verifying, not a failure of this criterion.
 - **SC-302**: 100% of attendee-authored profile fields survive a reload and appear identically on a
   second device.
 - **SC-303**: An uploaded photograph carries no location, camera, or timestamp metadata once stored —
   verified by inspecting stored bytes, not by trusting the upload path.
-- **SC-304**: An attendee who turns discoverability off cannot be retrieved by any other attendee
-  through any surface, verified server-side.
+- **SC-304**: An attendee who turns discoverability off, **or who has not verified their address**,
+  cannot be retrieved by any other attendee through any surface — verified server-side, and refused
+  identically in both cases so neither state is observable from outside.
+- **SC-304a**: A person cannot cause an email address they do not control to appear in any
+  conference's directory.
 - **SC-305**: An export contains 100% of the fields the product stores about the requesting attendee,
   verified by a test that fails when a field is added without export coverage.
 - **SC-306**: After account deletion, zero rows attributable to that attendee remain in any table,
@@ -705,12 +788,12 @@ switching** and **session save + notes** were discharged by 002 and 005 and are 
 | **Desktop layout** (Principle IV) | Sign-up, join, verification and reset render outside the authenticated shell, alongside the existing sign-in screen and following its established composition. Inside the shell the persistent left rail and top bar are unchanged; the profile renders as a single-column form within the multi-column workspace, with the account actions — discoverability, export, deletion — grouped below it and visually separated from ordinary editing. |
 | **Tablet layout** (Principle IV) | Reduced rail unchanged. The profile form keeps a single column; the account actions stack beneath it. Unauthenticated surfaces are centred as at desktop with a narrower measure. |
 | **Mobile layout** (Principle IV) | Compact header and bottom navigation unchanged. Every form is a single column with touch-sized controls and no horizontal scrolling at 320px. The delete-account confirmation is a **full-width overlay** with a clear close control and Escape dismissal. Image selection uses a touch-sized control that does not crowd the surrounding fields. |
-| **Empty / loading / failure states** (Principle IV) | **Sign-up**: submitting, failure, and a rejection that discloses nothing. **Join code**: submitting, unrecognised, already registered, failure. **No conference joined**: an invitation to join, not an empty conference. **Verification**: pending, verified, link expired, resend sent, failure. **Reset**: request submitted (identical whether or not the account exists), link expired, password set, failure. **Profile**: loading, empty-and-invited, saving, saved, failure. **Avatar**: no avatar (fallback), uploading, rejected for size or type, upload failed, removed. **Discoverability**: current state, saving, failure. **Export**: preparing, ready, failure. **Deletion**: confirming, deleting, failure. Every failure distinguishes offline from a server fault. |
+| **Empty / loading / failure states** (Principle IV) | **Sign-up**: submitting, failure, and a rejection that discloses nothing. **Join code**: submitting, unrecognised, already registered, failure. **Withdrawing from a conference**: confirming — stating that the conference's saved sessions and notes go with it (FR-317c) — withdrawing, failure. **No conference joined**: an invitation to join, not an empty conference. **Verification**: pending — stating that verification is what makes the attendee visible to others — verified, link expired, resend sent, **message could not be sent** (FR-318a, distinct from a rejected address), failure. **Reset**: request submitted (identical whether or not the account exists), link expired, password set, failure. **Profile**: loading, empty-and-invited, saving, saved, failure. **Avatar**: no avatar (fallback), uploading, rejected for size or type, upload failed, removed. **Discoverability**: current state, saving, failure. **Export**: preparing, ready, failure. **Deletion**: confirming, deleting, failure. Every failure distinguishes offline from a server fault. |
 | **Accessibility** (Principle IV) | Every control introduced has an accessible label, a visible focus state, and keyboard operability. Disabled confirmations state *why* they are disabled, so the reason is available to a screen reader rather than implied by a greyed control. The delete-account confirmation dismisses on Escape, confines focus while open, offers a visible labelled close control, and returns focus to its opener — the same treatment 005 established for the session panel. Verification and discoverability states are announced, never conveyed by colour alone. Password requirements are associated with the field rather than presented as adjacent prose. |
 | **Validation checklist discharged** (Principle VII) | Keyboard focus visibility and accessible labels for every control introduced; production build; desktop and mobile rendering extended to the sign-up, join, profile and account surfaces. Left to later features: attendee search and filter; card-sharing feedback; meeting scheduling and appointment creation; message composition; audience Q&A with upvoting. |
-| **Identity scoping & server-side authorization** (Principle VIII) | Applies to every surface here, and this feature adds the product's **first deliberately unauthenticated write routes**. **Rule**: authenticated routes derive identity from the sign-in session and never from a client-supplied identifier; a profile read for another attendee additionally requires a shared conference registration *and* that attendee's discoverability, both evaluated server-side. **Enforcement**: refusal by default; refusals that disclose nothing about existence; cross-attendee isolation asserted by tests exercising the server directly against real seeded rows. **The unauthenticated routes are enumerable and each is rate-limited** by the same defence protecting sign-in — sign-up, verification, reset request, reset completion. **New personal data stored**: profile fields, avatar image bytes, verification state, and short-lived verification and reset material. |
+| **Identity scoping & server-side authorization** (Principle VIII) | Applies to every surface here, and this feature adds the product's **first deliberately unauthenticated write routes**. **Rule**: authenticated routes derive identity from the sign-in session and never from a client-supplied identifier; a profile read for another attendee additionally requires **three** conditions, all evaluated server-side — a shared conference registration, that attendee's discoverability setting, and that attendee's address being verified (FR-359). A refusal is identical whichever condition failed, so verification state is never observable from outside (FR-361). **Registration gates scope and is never read as identity assurance** (FR-317b), which matters because the join code is public by decision. **Enforcement**: refusal by default; refusals that disclose nothing about existence; cross-attendee isolation asserted by tests exercising the server directly against real seeded rows. **The unauthenticated routes are enumerable and each is rate-limited** by the same defence protecting sign-in — sign-up, verification, reset request, reset completion. **New personal data stored**: profile fields, avatar image bytes, verification state, and short-lived verification and reset material. |
 | **Deletion & export coverage** (Principle VIII, added v2.3.0) | **This feature both discharges and defines the obligation.** Deletion is self-serve, hard, and cascading: profile, avatar bytes, registrations, active-conference selection, verification state, verification and reset material, sign-in sessions — and, transitively, the saved sessions and notes 005 already made cascade-reachable. **No tombstone.** Export is self-serve and machine-readable and covers every field named above except credential material, which is excluded by FR-376. **The one record no cascade can reach is `sign_in_attempts`**, which has no foreign key by design; it is covered by the retention clock (FR-381–FR-383) rather than by deletion. **Two structural guards are required rather than recommended**: a test that fails when a personal-data table is added with neither cascade nor retention rule (FR-370), and a test that fails when a field is collected without export coverage (FR-377). The retention window itself is an assumption below, open to challenge at the review gate. |
-| **Event scoping** (Constraints — data scoping) | **Attendee profile — cross-event.** A profile describes the person, not their presence at one conference; a networking product where a professional identity resets per conference is not what `requirements.md` describes, and the hybrid rule places relationships and person-level data on the cross-event side. **Avatar — cross-event**, for the same reason. **Verification and reset material — cross-event**, being properties of the account. **Discoverability — cross-event**, deliberately: a single setting rather than one per conference, because per-conference discoverability is per-field visibility's cousin and was rejected on the same grounds. *Recorded consequence*: profiles are cross-event data **read** through a per-event condition. That is a visibility rule, not a scoping rule, and FR-357–FR-361 state it as such so a later feature does not mistake it for one. **No existing table's scoping changes.** |
+| **Event scoping** (Constraints — data scoping) | **Attendee profile — cross-event.** A profile describes the person, not their presence at one conference; a networking product where a professional identity resets per conference is not what `requirements.md` describes, and the hybrid rule places relationships and person-level data on the cross-event side. **Avatar — cross-event**, for the same reason. **Verification and reset material — cross-event**, being properties of the account. **Discoverability — cross-event**, deliberately: a single setting rather than one per conference, because per-conference discoverability is per-field visibility's cousin and was rejected on the same grounds. **Verification state — cross-event**, being a property of the address rather than of any conference, and now load-bearing for visibility (FR-359). *Recorded consequence*: profiles are cross-event data **read** through a per-event condition. That is a visibility rule, not a scoping rule, and FR-357–FR-361 state it as such so a later feature does not mistake it for one. **No existing table's scoping changes.** |
 | **Register position** (Governance) | Assessed against constitution **v2.3.0**. **Resolved before this feature, by the amendment that unblocked it**: entries **5** (identity model), **6** (retention, deletion, export) and **13** (avatar handling). This feature *implements* those decisions; it does not resolve the entries, which are already closed. **Blocks this feature**: none. **Touched but not blocking**: **entry 11** — the object-storage provider, which FR-352 keeps off the critical path by requiring an implementation that needs no provisioning; **entry 18** — the transactional email provider, which FR-394 handles the same way, though unlike storage, mail that sends nothing real makes verification and recovery unprovable in production; **entry 19** — nobody moderates uploaded avatar images, which this feature *creates the exposure for* and does not resolve. See Dependencies. **Escalated by this feature**: **entry 4**, client validation of desktop and tablet layouts, now extended to the product's first unauthenticated surfaces beyond sign-in; and **entry 16**, the repository being public, which bears directly on the join code and is
 **accepted rather than worked around** — FR-317a records the code as non-secret and states why that
 is safe. **Remaining open and unchanged**: entry 17's preview path, entries 1–3, 7–10, 12, 14, 15. |
@@ -750,7 +833,9 @@ challenge them.
   be more machinery than the obligation needs.
 - **Discoverability defaults to on** for a new account. A networking product where everyone is
   invisible by default does not function, and the setting is presented plainly at sign-up and on the
-  profile so the default is visible rather than silent.
+  profile so the default is visible rather than silent. **The default is safe because it is not
+  sufficient**: FR-359 also requires a verified address, so an account defaulted to discoverable still
+  appears to nobody until its owner proves they can receive mail at it.
 - **The seed continues to run only against local development and per-PR preview environments**, never
   against an environment holding real attendee data.
 
@@ -801,6 +886,9 @@ challenge them.
   connection model is a register entry that blocks 008.
 - **Moderation of uploaded images.** The exposure is recorded, not addressed.
 - **Multiple avatar resolutions, image cropping, and filters.**
+- **Changing the email address on an existing account.** The address is the account's identity and
+  this feature provides no path to change it. Recorded as a limit rather than omitted: an attendee who
+  needs a different address must delete and re-register, which FR-364 and FR-303 both permit.
 - **Social or federated sign-in.** Authentication ownership is register entry 12 and remains open.
 - **Multi-factor authentication.**
 - **Caching any of this feature's data for offline reading.**
@@ -822,21 +910,26 @@ Recorded rather than resolved, per Principle I.
    settled before the first publicly reachable deployment.
 4. **Client validation of desktop and tablet layouts** — open since 001 and escalated again here,
    now covering the product's first unauthenticated surfaces beyond sign-in.
-5. **Whether `CameraService` should be wired for direct capture.** This feature assumes the platform
+5. **Whether verification gating discoverability is enough.** The review narrowed FR-324 so that an
+   unverified attendee cannot appear in a directory, which closes impersonation at its consequential
+   exit. It does not stop someone signing up under an address they do not own and using the product
+   privately, and it does not stop a person using a disposable address they *do* control. Both are
+   judged acceptable for a conference networking product; neither is judged solved.
+6. **Whether `CameraService` should be wired for direct capture.** This feature assumes the platform
    file input suffices, which on mobile already offers the camera. If a dedicated capture flow is
    wanted, the interface exists and is unused.
-6. **Whether 90 days is the right retention window** for sign-in attempts, and whether 24 hours and
+7. **Whether 90 days is the right retention window** for sign-in attempts, and whether 24 hours and
    1 hour are right for verification and reset links.
-7. **Where the account surfaces belong in the shell's navigation.** The profile, discoverability,
+8. **Where the account surfaces belong in the shell's navigation.** The profile, discoverability,
    export and deletion actions are not a sixth destination, and exactly where they hang off the
    existing five is a presentation question better answered against the built shell.
-8. **Hard deletion gets harder in 007 and 009.** Notes and saved sessions are private, so cascading
+9. **Hard deletion gets harder in 007 and 009.** Notes and saved sessions are private, so cascading
    them is clean. A deleted attendee's *messages* sit in another attendee's thread, and their
    *audience questions* sit on a session other people upvoted. FR-365 forbids a tombstone, so those
    phases will have to decide what a conversation with a deleted participant looks like. Settling the
    shape now, while the only affected data is the attendee's own, is easier than settling it later.
-9. **Whether the join code should become a secret later.** FR-317a decides it is not one, and states
+10. **Whether the join code should become a secret later.** FR-317a decides it is not one, and states
    why that is safe today: it grants registration and nothing else. If a future feature ever makes
    registration itself confer access to something private, that reasoning stops holding and this must
    be revisited — FR-317b exists to make such a change visible rather than silent.
-10. **What "PS" denotes** in the repository name — unchanged by this feature and still open.
+11. **What "PS" denotes** in the repository name — unchanged by this feature and still open.
