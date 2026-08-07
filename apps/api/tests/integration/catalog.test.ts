@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
 import type { FastifyInstance } from 'fastify'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
@@ -160,19 +160,36 @@ describe('session catalog', () => {
   })
 
   it('never joins a speaker to a session from another conference', async () => {
-    // data-model.md notes this rule cannot be expressed as a foreign key, so it is asserted
-    // here rather than claimed.
-    const summit = (await sessionsFor(summitId, adaCookie)).json() as Array<{
-      speakers: Array<{ id: string }>
-    }>
-    const horizons = (await sessionsFor(horizonsId, adaCookie)).json() as typeof summit
+    // ───────────────────────────────────────────────────────────────────────────────────────
+    // **Asserted over the TABLE, because the response cannot show a violation.**
+    //
+    // This previously compared the two endpoints' speaker ids and could not fail:
+    // `listSessions` already filters speakers with `WHERE speakers.event_id = scope.eventId`,
+    // so a genuinely cross-event `session_speakers` row is invisible to both responses. The
+    // test verified the read filter while its comment claimed it verified the integrity rule.
+    //
+    // data-model.md records that this rule is not expressible as a foreign key, which is
+    // exactly why it needs a direct assertion rather than an inferred one.
+    // ───────────────────────────────────────────────────────────────────────────────────────
+    const violations = await getDb().execute<{ n: number }>(sql`
+      SELECT count(*)::int AS n
+      FROM session_speakers ss
+      JOIN sessions s ON s.id = ss.session_id
+      JOIN speakers p ON p.id = ss.speaker_id
+      WHERE s.event_id <> p.event_id
+    `)
 
-    const summitSpeakerIds = new Set(summit.flatMap((s) => s.speakers.map((sp) => sp.id)))
-    const horizonsSpeakerIds = horizons.flatMap((s) => s.speakers.map((sp) => sp.id))
+    expect(
+      violations[0]?.n,
+      'A session_speakers row joins a session and a speaker from different conferences. No ' +
+        'foreign key can express this rule (data-model.md), so this assertion is what holds it.',
+    ).toBe(0)
 
-    for (const id of horizonsSpeakerIds) {
-      expect(summitSpeakerIds.has(id)).toBe(false)
-    }
+    // And the join table is not empty, or the count above would be trivially zero.
+    const joins = await getDb().execute<{ n: number }>(
+      sql`SELECT count(*)::int AS n FROM session_speakers`,
+    )
+    expect(joins[0]?.n).toBeGreaterThan(0)
   })
 
   it('returns tracks with names and token names', async () => {

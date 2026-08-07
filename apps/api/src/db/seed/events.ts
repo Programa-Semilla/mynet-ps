@@ -1,3 +1,5 @@
+import { sql } from 'drizzle-orm'
+
 import { events, registrations } from '../schema/events.js'
 import type { SeedContext, SeedModule } from './index.js'
 
@@ -98,6 +100,31 @@ export const eventSeed: SeedModule = {
   async run(db, context: SeedContext) {
     for (const event of SEED_EVENTS) {
       assertKnownTimeZone(event.timezone, event.name)
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────────────────
+    // …and against **PostgreSQL's** zone database, which is the one that actually consumes it.
+    //
+    // The ICU check above is Node's. The two sets are not identical, and a zone ICU accepts but
+    // PostgreSQL does not would raise inside the `now() AT TIME ZONE e.timezone` expression in
+    // `resolveActiveEvent` — which sits in the ORDER BY and is evaluated for every registration
+    // the attendee holds. `GET /workspace/active-event` would then return 500 for every
+    // attendee registered alongside the bad conference, and since the active event gates every
+    // conference-scoped surface, the whole product would degrade to failure banners. Silent at
+    // seed time, total at read time.
+    // ─────────────────────────────────────────────────────────────────────────────────────
+    for (const event of SEED_EVENTS) {
+      // One row per conference rather than an `= ANY(…)`: drizzle expands a JS array into a
+      // parameter tuple, which `ANY` rejects, and there are three conferences.
+      const rows = await db.execute<{ known: boolean }>(
+        sql`SELECT EXISTS (SELECT 1 FROM pg_timezone_names WHERE name = ${event.timezone}) AS known`,
+      )
+      if (!rows[0]?.known) {
+        throw new Error(
+          `Seed: "${event.name}" declares timezone "${event.timezone}", which PostgreSQL does ` +
+            'not recognise. Node accepted it, but the database is what evaluates it at read time.',
+        )
+      }
     }
 
     const inserted = await db

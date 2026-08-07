@@ -20,14 +20,15 @@ import { getDb } from '../client.js'
  * ═════════════════════════════════════════════════════════════════════════════════════════
  */
 
-/**
- * Declared as a type alias rather than an interface on purpose: `db.execute<T>` constrains `T`
- * to `Record<string, unknown>`, and only a type alias carries the implicit index signature that
- * satisfies it.
- */
 /** Matched rather than parsed — see the note in `recordActiveEvent`. */
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
+/**
+ * Declared as a type alias rather than an interface on purpose: `db.execute<T>` constrains `T`
+ * to `Record<string, unknown>`, and only a type alias carries the implicit index signature that
+ * satisfies it. Changing this to an `interface` breaks the build in a way whose cause is not
+ * obvious from the error.
+ */
 export type EventRow = {
   readonly id: string
   readonly name: string

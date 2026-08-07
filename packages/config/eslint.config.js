@@ -92,7 +92,7 @@ export default tseslint.config(
    */
   {
     name: 'mynet/event-scope-brand',
-    files: ['apps/api/**/*.ts'],
+    files: ['apps/api/**/*.{ts,tsx,mts,cts}'],
     ignores: ['apps/api/src/plugins/event-access.ts'],
     rules: {
       'no-restricted-syntax': [
@@ -108,6 +108,14 @@ export default tseslint.config(
         {
           selector: 'TSTypeAssertion > TSTypeReference > Identifier[name="EventScope"]',
           message: 'Do not assert a value to EventScope — see plugins/event-access.ts (FR-147).',
+        },
+        {
+          // A one-line local alias defeated the two selectors above: `type A = EventScope` and
+          // then `x as unknown as A` matched neither, because both key on the identifier text.
+          selector: 'TSTypeAliasDeclaration > TSTypeReference > Identifier[name="EventScope"]',
+          message:
+            'Do not alias EventScope. An alias defeats the assertion rules above, which match ' +
+            'on the type name. Use EventScope directly (FR-147).',
         },
       ],
     },

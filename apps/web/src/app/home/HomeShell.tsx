@@ -38,27 +38,44 @@ export interface HomeShellProps {
  * T015 — **slot → width, in exactly one place** (FR-156).
  *
  * ─────────────────────────────────────────────────────────────────────────────────────────
- * Everything about how Home responds to width is these three lines and the grid below. A card
- * never names a column, a breakpoint, or a span, so no card can be broken by a layout change,
- * and a layout change never has to visit the cards.
+ * Everything about how Home responds to width is this map and the grid below. A card never
+ * names a column, a breakpoint, or a span, so no card can be broken by a layout change, and a
+ * layout change never has to visit the cards.
  *
- *   Mobile  (<768px)        single column, everything stacked in slot order
- *   Tablet  (768–1279px)    two columns; `lead` spans both, `aside` folds below `primary`
- *   Desktop (>=1280px)      full-width `lead` above a `primary` column and an `aside` column
+ *   Mobile  (<768px)        one column; lead, then the primary cards, then the aside cards
+ *   Tablet  (768–1279px)    lead full width, then a two-thirds primary column beside a
+ *                           one-third aside column
+ *   Desktop (>=1280px)      the same arrangement, with wider gaps
  *
  * The bands are half-open (`tokens.css`), so exactly one layout matches any width and there is
  * no width at which two both claim to apply. Nothing here sets a fixed width or a minimum, so
  * the floor at 320px is the mobile layout working rather than a fourth case (FR-020, T080).
+ *
+ * **Tablet and desktop deliberately share an arrangement.** The spec declares two columns at
+ * tablet and a main-plus-secondary column at desktop, which is the same shape at two scales;
+ * only the gap changes. If the client's review asks for a genuinely different tablet layout,
+ * this map is the one place it changes.
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ *
+ * **Slots become COLUMNS, not grid items** — and that distinction is the fix for a real defect.
+ *
+ * This first placed every card directly into a two-column grid with `primary` and `aside`
+ * carrying identical classes. CSS auto-placement then put the two `primary` cards *beside each
+ * other* in one row and pushed `aside` to a third row — while the comment, and the spec's
+ * desktop declaration, both described a main column carrying the next session and the rest of
+ * the day with the attendee's conferences in a secondary column. The mapping was in one place,
+ * as FR-156 requires; that one place simply did not produce the declared layout, and no test
+ * looked at column arrangement.
+ *
+ * Grouping into per-slot containers makes the columns real: cards within a slot stack, and the
+ * slots sit side by side.
  * ─────────────────────────────────────────────────────────────────────────────────────────
  */
-const SLOT_LAYOUT: Record<HomeCardSlot, string> = {
-  // Always the full width of the grid, at every band. It introduces the screen.
-  lead: 'col-span-full',
-  // Mobile: the only column. Tablet: the left of two. Desktop: the left of two.
-  primary: 'col-span-full tablet:col-span-1',
-  // Folds below `primary` at tablet by taking the second row of the same column set; at
-  // desktop it becomes a genuine second column.
-  aside: 'col-span-full tablet:col-span-1',
+const SLOT_COLUMN: Record<Exclude<HomeCardSlot, 'lead'>, string> = {
+  // The main column: two thirds at tablet and desktop.
+  primary: 'tablet:col-span-2',
+  // The secondary column: one third.
+  aside: 'tablet:col-span-1',
 }
 
 /** Ascending `order`; registry position breaks ties, and only ties. */
@@ -69,7 +86,8 @@ const inSlot = (cards: readonly HomeCard[], slot: HomeCardSlot): readonly HomeCa
     .sort((a, b) => a.card.order - b.card.order || a.index - b.index)
     .map(({ card }) => card)
 
-const SLOT_ORDER: readonly HomeCardSlot[] = ['lead', 'primary', 'aside']
+/** The two slots that become columns. `lead` is handled separately — it spans both. */
+const COLUMN_SLOTS = ['primary', 'aside'] as const
 
 export const HomeShell = ({ cards, activeEvent, banner }: HomeShellProps) => (
   <section aria-labelledby="home-heading" className="px-4 py-6 tablet:px-6">
@@ -79,14 +97,38 @@ export const HomeShell = ({ cards, activeEvent, banner }: HomeShellProps) => (
 
     {banner}
 
-    <div className="grid grid-cols-1 gap-4 tablet:grid-cols-2 desktop:gap-6">
-      {SLOT_ORDER.flatMap((slot) =>
-        inSlot(cards, slot).map((card) => (
-          <div key={card.id} data-card={card.id} className={SLOT_LAYOUT[slot]}>
-            <CardBoundary card={card} activeEvent={activeEvent} />
+    <div className="grid grid-cols-1 gap-4 tablet:grid-cols-3 desktop:gap-6">
+      {/* The lead card introduces the screen: full width at every band. */}
+      {inSlot(cards, 'lead').map((card) => (
+        <div key={card.id} data-card={card.id} className="col-span-full">
+          <CardBoundary card={card} activeEvent={activeEvent} />
+        </div>
+      ))}
+
+      {COLUMN_SLOTS.map((slot) => {
+        const inColumn = inSlot(cards, slot)
+        if (inColumn.length === 0) return null
+
+        // When the other column is empty the remaining one takes the full width, so a Home
+        // carrying only `primary` cards does not leave a third of the row blank.
+        const otherSlot = slot === 'primary' ? 'aside' : 'primary'
+        const width = inSlot(cards, otherSlot).length === 0 ? 'col-span-full' : SLOT_COLUMN[slot]
+
+        return (
+          <div
+            key={slot}
+            data-slot={slot}
+            // `content-start` so a short column does not stretch its cards to match a tall one.
+            className={`grid content-start gap-4 desktop:gap-6 ${width}`}
+          >
+            {inColumn.map((card) => (
+              <div key={card.id} data-card={card.id}>
+                <CardBoundary card={card} activeEvent={activeEvent} />
+              </div>
+            ))}
           </div>
-        )),
-      )}
+        )
+      })}
     </div>
   </section>
 )

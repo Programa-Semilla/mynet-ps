@@ -43,7 +43,6 @@ export const EventSwitcher = () => {
 
   const menuId = useId()
   const triggerRef = useRef<HTMLButtonElement>(null)
-  const menuRef = useRef<HTMLDivElement>(null)
 
   const close = useCallback((returnFocus = true) => {
     setOpen(false)
@@ -133,12 +132,13 @@ export const EventSwitcher = () => {
    * anything, and offering it invites the attendee to try.
    */
   if (events.data.length === 1) {
+    // FR-110 requires the location as well as the name. FR-114 removes the *choice* for a
+    // single registration, not the identification — an attendee with one conference is exactly
+    // the person with no other way to see where it is.
     return (
-      <p
-        className="min-w-0 truncate text-sm font-medium text-text-primary"
-        data-testid="event-name"
-      >
-        {events.data[0]?.name}
+      <p className="min-w-0 truncate text-sm text-text-primary" data-testid="event-name">
+        <span className="font-medium">{events.data[0]?.name}</span>
+        <span className="text-text-muted"> · {events.data[0]?.location}</span>
       </p>
     )
   }
@@ -160,13 +160,18 @@ export const EventSwitcher = () => {
       >
         <span className="truncate">
           {active.status === 'ready' ? active.event.name : 'Conference'}
+          {active.status === 'ready' && (
+            // Visible from the tablet band up. Hidden at mobile, where the row already carries
+            // the product name and the sign-out control and 320px must not scroll (FR-020) —
+            // the accessible name below still carries it at every width.
+            <span className="hidden text-text-muted tablet:inline"> · {active.event.location}</span>
+          )}
         </span>
         <ChevronDown aria-hidden="true" size={14} strokeWidth={1.75} className="shrink-0" />
       </button>
 
       {open && (
         <div
-          ref={menuRef}
           /*
             T059 — one control, three presentations, selected in CSS so no width is read in
             JavaScript. Mobile is a full-width overlay with touch-sized targets; tablet and

@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { HomeShell } from '../src/app/home/HomeShell.js'
@@ -32,9 +32,21 @@ const SCENARIOS = {
   populated: () => ({
     events: { listRegistered: async () => [SUMMIT] },
     catalog: {
+      // TWO future sessions on the venue's today, so `rest-of-day` genuinely renders a list.
+      // With a single session it was excluded as the up-next one and the card rendered its
+      // EMPTY message — which the matrix then recorded as its "populated" state.
       listSessions: async () => [
-        // Far in the future relative to the fixed clock below, so "up next" has something.
-        aSession({ startsAt: '2026-09-14T14:00:00.000Z', endsAt: '2026-09-14T15:00:00.000Z' }),
+        aSession({
+          id: 's1',
+          startsAt: '2026-09-14T12:00:00.000Z',
+          endsAt: '2026-09-14T13:00:00.000Z',
+        }),
+        aSession({
+          id: 's2',
+          title: 'Later Session',
+          startsAt: '2026-09-14T14:00:00.000Z',
+          endsAt: '2026-09-14T15:00:00.000Z',
+        }),
       ],
       listTracks: async () => [],
     },
@@ -60,6 +72,21 @@ const SCENARIOS = {
   }),
 } as const
 
+/**
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ * **Cards whose content is a pure function of props, not of a repository.**
+ *
+ * `GreetingDayContext` reads no repository — it renders the resolved conference and the
+ * signed-in attendee — so varying repository behaviour cannot change it. Its states come from
+ * the props the shell passes, and it gets its own matrix below.
+ *
+ * **The default is the strict repository matrix**: a card added by a later feature is treated
+ * as data-backed unless it is deliberately named here, so an exemption has to be a decision
+ * rather than an omission.
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ */
+const PROP_DRIVEN = new Set(['greeting-day-context'])
+
 describe('every Home card in all four states (SC-109)', () => {
   beforeEach(() => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
@@ -79,7 +106,36 @@ describe('every Home card in all four states (SC-109)', () => {
 
   const states = Object.keys(SCENARIOS) as Array<keyof typeof SCENARIOS>
 
-  describe.each(HOME_CARDS.map((card) => [card.id, card] as const))('%s', (_id, card) => {
+  /**
+   * ═════════════════════════════════════════════════════════════════════════════════════════
+   * **Cards whose content is a pure function of props, not of a repository.**
+   *
+   * `GreetingDayContext` reads no repository — it renders the resolved conference and the
+   * signed-in attendee — so varying repository behaviour cannot change it, and asserting that
+   * it does would be asserting a fiction. Its four states come from the *shell's*
+   * active-conference resolution, which the block at the bottom of this file walks.
+   *
+   * **The default is the strict matrix**: a card added by a later feature is treated as
+   * data-backed unless it is deliberately added here, so the exemption has to be a decision
+   * rather than an omission. The classification test below makes the two lists cover the
+   * registry exactly.
+   * ═════════════════════════════════════════════════════════════════════════════════════════
+   */
+  const dataBacked = HOME_CARDS.filter((card) => !PROP_DRIVEN.has(card.id))
+
+  it('no card is exempted that no longer exists', () => {
+    // The sum of two complementary filters over one array is a tautology and was asserted as
+    // one. What can actually go wrong is a STALE exemption: rename a card and `PROP_DRIVEN`
+    // silently holds a dead id while the renamed card quietly enters the strict matrix — or,
+    // worse, a future edit adds an id here that never existed and exempts nothing visibly.
+    expect(
+      [...PROP_DRIVEN].filter((id) => !HOME_CARDS.some((card) => card.id === id)),
+      'these ids are exempted from the strict matrix but are not registered cards',
+    ).toEqual([])
+    expect(dataBacked.length, 'the strict matrix must cover something').toBeGreaterThan(0)
+  })
+
+  describe.each(dataBacked.map((card) => [card.id, card] as const))('%s', (_id, card) => {
     it.each(states)('renders something visible and meaningful when %s', async (state) => {
       render(
         <WithServices services={testServices(SCENARIOS[state]())}>
@@ -90,9 +146,7 @@ describe('every Home card in all four states (SC-109)', () => {
       // Settle any resolved promise the card kicked off.
       await vi.advanceTimersByTimeAsync(0)
 
-      const region = screen.getByRole(state === 'failed' ? 'region' : 'region', {
-        name: card.title,
-      })
+      const region = screen.getByRole('region', { name: card.title })
 
       // ─────────────────────────────────────────────────────────────────────────────────────
       // "Visible and meaningful" is the requirement, so an empty box is a failure. Every state
@@ -105,6 +159,46 @@ describe('every Home card in all four states (SC-109)', () => {
         `The "${card.title}" card renders nothing but its heading when ${state}. Every card owns ` +
           'its loading, empty and failure states (constitution: Home is composed, not aggregated).',
       ).toBeGreaterThan(0)
+
+      // ─────────────────────────────────────────────────────────────────────────────────────
+      // **State-specific markers, not merely "some text".**
+      //
+      // The assertion above alone was satisfied by a card that rendered the identical string in
+      // all four conditions — which is exactly what `rest-of-day` was doing, because the
+      // "populated" fixture left it with nothing to list. SC-109 says a *meaningful* state in
+      // each of the four; these are what make the four distinguishable.
+      // ─────────────────────────────────────────────────────────────────────────────────────
+      if (state === 'loading') {
+        expect(within(region).getByRole('status')).toBeInTheDocument()
+      }
+      if (state === 'failed') {
+        expect(within(region).getByRole('alert')).toBeInTheDocument()
+        expect(within(region).getByRole('button', { name: /try again/i })).toBeInTheDocument()
+      }
+    })
+
+    it('renders a DIFFERENT body in each of the four states', async () => {
+      const bodies = new Map<string, string>()
+
+      for (const state of states) {
+        const { unmount } = render(
+          <WithServices services={testServices(SCENARIOS[state]())}>
+            <HomeShell cards={[card]} activeEvent={{ status: 'ready', event: SUMMIT }} />
+          </WithServices>,
+        )
+        await vi.advanceTimersByTimeAsync(0)
+        const region = screen.getByRole('region', { name: card.title })
+        bodies.set(state, (region.textContent ?? '').replace(card.title, '').trim())
+        unmount()
+      }
+
+      // Loading, populated, empty and failed must not read identically. A card that showed the
+      // same words in all four would satisfy "renders something" and tell the attendee nothing.
+      expect(
+        new Set(bodies.values()).size,
+        `"${card.title}" renders indistinguishable bodies across states: ` +
+          JSON.stringify(Object.fromEntries(bodies)),
+      ).toBe(states.length)
     })
   })
 })
@@ -124,6 +218,16 @@ describe('every Home card in all four states (SC-109)', () => {
  * ─────────────────────────────────────────────────────────────────────────────────────────
  */
 describe('event-scoped cards in every active-conference state (SC-109)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.restoreAllMocks()
+  })
+
   const EVENT_SCOPED = HOME_CARDS.filter((card) => card.scope === 'event')
 
   const ACTIVE_EVENT_STATES = {
@@ -138,6 +242,59 @@ describe('event-scoped cards in every active-conference state (SC-109)', () => {
 
   it('there are event-scoped cards to exercise', () => {
     expect(EVENT_SCOPED.length).toBeGreaterThan(0)
+  })
+
+  /**
+   * ═════════════════════════════════════════════════════════════════════════════════════════
+   * **The states below never invoke `card.Component`** — `HomeShell` returns `CardPending` for
+   * loading, none and failed without rendering the card at all. So this block alone proved
+   * nothing about a prop-driven card: a mutation replacing `GreetingDayContext`'s body with an
+   * unconditional throw passed all 30 cases, because `CardUnavailable`'s "unavailable right
+   * now" satisfies "renders something".
+   *
+   * This is the matrix that actually renders the exempt cards, varying the **props** they are a
+   * function of — the analogue of the repository matrix above.
+   * ═════════════════════════════════════════════════════════════════════════════════════════
+   */
+  describe.each(
+    HOME_CARDS.filter((card) => PROP_DRIVEN.has(card.id)).map((card) => [card.id, card] as const),
+  )('%s (prop-driven)', (_id, card) => {
+    const WINDOWS = {
+      before: '2026-09-11T10:00:00Z',
+      during: '2026-09-15T10:00:00Z',
+      after: '2026-09-25T10:00:00Z',
+    } as const
+
+    it('renders a distinct body in each of before, during and after', async () => {
+      const bodies = new Map<string, string>()
+
+      for (const [label, instant] of Object.entries(WINDOWS)) {
+        vi.setSystemTime(new Date(instant))
+        const { unmount } = render(
+          <WithServices services={testServices(SCENARIOS.populated())}>
+            <HomeShell cards={[card]} activeEvent={{ status: 'ready', event: SUMMIT }} />
+          </WithServices>,
+        )
+        await vi.advanceTimersByTimeAsync(0)
+
+        const region = screen.getByRole('region', { name: card.title })
+        // A thrown card renders the shell's contained failure instead — catch that explicitly
+        // rather than letting its text satisfy a length check.
+        expect(
+          within(region).queryByRole('alert'),
+          `"${card.title}" failed to render (${label}); the shell contained it`,
+        ).toBeNull()
+
+        bodies.set(label, (region.textContent ?? '').replace(card.title, '').trim())
+        unmount()
+      }
+
+      expect(
+        new Set(bodies.values()).size,
+        `"${card.title}" reads the same before, during and after: ` +
+          JSON.stringify(Object.fromEntries(bodies)),
+      ).toBe(3)
+    })
   })
 
   describe.each(EVENT_SCOPED.map((card) => [card.id, card] as const))('%s', (_id, card) => {

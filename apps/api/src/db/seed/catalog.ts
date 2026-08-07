@@ -251,12 +251,21 @@ const instantAt = (
   day.setUTCDate(day.getUTCDate() + dayOffset)
   const date = day.toISOString().slice(0, 10)
 
-  // Find the UTC instant whose venue-local wall time is the one asked for. Two passes: guess at
-  // UTC, measure the zone's offset at that guess, then correct. One correction is enough for
-  // every real zone — offsets are whole minutes and change by at most an hour.
+  // ───────────────────────────────────────────────────────────────────────────────────────
+  // Find the UTC instant whose venue-local wall time is the one asked for.
+  //
+  // **Two correction passes, not one.** The offset that matters is the one in force at the
+  // *answer*, not at the guess, and those differ when a DST transition falls between them. A
+  // single pass gets `2026-03-29 01:00` in Europe/Madrid an hour wrong — it measures +2 at the
+  // guess, when the local time it is solving for is still +1 — and the failing window is wider
+  // for negative-offset zones. The first pass lands within an hour; the second lands exactly.
+  //
+  // A wall time inside a skipped hour has no instant at all; it normalises to the nearest real
+  // one rather than failing, which is the right behaviour for seed data a human wrote.
+  // ───────────────────────────────────────────────────────────────────────────────────────
   const guess = new Date(`${date}T${wallTime}:00Z`)
-  const offsetMs = zoneOffsetMs(guess, timezone)
-  return new Date(guess.getTime() - offsetMs)
+  const firstPass = new Date(guess.getTime() - zoneOffsetMs(guess, timezone))
+  return new Date(guess.getTime() - zoneOffsetMs(firstPass, timezone))
 }
 
 /** How far ahead of UTC the zone is at a given instant, in milliseconds. */

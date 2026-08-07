@@ -2,7 +2,8 @@ import type { RouteOptions } from 'fastify'
 import { beforeAll, describe, expect, it } from 'vitest'
 
 import { buildApp } from '../../src/app.js'
-import { requireEventAccess } from '../../src/plugins/event-access.js'
+import { requireAttendee } from '../../src/plugins/auth-context.js'
+import { assertVerifiedScope, requireEventAccess } from '../../src/plugins/event-access.js'
 
 /**
  * T068, T072 (002) — the route audit (FR-149, FR-132, FR-134, SC-105).
@@ -24,6 +25,51 @@ import { requireEventAccess } from '../../src/plugins/event-access.js'
 
 /** URL segments that name an event. Extend deliberately, not to make a failure go away. */
 const EVENT_PARAM = /:eventId\b|\{eventId\}/
+
+/**
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ * **A conference identifier is not always in the URL**, and the audit used to assume it was.
+ *
+ * FR-149 says "a route accepting a conference identifier", not "a route with an event path
+ * parameter". `PUT /workspace/active-event` already takes one in its **body**, and was
+ * therefore invisible to this audit — it is safe, because `recordActiveEvent` folds the
+ * registration check into a single `INSERT … WHERE EXISTS`, but the audit did not verify that
+ * and would not have noticed a sibling route that omitted it.
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ */
+const EVENT_ID_KEY = /^(event|conference)_?id$/i
+
+/**
+ * Searches a JSON-schema fragment for any property naming a conference, at any depth.
+ *
+ * A top-level exact-match on `eventId` was the first version, and it missed every ordinary
+ * variation: `allOf`, `items`, a nested object, and `conferenceId`. It also never looked at
+ * `params`, so a route spelled `/events/:id/sessions` was invisible to both this and the URL
+ * pattern. A gate that silently narrows is the failure this file's own header warns about.
+ */
+const mentionsEventId = (node: unknown): boolean => {
+  if (typeof node !== 'object' || node === null) return false
+  return Object.entries(node as Record<string, unknown>).some(
+    ([key, value]) => EVENT_ID_KEY.test(key) || mentionsEventId(value),
+  )
+}
+
+/**
+ * Routes that take a conference identifier but verify registration inside their query rather
+ * than through the guard. **Each entry must name why**, and the list must stay this short.
+ */
+const VERIFIES_INSIDE_ITS_QUERY = new Set([
+  // `recordActiveEvent` inserts only `WHERE EXISTS (SELECT 1 FROM registrations …)`, so the
+  // check and the write are one statement with no window between them. Using the guard here
+  // would verify the same registration twice.
+  'PUT /workspace/active-event',
+])
+
+const acceptsEventIdentifier = (route: RouteOptions): boolean =>
+  EVENT_PARAM.test(route.url) ||
+  (['body', 'querystring', 'params'] as const).some((part) =>
+    mentionsEventId((route.schema as Record<string, unknown> | undefined)?.[part]),
+  )
 
 const WRITE_METHODS = ['POST', 'PUT', 'PATCH', 'DELETE']
 
@@ -67,11 +113,12 @@ describe('event scope route audit', () => {
     ).toBeGreaterThan(0)
   })
 
-  it.each([true])('every route declaring an event parameter carries the access guard', () => {
+  it('every route accepting a conference identifier carries the access guard', () => {
     const unguarded = routes
-      .filter((route) => EVENT_PARAM.test(route.url))
+      .filter(acceptsEventIdentifier)
       .filter((route) => !preHandlersOf(route).includes(requireEventAccess))
       .map((route) => `${methodsOf(route).join('/')} ${route.url}`)
+      .filter((label) => !VERIFIES_INSIDE_ITS_QUERY.has(label))
 
     expect(
       unguarded,
@@ -82,15 +129,38 @@ describe('event scope route audit', () => {
     ).toEqual([])
   })
 
-  it('every event-scoped route also binds identity first', () => {
+  it('every event-scoped route binds identity FIRST, by reference not by count', () => {
     // `requireEventAccess` verifies a registration for `request.attendee`, so a route carrying
-    // it without `requireAttendee` would be verifying against nobody.
-    const missingIdentity = routes
-      .filter((route) => EVENT_PARAM.test(route.url))
-      .filter((route) => preHandlersOf(route).length < 2)
-      .map((route) => route.url)
+    // it without `requireAttendee` — or after it — would be verifying against nobody.
+    //
+    // This asserted `preHandlers.length >= 2` until a deep review pointed out that
+    // `[someUnrelatedHook, requireEventAccess]` satisfies a count. Now it compares the actual
+    // function references, which is possible because both guards are exported.
+    const wrong = routes
+      .filter((route) => preHandlersOf(route).includes(requireEventAccess))
+      .filter((route) => {
+        const handlers = preHandlersOf(route)
+        const identity = handlers.indexOf(requireAttendee)
+        return identity === -1 || identity > handlers.indexOf(requireEventAccess)
+      })
+      .map((route) => `${methodsOf(route).join('/')} ${route.url}`)
 
-    expect(missingIdentity).toEqual([])
+    expect(
+      wrong,
+      'These routes verify event access without binding identity first, so the registration ' +
+        'check has no attendee to check against.',
+    ).toEqual([])
+  })
+
+  it('the allowlist for query-verified routes stays justified and short', () => {
+    // An allowlist that grows silently is a hole. Every entry must still exist as a route.
+    const labels = routes.flatMap((route) =>
+      methodsOf(route).map((method) => `${method} ${route.url}`),
+    )
+    for (const allowed of VERIFIES_INSIDE_ITS_QUERY) {
+      expect(labels, `${allowed} is allowlisted but no longer exists`).toContain(allowed)
+    }
+    expect(VERIFIES_INSIDE_ITS_QUERY.size).toBeLessThanOrEqual(1)
   })
 
   /**
@@ -135,5 +205,49 @@ describe('event scope route audit', () => {
       .map((route) => route.url)
 
     expect(withAttendeeParam).toEqual([])
+  })
+})
+
+/**
+ * The runtime half of FR-147 (research D2).
+ *
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ * A security review defeated the compile-time brand five different ways — `Object.assign` both
+ * to forge and to mutate in place, `structuredClone`, `Object.create`, and the prototype's own
+ * constructor — every one of them compiling clean and passing lint. The type says what a value
+ * looks like; only membership of the guard's own set says where it came from.
+ *
+ * These assertions are what stop that fix from being quietly removed later. They use `as never`
+ * to smuggle non-scopes past the compiler on purpose, which is the only way to test a runtime
+ * check whose whole point is that the type system already refuses the obvious cases.
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ */
+describe('a scope must have been issued by the guard, not merely shaped like one', () => {
+  const forged = [
+    ['a plain object of the right shape', { attendeeId: 'a', eventId: 'e' }],
+    ['a frozen object of the right shape', Object.freeze({ attendeeId: 'a', eventId: 'e' })],
+    ['an object with a null prototype', Object.assign(Object.create(null), { eventId: 'e' })],
+  ] as const
+
+  it.each(forged)('refuses %s', (_label, candidate) => {
+    expect(() => assertVerifiedScope(candidate as never)).toThrow()
+  })
+
+  it('refuses a structured clone of a real scope', () => {
+    // The clone keeps the nominal type but is a different object, so it is not a member.
+    const realish = structuredClone({ attendeeId: 'a', eventId: 'e' })
+    expect(() => assertVerifiedScope(realish as never)).toThrow()
+  })
+
+  it('refuses identically to any other refusal, disclosing nothing (FR-148)', () => {
+    // The same `notFound()` an unregistered or nonexistent conference produces — a forged scope
+    // must not be distinguishable from either.
+    try {
+      assertVerifiedScope({ attendeeId: 'a', eventId: 'e' } as never)
+      throw new Error('should have refused')
+    } catch (error) {
+      expect((error as { code?: string }).code).toBe('not_found')
+      expect((error as { statusCode?: number }).statusCode).toBe(404)
+    }
   })
 })

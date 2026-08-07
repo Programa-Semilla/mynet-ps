@@ -183,6 +183,69 @@ describe('Home composition', () => {
     expect(container.querySelector('[data-card="exploding"]')).toBeInTheDocument()
   })
 
+  /**
+   * FR-156 and the spec's desktop declaration: the greeting spans the full width above a main
+   * column carrying the next session and the rest of the day, with the attendee's conferences
+   * in a secondary column.
+   *
+   * ─────────────────────────────────────────────────────────────────────────────────────────
+   * Added because nothing checked column *arrangement*. The shell previously placed every card
+   * directly into a two-column grid with `primary` and `aside` carrying identical classes, so
+   * auto-placement put the two primary cards side by side and pushed the aside card to a third
+   * row — the opposite of what the spec and the shell's own comment described. Every existing
+   * test passed, because they assert presence and containment, never structure.
+   *
+   * jsdom applies no stylesheet, so this asserts the grouping the CSS acts on rather than
+   * computed geometry; `e2e/responsive.spec.ts` is where real widths are exercised.
+   * ─────────────────────────────────────────────────────────────────────────────────────────
+   */
+  it('groups primary cards into one column and aside cards into another (FR-156)', () => {
+    const { container } = render(
+      <WithServices>
+        <HomeShell
+          cards={[
+            { ...healthyCard, id: 'lead-card', slot: 'lead', order: 0 },
+            { ...healthyCard, id: 'primary-one', slot: 'primary', order: 0 },
+            { ...healthyCard, id: 'primary-two', slot: 'primary', order: 1 },
+            { ...healthyCard, id: 'aside-one', slot: 'aside', order: 0 },
+          ]}
+          activeEvent={{ status: 'ready', event: SUMMIT }}
+        />
+      </WithServices>,
+    )
+
+    const primaryColumn = container.querySelector('[data-slot="primary"]')
+    const asideColumn = container.querySelector('[data-slot="aside"]')
+    expect(primaryColumn).toBeInTheDocument()
+    expect(asideColumn).toBeInTheDocument()
+
+    // Both primary cards live in the main column, stacked — not spread across the row.
+    expect(primaryColumn?.querySelector('[data-card="primary-one"]')).toBeInTheDocument()
+    expect(primaryColumn?.querySelector('[data-card="primary-two"]')).toBeInTheDocument()
+    expect(primaryColumn?.querySelector('[data-card="aside-one"]')).toBeNull()
+
+    // The aside card is in the secondary column, not beneath the first primary card.
+    expect(asideColumn?.querySelector('[data-card="aside-one"]')).toBeInTheDocument()
+
+    // The lead card is in neither column — it spans them.
+    expect(container.querySelector('[data-card="lead-card"]')?.className).toContain('col-span-full')
+  })
+
+  it('lets a single column take the full width when the other is empty', () => {
+    const { container } = render(
+      <WithServices>
+        <HomeShell
+          cards={[{ ...healthyCard, id: 'only-primary', slot: 'primary', order: 0 }]}
+          activeEvent={{ status: 'ready', event: SUMMIT }}
+        />
+      </WithServices>,
+    )
+
+    // No blank third of the row when nothing claims `aside`.
+    expect(container.querySelector('[data-slot="primary"]')?.className).toContain('col-span-full')
+    expect(container.querySelector('[data-slot="aside"]')).toBeNull()
+  })
+
   it('orders cards within a slot by `order`, not by registry position', () => {
     const { container } = render(
       <WithServices>

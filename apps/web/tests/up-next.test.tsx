@@ -68,9 +68,34 @@ describe('Up next', () => {
     atVenue('2026-09-14T20:00:00Z')
     renderWith([aSession()])
 
-    expect(await screen.findByText(/Nothing further is scheduled/i)).toBeInTheDocument()
+    expect(await screen.findByText(/Nothing further scheduled today/i)).toBeInTheDocument()
     // The crucial half: the morning's session must not be presented as "up next".
     expect(screen.queryByText('Tokens Beyond Colour')).not.toBeInTheDocument()
+  })
+
+  it('does NOT show tomorrow’s session once today’s programme is over (FR-140)', async () => {
+    // ───────────────────────────────────────────────────────────────────────────────────────
+    // A one-session fixture cannot express this: with only one day of programme, "nothing left
+    // today" and "nothing left at all" are the same condition, and a card that searched the
+    // whole conference would pass. Two days separate them.
+    //
+    // At 22:00 in Barcelona on day one, the next session in the *conference* is tomorrow's
+    // 09:30 — and it would render as a bare "09:30" with no date, reading as later tonight.
+    // ───────────────────────────────────────────────────────────────────────────────────────
+    atVenue('2026-09-14T20:00:00Z') // 22:00 at the venue, after day one has finished
+    renderWith([
+      aSession({ id: 'today', title: 'Today Morning Session' }),
+      aSession({
+        id: 'tomorrow',
+        title: 'Tomorrow Morning Session',
+        startsAt: '2026-09-15T07:30:00.000Z', // 09:30 on day two
+        endsAt: '2026-09-15T08:30:00.000Z',
+      }),
+    ])
+
+    expect(await screen.findByText(/Nothing further scheduled today/i)).toBeInTheDocument()
+    expect(screen.queryByText('Tomorrow Morning Session')).not.toBeInTheDocument()
+    expect(screen.queryByText('09:30')).not.toBeInTheDocument()
   })
 
   it('says the programme is unpublished when there is none at all (FR-139)', async () => {

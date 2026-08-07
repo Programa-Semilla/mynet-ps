@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
+import { HttpActiveEventRepository } from '../src/http/active-event-repository.js'
 import { HttpAttendeeRepository } from '../src/http/attendee-repository.js'
+import { HttpCatalogRepository } from '../src/http/catalog-repository.js'
 import { HttpClient } from '../src/http/client.js'
 import { HttpEventsRepository } from '../src/http/events-repository.js'
 import type {
@@ -55,6 +57,11 @@ const httpRepositories = () => {
   return {
     attendee: new HttpAttendeeRepository(http),
     events: new HttpEventsRepository(http),
+    // 002. Added because the sweep below derives its method list from THIS map: leaving the two
+    // new repositories out meant the guard reported green while covering half the surface —
+    // exactly the silent narrowing the comment above warns about, one level up.
+    activeEvent: new HttpActiveEventRepository(http),
+    catalog: new HttpCatalogRepository(http),
   }
 }
 
@@ -121,8 +128,25 @@ describe('no repository method accepts an attendee identifier (FR-036, FR-044)',
     expect(everyRepositoryMethod().length).toBeGreaterThan(0)
   })
 
-  it.each(everyRepositoryMethod())('%s takes no parameters', (_name, method) => {
-    expect(method.length).toBe(0)
+  /**
+   * ─────────────────────────────────────────────────────────────────────────────────────────
+   * **Zero parameters, or exactly one that names an event** (FR-106 vs FR-145).
+   *
+   * Until 002 every method took nothing, and arity alone expressed the rule. 002 introduced
+   * per-event reads, where naming the conference is required and the server verifies it — so
+   * `listSessions(eventId)` is correct and must not fail this. The rule the project actually
+   * holds is about *whose* identifier may be sent, which the signature check below encodes;
+   * this one keeps the surface from growing parameters nobody justified.
+   * ─────────────────────────────────────────────────────────────────────────────────────────
+   */
+  it.each(everyRepositoryMethod())('%s takes no parameter beyond an event id', (name, method) => {
+    expect(method.length, `${name} accepts more than one parameter`).toBeLessThanOrEqual(1)
+
+    if (method.length === 1) {
+      const source = method.toString()
+      const signature = source.slice(0, source.indexOf(')') + 1)
+      expect(signature, `${name}'s single parameter must be an event identifier`).toMatch(/event/i)
+    }
   })
 
   it.each(everyRepositoryMethod())(

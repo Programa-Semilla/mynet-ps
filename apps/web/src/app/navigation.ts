@@ -13,8 +13,9 @@ import { CalendarDays, Compass, Home, MessageSquare, Users, type LucideIcon } fr
  * Order is deliberate and matches the prototype: Home first because it is the entry view, then
  * the attendee's own time (Agenda), then other people (Discover, Messages, Network).
  *
- * These carry **no product content in this slice** (FR-023). Each destination renders an
- * identifiable region with a heading and an honest statement that its content is not built yet.
+ * **Home and Agenda carry product content from 002.** Discover, Messages and Network remain
+ * placeholders: each renders an identifiable region with a heading and `purpose` as an honest
+ * statement that its content is not built yet, until the feature that owns it lands.
  */
 
 export interface Destination {

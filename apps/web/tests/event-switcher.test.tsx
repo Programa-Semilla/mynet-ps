@@ -244,6 +244,50 @@ describe('EventSwitcher', () => {
         /Systems & Scale/,
       ),
     )
+
+    // ───────────────────────────────────────────────────────────────────────────────────────
+    // **"displayed AND recorded"** — the title says both, and only the display half was
+    // asserted. FR-118 forbids coming to rest showing one conference while having recorded
+    // another, so what reached the server matters as much as what is on screen.
+    // ───────────────────────────────────────────────────────────────────────────────────────
+    expect(setActive.mock.calls.map(([id]) => id)).toEqual([HORIZONS.id, THIRD.id])
+  })
+
+  it('re-reads when the server echoes a conference other than the one requested', async () => {
+    // The out-of-order case research D9 names as the residual risk. The switcher's own
+    // in-flight guard makes it unreachable through the UI, so it is driven directly here: if
+    // the echo disagrees, the client must not come to rest displaying the requested one.
+    const user = userEvent.setup()
+    const getActive = vi.fn(async () => SUMMIT)
+
+    render(
+      <MemoryRouter>
+        <WithServices
+          services={testServices({
+            events: { listRegistered: async () => [SUMMIT, HORIZONS] },
+            activeEvent: {
+              getActive,
+              // Echoes what the server actually stored, which is not what was asked for.
+              setActive: async () => SUMMIT,
+            },
+          })}
+        >
+          <ActiveEventProvider>
+            <EventSwitcher />
+          </ActiveEventProvider>
+        </WithServices>
+      </MemoryRouter>,
+    )
+
+    await openMenu(user)
+    await user.click(screen.getByRole('menuitemradio', { name: /Frontend Horizons/ }))
+
+    // It settles on what the server reported, never on the optimistic guess.
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /change conference/i })).toHaveAccessibleName(
+        /Product & Design Summit/,
+      ),
+    )
   })
 
   describe('keyboard and dismissal (FR-116)', () => {

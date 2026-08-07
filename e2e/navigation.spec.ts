@@ -178,7 +178,14 @@ test.describe('navigation', () => {
     await expect(page.locator('[data-card="greeting-day-context"]')).toBeVisible()
     await expect(page.locator('[data-card="up-next"]')).toBeVisible()
 
-    const before = await page.locator('[data-card="up-next"]').textContent()
+    // ───────────────────────────────────────────────────────────────────────────────────────
+    // Compared on the greeting card, which always carries the conference name and location.
+    // The up-next card was the obvious choice and is a time bomb: the seed uses fixed absolute
+    // dates, and from 2026-10-08 both of Ada's conferences are in the past, so both render the
+    // same "Nothing further today" string and the comparison fails for calendar reasons rather
+    // than product ones.
+    // ───────────────────────────────────────────────────────────────────────────────────────
+    const before = await page.locator('[data-card="greeting-day-context"]').textContent()
 
     // Switch, without touching the pointer.
     const trigger = page.getByRole('button', { name: /change conference/i })
@@ -237,13 +244,36 @@ test.describe('navigation', () => {
     await signedIn(page)
     await page.goto('/agenda')
 
-    const programmeBefore = await page.locator('main').textContent()
+    // Capture what is actually on screen, not just its length. SC-102 requires that **no
+    // surface still shows the previous conference** — `.not.toBe(before)` is satisfied by a
+    // regression that appends the new programme to the old one, or leaves a single stale row.
+    // SC-107's disjointness is exactly what makes the stronger assertion cheap.
+    // `allTextContents()` does not auto-wait, so wait for the programme to render before
+    // capturing it — otherwise this samples an empty page and asserts nothing.
+    await expect(page.getByRole('heading', { level: 3 }).first()).toBeVisible()
+    const titlesBefore = await page.getByRole('heading', { level: 3 }).allTextContents()
+    expect(titlesBefore.length, 'the programme must be visible before switching').toBeGreaterThan(0)
 
     const target = await switchToAnotherConference(page, ADA)
 
-    // Agenda re-renders in place, with no reload. The two seeded programmes share no session
-    // title, track, room or speaker (SC-107), so any leftover would be visible.
-    await expect.poll(() => page.locator('main').textContent()).not.toBe(programmeBefore)
+    // The new programme renders — and is genuinely non-empty. Without this guard every
+    // assertion below is satisfied by an Agenda that blanks after the switch, which is a
+    // regression rather than a pass.
+    await expect(page.getByRole('heading', { level: 3 }).first()).toBeVisible()
+    const titlesAfter = await page.getByRole('heading', { level: 3 }).allTextContents()
+    expect(titlesAfter.length, 'the new conference must render a programme').toBeGreaterThan(0)
+    expect(
+      titlesAfter.filter((title) => titlesBefore.includes(title)),
+      'no session from the previous conference may survive the switch',
+    ).toEqual([])
+
+    // …and not one session from the previous conference survives anywhere on the page.
+    for (const title of titlesBefore) {
+      await expect(
+        page.locator('main'),
+        `"${title}" belongs to the previous conference and is still on screen after the switch`,
+      ).not.toContainText(title)
+    }
 
     // And Home, which was never remounted, agrees.
     await page.goto('/')

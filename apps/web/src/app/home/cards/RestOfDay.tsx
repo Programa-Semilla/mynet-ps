@@ -60,7 +60,7 @@ const RestOfDayBody = ({
   event: EventCardProps['event']
 }) => {
   const now = new Date()
-  const upcoming = nextSession(sessions, now)
+  const upcoming = nextSession(sessions, now, event.timezone)
   const remaining = restOfVenueDay(sessions, now, event.timezone, upcoming?.id)
 
   // A visible empty state rather than a disappearing card (FR-161). The card keeps its place in

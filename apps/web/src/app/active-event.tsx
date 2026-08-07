@@ -42,7 +42,19 @@ const ActiveEventContext = createContext<ActiveEventContextValue | null>(null)
 export const ActiveEventProvider = ({ children }: { children: ReactNode }) => {
   const repository = useActiveEventRepository()
   const { status: authStatus, attendee } = useAuth()
-  const [state, setState] = useState<ActiveEventState>({ status: 'loading' })
+  /**
+   * The resolved conference, **tagged with the attendee it belongs to**.
+   *
+   * The tag is what makes a stale conference unobservable rather than merely short-lived: the
+   * value is derived away during render whenever it does not belong to the attendee who is
+   * signed in now, so B never sees A's conference even for a single frame. Clearing it from an
+   * effect instead would leave one render in which it was still on screen — and would be a
+   * cascading `setState` in an effect, which React's own lint rule rejects.
+   */
+  const [resolved, setResolved] = useState<{
+    readonly attendeeId: string | null
+    readonly state: ActiveEventState
+  }>({ attendeeId: null, state: { status: 'loading' } })
 
   /**
    * FR-118 — **the last selection wins, and the client is what sequences.**
@@ -82,27 +94,38 @@ export const ActiveEventProvider = ({ children }: { children: ReactNode }) => {
    * nothing. Reloading from an event handler is where that transition belongs, and `reload`
    * below is where it happens.
    */
-  const fetchActive = useCallback(() => {
-    const sequence = ++issued.current
+  const fetchActive = useCallback(
+    (forAttendeeId: string | null) => {
+      const sequence = ++issued.current
 
-    void repository
-      .getActive()
-      .then((event) => {
-        if (sequence < applied.current) return
-        applied.current = sequence
-        setState(event ? { status: 'ready', event: event as Event } : { status: 'none' })
-      })
-      .catch((error: unknown) => {
-        if (sequence < applied.current) return
-        applied.current = sequence
-        setState({ status: 'failed', message: failureMessage(error), retry })
-      })
-  }, [repository, retry])
+      void repository
+        .getActive()
+        .then((event) => {
+          if (sequence < applied.current) return
+          applied.current = sequence
+          setResolved({
+            attendeeId: forAttendeeId,
+            state: event ? { status: 'ready', event: event as Event } : { status: 'none' },
+          })
+        })
+        .catch((error: unknown) => {
+          if (sequence < applied.current) return
+          applied.current = sequence
+          setResolved({
+            attendeeId: forAttendeeId,
+            state: { status: 'failed', message: failureMessage(error), retry },
+          })
+        })
+    },
+    [repository, retry],
+  )
+
+  const attendeeId = attendee?.id ?? null
 
   const reload = useCallback(() => {
-    setState({ status: 'loading' })
-    fetchActive()
-  }, [fetchActive])
+    setResolved({ attendeeId, state: { status: 'loading' } })
+    fetchActive(attendeeId)
+  }, [fetchActive, attendeeId])
 
   /**
    * ═════════════════════════════════════════════════════════════════════════════════════════
@@ -128,14 +151,29 @@ export const ActiveEventProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     loadRef.current = reload
 
-    if (authStatus !== 'signed-in') {
-      // Not a failure — there is simply nobody to have a conference yet. `loading` is the
-      // honest state, and it is what the shell renders on the sign-in screen anyway.
-      return
-    }
+    // Nothing to read while signed out. No state is cleared here — `state` below derives the
+    // previous attendee's value away, so there is no window in which it can be seen.
+    if (authStatus !== 'signed-in') return
 
-    fetchActive()
-  }, [fetchActive, reload, authStatus, attendee?.id])
+    fetchActive(attendeeId)
+  }, [fetchActive, reload, authStatus, attendeeId])
+
+  /**
+   * ═════════════════════════════════════════════════════════════════════════════════════════
+   * **The conference on screen belongs to the attendee who is signed in now, or it is `loading`.**
+   *
+   * Derived, not stored, which is what closes a real shared-device leak. This provider sits
+   * above the router and never unmounts, so after A signed out and B signed in, the stored value
+   * was still `{ ready, A's conference }` for the whole of B's request: B saw A's conference
+   * name and venue in the top bar and on the lead card, and the event-scoped cards fetched A's
+   * programme — which the server correctly refused, putting failure regions on a perfectly
+   * healthy account.
+   * ═════════════════════════════════════════════════════════════════════════════════════════
+   */
+  const state: ActiveEventState =
+    authStatus === 'signed-in' && resolved.attendeeId === attendeeId
+      ? resolved.state
+      : { status: 'loading' }
 
   const switchTo = useCallback(
     async (eventId: string): Promise<Event> => {
@@ -149,19 +187,27 @@ export const ActiveEventProvider = ({ children }: { children: ReactNode }) => {
       // A slower earlier request must not overwrite a faster later one.
       if (sequence >= applied.current) {
         applied.current = sequence
-        setState({ status: 'ready', event: recorded })
+        setResolved({ attendeeId, state: { status: 'ready', event: recorded } })
       }
 
       // ───────────────────────────────────────────────────────────────────────────────────
-      // The echo disagreeing with our latest selection means the requests reached the server
-      // out of order (research D9's residual risk). Detection is cheap because the response
-      // carries the recorded conference; recovery is a re-read rather than a guess.
+      // **There is deliberately no echo-comparison here, and that is a correction.**
+      //
+      // This previously read `if (recorded.id !== eventId) reload()`, described as detecting
+      // requests that reached the server out of order (research D9's residual risk). It could
+      // never fire: `recordActiveEvent` returns the row for the event the request *named*, so
+      // the echo is the requested event by construction and the comparison is always false.
+      //
+      // The risk it claimed to cover is instead prevented upstream — `EventSwitcher` disables
+      // every menu item while a switch is in flight — together with the sequence guard above,
+      // which discards a slower earlier response. Making the echo meaningful would mean having
+      // the PUT return the row actually stored in `active_event_selections` after the upsert;
+      // that is a contract change, and nothing currently needs it.
       // ───────────────────────────────────────────────────────────────────────────────────
-      if (sequence === issued.current && recorded.id !== eventId) reload()
 
       return recorded
     },
-    [repository, reload],
+    [repository, attendeeId],
   )
 
   return (

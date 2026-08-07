@@ -58,7 +58,7 @@ const UpNextBody = ({
   sessions: Session[]
   event: EventCardProps['event']
 }) => {
-  const upcoming = nextSession(sessions, new Date())
+  const upcoming = nextSession(sessions, new Date(), event.timezone)
 
   // ───────────────────────────────────────────────────────────────────────────────────────
   // FR-140 — when nothing remains, **say so**. Never fall back to a session that has already
@@ -71,7 +71,7 @@ const UpNextBody = ({
       <p className="text-sm text-text-body">
         {sessions.length === 0
           ? 'This conference has no published programme yet.'
-          : 'Nothing further is scheduled. Enjoy the rest of your day.'}
+          : 'Nothing further scheduled today.'}
       </p>
     )
   }

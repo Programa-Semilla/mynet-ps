@@ -1,6 +1,6 @@
 import { asc, eq } from 'drizzle-orm'
 
-import type { EventScope } from '../../plugins/event-access.js'
+import { assertVerifiedScope, type EventScope } from '../../plugins/event-access.js'
 import { getDb } from '../client.js'
 import { rooms, sessions, sessionSpeakers, speakers, tracks } from '../schema/catalog.js'
 
@@ -62,7 +62,11 @@ export type TrackRow = {
  * row per speaker and require de-duplication in application code, which is where a session with
  * two speakers quietly becomes two sessions.
  */
-export const listSessions = async (scope: EventScope): Promise<SessionRow[]> => {
+export const listSessions = async (unverified: EventScope): Promise<SessionRow[]> => {
+  // Membership, not merely shape. A value can satisfy `EventScope` and still never have been
+  // through the guard — `Object.assign`, `structuredClone` and the prototype's constructor all
+  // produce one. This is the check that makes FR-147 true at runtime.
+  const scope = assertVerifiedScope(unverified)
   const db = getDb()
 
   const rows = await db
@@ -133,9 +137,12 @@ export const listSessions = async (scope: EventScope): Promise<SessionRow[]> => 
  * Carries the token **name**, never a colour value — the palette lives in
  * `apps/web/src/theme/tokens.css` and nowhere else (FR-136, research D7).
  */
-export const listTracks = async (scope: EventScope): Promise<TrackRow[]> =>
-  getDb()
+export const listTracks = async (unverified: EventScope): Promise<TrackRow[]> => {
+  const scope = assertVerifiedScope(unverified)
+
+  return getDb()
     .select({ id: tracks.id, name: tracks.name, colorToken: tracks.colorToken })
     .from(tracks)
     .where(eq(tracks.eventId, scope.eventId))
     .orderBy(asc(tracks.name))
+}

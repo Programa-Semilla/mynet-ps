@@ -34,9 +34,16 @@ export const events = pgTable(
      * else, which is the whole reason FR-120 exists.
      *
      * **No default, deliberately** (research D11). The migration adds the column with
-     * `DEFAULT 'UTC'` so existing rows stay valid, back-fills real zones, and then drops the
-     * default in the same migration — a column that keeps a silent default is how a wrong day
-     * number ships unnoticed.
+     * `DEFAULT 'UTC'` so existing rows stay valid and then drops the default in the same
+     * migration — a column that keeps a silent default is how a wrong day number ships
+     * unnoticed.
+     *
+     * **The real zones come from the seed, not from the migration.** An earlier version of this
+     * comment claimed the migration back-filled them; it does not, and the distinction matters:
+     * a database migrated but not re-seeded keeps every conference at `'UTC'`, with a wrong day
+     * number and nothing to detect it. `db:migrate` is always followed by `db:seed` in this
+     * project's own setup, quickstart and end-to-end harness, which is what closes the gap
+     * today.
      *
      * Validity is enforced at the seed boundary, not by a CHECK: `pg_timezone_names` is not
      * usable in one, and a wrong-but-valid zone would satisfy such a constraint anyway.
