@@ -1,7 +1,7 @@
 import { OfflineError } from '@mynet/data'
 import { render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
-import { describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 
 import { ActiveEventProvider } from '../../src/app/active-event.js'
 import { HomeShell } from '../../src/app/home/HomeShell.js'
@@ -26,6 +26,43 @@ import { aSession, SUMMIT, testServices, WithServices } from '../support/service
  * ═════════════════════════════════════════════════════════════════════════════════════════
  */
 describe('the next-saved-session card', () => {
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════════════════
+   * **THE CLOCK IS PINNED, BECAUSE THESE TESTS WERE TIME-OF-DAY DEPENDENT AND PASSED ANYWAY.**
+   *
+   * `nextSession` keeps only sessions whose **venue date** equals `now`'s venue date. The three
+   * populated cases below build a session at `Date.now() + 1h` against a real clock — so
+   * whenever the venue's local time is within an hour of midnight, `now + 1h` lands on the
+   * *next* Madrid day, the filter drops it, and the card correctly renders "nothing left today"
+   * while the test demands a session title.
+   *
+   * That is roughly a one-hour window in twenty-four. It passed on every developer machine and
+   * failed the first time CI happened to run inside it — 21:13 UTC, which is 23:13 in
+   * `Europe/Madrid`. A test that is right 96% of the time is not flaky infrastructure; it is an
+   * assertion about the clock that nobody wrote down.
+   *
+   * **Pinned to 20:00 on day one specifically** — the exact scenario this file's own header
+   * describes — and not to a convenient midday. The choice is load-bearing for one test:
+   * "does NOT render a LATER DAY'S session" saves `NEXT_DAY`, which is 09:30 Madrid on day
+   * **two**. Pinned to day two, that session would be filtered for being in the *past* and the
+   * test would still go green while having stopped testing what it names. Pinned to day one it
+   * is filtered for being on another day, which is the assertion.
+   *
+   * `now ± 3h` stays inside day one (17:00–23:00 Madrid), which covers every offset used below.
+   * `shouldAdvanceTime` keeps Testing Library's async `findBy*` queries working, which a frozen
+   * clock would hang.
+   * ═══════════════════════════════════════════════════════════════════════════════════════
+   */
+  beforeAll(() => {
+    // 18:00Z is 20:00 in Europe/Madrid (CEST), on day one of the SUMMIT fixture.
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    vi.setSystemTime(new Date('2026-09-14T18:00:00.000Z'))
+  })
+
+  afterAll(() => {
+    vi.useRealTimers()
+  })
+
   /**
    * Rendered through `HomeShell` rather than standalone, because the card's contract is with
    * the shell — the scope discriminant, the containment boundary, the slot. A test that mounted
