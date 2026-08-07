@@ -4,13 +4,35 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Status of this repository
 
-The production foundation has shipped, and **event context and the session catalog have shipped on
-top of it** — feature 002, squash-merged to `develop` in
-[#6](https://github.com/Programa-Semilla/mynet-ps/pull/6). An attendee signs in and arrives at the conference happening now, greeted
-by name and told which day of it today is in the venue's timezone. Home shows what is next and what
-remains of the day; **Agenda carries the conference programme**, read-only and chronological. The
-conference switcher is in the top bar at all three widths, and the choice survives sign-out and a
-change of device.
+The production foundation has shipped, event context and the session catalog shipped on top of it
+(feature 002, [#6](https://github.com/Programa-Semilla/mynet-ps/pull/6)), and **Agenda is now a
+personal schedule rather than a read-only programme** — feature 005, squash-merged to `develop` in
+[#PR_NUMBER](https://github.com/Programa-Semilla/mynet-ps/pull/PR_NUMBER).
+
+An attendee signs in and arrives at the conference happening now, greeted by name and told which day
+of it today is in the venue's timezone. Home shows what is next, what remains of the day, and **what
+is next from the sessions they chose**. Agenda carries the whole programme with an All/Saved filter,
+a save control on every session, and an addressable **session detail panel** with overview, speaker
+info and durable **personal notes**. The conference switcher is in the top bar at all three widths,
+and the choice survives sign-out and a change of device.
+
+Four things 005 established that every later feature inherits:
+
+- **The agenda is readable offline.** A caching decorator sits at the repository boundary — no
+  component knows it exists — keyed `(attendeeId, eventId, resource)` with a **24-hour lifetime**.
+  Every cached surface states when it was retrieved. Writes are **refused, never queued**: no write
+  queue, no optimistic update, no conflict merging. Offline, the age limit is the only thing that
+  revokes access, which is why it is a requirement rather than a tuning value.
+- **A destination owns its element and its nested addresses.** `routes.tsx` no longer names any
+  address literally; Agenda declares its own element and its `:sessionId` child in `navigation.ts`.
+  006–009 extend that file, not the router.
+- **The detail panel is the product's first real modal**, a native `<dialog>` with `showModal()` —
+  so the focus trap, background inertness and Escape come from the platform. Focus restoration to
+  the opener is explicit, because `<dialog>` does not do it reliably. It is structured as separate
+  sections so 009 can add audience questions without editing either of them.
+- **`CatalogRepository` is read-only in perpetuity**, asserted by name-shape over its exported
+  surface: attendee state *about* conference content belongs in its own repository, never on the
+  catalog.
 
 Three things 002 established that every later feature inherits:
 
@@ -24,13 +46,19 @@ Three things 002 established that every later feature inherits:
   repository interfaces, API route registration, and the seed.
 
 **Still carrying no product content**: Discover, Messages and Network. No attendee cards, no
-threads, no appointments. Saved sessions, personal notes and audience Q&A arrive in 005 and 009 —
-Agenda deliberately offers no save control today.
+threads, no appointments. Audience Q&A arrives in 009, as a third section on the panel 005 built.
 
-**Next in the queue is 004, attendee profiles**, and it is still blocked on three recorded
-decisions: the attendee identity model, data retention/deletion/export obligations, and avatar
-handling. 005 is now unblocked (it depended on 002), so 005 ∥ 006 is the first free parallel pair
-— 003 having been absorbed into 002. See `brainstorm/00-overview.md` for the queue.
+**005 stores the product's first attendee-authored free text** — personal session notes — on a
+narrow declared retention commitment: deleted with the account (a schema-level `ON DELETE CASCADE`,
+asserted by an integration test), **no export path**. The full retention, deletion and export
+obligation remains open and still blocks 004.
+
+**Next in the queue is 006, Discover**, which 005 was built alongside: migration `0005` is reserved
+for it, and the three shared registries 005 touched were each *appended to* so the two never
+contended. **004, attendee profiles, remains blocked** on three recorded decisions — the attendee
+identity model, data retention/deletion/export obligations, and avatar handling. `0003` stays
+reserved for it, which is why 005 claimed `0004` and left a gap. See `brainstorm/00-overview.md`
+for the queue.
 
 ```
 GroundZero/
@@ -51,7 +79,7 @@ specs/             # Feature specifications
 docs/superpowers/  # Design documents and implementation plans
 ```
 
-Project governance lives in `.specify/memory/constitution.md` (**v2.1.0**). It is authoritative for
+Project governance lives in `.specify/memory/constitution.md` (**v2.2.0**). It is authoritative for
 how work is done here and supersedes tool defaults, habit, and any conflicting statement in this
 file.
 
@@ -254,7 +282,7 @@ shape** (the API lives here, at `apps/api`).
 Each entry names the feature it blocks, because when to ask matters as much as what to ask.
 
 - **Attendee identity model.** How a person becomes an attendee — self sign-up, event invitation, ticket holder, organizer-provisioned — is unspecified, and it determines the authentication design. **Blocks the attendee profile feature.**
-- **Data retention, deletion, and export obligations** for personal data are recognised (constitution Principle VIII) but unspecified. **Blocks 004, the attendee profile feature.** Corrected 2026-08-07: 004 is *not* the first to store substantial personal data. It has no parallel partner and is blocked on other grounds, so **005 ships first** and stores the first attendee-authored free text as personal session notes. 005 proceeds on a narrow declared commitment — deleted with the account, no export — recorded in its specification. The full obligation is still open.
+- **Data retention, deletion, and export obligations** for personal data are recognised (constitution Principle VIII) but unspecified. **Blocks 004, the attendee profile feature.** Corrected 2026-08-07: 004 is *not* the first to store substantial personal data. It has no parallel partner and is blocked on other grounds, so **005 shipped first** and stores the first attendee-authored free text as personal session notes. 005 shipped on a narrow declared commitment — deleted with the account, no export — enforced by a schema-level `ON DELETE CASCADE` and asserted in `apps/api/tests/integration/agenda-deletion.test.ts`. The full obligation is still open.
 - **The connection model behind Network contacts.** The prototype derives contacts from the existence of a conversation. There is no connect or accept action, so there is no defined relationship to store. **Blocks the Network feature entirely.**
 - **Exchanged digital cards.** Requirements place them in Network; the prototype shows a transient 2-second confirmation and records nothing. What a card exchange creates, and whether it is mutual, is undefined. **Blocks the Network feature entirely.**
 - **Audience-question attribution.** Whether a Q&A question is attributed to its author or anonymous. It decides whether Q&A is a personal-data surface under Principle VIII. **Blocks the Q&A feature.**
@@ -273,7 +301,7 @@ Each entry names the feature it blocks, because when to ask matters as much as w
 - **Preview environments must never point at production data**, and preview access control is undecided. Cloudflare Pages previews are publicly reachable by default.
 - **Server-side branch protection is unconfigured** — a configuration task, not a limitation. Corrected 2026-08-07: the repo is **public** and organisation-owned (`Programa-Semilla/mynet-ps`), and the protection endpoints return **404 (no rule set)**, not 403. Protection is free on public repositories. Enforcement is meanwhile client-side and bypassable — materially more serious now that real attendee data is in scope.
 - **The repository is public**, and neither the constitution nor this file recorded that until 2026-08-07. It changes the Principle VIII threat model: seed data, migrations, workflow config and the API contract are world-readable, and previews are reachable by anyone who finds them.
-- **The pipeline runs red.** Every PR run of `verify` has concluded in failure, with `migrations`, `test-integration`, `test-accessibility` and `test-e2e` **skipped** — so the checks Principle VII names have never executed. 001 and 002 both merged in this state. Constitution v2.2.0 makes that an explicit governance breach requiring a recorded waiver.
+- **The pipeline runs red, and one of its two causes is now fixed.** Every PR run of `verify` has concluded in failure, with `migrations`, `test-integration`, `test-accessibility` and `test-e2e` **skipped** — so the checks Principle VII names have never executed. 001, 002 and 005 all merged in this state. Constitution v2.2.0 makes that an explicit governance breach requiring a recorded waiver. Diagnosed on PR #7 as two independent faults: **`test-unit` failed for want of `DATABASE_URL`, which 005 fixed** by giving the `unit` Vitest project dummy values (the route audit builds the app but never connects); and **`db-branch` fails because `NEON_API_KEY` is unset**, which skips everything downstream and is a repository secret only the owner can set. Until it is set, 005's isolation and deletion suites — its personal-data guarantees — are verified locally by `pnpm verify:clean` and **skipped in CI**.
 
 ### Not open questions — settled requirements the prototype failed to meet
 

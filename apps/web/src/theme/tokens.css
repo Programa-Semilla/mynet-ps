@@ -277,6 +277,31 @@ body {
 }
 
 /**
+ * 005 — the focus ring, **forwarded to the box the attendee can actually see**.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ * A segmented control is a real `<input type="radio">` inside a styled `<label>`: radios make
+ * the two states mutually exclusive without ARIA, expose which is current through `checked`,
+ * and bring arrow-key movement from the platform. The input itself must not be *seen*, though
+ * — the label is the control's appearance.
+ *
+ * That creates a trap the rule above cannot solve on its own. A visually suppressed input
+ * still takes focus, so `:focus-visible` fires and draws a ring around a box with no visible
+ * extent. The indicator is technically present and practically absent, which is the same
+ * outcome as the `focus:outline-none` Principle IV names as a defect — reached by a different
+ * route, and harder to notice, because nothing was removed.
+ *
+ * Opt-in rather than a blanket `label:has(:focus-visible)`: a label wrapping an ordinary
+ * visible field would then draw two rings, one round the field and one round the label.
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ */
+.focus-ring-within:has(:focus-visible) {
+  outline: var(--focus-ring-width) solid var(--color-focus-ring);
+  outline-offset: var(--focus-ring-offset);
+  border-radius: var(--radius-xs);
+}
+
+/**
  * FR-024, T081 — suppress non-essential animation under a reduced-motion preference.
  *
  * `!important` is deliberate here and is not a smell: this must win against any component

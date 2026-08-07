@@ -3,6 +3,7 @@ import type { FastifyInstance } from 'fastify'
 import { meRoutes } from './auth/me.js'
 import { signInRoutes } from './auth/sign-in.js'
 import { signOutRoutes } from './auth/sign-out.js'
+import { agendaRoutes } from './events/agenda.js'
 import { catalogRoutes } from './events/catalog.js'
 import { eventRoutes } from './events.js'
 import { healthRoutes } from './health.js'
@@ -43,4 +44,9 @@ export const ROUTES: readonly RoutePlugin[] = [
   // 002 — the session catalog. Every route here declares `:eventId` and carries
   // `requireEventAccess`; the audit in T068 fails the build if one ever does not.
   catalogRoutes,
+  // 005 — the attendee's own agenda: saved sessions and personal notes. **Appended, not
+  // inserted** (FR-235): reordering this array rewrites `contracts/openapi.json` for no
+  // behavioural reason, because the generated contract lists paths in observation order — and
+  // the per-domain split is what lets 005 and 006 proceed in parallel without contending here.
+  agendaRoutes,
 ]

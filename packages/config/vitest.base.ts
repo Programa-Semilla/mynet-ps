@@ -32,6 +32,46 @@ export const unitProject: UserWorkspaceConfig = {
       'scripts/**/*.test.mjs',
     ],
     exclude: ['**/node_modules/**', '**/dist/**'],
+
+    /**
+     * T001 (005) — **the route audit builds the application but never connects** (research D7).
+     *
+     * ═════════════════════════════════════════════════════════════════════════════════════
+     * `apps/api/tests/unit/event-scope-audit.test.ts` calls `buildApp()`, which calls
+     * `loadConfig()`, which refuses to start without the values below. The audit then walks
+     * the route table and **opens no connection at all** — the requirement is transitive, not
+     * real. On a developer's machine a local `.env` happened to satisfy it; in CI there is no
+     * such file, so `test-unit` failed on the first missing variable and FR-230's enforcement
+     * never ran once.
+     *
+     * That mattered more than an ordinary red test: the audit is what fails the build when a
+     * route accepting a conference identifier is added without `requireEventAccess`. A gate
+     * that cannot execute is not a gate, and under constitution v2.2.0 a check that did not
+     * run has not passed.
+     *
+     * **All three of `loadConfig`'s required values are set, not just the database URL.**
+     * Research D7 names `DATABASE_URL` because that is the one CI reported — it is simply the
+     * first `required()` call to be evaluated. Supplying it alone would move the failure one
+     * line down to `AUTH_PASSWORD_PEPPER` and leave the audit exactly as unrunnable.
+     *
+     * Values are syntactically valid and deliberately worthless: they satisfy the validator
+     * and authenticate nobody. Because `process.loadEnvFile` never overwrites an already-set
+     * variable, these also win over a developer's `.env`, which makes the unit layer hermetic
+     * — it now behaves the same on a fresh clone as it does in CI, which is how it reached CI
+     * broken in the first place.
+     *
+     * Rejected alternatives, from research D7: setting these only in the CI workflow (the test
+     * would still fail on a fresh clone), moving the audit to the integration layer (which is
+     * skipped whenever `db-branch` fails, so the audit would run *less* often), and making
+     * `loadConfig` lazy about the database URL (weakening a production guarantee to suit a
+     * test).
+     * ═════════════════════════════════════════════════════════════════════════════════════
+     */
+    env: {
+      DATABASE_URL: 'postgresql://unit-tests:unit-tests@127.0.0.1:5432/never-connected',
+      AUTH_PASSWORD_PEPPER: 'unit-tests-only-not-a-secret',
+      AUTH_ATTEMPT_HASH_KEY: 'unit-tests-only-not-a-secret',
+    },
   },
 }
 

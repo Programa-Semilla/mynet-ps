@@ -799,6 +799,546 @@
           }
         }
       }
+    },
+    "/events/{eventId}/agenda/saved": {
+      "get": {
+        "summary": "The attendee's saved session identifiers for this conference",
+        "tags": [
+          "agenda"
+        ],
+        "description": "Identifiers only, not whole sessions (FR-188). The programme is fetched separately and already carries the session data; returning it again here would be a second source of truth that could disagree with the first. An attendee who has saved nothing gets an empty array — a valid answer, not a 404 (FR-195).",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "eventId",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "sessionIds"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "sessionIds": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "format": "uuid"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not registered for that conference, **or** no such conference, **or** the session is not part of it. All three are deliberately indistinguishable — identical status and identical body — so that an attendee cannot enumerate conferences or sessions by watching which refusal comes back (FR-204, FR-231).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Not registered for that conference, **or** no such conference, **or** the session is not part of it. All three are deliberately indistinguishable — identical status and identical body — so that an attendee cannot enumerate conferences or sessions by watching which refusal comes back (FR-204, FR-231).",
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/events/{eventId}/agenda/saved/{sessionId}": {
+      "put": {
+        "summary": "Save a session. Idempotent",
+        "tags": [
+          "agenda"
+        ],
+        "description": "Saving an already-saved session succeeds with the same 204 (FR-187). The address IS the pairing, which is where the idempotency comes from — rather than from a uniqueness constraint doing double duty as business logic, though that constraint exists too as defence in depth (research D6). A double-tap on a slow connection is simply the same request twice.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "eventId",
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "sessionId",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Saved, or already saved. The same either way."
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not registered for that conference, **or** no such conference, **or** the session is not part of it. All three are deliberately indistinguishable — identical status and identical body — so that an attendee cannot enumerate conferences or sessions by watching which refusal comes back (FR-204, FR-231).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Not registered for that conference, **or** no such conference, **or** the session is not part of it. All three are deliberately indistinguishable — identical status and identical body — so that an attendee cannot enumerate conferences or sessions by watching which refusal comes back (FR-204, FR-231).",
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Unsave a session. Idempotent",
+        "tags": [
+          "agenda"
+        ],
+        "description": "Succeeds with 204 whether or not the session was saved. The caller does not need to know which, and telling them would leak nothing useful.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "eventId",
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "sessionId",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Default Response"
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not registered for that conference, **or** no such conference, **or** the session is not part of it. All three are deliberately indistinguishable — identical status and identical body — so that an attendee cannot enumerate conferences or sessions by watching which refusal comes back (FR-204, FR-231).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Not registered for that conference, **or** no such conference, **or** the session is not part of it. All three are deliberately indistinguishable — identical status and identical body — so that an attendee cannot enumerate conferences or sessions by watching which refusal comes back (FR-204, FR-231).",
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/events/{eventId}/agenda/notes": {
+      "get": {
+        "summary": "Every note the attendee has written in this conference",
+        "tags": [
+          "agenda"
+        ],
+        "description": "Returned as a set rather than per session, so opening the detail panel needs no additional request and the whole set caches as one entry. Nothing here can read a note the requester did not write — the attendee comes from the sign-in session and there is no parameter in which to name anyone else (FR-208).",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "eventId",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "notes"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "notes": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "sessionId",
+                          "body",
+                          "updatedAt"
+                        ],
+                        "additionalProperties": false,
+                        "properties": {
+                          "sessionId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "body": {
+                            "type": "string"
+                          },
+                          "updatedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not registered for that conference, **or** no such conference, **or** the session is not part of it. All three are deliberately indistinguishable — identical status and identical body — so that an attendee cannot enumerate conferences or sessions by watching which refusal comes back (FR-204, FR-231).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Not registered for that conference, **or** no such conference, **or** the session is not part of it. All three are deliberately indistinguishable — identical status and identical body — so that an attendee cannot enumerate conferences or sessions by watching which refusal comes back (FR-204, FR-231).",
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/events/{eventId}/agenda/notes/{sessionId}": {
+      "put": {
+        "summary": "Write or replace the attendee's note against a session",
+        "tags": [
+          "agenda"
+        ],
+        "description": "The last confirmed write wins (FR-214); no merge is attempted and no conflict is detected. Returning `updatedAt` is what lets the client enter its saved status FROM A CONFIRMED RESPONSE rather than from the keystroke — the property that keeps the autosave non-optimistic and therefore outside the constitution's optimistic-update clause (FR-210, research D5).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "body"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "body": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 10000,
+                    "description": "The note. Bounded here AND by a CHECK on the column, because client-side presentation of a limit is never its enforcement (Principle VIII, research D9). The editor surfaces the limit as it is approached, so a 400 from this route is defence rather than the designed path (FR-213)."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "eventId",
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "sessionId",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "updatedAt"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The note was empty or over length. Reachable only by a client that bypassed the editor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "The note was empty or over length. Reachable only by a client that bypassed the editor.",
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not registered for that conference, **or** no such conference, **or** the session is not part of it. All three are deliberately indistinguishable — identical status and identical body — so that an attendee cannot enumerate conferences or sessions by watching which refusal comes back (FR-204, FR-231).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Not registered for that conference, **or** no such conference, **or** the session is not part of it. All three are deliberately indistinguishable — identical status and identical body — so that an attendee cannot enumerate conferences or sessions by watching which refusal comes back (FR-204, FR-231).",
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Remove the attendee's note against a session. Idempotent",
+        "tags": [
+          "agenda"
+        ],
+        "description": "This is the path clearing the text takes (FR-212): an emptied note is deleted rather than stored blank. Combined with the `length(body) > 0` constraint on the column, \"no note\" has exactly one representation in the database.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "eventId",
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "sessionId",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Default Response"
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not registered for that conference, **or** no such conference, **or** the session is not part of it. All three are deliberately indistinguishable — identical status and identical body — so that an attendee cannot enumerate conferences or sessions by watching which refusal comes back (FR-204, FR-231).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Not registered for that conference, **or** no such conference, **or** the session is not part of it. All three are deliberately indistinguishable — identical status and identical body — so that an attendee cannot enumerate conferences or sessions by watching which refusal comes back (FR-204, FR-231).",
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "tags": [

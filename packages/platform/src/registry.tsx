@@ -17,6 +17,9 @@ import type { DeviceServices } from './interfaces/index.js'
  * `@mynet/platform` does not depend on `@mynet/data`. Both are leaves; the application root
  * is the only place that knows about both.
  */
+/** The conference content a surface can be reading, for the freshness question above. */
+export type ConferenceContent = 'programme' | 'tracks' | 'saved' | 'notes'
+
 export interface PlatformServices {
   readonly devices: DeviceServices
   readonly repositories: {
@@ -32,6 +35,40 @@ export interface PlatformServices {
       listSessions(eventId: string): Promise<unknown[]>
       listTracks(eventId: string): Promise<unknown[]>
     }
+    /**
+     * 005 — which sessions the attendee saved, per conference (FR-184–FR-188).
+     *
+     * Separate from `catalog` because the catalog is read-only in perpetuity and these are
+     * attendee state *about* its content (FR-191).
+     */
+    readonly savedSessions: {
+      listSaved(eventId: string): Promise<string[]>
+      save(eventId: string, sessionId: string): Promise<void>
+      unsave(eventId: string, sessionId: string): Promise<void>
+    }
+    /** 005 — the attendee's private notes, per conference (FR-207–FR-214). */
+    readonly sessionNotes: {
+      listNotes(eventId: string): Promise<unknown[]>
+      writeNote(eventId: string, sessionId: string, body: string): Promise<unknown>
+      deleteNote(eventId: string, sessionId: string): Promise<void>
+    }
+  }
+  /**
+   * 005 — **when the content currently on screen was retrieved** (FR-216, SC-204).
+   *
+   * ─────────────────────────────────────────────────────────────────────────────────────────
+   * Not a repository: it reads no domain data. It exists because a surface served from the
+   * cache must say when its content was last retrieved, and that is not answerable from the
+   * payload — a cached programme and a live one are the same array.
+   *
+   * Expressed in domain terms deliberately. A component asks "when did this device last
+   * receive this conference's programme"; it does not ask about a cache, a store, or a key,
+   * and it returns `null` whenever the content is live. That is what keeps Principle V intact
+   * while still satisfying FR-216.
+   * ─────────────────────────────────────────────────────────────────────────────────────────
+   */
+  readonly freshness: {
+    lastRetrieved(eventId: string, content: ConferenceContent): string | null
   }
   /**
    * Session lifecycle. Not a repository — it changes session state rather than reading domain

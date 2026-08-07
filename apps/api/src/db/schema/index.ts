@@ -20,3 +20,8 @@ export * from './active-event.js'
 
 // 002 — the session catalog. Every table in it is per-event; see the file for why.
 export * from './catalog.js'
+
+// 005 — the attendee's own agenda: saved sessions and personal notes. Both per-event, and both
+// state why in the file. Attendee state *about* conference content, never conference content —
+// which is why they are not in `catalog.js` and why the catalog gains no write path (FR-191).
+export * from './agenda.js'

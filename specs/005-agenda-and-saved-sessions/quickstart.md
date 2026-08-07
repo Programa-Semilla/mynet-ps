@@ -127,8 +127,19 @@ than assuming.
 
 ## Scenario 5 — Isolation (US5)
 
-Covered by `apps/api/tests/integration/agenda.test.ts`, which exercises the server directly rather
-than through the client.
+Covered by the agenda integration suite, which exercises the server directly rather than through
+the client. It is **five files rather than the single `agenda.test.ts` this guide first named**,
+split by the boundary each one asserts so a failure says which guarantee broke:
+
+| File | What it holds |
+|---|---|
+| `agenda-isolation.test.ts` | Attendee B cannot read or modify attendee A's saves or notes, by any request |
+| `agenda-cross-event.test.ts` | Conference scoping, and 403/404 indistinguishability |
+| `agenda-deletion.test.ts` | Deleting an attendee removes their saves and notes — the declared retention commitment |
+| `agenda-saved.test.ts`, `agenda-notes.test.ts` | The route contracts, including idempotency and the server-side length limit |
+
+`isolation.test.ts` additionally sweeps **every** per-event route the application declares — 005's
+six included — for refusal parity, and fails if a route exists that it does not exercise (SC-105).
 
 ```bash
 pnpm test:integration

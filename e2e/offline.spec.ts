@@ -86,7 +86,32 @@ test.describe('offline', () => {
     await context.setOffline(false)
   })
 
-  test('no stale attendee data is served from a cache while offline', async ({ page, context }) => {
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════════════════
+   * **005 — this assertion is SUPERSEDED IN PART, and updated rather than deleted.**
+   *
+   * 002 cached no API response at all, on the reasoning that showing yesterday's agenda with
+   * no indication that it is yesterday's is worse, at a conference, than showing nothing. That
+   * reasoning was right, and 005 does not discard it — it satisfies it. The agenda is now
+   * cached **with a retrieval stamp on every surface that serves it** and a 24-hour lifetime,
+   * so the objection ("no indication that it is yesterday's") no longer applies, and 002's
+   * Open Question 2 is closed by decision rather than by drift.
+   *
+   * What has **not** changed, and is still asserted below:
+   *
+   *   - The **conference list** is not cached. FR-215 names the *active* conference's content
+   *     and nothing else, so Home still cannot show which conferences an attendee belongs to
+   *     while offline.
+   *   - **Cache Storage** — the service worker's precache — still holds no attendee data. 005
+   *     stores its cache in IndexedDB, deliberately: the service worker caches the shell, and
+   *     mixing attendee content into it would put personal data behind a lifetime nobody
+   *     declared.
+   * ═══════════════════════════════════════════════════════════════════════════════════════
+   */
+  test('the conference list is still not cached, and the precache still holds no attendee data', async ({
+    page,
+    context,
+  }) => {
     await page.goto('/')
     await signIn(page, ADA)
     await expect(page.getByRole('heading', { name: ADA.events[0] })).toBeVisible()
@@ -95,13 +120,12 @@ test.describe('offline', () => {
     await context.setOffline(true)
     await page.reload()
 
-    // **API responses are never precached** (research.md D14). Showing yesterday's agenda with
-    // no indication that it is yesterday's is worse, at a conference, than showing nothing.
+    // Unchanged from 002: a cross-event read is not cached, so this is absent offline.
     for (const event of ADA.events) {
       await expect(page.getByRole('heading', { name: event, level: 2 })).toHaveCount(0)
     }
 
-    // And what caches do exist hold no attendee data at all.
+    // And the service worker's caches hold no attendee data at all — 005's cache is IndexedDB.
     const cachedAttendeeData = await page.evaluate(
       async (needles) => {
         const names = await caches.keys()
@@ -142,13 +166,51 @@ test.describe('offline', () => {
     })
   })
 
-  test('signing out leaves no attendee data on the device', async ({ page }) => {
-    // T102, FR-056. Structurally this is already true — the token is in an HttpOnly cookie and
-    // no API response is ever cached — but "structurally true" is a claim, and this is the
-    // assertion.
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════════════════
+   * **005 — this assertion now has real work to do, and the scan was widened to match.**
+   *
+   * In 002 it was true structurally: the token is in an HttpOnly cookie and no API response
+   * was cached anywhere, so "no residue" was a property of there being nothing to leave. 005
+   * changes that — the programme, the saved set and the attendee's **notes** are now stored on
+   * the device in IndexedDB — so this stops being a restatement of the design and becomes the
+   * check that `signOut` actually purges it.
+   *
+   * The scan therefore covers IndexedDB as well. Without that it would still pass, on a
+   * technicality, while personal content sat on a device somebody had just signed out of —
+   * which is exactly the shape of green result this codebase warns about.
+   * ═══════════════════════════════════════════════════════════════════════════════════════
+   */
+  test('signing out leaves no attendee data on the device, INCLUDING the offline cache', async ({
+    page,
+  }) => {
     await page.goto('/')
     await signIn(page, ADA)
     await awaitServiceWorker(page)
+
+    // Read the agenda first, so there is genuinely something cached to be purged. Without this
+    // the assertion is satisfied by nothing having been written.
+    await page.getByRole('link', { name: 'Agenda' }).first().click()
+    await expect(page.getByRole('heading', { level: 1, name: 'Agenda' })).toBeVisible()
+    await expect(page.getByRole('heading', { level: 3 }).first()).toBeVisible()
+
+    const cachedBefore = await page.evaluate(async () => {
+      const open = await new Promise<IDBDatabase | null>((resolve) => {
+        const request = indexedDB.open('mynet-cache')
+        request.onsuccess = () => resolve(request.result)
+        request.onerror = () => resolve(null)
+      })
+      if (!open || !open.objectStoreNames.contains('entries')) return 0
+      return new Promise<number>((resolve) => {
+        const count = open.transaction('entries', 'readonly').objectStore('entries').count()
+        count.onsuccess = () => resolve(count.result)
+        count.onerror = () => resolve(0)
+      })
+    })
+    expect(
+      cachedBefore,
+      'the agenda must actually be cached, or this proves nothing',
+    ).toBeGreaterThan(0)
 
     await page.getByRole('button', { name: 'Sign out' }).click()
     await expect(page.getByLabel('Password')).toBeVisible()
@@ -173,6 +235,27 @@ test.describe('offline', () => {
           for (const request of await cache.keys()) {
             const body = (await (await cache.match(request))?.text()) ?? ''
             if (needles.some((needle) => body.includes(needle))) found.push(`cache:${request.url}`)
+          }
+        }
+
+        // 005 — the offline cache. Every entry is read and searched, so a purge that missed a
+        // resource, or a key prefix that did not reach it, is caught by name.
+        const db = await new Promise<IDBDatabase | null>((resolve) => {
+          const request = indexedDB.open('mynet-cache')
+          request.onsuccess = () => resolve(request.result)
+          request.onerror = () => resolve(null)
+        })
+
+        if (db?.objectStoreNames.contains('entries')) {
+          const entries = await new Promise<unknown[]>((resolve) => {
+            const all = db.transaction('entries', 'readonly').objectStore('entries').getAll()
+            all.onsuccess = () => resolve(all.result as unknown[])
+            all.onerror = () => resolve([])
+          })
+
+          for (const entry of entries) {
+            const body = JSON.stringify(entry)
+            if (needles.some((needle) => body.includes(needle))) found.push('indexeddb:mynet-cache')
           }
         }
 

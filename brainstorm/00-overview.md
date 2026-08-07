@@ -27,7 +27,7 @@ the index, and it now differs from the roadmap in the ways #02 records.
 | 002 | Event Context, Session Catalog & Home Composition | **shipped** — 89/89 tasks, squash-merged to `develop` ([#6](https://github.com/Programa-Semilla/mynet-ps/pull/6)) | — |
 | 003 | ~~Session Catalog~~ | **absorbed into 002** (#02); migration `0002` transfers | — |
 | 004 | Attendee Profile & Own-Profile Editing | **next up**, no parallel partner — still blocked | identity model; retention obligations; avatar handling |
-| 005 | Agenda | **brainstormed** (#03) — specification next | 002 ✓ |
+| 005 | Agenda | **implemented** — 94/94 tasks; merge gated on register entry 17 (see below) | 002 ✓ |
 | 006 | Discover | queued (∥ 005) | 004 |
 | 007 | Messages | queued | 004 |
 | 008 | Network & Appointments | queued (∥ 009) | connection model; card-exchange semantics |
@@ -110,19 +110,33 @@ Each names the phase it blocks — when to ask matters as much as what to ask.
   free on public repositories, so this is a configuration task rather than an accepted risk
   (corrected 2026-08-06)
 
-### Design questions carried into 005's specification — open
+### Design questions carried into 005's specification — settled
 
-From #03. Not client or owner decisions — these are for `/speckit-specify` and its review gate.
+From #03, and now answered by the delivered feature.
 
-- **How long a cached programme may be shown before it is refused rather than stamped.** #03 decided
-  the staleness *stamp*; it did not decide an upper bound. A programme cached a week ago is probably
-  worse than no programme at all.
-- **Whether a saved session is removable from the detail panel as well as from its row**, or whether
-  one save affordance per session is clearer.
+- **How long a cached programme may be shown before it is refused rather than stamped** →
+  **settled: 24 hours from retrieval** (FR-221). #03 decided the staleness *stamp* and left the
+  upper bound open; the specification review escalated that absence from a governance gap to an
+  **authorization hole**, because offline there is no server present to refuse and the age limit is
+  the only thing that revokes access after a registration is withdrawn. Beyond it, content is
+  refused with the same wording as a conference never read rather than shown with an old stamp.
+  *Whether 24 hours is the right span stays open below; that there is a value does not.*
+- **Whether a saved session is removable from the detail panel as well as from its row** →
+  **settled: from the row only.** One save affordance per session. Recorded as an open presentation
+  question below, to be answered against the built screen rather than in advance.
+
+### Design questions still open after 005 — for observation, not for a gate
+
+- **Whether 24 hours is the right cache lifetime.** A value is set and enforced; whether a
+  conference day plus an overnight is the right span — against a multi-day conference with poor
+  signal throughout, or against a shorter window for tighter revocation — is a product judgement
+  worth revisiting once the feature is in use.
 - **Whether the two next-session cards on Home need any relationship.** 005's card and 002's
   `UpNext` can legitimately disagree — the attendee's saved 11:00 talk against the programme's
   id-first 11:00 talk. Decision 9 says they are independent; whether that reads as *composed* or as
-  *contradictory* on the first viewport is worth looking at once both are on screen.
+  *contradictory* on the first viewport is worth looking at now that both are on screen.
+- **Whether a session should be unsavable from the detail panel as well as from its row.** Two
+  affordances for one session may read as redundant or as convenient.
 - **The arbitrary tie-break in `nextSession()` survives** on the generic Up next card. The seed
   already contains two sessions starting at 11:00, so the first viewport is already featuring one
   for reasons the attendee cannot see. 005 works around it rather than fixing it; the recorded
@@ -204,7 +218,8 @@ Two of them — **session topology and CSRF** and **security response headers** 
 decision seen from two sides, and both are cheapest to settle before the first preview environment is
 opened rather than after.
 
-**Consumed and removed by #03**, each closed with a decision rather than deferred again:
+**Consumed and removed by #03**, each closed with a decision rather than deferred again — and all
+three now **delivered by 005**:
 
 - `interface-evolution-for-offline-data` → 005 caches the active conference's programme, saved set
   and notes; reads carry a staleness stamp; writes are refused offline rather than queued, so no
@@ -214,6 +229,8 @@ opened rather than after.
   once rather than once per caller.
 - `destination-owns-its-element` → an optional `element` moves onto the `Destination` entry, so the
   router's `path === '/agenda'` special-case becomes an append on Agenda's own line. 005's new
-  `/agenda/<sessionId>` route needs this regardless.
+  `/agenda/<sessionId>` route needs this regardless. **Delivered, and slightly larger than
+  scoped**: the destination also declares its nested `children`, so `routes.tsx` now names no
+  address at all and 006–009 extend `navigation.ts` rather than the router.
 
 The delivery-queue seed for phase 002 was consumed by #02 and removed.

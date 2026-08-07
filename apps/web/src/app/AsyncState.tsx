@@ -31,6 +31,38 @@ export const useAsync = <T,>(
   const [state, setState] = useState<AsyncState<T>>({ status: 'loading' })
   const [attempt, setAttempt] = useState(0)
 
+  /**
+   * ═════════════════════════════════════════════════════════════════════════════════════════
+   * **005 — WHEN THE INPUTS CHANGE, THE ANSWER TO THE OLD QUESTION IS DISCARDED.**
+   *
+   * Without this, a `ready` state fetched for one set of inputs stays on screen while the read
+   * for the *new* inputs is in flight. On Agenda that is not a cosmetic flicker: switching
+   * conference left the **previous conference's programme** rendered under the new
+   * conference's name, which is precisely what SC-102 forbids — "no surface still shows the
+   * previous conference".
+   *
+   * The race was always here. 002 did not see it because the replacement fetch was a fast
+   * local round trip that usually won; 005 added a cache read and write on the same path,
+   * which was enough to lose the race reliably and to turn a latent defect into a failing
+   * end-to-end test. The fix belongs here rather than at the call site, because every surface
+   * that swaps conference has exactly this problem.
+   *
+   * **Set during render, not in an effect.** This is React's documented "adjusting state when
+   * a prop changes" pattern: it re-renders immediately with the corrected state, before
+   * anything is committed to the screen, so the stale data is never shown at all. Doing it in
+   * an effect would paint the stale frame first — and would be the cascading `setState` that
+   * `react-hooks/set-state-in-effect` rejects, which is why the effect below still does not.
+   * ═════════════════════════════════════════════════════════════════════════════════════════
+   */
+  const [appliedDeps, setAppliedDeps] = useState(deps)
+  if (
+    deps.length !== appliedDeps.length ||
+    deps.some((dep, index) => !Object.is(dep, appliedDeps[index]))
+  ) {
+    setAppliedDeps(deps)
+    setState({ status: 'loading' })
+  }
+
   const isEmpty = options.emptyWhen ?? ((data: unknown) => Array.isArray(data) && data.length === 0)
 
   useEffect(() => {

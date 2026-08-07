@@ -1,5 +1,5 @@
 import type { components, paths } from './generated/api.js'
-import type { Attendee, Event, Session, Track } from './interfaces/index.js'
+import type { Attendee, Event, Session, SessionNote, Track } from './interfaces/index.js'
 
 /**
  * T042a — bind the client's domain types to the generated contract types.
@@ -71,5 +71,31 @@ export type _ActiveEventMatchesContract = Satisfies<ActiveEventResponse, Event>
 // route schema; if either changed, these would stop compiling.
 export type _SessionsMatchContract = Satisfies<SessionsResponse[number], Session>
 export type _TracksMatchContract = Satisfies<TracksResponse[number], Track>
+
+/** Response bodies of the agenda reads (005, T013). */
+export type SavedSessionsResponse =
+  paths['/events/{eventId}/agenda/saved']['get']['responses'][200]['content']['application/json']
+
+export type NotesResponse =
+  paths['/events/{eventId}/agenda/notes']['get']['responses'][200]['content']['application/json']
+
+export type WriteNoteResponse =
+  paths['/events/{eventId}/agenda/notes/{sessionId}']['put']['responses'][200]['content']['application/json']
+
+// 005 — the saved set arrives as identifiers, never as whole sessions: a second copy of session
+// data could disagree with the programme, and this is what would notice if the route ever
+// started sending one (FR-188).
+export type _SavedSessionsAreIdentifiers = Satisfies<SavedSessionsResponse['sessionIds'], string[]>
+
+// 005 — a note carries its `updatedAt`, and so does the response to writing one. That second
+// binding is load-bearing: the editor may enter its *saved* status only from a confirmed
+// response, so a route that stopped returning `updatedAt` would silently remove the only
+// evidence the write completed and push the client towards an optimistic update the
+// constitution requires be recorded separately (FR-210, research D5).
+export type _NotesMatchContract = Satisfies<
+  NotesResponse['notes'][number],
+  Omit<SessionNote, 'sessionId'> & { sessionId: string }
+>
+export type _WriteNoteConfirms = Satisfies<WriteNoteResponse, { updatedAt: string }>
 
 export type { components, paths }

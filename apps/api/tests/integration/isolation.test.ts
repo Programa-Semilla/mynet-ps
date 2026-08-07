@@ -214,13 +214,73 @@ describe('attendee data isolation', () => {
    * ═════════════════════════════════════════════════════════════════════════════════════════
    */
   describe('event isolation (002)', () => {
-    /** Every per-event route the application actually declares, as URL templates. */
-    const EVENT_ROUTES = ['/events/{id}/sessions', '/events/{id}/tracks'] as const
+    /**
+     * Every per-event route the application actually declares.
+     *
+     * ═══════════════════════════════════════════════════════════════════════════════════════
+     * **005 — this carries a METHOD now, and it had to.**
+     *
+     * The list was a plain array of URL templates, and every assertion below issued a `GET`.
+     * That was sufficient while every per-event route was a read; 005 adds four writes, and a
+     * coverage gate that can only express reads cannot cover them — it would have forced the
+     * new routes to be either omitted (defeating SC-105) or listed and then exercised with the
+     * wrong method (passing for the wrong reason).
+     *
+     * `ok` is the status a *legitimate* request returns, which differs per route: the
+     * refusal-parity assertions do not care, but the "serves the conference the attendee IS
+     * registered for" one does — and without it that test would have had to drop to "not a
+     * 404", which is exactly the weakening this suite exists to prevent.
+     * ═══════════════════════════════════════════════════════════════════════════════════════
+     */
+    interface EventRoute {
+      /** The URL as the application declares it, which is what coverage is checked against. */
+      readonly template: string
+      readonly method: 'GET' | 'PUT' | 'DELETE'
+      readonly payload?: Record<string, unknown>
+      /** What a legitimate request answers, so the "not over-refusing" half stays strict. */
+      readonly ok: number
+      /** Undoes a write, so one route's coverage test does not become another's fixture. */
+      readonly undo?: { readonly method: 'DELETE'; readonly template: string }
+    }
+
+    const EVENT_ROUTES: readonly EventRoute[] = [
+      // 002 — the catalog.
+      { template: '/events/:eventId/sessions', method: 'GET', ok: 200 },
+      { template: '/events/:eventId/tracks', method: 'GET', ok: 200 },
+      // 005 — the attendee's own agenda.
+      { template: '/events/:eventId/agenda/saved', method: 'GET', ok: 200 },
+      {
+        template: '/events/:eventId/agenda/saved/:sessionId',
+        method: 'PUT',
+        ok: 204,
+        undo: { method: 'DELETE', template: '/events/:eventId/agenda/saved/:sessionId' },
+      },
+      { template: '/events/:eventId/agenda/saved/:sessionId', method: 'DELETE', ok: 204 },
+      { template: '/events/:eventId/agenda/notes', method: 'GET', ok: 200 },
+      {
+        template: '/events/:eventId/agenda/notes/:sessionId',
+        method: 'PUT',
+        payload: { body: 'Written by the isolation suite.' },
+        ok: 200,
+        undo: { method: 'DELETE', template: '/events/:eventId/agenda/notes/:sessionId' },
+      },
+      { template: '/events/:eventId/agenda/notes/:sessionId', method: 'DELETE', ok: 204 },
+    ]
 
     const NONEXISTENT = '00000000-0000-0000-0000-000000000000'
 
     let adaEventIds: string[]
     let graceOnlyEventId: string
+    /** A session that really is in Ada's first conference, for the `:sessionId` routes. */
+    let adaSessionId: string
+
+    /**
+     * Fills a template. `:sessionId` is substituted with a real session only where the request
+     * is meant to succeed — every refusal case is refused by the *event* guard before the
+     * session is ever looked at, which is itself the property being asserted.
+     */
+    const urlFor = (template: string, eventId: string, sessionId: string): string =>
+      template.replace(':eventId', eventId).replace(':sessionId', sessionId)
 
     beforeAll(async () => {
       const ada = await app.inject({
@@ -241,6 +301,15 @@ describe('attendee data isolation', () => {
       const graceOnly = graceEvents.find((e) => !adaEventIds.includes(e.id))
       if (!graceOnly) throw new Error('Seed must give Grace an event Ada does not have.')
       graceOnlyEventId = graceOnly.id
+
+      const programme = await app.inject({
+        method: 'GET',
+        url: `/events/${adaEventIds[0] ?? ''}/sessions`,
+        headers: { cookie: cookieHeader(adaCookie) },
+      })
+      const first = (programme.json() as Array<{ id: string }>)[0]
+      if (!first) throw new Error("Seed must give Ada's first conference a programme.")
+      adaSessionId = first.id
     })
 
     it('covers every route the application declares with an event identifier (SC-105)', async () => {
@@ -254,7 +323,11 @@ describe('attendee data isolation', () => {
       })
       await probe.close()
 
-      const covered = EVENT_ROUTES.map((template) => template.replace('{id}', ':eventId'))
+      // Compared as URL sets: `PUT` and `DELETE` on one address are two entries in the list
+      // and one declared URL, and both directions of the comparison matter — an uncovered
+      // route is an untested scoping boundary, and a covered route that no longer exists is a
+      // list that has stopped describing the application.
+      const covered = [...new Set(EVENT_ROUTES.map((route) => route.template))]
       expect(
         [...new Set(declared)].sort(),
         'A per-event route exists that this isolation suite does not exercise. Add it to ' +
@@ -263,22 +336,24 @@ describe('attendee data isolation', () => {
     })
 
     it.each(EVENT_ROUTES)(
-      '%s — refuses another attendee’s conference IDENTICALLY to a nonexistent one (FR-148)',
-      async (template) => {
+      '$method $template — refuses another attendee’s conference IDENTICALLY to a nonexistent one (FR-148)',
+      async (route) => {
         // ───────────────────────────────────────────────────────────────────────────────────
         // **Refusal parity is the assertion that matters here.** A 403 for "exists but not
         // yours" and a 404 for "no such conference" would let Ada enumerate every conference in
         // the product by watching which refusal came back. Status *and* body must match.
         // ───────────────────────────────────────────────────────────────────────────────────
         const unregistered = await app.inject({
-          method: 'GET',
-          url: template.replace('{id}', graceOnlyEventId),
+          method: route.method,
+          url: urlFor(route.template, graceOnlyEventId, NONEXISTENT),
           headers: { cookie: cookieHeader(adaCookie) },
+          ...(route.payload ? { payload: route.payload } : {}),
         })
         const nonexistent = await app.inject({
-          method: 'GET',
-          url: template.replace('{id}', NONEXISTENT),
+          method: route.method,
+          url: urlFor(route.template, NONEXISTENT, NONEXISTENT),
           headers: { cookie: cookieHeader(adaCookie) },
+          ...(route.payload ? { payload: route.payload } : {}),
         })
 
         expect(unregistered.statusCode).toBe(nonexistent.statusCode)
@@ -287,44 +362,61 @@ describe('attendee data isolation', () => {
       },
     )
 
-    it.each(EVENT_ROUTES)('%s — a malformed identifier refuses the same way', async (template) => {
-      const malformed = await app.inject({
-        method: 'GET',
-        url: template.replace('{id}', 'not-a-uuid'),
-        headers: { cookie: cookieHeader(adaCookie) },
-      })
-      const nonexistent = await app.inject({
-        method: 'GET',
-        url: template.replace('{id}', NONEXISTENT),
-        headers: { cookie: cookieHeader(adaCookie) },
-      })
+    it.each(EVENT_ROUTES)(
+      '$method $template — a malformed identifier refuses the same way',
+      async (route) => {
+        const malformed = await app.inject({
+          method: route.method,
+          url: urlFor(route.template, 'not-a-uuid', NONEXISTENT),
+          headers: { cookie: cookieHeader(adaCookie) },
+          ...(route.payload ? { payload: route.payload } : {}),
+        })
+        const nonexistent = await app.inject({
+          method: route.method,
+          url: urlFor(route.template, NONEXISTENT, NONEXISTENT),
+          headers: { cookie: cookieHeader(adaCookie) },
+          ...(route.payload ? { payload: route.payload } : {}),
+        })
 
-      expect(malformed.statusCode).toBe(nonexistent.statusCode)
-      expect(malformed.json()).toEqual(nonexistent.json())
-    })
+        expect(malformed.statusCode).toBe(nonexistent.statusCode)
+        expect(malformed.json()).toEqual(nonexistent.json())
+      },
+    )
 
-    it.each(EVENT_ROUTES)('%s — refuses without a session at all', async (template) => {
+    it.each(EVENT_ROUTES)('$method $template — refuses without a session at all', async (route) => {
       const response = await app.inject({
-        method: 'GET',
-        url: template.replace('{id}', adaEventIds[0] ?? NONEXISTENT),
+        method: route.method,
+        url: urlFor(route.template, adaEventIds[0] ?? NONEXISTENT, adaSessionId),
+        ...(route.payload ? { payload: route.payload } : {}),
       })
 
       expect(response.statusCode).toBe(401)
     })
 
     it.each(EVENT_ROUTES)(
-      '%s — serves the conference the attendee IS registered for',
-      async (template) => {
-        // The other half: the guard must not be so enthusiastic that it refuses legitimate reads.
-        // A test suite that only asserted refusals would pass against a route that refused
-        // everything.
+      '$method $template — serves the conference the attendee IS registered for',
+      async (route) => {
+        // The other half: the guard must not be so enthusiastic that it refuses legitimate
+        // requests. A suite that only asserted refusals would pass against a route that
+        // refused everything.
+        const eventId = adaEventIds[0] ?? ''
         const response = await app.inject({
-          method: 'GET',
-          url: template.replace('{id}', adaEventIds[0] ?? ''),
+          method: route.method,
+          url: urlFor(route.template, eventId, adaSessionId),
           headers: { cookie: cookieHeader(adaCookie) },
+          ...(route.payload ? { payload: route.payload } : {}),
         })
 
-        expect(response.statusCode).toBe(200)
+        expect(response.statusCode).toBe(route.ok)
+
+        // A coverage test must not leave state behind for the next one to trip over.
+        if (route.undo) {
+          await app.inject({
+            method: route.undo.method,
+            url: urlFor(route.undo.template, eventId, adaSessionId),
+            headers: { cookie: cookieHeader(adaCookie) },
+          })
+        }
       },
     )
 

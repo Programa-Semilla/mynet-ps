@@ -11,5 +11,19 @@ export { HttpAttendeeRepository } from './attendee-repository.js'
 export { HttpEventsRepository } from './events-repository.js'
 export { HttpActiveEventRepository } from './active-event-repository.js'
 export { HttpCatalogRepository } from './catalog-repository.js'
+// 005 — the attendee's own agenda.
+export { HttpSavedSessionRepository, HttpSessionNotesRepository } from './agenda-repository.js'
+// 005 — the caching decorator. Applied at the composition root, so no component learns that a
+// cache exists (research D1, Principle V).
+export {
+  attendeePrefix,
+  cached,
+  cacheKey,
+  CACHE_LIFETIME_MS,
+  conferencePrefix,
+  createFreshnessRegistry,
+} from './cached.js'
+export type { CachedReads, CacheOptions, CacheScope, Clock, FreshnessRegistry } from './cached.js'
+export type { CachedEntry, LocalCache } from './cache-store.js'
 export { HttpAuthGateway } from './auth.js'
 export type { AuthGateway } from './auth.js'

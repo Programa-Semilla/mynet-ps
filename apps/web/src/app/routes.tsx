@@ -2,7 +2,6 @@ import { Route, Routes } from 'react-router'
 
 import { AppShell } from '../shell/AppShell.js'
 import { NotFound } from '../shell/NotFound.js'
-import { Agenda } from './destinations/Agenda.js'
 import { Home } from './destinations/Home.js'
 import { DestinationPlaceholder } from './destinations/Placeholder.js'
 import { DESTINATIONS, HOME } from './navigation.js'
@@ -44,16 +43,36 @@ export const AppRoutes = () => (
             return <Route key={destination.path} index element={<Home />} />
           }
 
-          // 002 — Agenda stops being a placeholder (T050). Discover, Messages and Network
-          // remain placeholders until the features that own them land.
-          const element =
-            destination.path === '/agenda' ? (
-              <Agenda />
-            ) : (
-              <DestinationPlaceholder destination={destination} />
-            )
-
-          return <Route key={destination.path} path={destination.path.slice(1)} element={element} />
+          // ─────────────────────────────────────────────────────────────────────────────
+          // T017 (005) — **the destination says what renders it; this file names no address**
+          // (FR-233).
+          //
+          // This used to read `destination.path === '/agenda' ? <Agenda /> : …`. Four more
+          // features would each have added a branch to that expression, so the router would
+          // have become the shared file every destination feature edits — the contention
+          // 002's per-domain splits exist to remove.
+          //
+          // A destination with no element yet is not broken: Discover, Messages and Network
+          // legitimately render the placeholder, which is a real state rather than a missing
+          // one.
+          // ─────────────────────────────────────────────────────────────────────────────
+          return (
+            <Route
+              key={destination.path}
+              path={destination.path.slice(1)}
+              element={destination.element ?? <DestinationPlaceholder destination={destination} />}
+            >
+              {/*
+                Nested addresses the destination declares for itself — today, Agenda's session
+                detail panel. Rendered generically: this file still names no address, so 009
+                extending that panel and 006–008 gaining their own nested views change
+                `navigation.ts` and never the router.
+              */}
+              {destination.children?.map((child) => (
+                <Route key={child.path} path={child.path} element={child.element} />
+              ))}
+            </Route>
+          )
         })}
 
         {/* FR-015 — inside the shell, so the navigation stays available. Never a blank screen. */}
