@@ -8,6 +8,7 @@ import {
   HttpAuthGateway,
   HttpCatalogRepository,
   HttpClient,
+  HttpDirectoryRepository,
   HttpEventsRepository,
   HttpIdentityRepository,
   HttpProfileRepository,
@@ -153,6 +154,20 @@ export const createServices = (): PlatformServices => {
       // ─────────────────────────────────────────────────────────────────────────────────────
       identity: purgingIdentity(new HttpIdentityRepository(http), store, identity),
       profile: new HttpProfileRepository(http),
+      // ─────────────────────────────────────────────────────────────────────────────────────
+      // 006 — **NOT decorated with `cached`, and this one is a requirement rather than a
+      // judgement** (FR-466, FR-468, SC-409).
+      //
+      // The specification states that no directory content is readable offline, and says why:
+      // a cached directory is a copy of other people's personal data sitting on this device,
+      // ageing, after they may have turned discoverability off. 005's decorator revokes on age
+      // alone, which is the wrong clock entirely for a visibility setting that takes effect on
+      // the very next request (FR-363).
+      //
+      // Declared here rather than merely omitted, because "no cache" and "nobody got round to
+      // it" look identical in a composition root.
+      // ─────────────────────────────────────────────────────────────────────────────────────
+      directory: new HttpDirectoryRepository(http),
     },
     freshness: {
       lastRetrieved: (eventId, content) =>
@@ -215,7 +230,10 @@ const attendeeIdentity = () => {
       repository: PlatformServices['repositories']['attendee'],
     ): PlatformServices['repositories']['attendee'] => ({
       getCurrent: async () => {
-        const attendee = (await repository.getCurrent()) as { id?: string } | null
+        // T012 (006) — no cast. `AttendeeRepository.getCurrent` is typed here now, so the
+        // identifier this reads is the one the interface promises rather than one recovered
+        // from `unknown` (FR-496).
+        const attendee = await repository.getCurrent()
         if (attendee?.id) attendeeId = attendee.id
         return attendee
       },

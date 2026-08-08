@@ -73,7 +73,20 @@ export const AppRoutes = () => (
             <Route
               key={destination.path}
               path={destination.path.slice(1)}
-              element={destination.element ?? <DestinationPlaceholder destination={destination} />}
+              // ─────────────────────────────────────────────────────────────────────────────
+              // T130 (006) — **wrapped, because a destination may now be code-split.**
+              //
+              // Discover is `lazy`; Home and Agenda are not. `navigation.ts` records why the
+              // rule narrowed from "the five destinations stay eager" to "the destinations
+              // needed to render the workspace stay eager". Wrapping generically keeps this
+              // file naming no address, and an eager destination simply never suspends — the
+              // same harmless generality the `Loadable` note below already describes.
+              // ─────────────────────────────────────────────────────────────────────────────
+              element={
+                <Loadable>
+                  {destination.element ?? <DestinationPlaceholder destination={destination} />}
+                </Loadable>
+              }
             >
               {/*
                 Nested addresses the destination declares for itself — today, Agenda's session
@@ -82,7 +95,21 @@ export const AppRoutes = () => (
                 `navigation.ts` and never the router.
               */}
               {destination.children?.map((child) => (
-                <Route key={child.path} path={child.path} element={child.element} />
+                <Route
+                  key={child.path}
+                  path={child.path}
+                  // ───────────────────────────────────────────────────────────────────────
+                  // T130 (006) — **wrapped, because a nested surface may now be code-split.**
+                  //
+                  // Discover's profile view is `lazy`, for the reason `navigation.ts` records:
+                  // it is reached deliberately, once, by somebody who has decided to look at
+                  // one person, and paying for it on every cold load of Home is exactly the
+                  // cost the asset budget exists to notice. Agenda's session panel is eager and
+                  // never suspends, so its boundary is simply never reached — the same
+                  // harmless generality the destination loop above already has.
+                  // ───────────────────────────────────────────────────────────────────────
+                  element={<Loadable>{child.element}</Loadable>}
+                />
               ))}
             </Route>
           )
@@ -117,8 +144,10 @@ export const AppRoutes = () => (
  * chunk fetch is indistinguishable from a broken navigation, and a screen-reader user gets
  * nothing at all from an empty `<div>`.
  *
- * Only the standalone routes are wrapped. The five destinations are imported eagerly and never
- * suspend, so wrapping them would add a boundary that can never be reached.
+ * **006 widened this**: it wraps the destinations and their nested children too, because
+ * Discover and its profile view are now code-split. An eager destination never suspends, so its
+ * boundary is simply never reached — which is the same harmless generality that lets this file
+ * go on naming no address at all.
  * ─────────────────────────────────────────────────────────────────────────────────────────
  */
 const Loadable = ({ children }: { children: React.ReactNode }) => (

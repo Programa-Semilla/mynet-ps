@@ -3,7 +3,7 @@ import { useProfileRepository } from '@mynet/platform'
 import { useCallback, useEffect, useId, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router'
 
-import { AVAILABILITY_LABELS, INTENT_LABELS } from './labels.js'
+import { asAvailability, asNetworkingIntent, AVAILABILITY_LABELS, INTENT_LABELS } from './labels.js'
 
 /**
  * T074 (004) — editing the profile (FR-337, FR-338).
@@ -83,7 +83,7 @@ export const ProfileEdit = () => {
   const load = useCallback(async () => {
     try {
       // The await first, so the state write sits behind an async boundary — see `Profile.tsx`.
-      const profile = (await repository.getOwn()) as OwnProfile
+      const profile = await repository.getOwn()
       setDraft(toDraft(profile))
     } catch (error) {
       setLoadFailure(
@@ -147,8 +147,10 @@ export const ProfileEdit = () => {
         company: draft.company.trim() || null,
         role: draft.role.trim() || null,
         headline: draft.headline.trim() || null,
-        networkingIntent: (draft.networkingIntent || null) as OwnProfile['networkingIntent'],
-        availability: (draft.availability || null) as OwnProfile['availability'],
+        // T011 (006) — narrowed by a membership check rather than asserted (SC-414). A
+        // `<select>` yields `string`; `asNetworkingIntent` returns the union member or `null`.
+        networkingIntent: asNetworkingIntent(draft.networkingIntent),
+        availability: asAvailability(draft.availability),
         interests: parseInterests(draft.interests),
       })
       await navigate('/profile')

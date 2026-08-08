@@ -96,10 +96,15 @@ export const nextSession = (
   )
   if (upcoming.length === 0) return null
 
-  return [...upcoming].sort(
-    (a, b) =>
-      new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime() || (a.id < b.id ? -1 : 1),
-  )[0] as Session
+  // T013 (006) — `?? null` rather than `[0] as Session`. The length check above already
+  // guarantees a first element, so the assertion was true; it was still an instruction to stop
+  // checking, on a function whose return type is `Session | null` and can express the answer.
+  return (
+    [...upcoming].sort(
+      (a, b) =>
+        new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime() || (a.id < b.id ? -1 : 1),
+    )[0] ?? null
+  )
 }
 
 /**

@@ -284,6 +284,19 @@ describe('attendee data isolation', () => {
       },
       { template: '/events/:eventId/agenda/notes/:sessionId', method: 'DELETE', ok: 204 },
       // ─────────────────────────────────────────────────────────────────────────────────────
+      // 006 — the Discover directory.
+      //
+      // **This entry exists because the coverage assertion above demanded it**, which is the
+      // guard working: the route was added, this suite failed, and the boundary had to be
+      // exercised before it could pass.
+      //
+      // It is the widest per-event read in the product — every co-attendee at a conference,
+      // rather than one named row — so an event-scoping failure here discloses the most. The
+      // suite's other half proves the reverse direction: Ada asking for a conference that is
+      // Grace's and not hers gets the same refusal a nonexistent conference produces.
+      // ─────────────────────────────────────────────────────────────────────────────────────
+      { template: '/events/:eventId/attendees', method: 'GET', ok: 200 },
+      // ─────────────────────────────────────────────────────────────────────────────────────
       // 004 — reading a co-attendee, and leaving a conference.
       //
       // The first two are the product's first routes naming an attendee identifier. They are

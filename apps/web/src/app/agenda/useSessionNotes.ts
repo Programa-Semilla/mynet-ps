@@ -40,7 +40,7 @@ export const useSessionNotes = (eventId: string): SessionNotes => {
       .listNotes(eventId)
       .then((notes) => {
         if (cancelled) return
-        setBySession(new Map((notes as SessionNote[]).map((note) => [note.sessionId, note])))
+        setBySession(new Map(notes.map((note) => [note.sessionId, note])))
         setError(null)
         setStatus('ready')
       })

@@ -65,7 +65,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const refresh = useCallback(async () => {
     try {
-      const current = (await attendeeRepository.getCurrent()) as Attendee
+      const current = await attendeeRepository.getCurrent()
       setAttendee(current)
       setStatus('signed-in')
       setExpired(false)

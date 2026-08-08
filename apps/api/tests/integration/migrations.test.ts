@@ -3,7 +3,7 @@ import type { FastifyInstance } from 'fastify'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { getDb } from '../../src/db/client.js'
-import { setupTestApp, teardown } from './helpers.js'
+import { resetDatabase, setupTestApp, teardown } from './helpers.js'
 
 /**
  * T006 (005) — **migration `0004` applies forward against a real database** (Principle VII).
@@ -58,6 +58,20 @@ describe('migration 0004 — saved sessions and notes', () => {
   beforeAll(async () => {
     // Runs every committed migration in order, `0004` included, against a real instance.
     app = await setupTestApp()
+    // ───────────────────────────────────────────────────────────────────────────────────────
+    // **Seeded HERE, because several assertions below read seeded rows** — the constraint
+    // checks insert `SELECT … FROM registrations JOIN sessions … LIMIT 1`, and the seeded-join-
+    // code check reads `events`.
+    //
+    // Without this the file passed only when some *other* file happened to run first and seed
+    // the shared database. 006 added eight integration files, the order changed, and five tests
+    // failed in CI while passing locally. Worse, they failed **silently in the wrong direction**:
+    // an empty `SELECT` inserts zero rows, so no constraint is violated and the assertion sees
+    // `undefined` — a fixture problem reported as a missing CHECK constraint.
+    //
+    // `resetDatabase()` is what every other integration file does. This file was the exception.
+    // ───────────────────────────────────────────────────────────────────────────────────────
+    await resetDatabase()
   })
 
   afterAll(async () => {
@@ -241,9 +255,19 @@ describe('migration 0004 — saved sessions and notes', () => {
     const tags = await journalTags()
 
     expect(tags.filter((tag) => tag.startsWith('0004_'))).toEqual(['0004_saved_sessions_and_notes'])
+    // ─────────────────────────────────────────────────────────────────────────────────────
+    // **`0005` was asserted absent until 006 shipped, and is now asserted present** — the same
+    // deliberate edit 004 made to the `0003` line below, and for the same reason. 005 wrote
+    // this so that 006 claiming its reserved number would appear in a reviewed diff rather
+    // than happening quietly. This is that diff. `0006` remains reserved for 007.
+    // ─────────────────────────────────────────────────────────────────────────────────────
     expect(
       tags.filter((tag) => tag.startsWith('0005_')),
-      '0005 belongs to 006',
+      '0005 belongs to 006, and 006 has claimed it — exactly one migration, as reserved',
+    ).toEqual(['0005_directory_indexes'])
+    expect(
+      tags.filter((tag) => tag.startsWith('0006_')),
+      '0006 belongs to 007',
     ).toEqual([])
     expect(
       tags.filter((tag) => tag.startsWith('0003_')),
@@ -293,6 +317,9 @@ describe('migration 0003 — attendee identity, personal data and profile', () =
 
   beforeAll(async () => {
     app = await setupTestApp()
+    // Seeded for the same reason as the block above: these assertions read seeded rows, and an
+    // empty fixture fails as a missing constraint rather than as an empty fixture.
+    await resetDatabase()
   })
 
   afterAll(async () => {
@@ -496,5 +523,157 @@ describe('migration 0003 — attendee identity, personal data and profile', () =
 
     expect(identifier?.indexdef).toContain('(action, identifier_hash, occurred_at)')
     expect(source?.indexdef).toContain('(action, source_hash, occurred_at)')
+  })
+})
+
+/**
+ * T019 (006) — **migration `0005` applies forward against a real database** (Principle VII,
+ * FR-488).
+ *
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ * `0005` is the first migration in this product that adds **no table and no column**. It is
+ * five indexes and one extension, and that makes verifying it *more* important rather than
+ * less: a missing table fails the next query loudly, whereas a missing index fails nothing at
+ * all. It simply makes the directory scan, the deletion cascade scan, and the join scan —
+ * correct answers, arrived at slowly, for as long as nobody measures.
+ *
+ * So the assertions are structural. Two of the five discharge findings 004's review left open
+ * deliberately (FR-498, FR-499); two serve this feature's own query (research D11); and the
+ * extension is what makes accent-insensitive search possible at all (FR-407, D5).
+ *
+ * **`unaccent` and the functional index are hand-written into the migration**, because neither
+ * is expressible in the Drizzle schema. That means `drizzle-kit generate` will not re-emit them
+ * — so these two assertions are the only thing standing between a future regeneration and a
+ * database that silently loses both. See the block comment in `0005_directory_indexes.sql`.
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ */
+describe('migration 0005 — the directory indexes', () => {
+  let app: FastifyInstance
+
+  beforeAll(async () => {
+    app = await setupTestApp()
+    // Seeded for the same reason as the block above: these assertions read seeded rows, and an
+    // empty fixture fails as a missing constraint rather than as an empty fixture.
+    await resetDatabase()
+  })
+
+  afterAll(async () => {
+    await teardown(app)
+  })
+
+  const indexesOn = async (table: string) =>
+    getDb().execute<{ indexname: string; indexdef: string }>(sql`
+      SELECT indexname, indexdef FROM pg_indexes
+      WHERE schemaname = 'public' AND tablename = ${table}
+      ORDER BY indexname
+    `)
+
+  it('adds no table and no column — the headline of this feature (data-model.md)', async () => {
+    // The two structural guards read the Drizzle schema; this reads the database they produced.
+    // Asserted here because "no new table and no new column" is what keeps deletion coverage and
+    // export coverage green with no allow-list entry, and an accidental column would be caught
+    // by those guards only if somebody declared it in the schema — a hand-written migration
+    // could add one without them ever seeing it.
+    const added = await getDb().execute<{ table_name: string; column_name: string }>(sql`
+      SELECT table_name, column_name
+      FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND column_name IN ('avatar_card_object_key', 'card_object_key', 'rendition')
+    `)
+
+    expect(
+      added,
+      'The card rendition is keyed by CONVENTION, derived from the profile key (research D3). ' +
+        'A column here would be a new column collecting attendee data, and ' +
+        '`tests/unit/export-coverage.test.ts` fails when one exists without export coverage.',
+    ).toEqual([])
+  })
+
+  it("indexes registrations by event — the directory's primary access path (D11)", async () => {
+    const indexes = await indexesOn('registrations')
+    const byEvent = indexes.find((row) => row.indexname === 'registrations_event_id_idx')
+
+    expect(
+      byEvent,
+      'The directory asks "who else is at this conference". Only attendee_id was indexed, and ' +
+        'the composite unique leads with the wrong column, so that read scanned the table.',
+    ).toBeDefined()
+    expect(byEvent?.indexdef).toContain('(event_id)')
+
+    // The 001–005 access path is unchanged. Both reads exist, so both indexes do.
+    expect(indexes.map((row) => row.indexname)).toContain('registrations_attendee_id_idx')
+  })
+
+  it('indexes attendee_interests by interest — the filter and the ranking join (D12)', async () => {
+    const byInterest = (await indexesOn('attendee_interests')).find(
+      (row) => row.indexname === 'attendee_interests_interest_idx',
+    )
+
+    expect(
+      byInterest,
+      "The primary key leads with attendee_id, which answers 'this attendee's interests'. The " +
+        "directory asks the other way round — 'which attendees hold this interest' — for both " +
+        'the filter and the overlap count, and a composite cannot serve a search on its second ' +
+        'column.',
+    ).toBeDefined()
+    expect(byInterest?.indexdef).toContain('(interest)')
+  })
+
+  it.each(['attendee_verifications', 'attendee_password_resets'])(
+    'indexes %s on attendee_id, so account deletion stops scanning it (FR-498, SC-415)',
+    async (table) => {
+      const index = (await indexesOn(table)).find(
+        (row) => row.indexname === `${table}_attendee_id_idx`,
+      )
+
+      expect(
+        index,
+        'PostgreSQL creates NO index for a foreign key, so ON DELETE CASCADE from attendees had ' +
+          'to find rows here by sequential scan — on a path an attendee is waiting on, growing ' +
+          'with every account that ever verified an address. A 004 review finding.',
+      ).toBeDefined()
+      expect(index?.indexdef).toContain('(attendee_id)')
+    },
+  )
+
+  it('indexes the join-code lookup as it is actually written (FR-499)', async () => {
+    const functional = (await indexesOn('events')).find(
+      (row) => row.indexname === 'events_join_code_lower_btrim_idx',
+    )
+
+    expect(
+      functional,
+      'The UNIQUE constraint indexes the RAW column; the lookup matches lower(btrim(join_code)) ' +
+        'because a code read off a badge arrives with arbitrary case and whitespace. An index ' +
+        'the expression does not match cannot be used. Hand-written into 0005 — Drizzle cannot ' +
+        'express an expression index, so a regeneration will not re-emit it.',
+    ).toBeDefined()
+
+    // The expression, not merely the column: an index on the bare column would satisfy a
+    // name-only check while leaving the lookup scanning exactly as before.
+    expect(functional?.indexdef).toContain('lower(btrim(join_code))')
+  })
+
+  it('enables the unaccent extension (FR-407, research D5)', async () => {
+    const rows = await getDb().execute<{ extname: string }>(sql`
+      SELECT extname FROM pg_extension WHERE extname = 'unaccent'
+    `)
+
+    expect(
+      rows,
+      'Searching "Munoz" must find "Muñoz": the organisation is Programa-Semilla and its ' +
+        'conferences are Spanish-language. Hand-written into 0005 for the same reason as the ' +
+        'functional index above.',
+    ).toHaveLength(1)
+  })
+
+  it('actually normalises accents, rather than merely being installed', async () => {
+    // The behavioural half. An extension present in `pg_extension` but installed into a schema
+    // outside the search path answers "installed" and then fails every query that uses it.
+    const rows = await getDb().execute<{ folded: string }>(sql`
+      SELECT unaccent(lower('Muñoz')) AS folded
+    `)
+
+    expect(rows[0]?.folded).toBe('munoz')
   })
 })

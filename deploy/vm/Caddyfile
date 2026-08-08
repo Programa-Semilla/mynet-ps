@@ -1,0 +1,121 @@
+# Automatic HTTPS for {$APP_DOMAIN} (injected from the .env beside docker-compose.yml). Caddy
+# obtains and renews the certificate as long as the public DNS A record points at this VM and
+# ports 80/443 are open (FR-479).
+#
+# ═══════════════════════════════════════════════════════════════════════════════════════════════
+# **CADDY IS BOTH FILE SERVER AND REVERSE PROXY, AND THAT IS THE WHOLE POINT** (FR-476, research
+# D6).
+#
+# This differs from the mission-control reference in exactly one way: there, Caddy proxies
+# *everything* to one application that serves its own static content. Here the client is a static
+# build with no server of its own, so Caddy serves it directly and proxies only `/api/*`.
+#
+# **The configuration this replaces could not sign anyone in.** The client was on `pages.dev` and
+# the API on `fly.dev` — two separate registrable domains on the Public Suffix List — so the
+# session cookie's `SameSite=Lax` meant the cookie was never sent at all. One origin is what makes
+# `Lax` a genuine CSRF defence (FR-477) and what makes `connect-src 'self'` literally true
+# (FR-480).
+# ═══════════════════════════════════════════════════════════════════════════════════════════════
+
+{
+	email {$ACME_EMAIL}
+}
+
+{$APP_DOMAIN} {
+	encode zstd gzip
+
+	# ─────────────────────────────────────────────────────────────────────────────────────────
+	# Security headers on the STATIC DOCUMENT. The API sets its own on API responses; neither
+	# sets the other's (research D8, FR-480). This split is what makes the API's half assertable
+	# by the integration suite with no proxy in front.
+	#
+	# **SITE LEVEL, not inside the client handler — and that placement is a correction.** These
+	# lived in the `handle` block that serves /srv/web, so the MAINTENANCE page — which runs in
+	# front of everything and answers every request for the whole window, including /api/* — was
+	# served with no CSP, no HSTS and no nosniff. HSTS in particular was absent for the entire
+	# duration of every planned window, which is when an operator is least likely to be looking.
+	#
+	# **`img-src` MUST permit `data:`** (FR-481). Avatars are delivered as data URLs so that a
+	# directory page of 24 faces is one request rather than 25 (FR-456). Dropping `data:` in a
+	# later tightening would blank every face in the directory, silently.
+	#
+	# `connect-src 'self'` is literally true because the API is same-origin under /api.
+	# ─────────────────────────────────────────────────────────────────────────────────────────
+	header {
+		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer"
+		X-Frame-Options "DENY"
+		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()"
+		Strict-Transport-Security "max-age=63072000; includeSubDomains"
+		# Caddy adds this by default; removing it keeps the server's identity out of the response
+		# for the same reason /health reports no version.
+		-Server
+	}
+
+	# ─────────────────────────────────────────────────────────────────────────────────────────
+	# Maintenance is a FILE ON DISK, tested per request — no reload, no container recreate, no
+	# config rewrite. `maintenance.sh` creates and removes /srv/maintenance/ON over SSH; the next
+	# request picks it up. That is what makes leaving maintenance a pure `rm` with no restart, and
+	# what keeps the page serving while the API is stopped, rebuilding or crash-looping — because
+	# this matcher runs IN FRONT of both the file server and the proxy.
+	# ─────────────────────────────────────────────────────────────────────────────────────────
+	@maintenance file {
+		root /srv/maintenance
+		try_files /ON
+	}
+	handle @maintenance {
+		root * /srv/maintenance
+		# `rewrite`, NOT `try_files {path} /index.html`. Resolving {path} first would turn this
+		# into an unauthenticated file server over the whole mounted directory for the duration
+		# of every window — and buy nothing, because the page is deliberately single-file with
+		# zero assets, so there is no asset for {path} to find.
+		rewrite * /index.html
+		# **503 plus a retry indication is the ONLY signal external monitoring gets** to tell a
+		# planned window from an outage. A page that renders perfectly while answering 200 looks
+		# completely correct in a browser and silently defeats that — so this pair is verified
+		# with `curl -sI`, never by eye (T073).
+		header Retry-After "600"
+		# A cached maintenance page would outlive the window and keep attendees out of a site
+		# that is already back.
+		header Cache-Control "no-store, must-revalidate"
+		file_server {
+			status 503
+		}
+	}
+
+	# ─────────────────────────────────────────────────────────────────────────────────────────
+	# The API. `/api/*` is stripped before proxying, so the API's own routes are unchanged and
+	# `VITE_API_BASE_URL=/api` is the only configuration the client needs (research D6).
+	#
+	# **Matched before the file server**, or `handle` would fall through to the SPA fallback and
+	# every API call would be answered with the client's index.html — a 200 carrying HTML, which
+	# the client's JSON parse reports as an unrecognisable failure rather than as a routing bug.
+	# ─────────────────────────────────────────────────────────────────────────────────────────
+	handle /api/* {
+		uri strip_prefix /api
+		reverse_proxy api:3000
+	}
+
+	# ─────────────────────────────────────────────────────────────────────────────────────────
+	# The built client, with an SPA fallback.
+	#
+	# Every destination is individually addressable (standing decision 6), so a reader who
+	# bookmarks `/discover/<attendeeId>` or reloads on it must get the application rather than a
+	# 404 — the client's router resolves the address, not the file system.
+	# ─────────────────────────────────────────────────────────────────────────────────────────
+	handle {
+		root * /srv/web
+
+		# Hashed asset filenames, so a long cache is safe and a deploy is picked up immediately.
+		@immutable path /assets/*
+		header @immutable Cache-Control "public, max-age=31536000, immutable"
+		# The document itself must never be cached, or a deploy leaves browsers loading an old
+		# index.html that references assets which no longer exist.
+		@document path / /index.html
+		header @document Cache-Control "no-cache"
+
+		try_files {path} /index.html
+		file_server
+	}
+}

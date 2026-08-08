@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm'
-import { check, pgTable, primaryKey, text, timestamp, uuid } from 'drizzle-orm/pg-core'
+import { check, index, pgTable, primaryKey, text, timestamp, uuid } from 'drizzle-orm/pg-core'
 
 import { attendees } from './attendees.js'
 
@@ -166,6 +166,19 @@ export const attendeeInterests = pgTable(
      * check.
      */
     primaryKey({ columns: [table.attendeeId, table.interest] }),
+
+    /**
+     * T015 (006) — the interest filter, and the overlap join that computes the ranking.
+     *
+     * The primary key above leads with `attendee_id`, which serves "this attendee's interests"
+     * — every read 004 makes. 006 reads the other way: *which attendees hold this interest*,
+     * both for the `interest` filter and for the `LEFT JOIN` that counts overlap with the
+     * reader's own set (research D12). A composite index cannot serve a search on its second
+     * column, so this is the index that turns the ranking join into a scan of matching rows
+     * rather than of the whole table. It is the collection on 004's own note above, which
+     * records that this is a table rather than an array column precisely so 006 could index it.
+     */
+    index('attendee_interests_interest_idx').on(table.interest),
 
     // Length only. The count bound lives where the set is written — see PROFILE_LIMITS above
     // for why a per-row CHECK cannot express it.

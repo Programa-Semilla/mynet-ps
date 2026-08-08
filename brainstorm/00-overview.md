@@ -1,6 +1,6 @@
 # Brainstorm Overview
 
-Last updated: 2026-08-07 (004 shipped)
+Last updated: 2026-08-07 (006 implemented)
 
 The authoritative registers live elsewhere — open questions in `.specify/memory/constitution.md`,
 delivery sequence in `docs/superpowers/specs/2026-08-06-mynet-delivery-roadmap-design.md`. This file
@@ -16,6 +16,7 @@ win and this is stale.
 | 02 | 2026-08-06 | event-context-and-catalog | shipped (PR #6) | `specs/002-event-context-and-catalog/` |
 | 03 | 2026-08-07 | agenda-and-saved-sessions | shipped (PR #8) | `specs/005-agenda-and-saved-sessions/` |
 | 04 | 2026-08-07 | attendee-identity-and-profile | shipped (PR #12) | `specs/004-attendee-identity-and-profile/` |
+| 05 | 2026-08-07 | discover-and-the-deployment-platform | ratified in constitution **v3.0.0** | `specs/006-discover-and-deployment-platform/` |
 
 ## Delivery queue
 
@@ -29,8 +30,8 @@ the index, and it now differs from the roadmap in the ways #02 records.
 | 003 | ~~Session Catalog~~ | **absorbed into 002** (#02); migration `0002` transfers | — |
 | 004 | Attendee Identity, Personal Data & Profile | **shipped** — 131/131 tasks, squash-merged to `develop` ([#12](https://github.com/Programa-Semilla/mynet-ps/pull/12)); scope well beyond the roadmap's | — |
 | 005 | Agenda | **shipped** — 94/94 tasks, squash-merged to `develop` ([#8](https://github.com/Programa-Semilla/mynet-ps/pull/8)) | 002 ✓ |
-| 006 | Discover | **active — next to spec.** Migration `0005` reserved; 005's shared-file appends keep it uncontended | 004 ✓ |
-| 007 | Messages | queued | 004 ✓ |
+| 006 | Discover, and the deployment platform | **implemented** — awaiting the two owner decisions that gate the first deploy (a domain, an Azure subscription). Migration `0005`: five indexes and one extension, **no new table and no new column** | 004 ✓ |
+| 007 | Messages | **next** | 004 ✓, 006 ✓ |
 | 008 | Network & Appointments | queued (∥ 009) | connection model; card-exchange semantics |
 | 009 | Session Q&A | queued (∥ 008) | question attribution |
 | 010 | Launch Readiness | queued | brand assets; client validation of desktop |
@@ -50,6 +51,23 @@ Its Home contribution is **its own card** rather than the roadmap's "Up-next pre
 sessions", because that phrasing means editing 002's `UpNext` and standing decision 9 forbids a
 feature editing another feature's card. And it carries a **per-conference cache** the roadmap did
 not scope into this phase, which is what closes two idea-inbox entries at once.
+
+**006 departs from the roadmap far more than 005 did**, and its specification says so. The roadmap
+scopes it as a directory; as delivered it also carries **the whole deployment platform** — two Azure
+VMs, Caddy with automatic TLS in front of an API container and a loopback-only PostgreSQL container,
+replacing Fly, Cloudflare Pages and Neon. That half is what constitution **v3.0.0** ratifies, and it
+is the first time this project has **retracted a delivered requirement**: 001's FR-066 and SC-011
+promised a reviewer a preview of that exact change, and there is no longer one.
+
+The reason the two halves shipped together is that **the configuration they replace could not sign
+anyone in**. `fly.dev` and `pages.dev` are separate registrable domains on the Public Suffix List,
+so the `SameSite=Lax` session cookie was never sent — a directory nobody can reach is not a
+directory. One origin is the fix, and it is a deployment change rather than a feature one.
+
+006 also discharged debt that would otherwise have compounded: **seventeen unchecked repository
+casts** removed before its own repository work (FR-497 required that order, and the count was
+fifteen in the idea inbox), and the two index findings 004's review deliberately left for whichever
+feature owned the next migration number.
 
 ## Open Threads
 
@@ -220,7 +238,9 @@ All from #02, and all now answered by the delivered feature.
   No administrative interface and no content import path.
 - **Home composition** — a slot-based card registry built early, not a dashboard aggregated late.
 - **Sequencing** — phases run mostly sequentially, in parallel only where they touch disjoint files.
-- **Attendee profile view** — a profile detail view is delivered in 006, closing the gap where
+- ~~**Attendee profile view**~~ — **delivered in 006.** A `<dialog>` at `/discover/:attendeeId`,
+  built on 004's three-condition read unchanged, so it inherits the four-way indistinguishable
+  refusal by construction. Original entry: a profile detail view is delivered in 006, closing the gap where
   `requirements.md` says a profile can be opened and the prototype has no such screen.
 - **Repository shape** — the API lives in this repository, at `apps/api` inside the pnpm workspace.
 

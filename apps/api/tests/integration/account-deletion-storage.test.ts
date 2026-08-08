@@ -102,7 +102,11 @@ describe('the avatar goes with the account, and goes first (research D10)', () =
   }
 
   it('has bytes to delete before it starts — otherwise this proves nothing', async () => {
-    expect(await storedCount()).toBe(1)
+    // TWO since 006: the 512px profile rendition and the 96px card rendition the directory
+    // embeds (FR-457). The count matters here — the point of this assertion is that the
+    // deletion test below has something to delete, and a deletion path that removed only one
+    // of the two would pass a "zero remain" check written against a single rendition.
+    expect(await storedCount(), 'both renditions exist before deletion (FR-460, SC-408)').toBe(2)
   })
 
   it('removes the stored object when the account is deleted (FR-366)', async () => {
@@ -130,6 +134,9 @@ describe('the avatar goes with the account, and goes first (research D10)', () =
     const calls: string[] = []
 
     const observing: StorageService = {
+      // 006 widened the port with a batched read (FR-456). Delegates, so this double keeps
+      // observing exactly what it observed before.
+      getMany: async (keys) => storage.getMany(keys),
       async put(key: string, bytes: Buffer, contentType: string): Promise<void> {
         calls.push('put')
         return storage.put(key, bytes, contentType)

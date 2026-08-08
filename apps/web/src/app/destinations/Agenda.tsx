@@ -82,10 +82,7 @@ const Programme = ({ event }: { event: { id: string; timezone: string } }) => {
   const notes = useSessionNotes(event.id)
   const [filter, setFilter] = useState<Filter>('all')
 
-  const load = useCallback(
-    () => catalog.listSessions(event.id) as Promise<Session[]>,
-    [catalog, event.id],
-  )
+  const load = useCallback(() => catalog.listSessions(event.id), [catalog, event.id])
   // `emptyWhen` claims the no-programme case (FR-139) so it cannot be rendered as a bare
   // `ready` with an empty list — which would look identical to a failure that returned nothing.
   const sessions = useAsync<Session[]>(load, [load], {

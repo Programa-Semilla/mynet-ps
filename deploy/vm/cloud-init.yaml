@@ -1,0 +1,39 @@
+#cloud-config
+# First-boot configuration for a MyNet environment VM. Consumed by `az vm create --custom-data`.
+#
+# ASCII ONLY. The az CLI encodes --custom-data as latin-1, so a single non-ASCII character
+# anywhere in this file -- a comment counts -- aborts `az vm create` with an opaque codec error
+# that names no file. provision-vm.sh checks for that before calling az, and points at the byte.
+package_update: true
+package_upgrade: true
+
+packages:
+  - ca-certificates
+  - curl
+  - gnupg
+  - rsync
+  - postgresql-client
+  # backup.sh takes a single-run lock with flock. Without util-linux present the lock is silently
+  # unavailable and two overlapping cron runs would both write.
+  - util-linux
+
+runcmd:
+  # Docker from Docker's own repository rather than the distribution's: the distribution package
+  # lags, and `docker compose` (the plugin, not the standalone binary) is what every script here
+  # calls.
+  - install -m 0755 -d /etc/apt/keyrings
+  - curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+  - chmod a+r /etc/apt/keyrings/docker.asc
+  - >-
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc]
+    https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo $VERSION_CODENAME) stable"
+    > /etc/apt/sources.list.d/docker.list
+  - apt-get update
+  - apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+  # The admin user drives compose over SSH without sudo. Takes effect on the next login, which is
+  # after cloud-init finishes, so the first deploy is unaffected.
+  - usermod -aG docker azureuser
+  - systemctl enable --now docker
+  # Unattended security updates. This VM is publicly reachable and nobody is watching it.
+  - apt-get install -y unattended-upgrades
+  - dpkg-reconfigure -f noninteractive unattended-upgrades

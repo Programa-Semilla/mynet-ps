@@ -43,10 +43,10 @@ export const JoinConference = () => {
     setOutcome(null)
 
     try {
-      const result = (await identity.joinConference(joinCode)) as {
-        event: { name: string }
-        alreadyRegistered: boolean
-      }
+      // T012 (006) — no cast. `IdentityRepository.joinConference` answers `JoinResult`, and the
+      // registry now says so (FR-496). This site was not in the eleven files research D10
+      // counted; SC-414 asks for zero, so it goes with them.
+      const result = await identity.joinConference(joinCode)
 
       if (result.alreadyRegistered) {
         // Not an error (FR-312). Said plainly, and the person is left where they are rather

@@ -1,5 +1,7 @@
 import { createContext, type ReactNode } from 'react'
 
+import type { Repositories } from '@mynet/data'
+
 import type { DeviceServices } from './interfaces/index.js'
 
 /**
@@ -13,76 +15,44 @@ import type { DeviceServices } from './interfaces/index.js'
  * nested providers would mean eleven substitutions per test, and the substitutability claim
  * would be technically true and practically unusable.
  *
- * The repositories are typed structurally rather than imported from `@mynet/data`, so
- * `@mynet/platform` does not depend on `@mynet/data`. Both are leaves; the application root
- * is the only place that knows about both.
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ * **T009 (006) — THE REPOSITORIES ARE THE REAL INTERFACES NOW, NOT A STRUCTURAL MIRROR OF
+ * THEM** (FR-496, FR-497, research D10).
+ *
+ * This block used to declare every repository method by hand as `Promise<unknown>`, with a
+ * comment explaining that the mirroring existed "so `@mynet/platform` does not depend on
+ * `@mynet/data`. Both are leaves." That reasoning was about the **runtime** dependency graph,
+ * and `import type` is erased entirely at build time — so a `devDependency` plus a type-only
+ * import preserves exactly the property the comment was protecting.
+ *
+ * What the mirroring cost was **fifteen unchecked casts across eleven files**: every consumer
+ * of a repository hook wrote `(await repository.getOwn()) as OwnProfile` to recover the type
+ * this file had just discarded. Each one was a place where a genuine contract change would
+ * type-check and fail at runtime. `apps/web/tests/unit/repository-casts.test.ts` now asserts
+ * that none returns (SC-414).
+ *
+ * FR-497 required this before 006's own repository work, so that the directory repository is
+ * added to a registry that already carries real types rather than adding four more casts and
+ * then deleting them.
+ * ═════════════════════════════════════════════════════════════════════════════════════════
  */
 /** The conference content a surface can be reading, for the freshness question above. */
 export type ConferenceContent = 'programme' | 'tracks' | 'saved' | 'notes'
 
 export interface PlatformServices {
   readonly devices: DeviceServices
-  readonly repositories: {
-    readonly attendee: { getCurrent(): Promise<unknown> }
-    readonly events: { listRegistered(): Promise<unknown[]> }
-    /** 002 — the attendee's active conference, recorded or derived (FR-100–FR-104). */
-    readonly activeEvent: {
-      getActive(): Promise<unknown>
-      setActive(eventId: string): Promise<unknown>
-    }
-    /** 002 — the conference programme, per event and guarded server-side (FR-137-FR-140). */
-    readonly catalog: {
-      listSessions(eventId: string): Promise<unknown[]>
-      listTracks(eventId: string): Promise<unknown[]>
-    }
-    /**
-     * 005 — which sessions the attendee saved, per conference (FR-184–FR-188).
-     *
-     * Separate from `catalog` because the catalog is read-only in perpetuity and these are
-     * attendee state *about* its content (FR-191).
-     */
-    readonly savedSessions: {
-      listSaved(eventId: string): Promise<string[]>
-      save(eventId: string, sessionId: string): Promise<void>
-      unsave(eventId: string, sessionId: string): Promise<void>
-    }
-    /** 005 — the attendee's private notes, per conference (FR-207–FR-214). */
-    readonly sessionNotes: {
-      listNotes(eventId: string): Promise<unknown[]>
-      writeNote(eventId: string, sessionId: string, body: string): Promise<unknown>
-      deleteNote(eventId: string, sessionId: string): Promise<void>
-    }
-    /**
-     * 004 — becoming an attendee, recovering an account, and leaving (FR-300–FR-379).
-     *
-     * ─────────────────────────────────────────────────────────────────────────────────────
-     * **Not one method here takes an attendee identifier**, and on this interface that matters
-     * more than anywhere else in the registry: `deleteAccount` and `exportPersonalData` mean
-     * *the signed-in attendee's*, and there is no parameter in which a caller could name
-     * anybody else (FR-378, FR-385).
-     * ─────────────────────────────────────────────────────────────────────────────────────
-     */
-    readonly identity: {
-      signUp(account: { email: string; displayName: string; password: string }): Promise<void>
-      joinConference(joinCode: string): Promise<unknown>
-      withdrawFromConference(eventId: string): Promise<void>
-      verifyEmail(token: string): Promise<void>
-      resendVerification(): Promise<void>
-      requestPasswordReset(email: string): Promise<void>
-      resetPassword(token: string, password: string): Promise<void>
-      exportPersonalData(): Promise<unknown>
-      deleteAccount(): Promise<void>
-    }
-    /** 004 — the attendee's own profile, and only ever their own (FR-334–FR-363). */
-    readonly profile: {
-      getOwn(): Promise<unknown>
-      saveOwn(draft: unknown): Promise<unknown>
-      setDiscoverable(discoverable: boolean): Promise<unknown>
-      readOwnAvatar(): Promise<string | null>
-      uploadAvatar(image: Blob): Promise<void>
-      removeAvatar(): Promise<void>
-    }
-  }
+  /**
+   * Every repository, as its own interface declares it (FR-496).
+   *
+   * `Repositories` is `@mynet/data`'s own aggregate — the one declaration that stays in its
+   * barrel because it is the aggregate *of* the domains rather than a member of any one. A
+   * feature adding a domain adds it there, and this file needs no edit at all.
+   *
+   * **`import type` only.** Nothing here survives to runtime, so `@mynet/platform` still emits
+   * no `require` or `import` of `@mynet/data` and the two packages remain independent where
+   * that independence is actually observable.
+   */
+  readonly repositories: Repositories
   /**
    * 005 — **when the content currently on screen was retrieved** (FR-216, SC-204).
    *

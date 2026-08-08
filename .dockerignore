@@ -11,10 +11,30 @@ build
 coverage
 **/coverage
 
+# ═════════════════════════════════════════════════════════════════════════════════════════════
 # Secrets must never reach an image (FR-041).
+#
+# **`**/` IS LOAD-BEARING, and its absence was a real leak.** Docker matches these patterns with
+# `filepath.Match` semantics, in which `*` does not cross `/` — so a bare `.env` matches only the
+# context root. 006 builds the API image ON THE VM with `context: ../..` (deploy/vm/
+# docker-compose.yml), i.e. the directory that also contains `deploy/vm/.env` — that environment's
+# POSTGRES_PASSWORD, AUTH_PASSWORD_PEPPER and AUTH_ATTEMPT_HASH_KEY — and `deploy/vm/backups`,
+# up to seven `pg_dump` archives of the live database. Neither was excluded, and the build stage
+# is `COPY . .`, so every deploy baked both into a build-stage layer that `docker image prune -f`
+# does not remove.
+# ═════════════════════════════════════════════════════════════════════════════════════════════
 .env
 .env.*
+**/.env
+**/.env.*
 !.env.example
+!**/.env.example
+
+# The database's own backups, and the built client. Neither belongs in an API image, and the
+# first is every attendee row and every credential hash.
+deploy/vm/backups
+**/backups
+deploy/vm/web
 
 .git
 .github

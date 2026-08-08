@@ -115,6 +115,14 @@ export const testServices = (
       uploadAvatar: async () => {},
       removeAvatar: async () => {},
     },
+    // 006 — a conference where nobody else is discoverable, which is what an empty page is and
+    // what every seeded conference looks like before a second attendee turns discoverability
+    // on. An empty directory is a valid answer, not a failure, so the default resolves.
+    directory: {
+      list: async () => ({ attendees: [], nextCursor: null }),
+      get: async () => null,
+      readAvatar: async () => null,
+    },
     ...overrides,
   },
   // 005 — content is live in a component test unless a test says otherwise, so no staleness

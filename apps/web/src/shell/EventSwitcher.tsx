@@ -31,10 +31,7 @@ export const EventSwitcher = () => {
   const eventsRepository = useEventsRepository()
   const { state: active, switchTo } = useActiveEventContext()
 
-  const load = useCallback(
-    () => eventsRepository.listRegistered() as Promise<Event[]>,
-    [eventsRepository],
-  )
+  const load = useCallback(() => eventsRepository.listRegistered(), [eventsRepository])
   const events = useAsync<Event[]>(load, [load])
 
   const [open, setOpen] = useState(false)

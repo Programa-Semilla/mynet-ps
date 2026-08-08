@@ -4,7 +4,30 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { HomeShell } from '../src/app/home/HomeShell.js'
 import { HOME_CARDS } from '../src/app/home/registry.js'
-import { aSession, SUMMIT, testServices, WithServices } from './support/services.js'
+import { aSession, EMPTY_PROFILE, SUMMIT, testServices, WithServices } from './support/services.js'
+
+/**
+ * 006 — the profile double, and a reader who has set interests.
+ *
+ * The People to meet card reads the reader's own profile for exactly one reason: FR-449 needs
+ * "you have set no interests" told apart from "nobody to suggest", and the listing alone cannot
+ * distinguish them. Every scenario below therefore has to say which of the two it means.
+ */
+const PROFILE_DOUBLE = testServices().repositories.profile
+const PROFILE_WITH_INTERESTS = { ...EMPTY_PROFILE, interests: ['Design systems'] }
+
+const SUGGESTION = {
+  attendeeId: 'aaaaaaaa-1111-4111-8111-111111111111',
+  displayName: 'Trina Three',
+  company: 'Overlap Maximal',
+  role: 'Principal Engineer',
+  headline: null,
+  networkingIntent: null,
+  availability: null,
+  interests: ['Design systems'],
+  sharedInterestCount: 1,
+  avatar: null,
+} as const
 
 /**
  * T078 (002) — **every registered card renders a visible, meaningful state in all four of
@@ -36,6 +59,17 @@ const SCENARIOS = {
       save: async () => {},
       unsave: async () => {},
     },
+    // 006 — driven for the same reason 005's is, and this file's own header predicted it: "a
+    // card added in feature 006 will inherit the mechanism automatically and can still forget to
+    // render an empty state." It cannot forget, but it *can* be left reading a default double
+    // that never changes — in which case the matrix records one state four times and reports
+    // green.
+    directory: {
+      list: () => new Promise<never>(() => {}),
+      get: () => new Promise<never>(() => {}),
+      readAvatar: () => new Promise<never>(() => {}),
+    },
+    profile: { ...PROFILE_DOUBLE, getOwn: () => new Promise<never>(() => {}) },
   }),
   populated: () => ({
     events: { listRegistered: async () => [SUMMIT] },
@@ -65,11 +99,27 @@ const SCENARIOS = {
       save: async () => {},
       unsave: async () => {},
     },
+    // A reader with interests and somebody to meet, so 006's card renders its populated body
+    // rather than either of its two empty ones.
+    directory: {
+      list: async () => ({ attendees: [SUGGESTION], nextCursor: null }),
+      get: async () => null,
+      readAvatar: async () => null,
+    },
+    profile: { ...PROFILE_DOUBLE, getOwn: async () => PROFILE_WITH_INTERESTS },
   }),
   empty: () => ({
     events: { listRegistered: async () => [] },
     catalog: { listSessions: async () => [], listTracks: async () => [] },
     savedSessions: { listSaved: async () => [], save: async () => {}, unsave: async () => {} },
+    // Nobody to suggest — and the reader still has interests, so this is the *directory* empty
+    // state rather than the no-interests one. Both are 006's, and they are different facts.
+    directory: {
+      list: async () => ({ attendees: [], nextCursor: null }),
+      get: async () => null,
+      readAvatar: async () => null,
+    },
+    profile: { ...PROFILE_DOUBLE, getOwn: async () => PROFILE_WITH_INTERESTS },
   }),
   failed: () => ({
     events: {
@@ -92,6 +142,14 @@ const SCENARIOS = {
       save: async () => {},
       unsave: async () => {},
     },
+    directory: {
+      list: async () => {
+        throw new Error('server fault')
+      },
+      get: async () => null,
+      readAvatar: async () => null,
+    },
+    profile: { ...PROFILE_DOUBLE, getOwn: async () => PROFILE_WITH_INTERESTS },
   }),
 } as const
 

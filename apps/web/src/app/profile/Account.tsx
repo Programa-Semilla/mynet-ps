@@ -30,7 +30,7 @@ export const Account = () => {
 
   const load = useCallback(async () => {
     try {
-      const own = (await repository.getOwn()) as OwnProfile
+      const own = await repository.getOwn()
       setProfile(own)
     } catch (error) {
       setLoadFailure(
@@ -348,7 +348,7 @@ const DiscoverabilityControl = ({ profile }: { profile: OwnProfile }) => {
       // The server's answer replaces the local one wholesale — the state comes from a confirmed
       // response rather than from what was just clicked, which is what keeps this
       // non-optimistic and what makes `effectivelyVisible` trustworthy.
-      setState((await repository.setDiscoverable(discoverable)) as Discoverability)
+      setState(await repository.setDiscoverable(discoverable))
     } catch (error) {
       setFailure(
         error instanceof OfflineError

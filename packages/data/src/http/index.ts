@@ -16,6 +16,8 @@ export { HttpSavedSessionRepository, HttpSessionNotesRepository } from './agenda
 // 004 — identity and the attendee's own profile.
 export { HttpIdentityRepository } from './identity-repository.js'
 export { HttpProfileRepository } from './profile-repository.js'
+// 006 — the Discover directory. One new route plus 004's two profile reads, used unchanged.
+export { HttpDirectoryRepository } from './directory-repository.js'
 // 005 — the caching decorator. Applied at the composition root, so no component learns that a
 // cache exists (research D1, Principle V).
 export {

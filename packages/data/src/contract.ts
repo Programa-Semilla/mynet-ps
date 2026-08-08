@@ -1,5 +1,13 @@
 import type { components, paths } from './generated/api.js'
-import type { Attendee, Event, Session, SessionNote, Track } from './interfaces/index.js'
+import type {
+  Attendee,
+  DirectoryEntry,
+  Event,
+  Session,
+  SessionNote,
+  Track,
+  VisibleProfile,
+} from './interfaces/index.js'
 
 /**
  * T042a — bind the client's domain types to the generated contract types.
@@ -97,5 +105,60 @@ export type _NotesMatchContract = Satisfies<
   Omit<SessionNote, 'sessionId'> & { sessionId: string }
 >
 export type _WriteNoteConfirms = Satisfies<WriteNoteResponse, { updatedAt: string }>
+
+/** Response bodies of the directory reads (006, T048). */
+export type DirectoryResponse =
+  paths['/events/{eventId}/attendees']['get']['responses'][200]['content']['application/json']
+
+export type VisibleProfileResponse =
+  paths['/events/{eventId}/attendees/{attendeeId}']['get']['responses'][200]['content']['application/json']
+
+/**
+ * 006 — the directory entry, minus its avatar.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ * **`avatar` is deliberately excluded from this binding, and the exclusion is the interesting
+ * part.** On the wire it is `{ contentType, base64 } | null`; in the domain type it is a data
+ * URL, because `HttpDirectoryRepository` converts it at the transport boundary so presentation
+ * code never learns that a network exists (Principle V). Binding it would assert that the two
+ * are the same shape, which they must not be.
+ *
+ * Everything else is bound. If the route stopped sending `sharedInterestCount` — the number
+ * FR-412 puts on the card and FR-411 ranks by — this is what would notice, at build time,
+ * rather than a directory rendering with no reason to meet anybody.
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ */
+export type _DirectoryEntryMatchesContract = Satisfies<
+  Omit<DirectoryResponse['attendees'][number], 'avatar'>,
+  Omit<DirectoryEntry, 'avatar'>
+>
+
+// 006 — `nextCursor` is nullable and must stay so: a non-nullable cursor would give the client
+// no way to know it had reached the end except by reading an empty page.
+export type _DirectoryPagesAreCursored = Satisfies<
+  DirectoryResponse['nextCursor'],
+  string | null | undefined
+>
+
+/**
+ * 006 — the profile view is built on 004's read **unchanged** (research D14), so this binding is
+ * what would notice if a later feature "helpfully" added a field to it or removed one.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ * **`Required<>` here, and not on the directory binding above, for a stated reason.** 004's
+ * route lists only four properties in its schema's `required`, so the generated type marks the
+ * nullable ones optional. 006's own route lists all of them, because it can — it is this
+ * feature's route to declare. Reusing 004's read *unchanged* is a requirement (FR-431), and
+ * tightening its `required` would be a change to it, so the binding adapts instead.
+ *
+ * `Required<>` keeps every `| null`; it only asserts that when a field is present it has the
+ * declared shape. A removed or retyped field still fails to compile, which is the property this
+ * file exists for.
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ */
+export type _VisibleProfileMatchesContract = Satisfies<
+  Required<VisibleProfileResponse>,
+  VisibleProfile
+>
 
 export type { components, paths }

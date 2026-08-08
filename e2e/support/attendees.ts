@@ -62,6 +62,39 @@ export const switchToAnotherConference = async (
   return target
 }
 
+/**
+ * Makes a NAMED conference the active one, switching only if it is not already.
+ *
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ * **A SPEC THAT DEPENDS ON *WHICH* CONFERENCE IS ACTIVE MUST SAY SO, AND THIS IS HOW.**
+ *
+ * The active conference is durable by design (FR-104) and the end-to-end database is seeded
+ * once for the whole run — so a spec that ran earlier and switched conferences has changed the
+ * starting state of every spec after it. `switchToAnotherConference` above records the same
+ * hazard from the other direction.
+ *
+ * 006 is where this stopped being theoretical: the Discover specs need Ada in `Product & Design
+ * Summit`, because that is the conference she shares with Grace. Run alone they passed; run
+ * after the agenda specs — which switch her to `Frontend Horizons` — the directory was correctly
+ * empty and every assertion failed. The suite was right and the specs were wrong.
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ *
+ * Idempotent, so calling it costs nothing when the conference is already active. Asserted on
+ * the switcher's accessible name rather than on any content, so it does not depend on what the
+ * destination underneath happens to be rendering.
+ */
+export const useConference = async (page: Page, name: string): Promise<void> => {
+  const trigger = page.getByRole('button', { name: /change conference/i })
+  await expect(trigger).toBeVisible()
+
+  const current = (await trigger.getAttribute('aria-label')) ?? ''
+  if (current.includes(name)) return
+
+  await trigger.click()
+  await page.getByRole('menuitemradio', { name: new RegExp(name) }).click()
+  await expect(trigger).toHaveAccessibleName(new RegExp(name))
+}
+
 /** Fills and submits the sign-in form, and waits until the workspace has rendered. */
 export const signIn = async (page: Page, attendee: SeededAttendee): Promise<void> => {
   await page.getByLabel('Email address').fill(attendee.email)

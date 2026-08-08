@@ -10,6 +10,7 @@ import { verifyRoutes } from './auth/verify.js'
 import { agendaRoutes } from './events/agenda.js'
 import { attendeeProfileRoutes } from './events/attendees.js'
 import { catalogRoutes } from './events/catalog.js'
+import { directoryRoutes } from './events/directory.js'
 import { joinRoutes } from './events/join.js'
 import { eventRoutes } from './events.js'
 import { healthRoutes } from './health.js'
@@ -80,4 +81,9 @@ export const ROUTES: readonly RoutePlugin[] = [
   // 004 — the personal-data export, and (from US7) deletion. Both bound to the session with no
   // identifier in the address, which is FR-378's refusal expressed as an absence.
   accountRoutes,
+  // 006 — the Discover directory. **Appended, never inserted**, for the reason every entry
+  // above states: the generated contract lists paths in observation order. It carries `:eventId`
+  // and therefore acquires `requireEventAccess` and the branded scope, which the route audit
+  // fails the build for omitting (research D14).
+  directoryRoutes,
 ]

@@ -18,7 +18,7 @@ import {
 } from '../db/schema/profiles.js'
 import { imageTooLarge, imageUnreadable, notFound, tooManyAttempts } from '../errors.js'
 import { processAvatar, UnreadableImageError } from '../images/avatar.js'
-import { avatarObjectKey } from '../storage/service.js'
+import { avatarObjectKey, cardKeyFor } from '../storage/service.js'
 
 /**
  * T071 (004) — the attendee's own profile (FR-334–FR-341).
@@ -477,8 +477,23 @@ const avatarRoutes = async (app: FastifyInstance): Promise<void> => {
       // who had its key, which is precisely what "the previous bytes are no longer retrievable"
       // rules out. Overwriting means there is never a second copy to forget about.
       // ───────────────────────────────────────────────────────────────────────────────────
+      // ───────────────────────────────────────────────────────────────────────────────────
+      // T024 (006) — **both renditions are written here**, from the one decode (FR-457, D2).
+      //
+      // Upload time rather than read time, and the objection to that is backfill: what about
+      // avatars stored before this change? There are none. `register entry 11` and this repo's
+      // own history both record that **the product has never been deployed**, so the only
+      // databases holding an avatar are development and test ones built from a seed that
+      // regenerates. `routes/events/directory.ts` carries a read-path repair for a developer
+      // whose database predates this, and that is all it is for.
+      //
+      // Deriving only on read was rejected: it would put image processing on the hot path of
+      // the one request FR-456 exists to make cheap, and would need a cache not to repeat —
+      // a second mechanism where FR-466 already forbids caching.
+      // ───────────────────────────────────────────────────────────────────────────────────
       const key = avatarObjectKey(attendeeId)
-      await app.storage.put(key, processed.bytes, processed.contentType)
+      await app.storage.put(key, processed.profile.bytes, processed.profile.contentType)
+      await app.storage.put(cardKeyFor(key), processed.card.bytes, processed.card.contentType)
       await setAvatarObjectKey(attendeeId, key)
 
       return reply.status(204).send()
@@ -510,7 +525,13 @@ const avatarRoutes = async (app: FastifyInstance): Promise<void> => {
       // Object first, then the row — the same ordering the account-deletion path uses and for
       // the same reason: a failure between the two must leave a row pointing at missing bytes
       // (recoverable, renders the fallback) rather than bytes no row references (unreachable).
-      await app.storage.delete(avatarObjectKey(attendeeId))
+      //
+      // T024 (006) — **both renditions**. Removing an avatar and leaving the card copy behind
+      // would keep the attendee's face in every co-attendee's directory after they had removed
+      // it, which is the same regression FR-460 forbids on the deletion path.
+      const key = avatarObjectKey(attendeeId)
+      await app.storage.delete(key)
+      await app.storage.delete(cardKeyFor(key))
       await setAvatarObjectKey(attendeeId, null)
 
       return reply.status(204).send()

@@ -132,8 +132,25 @@ export const registrations = pgTable(
   (table) => [
     // An attendee attends an event once.
     unique('registrations_attendee_event_unique').on(table.attendeeId, table.eventId),
-    // Every read of this table is "the authenticated attendee's registrations".
+    /**
+     * ───────────────────────────────────────────────────────────────────────────────────────
+     * **T014 (006) — this comment used to read "Every read of this table is 'the authenticated
+     * attendee's registrations'", AND THAT IS NO LONGER TRUE.**
+     *
+     * 006's directory reads this table **by conference**: "who else is registered for the event
+     * I am looking at". That is the opposite access path, and neither existing index serves it —
+     * this one leads with `attendee_id`, and so does the composite unique above, so a
+     * conference-wide read scans.
+     *
+     * Both indexes are kept because both reads exist. This one still serves every 001–005 read;
+     * `registrations_event_id_idx` below is the directory's primary access path (research D11).
+     * A later feature adding a third access path should add a third index rather than
+     * repurposing either, and should correct this comment again if it stops being true.
+     * ───────────────────────────────────────────────────────────────────────────────────────
+     */
     index('registrations_attendee_id_idx').on(table.attendeeId),
+    // T014 (006) — the directory's primary access path: every attendee at one conference.
+    index('registrations_event_id_idx').on(table.eventId),
   ],
 )
 

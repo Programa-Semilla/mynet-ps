@@ -20,6 +20,7 @@ import authContext from './plugins/auth-context.js'
 import errors from './plugins/errors.js'
 import eventAccess from './plugins/event-access.js'
 import ports, { type PortOverrides } from './plugins/ports.js'
+import securityHeaders from './plugins/security-headers.js'
 import swagger from './plugins/swagger.js'
 import { ROUTES } from './routes/index.js'
 
@@ -132,6 +133,17 @@ export const buildApp = async (options: BuildAppOptions = {}): Promise<FastifyIn
     // green test suite and a broken browser.
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
   })
+
+  // 2a. T063 (006) — security response headers on **every** API response (FR-480, research D8).
+  //
+  //     Before the error handler on purpose. The hook runs `onSend`, so it applies to whatever
+  //     the response turned out to be — including a 500 shaped by step 3 and a 401 from a guard.
+  //     A header set only on the success path is a header absent from exactly the responses an
+  //     attacker is most interested in.
+  //
+  //     The API sets its own; Caddy sets the static document's. Neither sets the other's — which
+  //     is what makes these assertable by the integration suite with no proxy in front (SC-411).
+  await app.register(securityHeaders)
 
   // 3. Error handling. Registered before routes so that a failure *inside* route
   //    registration is still shaped by FR-059/FR-060 rather than leaking a stack trace.

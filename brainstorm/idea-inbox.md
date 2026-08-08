@@ -173,3 +173,39 @@ An entry is removed once a brainstorm document has been written from it.
 - **Summary**: Every component query for the deletion confirmation uses `getByRole('dialog', { hidden: true })`, which proves the component mounted the dialog but not that `showModal()` ran or that it is `open`.
 
 > Informational rather than a defect: the real guarantees — visible dialog, Escape dismissal, focus restoration to the opener — are correctly proved in a browser by the e2e accessibility and journey specs, and `tests/setup.ts` documents at length why the jsdom shim must not be trusted for modality. Worth revisiting because 005's session-panel component tests asserted the shim's `data-modal` marker to distinguish `showModal` from `show`, and 004's dialog — the more consequential one, since it guards account deletion — does not.
+
+### directory-listing-throttle
+
+- **Source**: deep-review
+- **Date**: 2026-08-07
+- **Reference**: feat/006-discover-and-deployment-platform
+- **Summary**: The directory listing carries no rate limit, so anyone who self-signs-up and enters a world-readable join code can harvest a whole conference at 100 rows per request.
+
+> FR-404 deliberately concedes that a listing discloses the discoverable-and-verified set — but what it concedes to a human browsing is not what it concedes to a machine collecting 1,000 names, employers, roles, headlines, interests and faces in ten cheap keyset-paged requests. The join route already carries its own per-action counter, so the mechanism exists.
+
+### backups-share-a-failure-domain
+
+- **Source**: deep-review
+- **Date**: 2026-08-07
+- **Reference**: feat/006-discover-and-deployment-platform
+- **Summary**: Every backup artifact stays on the same VM and disk as the live database, so the most likely event a daily backup is kept for destroys the database and all seven artifacts together.
+
+> Standing decision 17 made backups a governance obligation precisely because no vendor is doing it. The schedule and the written retention period are discharged; the purpose is only partly. Closing it means an off-host copy after the verification gate and before pruning, with local pruning conditional on a confirmed remote copy.
+
+### unbounded-directory-accumulation
+
+- **Source**: deep-review
+- **Date**: 2026-08-07
+- **Reference**: feat/006-discover-and-deployment-platform
+- **Summary**: The rendered directory list grows without a ceiling, each entry carrying an inline base64 avatar, with no virtualisation.
+
+> At FR-401c's stated 1,000 attendees a reader who pages to the end holds megabytes of base64 plus a thousand decoded bitmaps and DOM subtrees, on a phone at a venue. The explicit "Show more" control makes this degrade gradually rather than at once. FR-466 forbids caching, not windowing, so trimming the retained list is available and the keyset cursor makes it recoverable.
+
+### read-path-avatar-repair-yagni
+
+- **Source**: deep-review
+- **Date**: 2026-08-07
+- **Reference**: feat/006-discover-and-deployment-platform
+- **Summary**: The directory's read-path avatar repair decodes an image and writes to storage during a GET, for a case its own comment says does not exist.
+
+> The comment states there is no production avatar to backfill because the product has never been deployed, and that the repair exists only for a developer whose database predates the change — who is equally served by re-running the seed. It is now concurrency-bounded, but it remains a request path that mutates storage, which contradicts the upload-time decision recorded beside it.

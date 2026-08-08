@@ -28,6 +28,8 @@ export {
   useCatalogRepository,
   useConnectivity,
   useContactShare,
+  // 006 — the Discover directory.
+  useDirectoryRepository,
   useEventsRepository,
   useFreshness,
   useIdentityRepository,

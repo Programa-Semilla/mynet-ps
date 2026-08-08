@@ -162,11 +162,15 @@ describe('an upload that violates the stated limits is refused (FR-347)', () => 
       .toBuffer()
 
     expect((await upload(good)).statusCode).toBe(204)
-    expect(await storedCount()).toBe(1)
+    // TWO since 006: the profile rendition and the card rendition the directory embeds
+    // (FR-457). The count is what carries the assertion — a refused upload must change it
+    // neither up nor down, and "some avatar bytes exist" would not catch a refusal that
+    // removed one rendition and left the other.
+    expect(await storedCount()).toBe(2)
 
     await upload(Buffer.from('not an image'))
 
-    expect(await storedCount()).toBe(1)
+    expect(await storedCount()).toBe(2)
     const profile = await app.inject({
       method: 'GET',
       url: '/profile',

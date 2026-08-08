@@ -109,7 +109,7 @@ export const ActiveEventProvider = ({ children }: { children: ReactNode }) => {
           applied.current = sequence
           setResolved({
             attendeeId: forAttendeeId,
-            state: event ? { status: 'ready', event: event as Event } : { status: 'none' },
+            state: event ? { status: 'ready', event } : { status: 'none' },
           })
         })
         .catch((error: unknown) => {
@@ -215,7 +215,7 @@ export const ActiveEventProvider = ({ children }: { children: ReactNode }) => {
       // No optimistic update. Nothing is shown as switched before the server confirms it, which
       // is what keeps this reconciliation rather than an optimistic write — the distinction
       // matters, because the latter would need its own recorded decision under Principle VI.
-      const recorded = (await repository.setActive(eventId)) as Event
+      const recorded = await repository.setActive(eventId)
 
       // A slower earlier request must not overwrite a faster later one.
       if (sequence >= applied.current) {

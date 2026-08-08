@@ -1,7 +1,7 @@
 import { sql } from 'drizzle-orm'
 
 import { assertVerifiedScope, type EventScope } from '../../plugins/event-access.js'
-import { avatarObjectKey, type StorageService } from '../../storage/service.js'
+import { avatarObjectKey, cardKeyFor, type StorageService } from '../../storage/service.js'
 import { getDb } from '../client.js'
 
 /**
@@ -281,9 +281,25 @@ export const deleteAccount = async (
   attendeeId: string,
   storage: StorageService,
 ): Promise<boolean> => {
-  // Unconditional: `delete` is idempotent, so an attendee who never uploaded anything does not
-  // need a branch, and a row whose key was somehow lost still has its bytes removed.
-  await storage.delete(avatarObjectKey(attendeeId))
+  // ───────────────────────────────────────────────────────────────────────────────────────
+  // T025 (006) — **every rendition, not only the profile one** (FR-460, SC-408).
+  //
+  // 006 adds a second stored rendition of the same image. A deletion path that removed only the
+  // 512px object would leave the attendee's face in the directory's card payload after their
+  // account was gone — **a silent regression of a guarantee 004 shipped**, and one nothing would
+  // report: the profile would 404 correctly while the face went on being served.
+  //
+  // The card key is **derived** (research D3) rather than read from a column, so this reaches it
+  // from the attendee identifier alone. That is the point of the derivation: deletion cannot
+  // depend on a column being correct, because a drifted key would leave bytes behind with no row
+  // left to find them from.
+  //
+  // Unconditional, and `delete` is idempotent: an attendee who never uploaded anything needs no
+  // branch, and a row whose key was somehow lost still has its bytes removed.
+  // ───────────────────────────────────────────────────────────────────────────────────────
+  const avatarKey = avatarObjectKey(attendeeId)
+  await storage.delete(avatarKey)
+  await storage.delete(cardKeyFor(avatarKey))
 
   const rows = await getDb().execute<{ id: string }>(sql`
     DELETE FROM attendees WHERE id = ${attendeeId}::uuid RETURNING id
