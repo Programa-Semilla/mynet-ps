@@ -34,6 +34,26 @@ export type {
   ProfileRepository,
 } from './interfaces/index.js'
 
+// 006 — the Discover directory. Appended likewise, for the same reason.
+export type {
+  DirectoryEntry,
+  DirectoryPage,
+  DirectoryQuery,
+  DirectoryRepository,
+  VisibleProfile,
+} from './interfaces/index.js'
+
+/**
+ * T009 (006) — the aggregate, exported from the root barrel for the first time (FR-496).
+ *
+ * `@mynet/platform`'s registry used to mirror every repository method by hand as
+ * `Promise<unknown>`, and fifteen casts across eleven files existed to undo that. It now takes
+ * a **type-only** dependency on this package and names this type directly, so the mirror — and
+ * every cast that paid for it — is gone. Nothing is added to the runtime dependency graph:
+ * `import type` is erased at build time.
+ */
+export type { Repositories } from './interfaces/index.js'
+
 export {
   NotAuthenticatedError,
   OfflineError,

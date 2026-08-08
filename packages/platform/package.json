@@ -17,6 +17,7 @@
   },
   "devDependencies": {
     "@mynet/config": "workspace:*",
+    "@mynet/data": "workspace:*",
     "@types/react": "^19.2.18",
     "typescript": "6.0.3"
   }

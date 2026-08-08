@@ -55,6 +55,25 @@ const nonNegativeInt = (name: string, fallback: number): number => {
 export interface AppConfig {
   readonly nodeEnv: 'development' | 'test' | 'production'
   readonly isProduction: boolean
+  /**
+   * T065 (006) — **whether this process is running in a deployed environment** (FR-478).
+   *
+   * ───────────────────────────────────────────────────────────────────────────────────────
+   * **Deliberately the INVERSE of "is local development", not a synonym for `isProduction`.**
+   *
+   * The session cookie's `Secure` attribute was gated on `isProduction`, which is a statement
+   * about a name rather than about a deployment. UAT is a real, publicly reachable environment
+   * carrying realistically-shaped attendee data over HTTPS, and every environment this project
+   * deploys is one of exactly two — so anything that is not the developer's machine or the test
+   * suite is deployed, and must send `Secure`.
+   *
+   * Expressed as `nodeEnv !== 'development' && nodeEnv !== 'test'` rather than as
+   * `nodeEnv === 'production'` so that **a new environment name defaults to secure**. A future
+   * `staging` would otherwise silently serve a non-`Secure` session cookie, which is precisely
+   * the failure mode this framing removes.
+   * ───────────────────────────────────────────────────────────────────────────────────────
+   */
+  readonly isDeployed: boolean
   readonly host: string
   readonly port: number
   readonly webOrigin: string
@@ -124,6 +143,22 @@ export interface AppConfig {
     readonly maxUploadBytes: number
     /** The bounded square an accepted image is resized to (FR-348). */
     readonly dimensionPx: number
+    /**
+     * T021 (006) — the **card**-sized square, embedded in the directory listing (FR-457, D2).
+     *
+     * ───────────────────────────────────────────────────────────────────────────────────────
+     * A second rendition rather than serving the profile one smaller, because FR-456 delivers
+     * every face **inside the listing response** — one request for a page of 24, not 25. At
+     * quality 82 a 96px square is roughly 3–5 KB, so twenty-four base64-encoded are on the order
+     * of 150 KB; twenty-four 512px renditions would be about a megabyte, on a conference
+     * connection, for images rendered at a fraction of that size.
+     *
+     * Configurable exactly as `dimensionPx` is, and for the same reason: it is a capacity
+     * decision rather than a security boundary. The accepted *formats* remain non-configurable
+     * — see the note above.
+     * ───────────────────────────────────────────────────────────────────────────────────────
+     */
+    readonly cardDimensionPx: number
   }
   readonly mail: {
     /**
@@ -165,6 +200,9 @@ export const loadConfig = (): AppConfig => {
   cached = {
     nodeEnv,
     isProduction: nodeEnv === 'production',
+    // Not `=== 'production'`: see `isDeployed` on the interface. A new environment name must
+    // default to secure rather than to insecure.
+    isDeployed: nodeEnv !== 'development' && nodeEnv !== 'test',
     host: optional('API_HOST', '0.0.0.0'),
     port: positiveInt('API_PORT', 3000),
     webOrigin: optional('WEB_ORIGIN', 'http://localhost:5173'),
@@ -208,6 +246,8 @@ export const loadConfig = (): AppConfig => {
       // A single bounded size, not a set of resolutions (Assumptions). 512px covers a
       // retina-density avatar at every place a profile renders today.
       dimensionPx: positiveInt('AVATAR_DIMENSION_PX', 512),
+      // 006 — the card rendition. 96px covers a 48px card avatar at 2× density.
+      cardDimensionPx: positiveInt('AVATAR_CARD_DIMENSION_PX', 96),
     },
     mail: {
       from: optional('MAIL_FROM', 'MyNet <no-reply@mynet.invalid>'),

@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm'
+import { eq, inArray } from 'drizzle-orm'
 
 import { getDb } from '../db/client.js'
 import { storedObjects } from '../db/schema/stored-objects.js'
@@ -38,6 +38,31 @@ export class DbStorageService implements StorageService {
         target: storedObjects.key,
         set: { bytes, contentType, createdAt: new Date() },
       })
+  }
+
+  /**
+   * One statement for many keys — `WHERE key = ANY(...)` rather than N single-row lookups.
+   *
+   * The directory embeds a card rendition per attendee (FR-456), so the page's faces are
+   * resolved together or not at all. See the interface for why this method exists.
+   */
+  async getMany(keys: readonly string[]): Promise<ReadonlyMap<string, StoredBytes>> {
+    const found = new Map<string, StoredBytes>()
+    if (keys.length === 0) return found
+
+    const rows = await getDb()
+      .select({
+        key: storedObjects.key,
+        bytes: storedObjects.bytes,
+        contentType: storedObjects.contentType,
+      })
+      .from(storedObjects)
+      .where(inArray(storedObjects.key, [...new Set(keys)]))
+
+    for (const row of rows) {
+      found.set(row.key, { bytes: row.bytes, contentType: row.contentType })
+    }
+    return found
   }
 
   async get(key: string): Promise<StoredBytes | null> {

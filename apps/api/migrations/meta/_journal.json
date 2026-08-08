@@ -36,6 +36,13 @@
       "when": 1786107373908,
       "tag": "0004_saved_sessions_and_notes",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1786146484684,
+      "tag": "0005_directory_indexes",
+      "breakpoints": true
     }
   ]
 }

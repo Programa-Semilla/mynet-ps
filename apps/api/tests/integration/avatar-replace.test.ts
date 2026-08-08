@@ -4,6 +4,7 @@ import sharp from 'sharp'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 
 import { getDb } from '../../src/db/client.js'
+import { cardKeyFor } from '../../src/storage/service.js'
 import {
   ADA,
   clearThrottle,
@@ -87,7 +88,23 @@ describe('replacing and removing an avatar (FR-350, FR-351)', () => {
   const served = async () =>
     app.inject({ method: 'GET', url: '/profile/avatar', headers: { cookie: cookieHeader(ada) } })
 
-  it('keeps exactly ONE stored object however many times the avatar is replaced', async () => {
+  /**
+   * ───────────────────────────────────────────────────────────────────────────────────────
+   * **006 changed the expected count from one to two, and the property under test is
+   * unchanged.**
+   *
+   * 004 stored one rendition per attendee; 006 stores two — the 512px profile rendition and a
+   * 96px card rendition embedded in the directory listing (FR-457, research D2). So "exactly
+   * one" became "exactly two", and it would have been easy to relax this to "at most a few"
+   * and lose the assertion entirely.
+   *
+   * What FR-350 actually requires is that the count **does not grow with the number of
+   * uploads**: a fresh key per upload would leave every previous photograph retrievable by
+   * anyone holding its key, including the one somebody replaced *because* they wanted it gone.
+   * Both keys are derived from the attendee, so both overwrite. Three uploads, two objects.
+   * ───────────────────────────────────────────────────────────────────────────────────────
+   */
+  it('keeps exactly one object PER RENDITION however many times the avatar is replaced', async () => {
     await upload(await solid(255, 0, 0))
     await upload(await solid(0, 255, 0))
     await upload(await solid(0, 0, 255))
@@ -98,7 +115,14 @@ describe('replacing and removing an avatar (FR-350, FR-351)', () => {
       stored,
       'A fresh key per upload would leave every previous photograph retrievable by anyone who ' +
         'held its key — including the one somebody replaced BECAUSE they wanted it gone (FR-350).',
-    ).toHaveLength(1)
+    ).toHaveLength(2)
+
+    // Related, not merely counted: two objects could also be one attendee's avatar plus a
+    // stray. The card key is DERIVED from the profile key (research D3), and asserting that
+    // relation is what proves deletion can reach it from the attendee identifier alone.
+    const [profileKey, cardKey] = stored.map((object) => object.key)
+    expect(profileKey).toMatch(/^avatars\//)
+    expect(cardKey).toBe(cardKeyFor(profileKey as string))
   })
 
   it('makes the previous bytes unretrievable, not merely unreferenced', async () => {
@@ -137,7 +161,7 @@ describe('replacing and removing an avatar (FR-350, FR-351)', () => {
 
   it('removes the bytes and restores the fallback (FR-351)', async () => {
     await upload(await solid(120, 120, 120))
-    expect(await objects()).toHaveLength(1)
+    expect(await objects(), 'both renditions are stored (006, FR-457)').toHaveLength(2)
 
     const removed = await app.inject({
       method: 'DELETE',
@@ -205,7 +229,7 @@ describe('replacing and removing an avatar (FR-350, FR-351)', () => {
 
     // Grace removing hers must not remove Ada's — the key is derived from the session's
     // attendee, so there is no path by which one caller reaches another's object.
-    expect(await objects()).toHaveLength(1)
+    expect(await objects(), "Ada's two renditions survive Grace's removal").toHaveLength(2)
     expect((await served()).statusCode).toBe(200)
   })
 })

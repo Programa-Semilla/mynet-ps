@@ -113,6 +113,37 @@ describe('event scope route audit', () => {
     ).toBeGreaterThan(0)
   })
 
+  /**
+   * T043 (006) — **the directory listing is covered by this audit, and would fail without the
+   * guard** (FR-402, research D14).
+   *
+   * ─────────────────────────────────────────────────────────────────────────────────────────
+   * The generic assertion below already covers it: `/events/:eventId/attendees` matches
+   * `EVENT_PARAM`, so a version registered without `requireEventAccess` lands in `unguarded`
+   * and fails the build. This names it anyway, because "the audit covers the new route" and
+   * "the audit happens to match a pattern the new route also matches" are different claims, and
+   * only the first survives someone renaming the route to `/events/:eventId/directory`.
+   *
+   * The reader-side condition of FR-402 is therefore enforced by CI rather than by anyone
+   * remembering it — which is the whole reason 006 puts the listing under `:eventId` at all.
+   * ─────────────────────────────────────────────────────────────────────────────────────────
+   */
+  it("carries the guard on 006's directory listing, specifically (FR-402)", () => {
+    const listing = routes.find(
+      (route) => route.url === '/events/:eventId/attendees' && methodsOf(route).includes('GET'),
+    )
+
+    expect(
+      listing,
+      'The directory listing is missing from the route table. If it moved, move this assertion ' +
+        'with it — do not delete it: the reader-side half of FR-402 is enforced here and ' +
+        'nowhere else.',
+    ).toBeDefined()
+
+    expect(preHandlersOf(listing as RouteOptions)).toContain(requireEventAccess)
+    expect(preHandlersOf(listing as RouteOptions)).toContain(requireAttendee)
+  })
+
   it('every route accepting a conference identifier carries the access guard', () => {
     const unguarded = routes
       .filter(acceptsEventIdentifier)
@@ -268,6 +299,21 @@ describe('event scope route audit', () => {
     /** Each entry states why it cannot require a session. The list must stay this short. */
     const DELIBERATELY_UNAUTHENTICATED = new Map([
       ['GET /health', 'Liveness. Touches no attendee data and no database row.'],
+      /**
+       * 006 — readiness. **This entry is the audit doing its job**, and it is worth saying
+       * so: `/ready` was added, this test failed, and the reason had to be written down before
+       * it could pass. That is the mechanism FR-387 asks for.
+       *
+       * It cannot require a session, because it is what a *deployment* gates on — nothing has
+       * signed in at the moment it is called (SC-412). It performs one `select 1` and reports
+       * the word "database"; it reads no attendee row and discloses no host, port or driver
+       * message.
+       */
+      [
+        'GET /ready',
+        'Readiness. Called by the deployment before any attendee is signed in, so it cannot ' +
+          'require a session (FR-482). One `select 1`; no attendee data, no dependency detail.',
+      ],
       ['POST /auth/sign-in', 'Obtaining a session is what it is for (001).'],
       ['POST /auth/sign-up', 'A person creating an account does not have one yet (FR-300).'],
       [

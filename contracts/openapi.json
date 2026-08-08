@@ -49,6 +49,62 @@
         }
       }
     },
+    "/ready": {
+      "get": {
+        "summary": "Readiness probe",
+        "tags": [
+          "operational"
+        ],
+        "description": "Reports whether this process can actually serve, which requires the database. Distinct from /health, which is deliberately dependency-free because it is unauthenticated (FR-483). 503 when the database is unreachable, so a deploy is reported unhealthy BEFORE it takes traffic rather than after every request has failed (SC-412).",
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "status"
+                  ],
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "ready"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "status"
+                  ],
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "unavailable"
+                      ]
+                    },
+                    "dependency": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/auth/sign-in": {
       "post": {
         "summary": "Exchange credentials for a sign-in session cookie",
@@ -2917,6 +2973,245 @@
               "application/json": {
                 "schema": {
                   "description": "Not registered for that conference, or no such conference — indistinguishable (FR-148).",
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/events/{eventId}/attendees": {
+      "get": {
+        "summary": "The attendee directory for one conference",
+        "tags": [
+          "profile"
+        ],
+        "description": "Filtered, ranked by shared interests, paginated, with card-sized avatars embedded. Carries both guards: the READER is registered for this conference (proven by the branded EventScope the route audit guarantees is present), and every returned attendee is additionally registered for the same conference, discoverable, and verified — all three evaluated in one query before any field is produced (FR-402, FR-409). An attendee excluded by any condition is absent from the response entirely, never withheld from display. There is no total, no withheld count, and no field distinguishing a hidden attendee from a nonexistent one (FR-404).",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "description": "Free text over display name, company, role and headline — case- and accent-insensitively, so \"Munoz\" finds \"Muñoz\". NEVER matches email address (FR-407)."
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 120
+            },
+            "in": "query",
+            "name": "role",
+            "required": false
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 60
+            },
+            "in": "query",
+            "name": "interest",
+            "required": false
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "description": "Opaque. Encodes the previous page's last (sharedInterestCount, attendeeId). It is a position, never a scope — the conference comes from the path and its guard."
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 24
+            },
+            "in": "query",
+            "name": "limit",
+            "required": false
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "eventId",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "attendees",
+                    "nextCursor"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "attendees": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "attendeeId",
+                          "displayName",
+                          "company",
+                          "role",
+                          "headline",
+                          "networkingIntent",
+                          "availability",
+                          "interests",
+                          "sharedInterestCount",
+                          "avatar"
+                        ],
+                        "additionalProperties": false,
+                        "properties": {
+                          "attendeeId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "displayName": {
+                            "type": "string"
+                          },
+                          "company": {
+                            "type": [
+                              "null",
+                              "string"
+                            ]
+                          },
+                          "role": {
+                            "type": [
+                              "null",
+                              "string"
+                            ]
+                          },
+                          "headline": {
+                            "type": [
+                              "null",
+                              "string"
+                            ]
+                          },
+                          "networkingIntent": {
+                            "type": [
+                              "null",
+                              "string"
+                            ],
+                            "enum": [
+                              "open_to_meetings",
+                              "open_to_messages",
+                              "not_networking",
+                              null
+                            ]
+                          },
+                          "availability": {
+                            "type": [
+                              "null",
+                              "string"
+                            ],
+                            "enum": [
+                              "available",
+                              "busy",
+                              null
+                            ]
+                          },
+                          "interests": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "sharedInterestCount": {
+                            "type": "integer",
+                            "description": "How many interests this attendee shares with the reader. May be 0, and a zero-overlap attendee still appears — they simply rank last (FR-411). This is the number the card displays, which is what makes FR-413 checkable."
+                          },
+                          "avatar": {
+                            "description": "The 96px CARD rendition, embedded so a page of 24 faces is one request rather than 25 (FR-456, SC-407). Never the 512px profile rendition, which continues to serve the profile view. Null when the attendee has no avatar.",
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "required": [
+                                  "contentType",
+                                  "base64"
+                                ],
+                                "additionalProperties": false,
+                                "properties": {
+                                  "contentType": {
+                                    "type": "string"
+                                  },
+                                  "base64": {
+                                    "type": "string"
+                                  }
+                                }
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        }
+                      }
+                    },
+                    "nextCursor": {
+                      "type": [
+                        "null",
+                        "string"
+                      ],
+                      "description": "Null when this is the last page."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such conference, **or** the reader is not registered for it. One refusal for both, produced by requireEventAccess before the handler runs — the reader learns nothing about conferences they are not part of (FR-148).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "No such conference, **or** the reader is not registered for it. One refusal for both, produced by requireEventAccess before the handler runs — the reader learns nothing about conferences they are not part of (FR-148).",
                   "type": "object",
                   "properties": {
                     "code": {

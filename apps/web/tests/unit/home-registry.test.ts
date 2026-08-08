@@ -18,7 +18,7 @@ import { assertAtMostOneLead, HOME_CARDS } from '../../src/app/home/registry.js'
  * own card, they would have broken somebody else's.
  * ═════════════════════════════════════════════════════════════════════════════════════════
  */
-describe('the Home card registry, after 005 appended to it', () => {
+describe('the Home card registry, after 005 and 006 appended to it', () => {
   it('has AT MOST ONE lead card (FR-157)', () => {
     const leads = HOME_CARDS.filter((card) => card.slot === 'lead')
 
@@ -59,7 +59,29 @@ describe('the Home card registry, after 005 appended to it', () => {
       'rest-of-day',
       'your-conferences',
     ])
-    expect(ids.at(-1), '005’s card is last, because it was appended').toBe('next-saved-session')
+    expect(ids[4], '005’s card follows the four 002 contributed').toBe('next-saved-session')
+    // T093 (006) — appended after 005's, not inserted before it. The assertion moved from
+    // "005's card is last" to "005's card is fifth" for the obvious reason: a second contributor
+    // arrived. What it is actually protecting — that nobody reorders anybody else's line — is
+    // unchanged and is now checked over the whole prefix rather than over one position.
+    expect(ids.at(-1), '006’s card is last, because it was appended').toBe('people-to-meet')
+  })
+
+  /**
+   * T093 (006) — the card 006 contributes, checked the same way 005's is.
+   *
+   * Event-scoped, because a directory is a property of one conference: standing decision 7 names
+   * the Discover directory explicitly as conference content, and it swaps entirely on a switch
+   * (FR-401a). An attendee-scoped card would keep rendering the previous conference's people.
+   */
+  it('contains 006’s card exactly ONCE, event-scoped (FR-446)', () => {
+    const contributed = HOME_CARDS.filter((card) => card.id === 'people-to-meet')
+
+    expect(contributed).toHaveLength(1)
+    expect(contributed[0]?.scope).toBe('event')
+    expect(contributed[0]?.slot, 'not the lead card — Home answers "what is next" first').not.toBe(
+      'lead',
+    )
   })
 
   it('keeps every card id unique, so React keys and test selectors stay stable', () => {
@@ -74,12 +96,17 @@ describe('the Home card registry, after 005 appended to it', () => {
     // remove. Two features appending concurrently must not be able to reorder each other's
     // cards by winning a merge.
     // ───────────────────────────────────────────────────────────────────────────────────────
-    const primary = HOME_CARDS.filter((card) => card.slot === 'primary')
-    const orders = primary.map((card) => card.order)
+    // T093 (006) — widened from `primary` alone to **every** slot. 005 only ever appended to
+    // `primary`, so checking that one was enough then; 006 appends to `aside`, and a check that
+    // silently covers only the slot the last feature happened to use is a check that stops
+    // working exactly when a new contributor arrives.
+    for (const slot of ['lead', 'primary', 'aside'] as const) {
+      const orders = HOME_CARDS.filter((card) => card.slot === slot).map((card) => card.order)
 
-    expect(new Set(orders).size, `orders within 'primary' collide: ${orders.join(', ')}`).toBe(
-      orders.length,
-    )
+      expect(new Set(orders).size, `orders within '${slot}' collide: ${orders.join(', ')}`).toBe(
+        orders.length,
+      )
+    }
   })
 
   it('gives every card a title, which is what the shell names when a card cannot render', () => {

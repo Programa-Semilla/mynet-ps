@@ -88,6 +88,13 @@ const renderSignIn = (overrides: Partial<PlatformServices> = {}) => {
         uploadAvatar: async () => Promise.reject(new Error('not signed in')),
         removeAvatar: async () => Promise.reject(new Error('not signed in')),
       },
+      // 006 — signed out, so the directory rejects like the rest. Discover is behind
+      // authentication in every layout; nothing on this screen can reach it.
+      directory: {
+        list: async () => Promise.reject(new Error('not signed in')),
+        get: async () => Promise.reject(new Error('not signed in')),
+        readAvatar: async () => Promise.reject(new Error('not signed in')),
+      },
     },
     freshness: { lastRetrieved: () => null },
     auth: { signIn, signOut: async () => {} },

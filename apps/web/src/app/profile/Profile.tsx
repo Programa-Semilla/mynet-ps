@@ -38,7 +38,7 @@ export const Profile = () => {
       // The await comes first deliberately: every `setState` below it is behind an async
       // boundary, so this is not the synchronous cascade `set-state-in-effect` targets — and
       // writing it this way means the rule can see that, rather than needing a disable comment.
-      const profile = (await repository.getOwn()) as OwnProfile
+      const profile = await repository.getOwn()
       setState({ status: 'ready', profile })
     } catch (error) {
       setState({

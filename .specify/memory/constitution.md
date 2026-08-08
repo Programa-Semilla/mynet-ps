@@ -1,5 +1,99 @@
 <!--
 SYNC IMPACT REPORT
+Version change: 2.3.0 → 3.0.0
+Rationale: MAJOR. Principle VII's mandatory pipeline element "a preview deployment" is redefined in
+a way that invalidates work performed under 2.x, and two DELIVERED requirements of phase 001 —
+FR-066 and SC-011 — are withdrawn outright. The versioning policy's MAJOR test is "a principle is
+removed or redefined in a backward-incompatible way", and the 2.0.0 precedent applied that test by
+asking whether prior work is invalidated. It is: the `deploy-api` and `deploy-preview` jobs are
+deleted, and a shipped guarantee to reviewers is retracted.
+
+The counter-argument was considered and rejected. Relaxing a requirement cannot make
+previously-compliant work non-compliant, so this could be read as MINOR. That reading is wrong here
+because the change is not a relaxation of a rule nobody relied on: FR-066 and SC-011 were built,
+verified, and are what a reviewer was promised. Retracting a delivered guarantee is a
+backward-incompatible redefinition from the standpoint of everyone who relied on it, and recording
+it as MINOR would understate what is being given up.
+
+Decisions cited by this amendment (all 2026-08-07, recorded in
+brainstorm/05-discover-and-the-deployment-platform.md):
+  D11. Client and API share one origin. The topology decision and the CSRF defence are one decision.
+       (Underlies the Principle VII and deployment changes.)
+  D12. Production and UAT are Azure VMs on the mission-control/deploy/vm pattern — Caddy with
+       automatic TLS in front of an API container and a loopback-only PostgreSQL container.
+       (Resolves register entry 11.)
+  D13. Preview becomes one long-lived UAT environment rather than per-pull-request ephemeral
+       environments. (Supersedes 001 FR-066 and SC-011; changes register entry 14; resolves the
+       remainder of entry 17 by replacement.)
+
+Modified principles:
+  - VII. Verified on Linux CI — REDEFINED. The pipeline's required elements no longer include a
+    per-change preview deployment. A deployment to a long-lived UAT environment on merge to
+    `develop` satisfies the requirement. Every correctness gate is unchanged, and the breach clause
+    added in 2.2.0 is unchanged.
+
+Modified binding constraints:
+  - Technology and Architecture Constraints, "Backend and API" — the database is no longer required
+    to be MANAGED. PostgreSQL itself is unchanged, as are the project-owned API contract, versioned
+    reviewed migrations verified in CI before reaching real data, and repository-interface data
+    access. Only who provisions the database changes.
+  - A new "Deployment environments" block records what replaces the per-change preview: two isolated
+    environments, the data-separation rule carried forward from 001 FR-067, and the backup and
+    restore obligation.
+
+Withdrawn requirements from a shipped feature:
+  - specs/001-production-foundation/spec.md FR-066 and SC-011 are SUPERSEDED. What replaces the
+    reviewer-facing guarantee is stated in the "Deployment environments" block: review against UAT
+    after merge, plus a locally reproducible stack, with the reduction in per-change reviewability
+    recorded as accepted rather than solved. 001's FR-067 SURVIVES and is carried forward by 006's
+    FR-485.
+
+Register changes:
+  - 11. RESOLVED. API hosting, the PostgreSQL provider and object storage — Azure VMs, PostgreSQL in
+    the stack, StorageService on a VM volume.
+  - 14. CHANGED, not closed. Cloudflare Pages previews are withdrawn; a long-lived, publicly
+    reachable UAT replaces them, so the access-control question survives in a sharper form.
+  - 17. Remainder RESOLVED BY REPLACEMENT rather than by provisioning. `db-branch`, `schema-diff`,
+    `deploy-api` and `deploy-preview` are deleted, so NEON_API_KEY, NEON_PROJECT_ID, FLY_API_TOKEN
+    and the three Cloudflare values are no longer needed. NO CHECK WAS WEAKENED — the jobs removed
+    verify nothing about correctness, and all ten that do are unchanged.
+  - 4. ESCALATED. Discover is card-dense at all three widths and adds a second overlay.
+  - 19. ESCALATED. Discover broadcasts avatar images to every co-attendee, converting an unmoderated
+    upload from a private artifact into a published one.
+
+Register numbering remains STABLE, per 2.3.0. Resolved entries are struck through IN PLACE.
+
+Templates and dependent artifacts:
+  ✅ .specify/templates/plan-template.md — Constitution Check resolves against this file at plan
+     time; no static edit required.
+  ✅ .specify/templates/spec-template.md — no edit required. The Principle IX declaration rows are
+     unchanged by this amendment. The 2.3.0 tracking caveat still applies: `**/.specify/**` is
+     gitignored except `memory/`, so any template edit lives in one clone until `spex init
+     --refresh` overwrites it.
+  ✅ .specify/templates/tasks-template.md — no edit required; task categories are unaffected.
+  ✅ CLAUDE.md — updated in this change. Four restatements of "managed PostgreSQL" and the CI
+     requirement's "preview deploy on every change" are corrected, and the register summary is
+     resynchronised.
+  ⚠️ specs/001-production-foundation/spec.md — NOT edited. FR-066 and SC-011 are superseded by this
+     amendment, not rewritten. A shipped specification records what was decided and built at the
+     time; editing it retroactively would destroy the very record that makes this supersession
+     legible. The supersession is recorded here and in 006's specification.
+  ✅ specs/006-discover-and-deployment-platform/ — this amendment is what its T001 requires and what
+     its Complexity Tracking names as a merge prerequisite.
+  ✅ brainstorm/00-overview.md — updated on the brainstorm branch ahead of this amendment.
+  ✅ docs/superpowers/specs/2026-08-06-mynet-delivery-roadmap-design.md — NOT edited. It is a plan
+     rather than governance; 006 departs from it and says so in its specification.
+
+Deferred TODOs:
+  - No domain name exists. Caddy cannot obtain a certificate until an A record resolves. Blocks the
+    first deploy, not this amendment.
+  - UAT access control is undecided — register entry 14, in its new form.
+  - The 2.0.0 report above states "Architecture: custom API over managed PostgreSQL" at decision 4.
+    That line is a HISTORICAL RECORD of what was decided on 2026-08-04 and is deliberately NOT
+    edited. It was true then. This amendment supersedes it; falsifying the record would be worse
+    than leaving it superseded.
+
+--- PRIOR REPORT: 2.3.0 ---
 Version change: 2.2.0 → 2.3.0
 Rationale: MINOR. Three register entries are resolved by client and owner decision, one principle is
 materially expanded, one gains a seventh interface, one product-boundary statement is narrowed, and a
@@ -458,8 +552,22 @@ requirement to decide offline semantics deliberately, per feature.
 Every change MUST pass an automated pipeline that runs on Linux with no Apple infrastructure. The
 pipeline MUST cover both the client and the API: type checking, linting, unit tests, component
 tests, **API contract tests**, **database migration verification**, **integration tests against a
-real database instance**, accessibility checks, end-to-end browser tests, a production build, and a
-preview deployment.
+real database instance**, accessibility checks, end-to-end browser tests, and a production build.
+
+**A per-change preview deployment is NOT required** (amended 3.0.0, decision D13). A change MUST
+reach a **deployed environment** before it reaches production, but that environment is the
+long-lived UAT described under "Deployment environments" below, deployed on merge to `develop` —
+not an ephemeral environment built for each pull request.
+
+This supersedes phase 001's **FR-066** and **SC-011**, which are the strongest form of the earlier
+reading: *"a preview of that exact change at an address a reviewer can open without local setup"*.
+Both are withdrawn. **What is given up is stated plainly rather than glossed**: a reviewer no longer
+sees the change they are reviewing, deployed, before approving it. What replaces it is review
+against UAT *after* merge plus a locally reproducible stack, and the residual reduction in
+per-change reviewability is **accepted, not solved**.
+
+001's **FR-067** — no environment holding real attendee data may back a non-production deployment —
+is **unaffected and survives**. It binds UAT exactly as it bound previews.
 
 A change is not complete until the pipeline is green. Completion MUST NOT be claimed from
 inspection; it MUST be claimed from pipeline output. Failing or skipped checks MUST be reported
@@ -581,11 +689,19 @@ the failure mode where a hardening phase becomes a rubber stamp for work that wa
 
 - **Client stack**: React + TypeScript, built as an installable PWA. Type checking MUST be enabled
   and enforced (the prototype has no `tsconfig.json`; production MUST).
-- **Backend and API**: MyNet has a project-owned API service over a managed **PostgreSQL** database.
-  The API contract is owned by this project — not generated by a vendor and not dictated by a
-  third-party platform. This was decided by the owner on 2026-08-04 in preference to a managed
+- **Backend and API**: MyNet has a project-owned API service over a **PostgreSQL** database. The API
+  contract is owned by this project — not generated by a vendor and not dictated by a third-party
+  platform. This was decided by the owner on 2026-08-04 in preference to a managed
   backend-as-a-service, for portability and contract control; the operational cost of that choice is
   accepted.
+
+  **The database need not be a managed service** (amended 3.0.0, decision D12). Until 3.0.0 this
+  clause read "a managed **PostgreSQL** database"; PostgreSQL now runs as a container in the
+  application's own stack, reachable only from its host. **What is unchanged is most of what the
+  original clause was protecting**: the engine is still PostgreSQL, the API contract is still owned
+  by this project, schema changes are still versioned reviewed migrations verified in CI before
+  reaching real data, and data access still goes through repository interfaces. Only *who provisions
+  and operates the database* changes — and with it, the obligation below.
 - **Schema changes** MUST be expressed as versioned, reviewed migrations committed to the
   repository. Ad-hoc changes to a live database are prohibited. Every migration MUST be verified in
   CI before it reaches an environment that holds real data.
@@ -621,6 +737,35 @@ the failure mode where a hardening phase becomes a rubber stamp for work that wa
 - **Persistence**: attendee data is durable and server-side. `SecureStorage` covers client-side
   secrets and MUST NOT be used as a general cache. What may be cached on the client, and for how
   long, MUST be specified per feature rather than assumed.
+
+### Deployment environments
+
+Added in 3.0.0 by decision D12/D13. This block is what replaces the per-change preview deployment
+Principle VII no longer requires.
+
+- **Two environments, isolated by construction**: `uat` and `prod`. Each MUST have its own host, its
+  own database, its own secrets, and its own address. A deployment, a runaway query, or resource
+  exhaustion in one MUST NOT be able to affect the other.
+- **UAT MUST NOT be connected to any data store holding real attendee data.** This is 001's FR-067,
+  unchanged in substance and unchanged in force — the environment it binds has changed, the rule has
+  not. **Separate configuration is not sufficient**: the separation MUST be enforced, and a
+  deployment tool that can be pointed at the wrong database MUST refuse rather than proceed.
+- **The client and the API MUST be served from one origin.** This is not an implementation
+  preference: it is what keeps the session cookie's `SameSite` attribute a genuine CSRF defence
+  rather than a nominal one, and it is why no synchroniser-token scheme is required. A topology that
+  splits them MUST NOT ship without one.
+- **Every deployed environment MUST serve over TLS** with a publicly trusted certificate obtained
+  and renewed without manual intervention.
+- **The database MUST NOT be reachable from outside its own host.**
+- **Backups are a governance obligation, not an operational nicety.** Now that the project
+  provisions its own database, no vendor provides point-in-time recovery. Production MUST be backed
+  up at least daily on an automated schedule; the schedule, the retention period, and the restore
+  procedure MUST be written down; and **the restore MUST have been performed successfully at least
+  once before production holds real attendee data.** A documented restore that has never been run is
+  a hope, not a procedure.
+- **A rollback procedure MUST exist and MUST state what happens when the schema has moved ahead of
+  the application.** A rollback path that assumes the database can always follow the code backwards
+  is the one that fails when it is needed.
 
 ### Data scoping, content provenance, and composition
 
@@ -847,6 +992,32 @@ confirmed he speaks for the client, so 5 and 6 are closed as client decisions.
 - ~~13. Attendee avatar handling~~ — **RESOLVED by D7: real upload**, with resizing and EXIF
   stripping mandatory rather than optional.
 
+**Resolved in 3.0.0**
+
+Owner decisions taken on 2026-08-07 in brainstorm #05
+(`brainstorm/05-discover-and-the-deployment-platform.md`).
+
+- ~~11. API hosting, the managed PostgreSQL provider, and object storage~~ — **RESOLVED by D12: two
+  isolated Azure VMs.** Each environment is one `Standard_B2s` running a Compose stack of Caddy
+  (automatic TLS, and the reverse proxy that puts client and API on one origin), the API container,
+  and a **loopback-only PostgreSQL container**. `StorageService` is backed by a volume on the same
+  host. Fixed-cost, no vendor, isolation by construction. The trade is recorded rather than implied:
+  a managed instance would have honoured the previous wording with no amendment, at additional cost
+  per environment and a second thing to provision — it was rejected by owner decision, not by
+  analysis. **The consequence is a new governance obligation**: backups, retention, and an
+  *exercised* restore are now this project's responsibility, and are written into "Deployment
+  environments".
+- ~~17 (remainder). The preview path awaiting seven vendor secrets~~ — **RESOLVED by D13, by
+  replacement.** The jobs are deleted rather than provisioned. See the annotation on entry 17 for
+  why this is not a weakened gate, and Principle VII for what is given up.
+
+**Withdrawn in 3.0.0, from a shipped feature**
+
+- **001 FR-066 and SC-011** — the guarantee that a reviewer can open a preview of *that exact
+  change*. Superseded by Principle VII as amended. This is the first time this project has retracted
+  a delivered, verified requirement, and it is the reason this amendment is MAJOR rather than MINOR.
+  **001 FR-067 is not withdrawn** and binds UAT unchanged.
+
 **Open — require a client decision**
 
 *Numbering is stable.* Resolved entries are **struck through in place** rather than removed, and
@@ -863,7 +1034,9 @@ so a gap in the source would silently render as the wrong number against a neigh
    divergence is recorded is undecided.
 4. **Desktop and tablet layouts have never been validated by the client.** The approved prototype is
    mobile-only at a fixed 390×844 frame. Every desktop layout built before this is answered is
-   unreviewed design, so the cost of leaving it open compounds with each feature.
+   unreviewed design, so the cost of leaving it open compounds with each feature. *Escalated
+   2026-08-07 in 3.0.0*: phase 006 adds a card-dense multi-column directory grid and a second modal
+   overlay, making it the largest single addition of unreviewed desktop design so far.
 5. ~~**Attendee identity model.**~~ **RESOLVED 2026-08-07 in 2.3.0** — self sign-up with an event
    join code. Retained in place so the numbering stays stable; see "Resolved in 2.3.0" above.
 6. ~~**Data retention, deletion, and export obligations.**~~ **RESOLVED 2026-08-07 in 2.3.0** — full
@@ -883,17 +1056,23 @@ so a gap in the source would silently render as the wrong number against a neigh
 
 **Open — require an owner or planning decision**
 
-11. **API hosting, the managed PostgreSQL provider, and object storage.** *Widened 2026-08-07 by
-    D9*: the object-storage provider backing `StorageService` for avatar images folds into this
-    entry rather than opening a new one, since it is the same provisioning decision. No feature is
-    blocked on it — `StorageService` carries a local implementation for development, test, and
-    preview — but the production path stays unproven until this is answered.
+11. ~~**API hosting, the managed PostgreSQL provider, and object storage.**~~ **RESOLVED 2026-08-07
+    in 3.0.0** by D12 — two isolated Azure VMs (`uat`, `prod`), each running Caddy with automatic
+    TLS in front of an API container and a **loopback-only PostgreSQL container**, with
+    `StorageService` backed by a volume on the same host. All three halves of this entry close
+    together, which is what the 2.3.0 widening anticipated. Retained in place so the numbering stays
+    stable; see "Resolved in 3.0.0" below.
 12. **Authentication ownership** — self-implemented versus a delegated provider.
 13. ~~**Attendee avatar handling.**~~ **RESOLVED 2026-08-07 in 2.3.0** — real upload, with resizing
     and EXIF stripping mandatory. Retained in place; see "Resolved in 2.3.0" above.
-14. **Public preview URLs.** Cloudflare Pages previews are publicly reachable by default; with real
-    data in scope, preview environments MUST NOT be pointed at production data, and preview access
-    control is undecided.
+14. **Public non-production URLs.** *Changed, not closed, 2026-08-07 in 3.0.0 by D13.* The original
+    entry read "Public preview URLs" and named Cloudflare Pages previews, which are withdrawn. It is
+    replaced by something **sharper, not milder**: a single long-lived UAT environment, publicly
+    reachable, carrying realistically-shaped attendee data, and persisting between changes rather
+    than being destroyed with each pull request. The data-separation half is now settled and binding
+    (Deployment environments, above, carrying 001's FR-067 forward). **Access control remains
+    undecided**, and it is now a question about a permanent address rather than a transient one.
+    Interacts with entries 16 and 19.
 15. **Server-side branch protection is unconfigured** — a configuration task, not an accepted risk.
     *Corrected 2026-08-07*: this entry previously recorded it as "unavailable (private repository,
     free personal account; APIs return 403)". **Both halves were wrong.** The repository is public
@@ -945,6 +1124,22 @@ so a gap in the source would silently render as the wrong number against a neigh
     005 merged under a recorded waiver naming the then-unsatisfied checks (PR #8), before PR #9
     landed. *Annotated 2026-08-07.*
 
+    **CLOSED 2026-08-07 in 3.0.0 — the remainder is resolved BY REPLACEMENT, not by provisioning.**
+    D13 retires Fly, Cloudflare Pages and Neon, so `db-branch`, `schema-diff`, `deploy-api` and
+    `deploy-preview` are **deleted**. The seven secrets they awaited are no longer needed, and the
+    aggregate check can go green because its blocker no longer exists.
+
+    **This is not the shortcut FR-071 forbids, and the distinction is worth stating precisely**: the
+    four jobs removed verify nothing about correctness — they build environments. Every check that
+    does verify correctness is unchanged and still runs: `typecheck`, `lint`, `test-unit`,
+    `test-component`, `contract`, `migrations`, `test-integration`, `build`, `test-accessibility`
+    and `test-e2e`. `test-e2e` was checked specifically and runs against a `postgres:17` service
+    container, never against the preview. **Zero checks were weakened, disabled, or made
+    non-blocking.**
+
+    What *is* given up is the reviewer-facing guarantee, and it is recorded under Principle VII
+    rather than buried here.
+
 18. **The transactional email provider.** D8 settles that account mail is sent — verification and
     password reset — and that it is distinct from the excluded engagement notifications. By whom it
     is sent is undecided, and it brings one external dependency and one secret. Needed by phase 004.
@@ -956,8 +1151,15 @@ so a gap in the source would silently render as the wrong number against a neigh
     who may upload, or by accepting the exposure is undecided. Cheapest to settle before the first
     publicly reachable preview, and interacts with entries 14 and 16. *Added 2026-08-07.*
 
+    **ESCALATED 2026-08-07 in 3.0.0.** When this entry was written, an uploaded image was visible on
+    one profile page to whoever navigated to it. Phase 006 renders co-attendee faces **in a
+    directory, to every attendee of the conference, by default** — which converts an unmoderated
+    upload from a private artifact into a published one. The entry is unchanged in substance and
+    materially larger in consequence. Now interacts with entry 14 in its new form: a permanent,
+    publicly reachable UAT carrying real-shaped profile images.
+
 **Runtime guidance**: `CLAUDE.md` provides durable project context for AI-assisted sessions. It MUST
 stay consistent with this constitution and MUST NOT contain implementation plans, session tasks,
 progress updates, or invented requirements.
 
-**Version**: 2.3.0 | **Ratified**: 2026-08-04 | **Last Amended**: 2026-08-07
+**Version**: 3.0.0 | **Ratified**: 2026-08-04 | **Last Amended**: 2026-08-07

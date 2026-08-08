@@ -51,6 +51,30 @@ export interface ProcessedAvatar {
 }
 
 /**
+ * T022 (006) — **both stored renditions, from one decode** (FR-457, FR-458, research D2).
+ *
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ * **THE CARD RENDITION COMES OUT OF THIS FILE, AND IT MUST.**
+ *
+ * FR-458 is explicit that the card rendition is produced by the same decode-and-re-encode path,
+ * and the reason is the whole of the header above: metadata absence is a **property of the
+ * operation**, not a list of tags. A second production path — a copy of the stored 512px bytes,
+ * a client-side resize, a `sharp` chain assembled somewhere else — would be a second place EXIF
+ * stripping could regress, and it would regress silently, because a photograph with GPS
+ * coordinates in it looks exactly like one without.
+ *
+ * The two renditions therefore share `rotate()`, `resize(fit: 'cover', position: 'attention')`,
+ * the single output format, and the absence of `withMetadata()`. They differ in one number.
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ */
+export interface ProcessedAvatarSet {
+  /** 512px by default — what the profile view and the export carry. */
+  readonly profile: ProcessedAvatar
+  /** 96px by default — embedded in the directory listing, never the larger one (FR-457). */
+  readonly card: ProcessedAvatar
+}
+
+/**
  * Turns uploaded bytes into the single stored representation of an avatar.
  *
  * ─────────────────────────────────────────────────────────────────────────────────────────
@@ -64,7 +88,7 @@ export interface ProcessedAvatar {
  * decide what it is holding.
  * ─────────────────────────────────────────────────────────────────────────────────────────
  */
-export const processAvatar = async (input: Buffer): Promise<ProcessedAvatar> => {
+export const processAvatar = async (input: Buffer): Promise<ProcessedAvatarSet> => {
   const { avatar } = loadConfig()
 
   // `failOn: 'error'` refuses a truncated or corrupt image rather than decoding whatever
@@ -122,10 +146,30 @@ export const processAvatar = async (input: Buffer): Promise<ProcessedAvatar> => 
    * the two axes explicitly, not to re-derive a shorter edge that was already correct.
    * ───────────────────────────────────────────────────────────────────────────────────────
    */
-  const side = Math.min(avatar.dimensionPx, Math.min(width, height))
+  const shortestSide = Math.min(width, height)
 
-  try {
+  /**
+   * One rendition, at one bound.
+   *
+   * ───────────────────────────────────────────────────────────────────────────────────────
+   * **Every rendition is built here and nowhere else** (FR-458). The chain — `rotate()`, the
+   * square `cover` crop toward the busiest region, the single output format, and above all the
+   * *absence* of `withMetadata()` — is written once, so "no metadata survived" is a property of
+   * this function rather than a property somebody has to reproduce correctly per size.
+   *
+   * `image.clone()` because a `sharp` instance is a pipeline that can only be consumed once;
+   * calling `.resize()` twice on the same instance would apply both to one chain and emit the
+   * second size only. Cloning shares the **decoded input** — so this is still one decode, which
+   * is what research D2 asks for and what keeps the upload path's cost unchanged.
+   * ───────────────────────────────────────────────────────────────────────────────────────
+   */
+  const renditionAt = async (bound: number): Promise<ProcessedAvatar> => {
+    // Never upscaled: the side is the input's shorter edge when that is smaller than the bound,
+    // so a 96px photograph stays 96px and stays sharp rather than being invented up to 512.
+    const side = Math.min(bound, shortestSide)
+
     const resized = image
+      .clone()
       // ───────────────────────────────────────────────────────────────────────────────────
       // **`rotate()` before the strip, and it must be before.**
       //
@@ -146,10 +190,20 @@ export const processAvatar = async (input: Buffer): Promise<ProcessedAvatar> => 
 
     // `withMetadata()` is deliberately NOT called anywhere in this chain. Calling it is what
     // would copy EXIF, ICC and XMP across — the default is to emit none, and that default is
-    // the requirement (FR-349).
+    // the requirement (FR-349, FR-458).
     const bytes = await resized[AVATAR_OUTPUT_FORMAT]({ quality: 82 }).toBuffer()
 
     return { bytes, contentType: AVATAR_OUTPUT_CONTENT_TYPE }
+  }
+
+  try {
+    // Sequential rather than `Promise.all`: both share one `sharp` input, and libvips is already
+    // internally concurrent. Racing them buys nothing and doubles peak memory for the one
+    // request whose memory profile `limitInputPixels` exists to bound.
+    const profile = await renditionAt(avatar.dimensionPx)
+    const card = await renditionAt(avatar.cardDimensionPx)
+
+    return { profile, card }
   } catch (error) {
     // A decode that succeeded at the header and failed at the pixels lands here. Refused as
     // unreadable rather than as a server fault: nothing is wrong on our side.

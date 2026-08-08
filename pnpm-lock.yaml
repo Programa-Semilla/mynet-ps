@@ -178,6 +178,9 @@ importers:
       '@mynet/config':
         specifier: workspace:*
         version: link:../config
+      '@mynet/data':
+        specifier: workspace:*
+        version: link:../data
       '@types/react':
         specifier: ^19.2.18
         version: 19.2.18

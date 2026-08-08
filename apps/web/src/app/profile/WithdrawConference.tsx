@@ -37,7 +37,7 @@ export const WithdrawConference = () => {
 
   const load = useCallback(async () => {
     try {
-      setRegistered((await events.listRegistered()) as Event[])
+      setRegistered(await events.listRegistered())
     } catch {
       // A conference list that will not load is not worth an error banner on an account page:
       // the section simply does not offer what it cannot describe.

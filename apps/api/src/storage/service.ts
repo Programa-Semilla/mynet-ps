@@ -56,6 +56,28 @@ export interface StorageService {
   get(key: string): Promise<StoredBytes | null>
 
   /**
+   * 006 — the bytes under several keys, in **one** round trip. Absent keys are simply missing
+   * from the result.
+   *
+   * ═════════════════════════════════════════════════════════════════════════════════════════
+   * **A fourth method, and the header above says there must never be one — so this earns it.**
+   *
+   * That rule exists to stop capability nobody asked for: a `list` or a `copy` would be surface
+   * the production adapter has to implement for no requirement. This is not that. It is `get`,
+   * for the case the directory actually has, and a requirement asks for it: FR-456 makes a page
+   * of twenty-four cards **one request**, and resolving their faces one key at a time turned
+   * that one request into 1 + N *statements* against a pool of ten connections — at the maximum
+   * page size, 101. SC-402 and SC-403 are stated at 1,000 attendees, and this is the part of
+   * the response that scales with page size rather than with the query.
+   *
+   * It does not weaken FR-459: the caller still passes only keys derived from rows the
+   * visibility predicate already bounded, so the face is still reachable exactly when the
+   * profile is.
+   * ═════════════════════════════════════════════════════════════════════════════════════════
+   */
+  getMany(keys: readonly string[]): Promise<ReadonlyMap<string, StoredBytes>>
+
+  /**
    * Removes the object under a key. **Idempotent** — deleting nothing succeeds.
    *
    * That matters on the deletion path: `DELETE /account` removes the object before the row
@@ -76,3 +98,31 @@ export interface StorageService {
  * deletion path construct it and they must not be able to disagree.
  */
 export const avatarObjectKey = (attendeeId: string): string => `avatars/${attendeeId}`
+
+/**
+ * T023 (006) — the card rendition's key, **derived rather than stored** (FR-457, research D3).
+ *
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ * **THIS IS THE DECISION THAT KEEPS "NO NEW TABLE AND NO NEW COLUMN" TRUE, AND IT IS
+ * LOAD-BEARING RATHER THAN INCIDENTAL.**
+ *
+ * The obvious alternative is an `avatar_card_object_key` column on `attendees`. That column
+ * would be **a new column collecting attendee data**, and `tests/unit/export-coverage.test.ts`
+ * derives its expectations from the Drizzle schema — so it would **fail by existing**. Passing
+ * it would take either exporting a second copy of an image the export already embeds, or
+ * writing an allow-list entry justifying the omission. Deriving the key needs neither.
+ *
+ * It also means the deletion path reaches the card rendition without being told where it is:
+ * `deleteAccount` derives both keys from the attendee identifier it already holds (FR-460).
+ * A stored key would have made deletion depend on a column being correct, and a row whose key
+ * had drifted would leave a face behind after the account was gone.
+ *
+ * `stored_objects` is deliberately opaque about what a key means — its own header says
+ * "`storage/service.ts` decides what a key means" — so a key convention belongs exactly here.
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ *
+ * **Derived from the profile key, not from the attendee id**, so there is one place that decides
+ * where an attendee's avatar lives. If `avatarObjectKey` ever changes, this follows it rather
+ * than silently continuing to point at the old prefix.
+ */
+export const cardKeyFor = (profileKey: string): string => `${profileKey}/card`

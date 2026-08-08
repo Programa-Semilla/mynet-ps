@@ -1,13 +1,24 @@
-# The API as a container, for Fly.io (research.md D15).
+# The API as a container.
 #
 # Debian rather than Alpine on purpose: Argon2id is a native module, and the published prebuilt
 # binaries are glibc. On musl it falls back to compiling from source, which needs a toolchain in
 # the image and turns a fast build into a slow one for no benefit.
 #
 # ─────────────────────────────────────────────────────────────────────────────────────────
-# **Unvalidated until T003.** Nothing has deployed this image, because the API hosting account
-# does not exist yet — that is owner provisioning, and FR-070 puts it before the pipeline can
-# run green. Treat the runtime stage as reviewed-but-untried.
+# **T075 (006) — this header used to say "for Fly.io", and Fly is gone.**
+#
+# Constitution v3.0.0 moved the product onto two Azure VMs running a Compose stack of Caddy, this
+# image and a loopback-only PostgreSQL container (research D9). **The image itself is reused
+# unchanged**, and that is worth stating rather than leaving as an absence: nothing in it was ever
+# Fly-specific — it is a generic Node runtime that reads its port, database URL and secrets from
+# the environment. Only the comment was.
+#
+# It is built and run by `deploy/vm/docker-compose.yml`, which supplies every value below.
+#
+# **Still unvalidated by a real deployment.** The environments do not exist yet: a domain and an
+# Azure subscription are owner decisions the specification records as open (tasks T004, T006), and
+# Caddy cannot obtain a certificate without a resolving A record (FR-479). Treat the runtime stage
+# as reviewed-but-untried until T080 has been performed.
 # ─────────────────────────────────────────────────────────────────────────────────────────
 
 FROM node:22-slim AS base

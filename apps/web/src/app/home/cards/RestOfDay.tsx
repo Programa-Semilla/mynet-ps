@@ -19,10 +19,7 @@ import type { EventCardProps, HomeCard } from '../contract.js'
 const RestOfDayCard = ({ event }: EventCardProps) => {
   const catalog = useCatalogRepository()
 
-  const load = useCallback(
-    () => catalog.listSessions(event.id) as Promise<Session[]>,
-    [catalog, event.id],
-  )
+  const load = useCallback(() => catalog.listSessions(event.id), [catalog, event.id])
   const sessions = useAsync<Session[]>(load, [load], { emptyWhen: () => false })
 
   return (

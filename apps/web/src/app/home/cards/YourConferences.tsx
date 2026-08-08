@@ -28,10 +28,7 @@ import type { HomeCard } from '../contract.js'
 const YourConferencesCard = () => {
   const eventsRepository = useEventsRepository()
 
-  const load = useCallback(
-    () => eventsRepository.listRegistered() as Promise<Event[]>,
-    [eventsRepository],
-  )
+  const load = useCallback(() => eventsRepository.listRegistered(), [eventsRepository])
   const events = useAsync<Event[]>(load, [load])
 
   return (

@@ -46,6 +46,61 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/ready": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Readiness probe
+         * @description Reports whether this process can actually serve, which requires the database. Distinct from /health, which is deliberately dependency-free because it is unauthenticated (FR-483). 503 when the database is unreachable, so a deploy is reported unhealthy BEFORE it takes traffic rather than after every request has failed (SC-412).
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @enum {string} */
+                            status: "ready";
+                        };
+                    };
+                };
+                /** @description Default Response */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @enum {string} */
+                            status: "unavailable";
+                            dependency?: string;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/sign-in": {
         parameters: {
             query?: never;
@@ -2129,6 +2184,102 @@ export interface paths {
                 };
             };
         };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/events/{eventId}/attendees": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The attendee directory for one conference
+         * @description Filtered, ranked by shared interests, paginated, with card-sized avatars embedded. Carries both guards: the READER is registered for this conference (proven by the branded EventScope the route audit guarantees is present), and every returned attendee is additionally registered for the same conference, discoverable, and verified — all three evaluated in one query before any field is produced (FR-402, FR-409). An attendee excluded by any condition is absent from the response entirely, never withheld from display. There is no total, no withheld count, and no field distinguishing a hidden attendee from a nonexistent one (FR-404).
+         */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description Free text over display name, company, role and headline — case- and accent-insensitively, so "Munoz" finds "Muñoz". NEVER matches email address (FR-407). */
+                    q?: string;
+                    role?: string;
+                    interest?: string;
+                    /** @description Opaque. Encodes the previous page's last (sharedInterestCount, attendeeId). It is a position, never a scope — the conference comes from the path and its guard. */
+                    cursor?: string;
+                    limit?: number;
+                };
+                header?: never;
+                path: {
+                    eventId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            attendees: {
+                                /** Format: uuid */
+                                attendeeId: string;
+                                displayName: string;
+                                company: null | string;
+                                role: null | string;
+                                headline: null | string;
+                                /** @enum {null|string} */
+                                networkingIntent: "open_to_meetings" | "open_to_messages" | "not_networking" | null;
+                                /** @enum {null|string} */
+                                availability: "available" | "busy" | null;
+                                interests: string[];
+                                /** @description How many interests this attendee shares with the reader. May be 0, and a zero-overlap attendee still appears — they simply rank last (FR-411). This is the number the card displays, which is what makes FR-413 checkable. */
+                                sharedInterestCount: number;
+                                /** @description The 96px CARD rendition, embedded so a page of 24 faces is one request rather than 25 (FR-456, SC-407). Never the 512px profile rendition, which continues to serve the profile view. Null when the attendee has no avatar. */
+                                avatar: {
+                                    contentType: string;
+                                    base64: string;
+                                } | null;
+                            }[];
+                            /** @description Null when this is the last page. */
+                            nextCursor: null | string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description No such conference, **or** the reader is not registered for it. One refusal for both, produced by requireEventAccess before the handler runs — the reader learns nothing about conferences they are not part of (FR-148). */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;

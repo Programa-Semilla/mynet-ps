@@ -5,26 +5,40 @@ name: verify
 # claimed from this output rather than from inspection.
 #
 # ─────────────────────────────────────────────────────────────────────────────────────────
-# FR-063 names eleven required checks. Each has its own job below so that each reports its own
-# result, and the aggregate `verify` job at the bottom refuses to report success unless every
-# one of them literally succeeded (FR-064):
+# **TEN REQUIRED CHECKS.** Each has its own job below so that each reports its own result, and
+# the aggregate `verify` job at the bottom refuses to report success unless every one of them
+# literally succeeded (FR-064):
 #
 #    1 typecheck        5 contract          9 test-e2e
 #    2 lint             6 migrations       10 build
-#    3 test-unit        7 test-integration 11 deploy-preview
+#    3 test-unit        7 test-integration
 #    4 test-component   8 test-accessibility
 #
-# Three ephemeral resources are created per pull request — a Neon database branch, a Fly.io API
-# deployment, and a Cloudflare Pages preview — and wired to each other. plan.md records that
-# cost under Complexity Tracking: FR-066 wants a working preview of that exact change, and
-# FR-067 forbids pointing any preview at real attendee data, so the preview needs its own API,
-# which needs its own database.
-# ─────────────────────────────────────────────────────────────────────────────────────────
+# ═════════════════════════════════════════════════════════════════════════════════════════
+# **006 (T076) — FIVE JOBS WERE DELETED, AND THIS IS NOT THE SHORTCUT FR-071 FORBIDS.**
 #
-# **This pipeline cannot be green until T001–T003 provisioning exists.** FR-070 fixes that
-# order and FR-071 forbids the obvious shortcut: no check here may be disabled, skipped, or
-# made non-blocking to obtain a green result. A red pipeline with the secrets missing is the
-# correct state until the owner provisions them.
+# `db-branch`, `deploy-api`, `deploy-preview`, `schema-diff` and `cleanup` are gone, along with
+# the three vendors they served — Neon, Fly.io and Cloudflare Pages. Constitution v3.0.0 moved
+# the product onto two Azure VMs (research D9, D13), so those jobs serve nothing.
+#
+# **The distinction that matters: those five jobs BUILT ENVIRONMENTS. THEY VERIFIED NOTHING.**
+# Every check that verifies correctness is unchanged and still runs — including `test-e2e`,
+# which was checked specifically and runs against `localhost:3000` on its own `postgres:17`
+# service container, never against the preview. Zero checks were weakened, disabled, or made
+# non-blocking (FR-490).
+#
+# **The cost is real and is recorded rather than glossed.** 001's FR-066 and SC-011 promise a
+# reviewer a working preview of *that exact change*, `deploy-preview` was that promise's only
+# implementation, and v3.0.0 **withdraws both requirements** — the first delivered requirement
+# this project has retracted, which is why it is a major version. What replaces it is a
+# long-lived UAT environment deployed on merge to `develop`: a reviewer now sees the change
+# deployed *after* approving it rather than before.
+#
+# With the vendors gone, `FLY_API_TOKEN`, `NEON_API_KEY`, `NEON_PROJECT_ID`, the three
+# Cloudflare secrets and the `preview-base` branch are all no longer needed — so the aggregate
+# check can go green for the first time, because **its cause disappeared rather than being
+# suppressed** (register entry 17, closed by replacement).
+# ═════════════════════════════════════════════════════════════════════════════════════════
 
 on:
   pull_request:
@@ -58,61 +72,6 @@ env:
   AUTH_ATTEMPT_HASH_KEY: preview-only-attempt-key-not-a-secret
 
 jobs:
-  # ── Ephemeral database branch, per pull request (FR-067, research.md D5) ─────────────────
-  #
-  # One mechanism serving two requirements: preview isolation, and a genuinely clean database
-  # for migration verification (FR-038). A branch is created from the parent on open and on
-  # every push, and deleted when the pull request closes.
-  db-branch:
-    name: db-branch
-    # Pull requests only. Running on push created a branch named `pr-<run_id>` that the cleanup
-    # job — which only fires on a closed pull request — could never delete, so every merge
-    # leaked one database permanently until the project hit Neon's branch limit and the whole
-    # pipeline stopped working for an unrelated reason.
-    if: github.event_name == 'pull_request' && github.event.action != 'closed'
-    runs-on: ubuntu-latest
-    outputs:
-      db_url: ${{ steps.create.outputs.db_url_pooled }}
-    steps:
-      # ─────────────────────────────────────────────────────────────────────────────────────
-      # ─────────────────────────────────────────────────────────────────────────────────────
-      # **One branch, for the preview only.**
-      #
-      # This used to create three — one each for `test-integration`, `test-e2e` and
-      # `test-accessibility` — because all three destructively reset the database they are
-      # given, and sharing one let a suite's sign-in session have its attendee row deleted out
-      # from under it mid-run.
-      #
-      # Those three suites now run against their own per-job PostgreSQL service containers,
-      # which is stronger isolation than three shared branches and, more importantly, does not
-      # depend on a repository secret. What remains is the branch the **preview** uses: an API
-      # deployed to Fly outlives the job that deployed it, so it needs a database that outlives
-      # the job too.
-      # ─────────────────────────────────────────────────────────────────────────────────────
-      - name: create a database branch for this pull request
-        id: create
-        uses: neondatabase/create-branch-action@v5
-        with:
-          project_id: ${{ secrets.NEON_PROJECT_ID }}
-          branch_name: pr-${{ github.event.number }}
-          # ─────────────────────────────────────────────────────────────────────────────────
-          # **Explicit parent, never the project default.** Omitting this branches from the
-          # default branch — which is where production data will live. Today that is harmless
-          # because there is no production data; the day there is, every pull request would
-          # silently receive a copy-on-write clone of the real attendee table, credential
-          # hashes included, behind a publicly reachable preview API. FR-067 forbids exactly
-          # that, and it would arrive with no code change to trigger it.
-          #
-          # `preview-base` is a permanently data-free branch. It is owner provisioning (T001).
-          #
-          # The input is `parent`, not `parent_branch`. The action accepts unknown inputs with
-          # only a warning, so the wrong name silently branched from the default anyway — the
-          # guard would have looked present in review and done nothing. Caught by reading a real
-          # run's log rather than by any check.
-          # ─────────────────────────────────────────────────────────────────────────────────
-          parent: preview-base
-          api_key: ${{ secrets.NEON_API_KEY }}
-
   # ── Gate 1: type checking (FR-001) ──────────────────────────────────────────────────────
   typecheck:
     name: typecheck
@@ -144,6 +103,31 @@ jobs:
       - run: pnpm lint
       - name: formatting
         run: pnpm format:check
+      # ─────────────────────────────────────────────────────────────────────────────────────
+      # **006 — the deploy scripts are PARSED AND LINTED here, and nothing did that before.**
+      #
+      # `deploy/vm/*.sh` are executed by `deploy-uat` and `deploy-prod` against real
+      # environments, and no gate in this pipeline had ever looked at them. One defect reached
+      # review because of it: `maintenance.sh on` exited non-zero whenever `--until` was
+      # omitted, because its last statement was an `[[ … ]] && echo` AND-list whose false test
+      # became the script's exit status — aborting **every** default deploy immediately after
+      # raising the maintenance flag. `bash -n` does not catch that; ShellCheck's SC2015 does,
+      # which is why both run.
+      #
+      # ShellCheck is preinstalled on `ubuntu-latest`.
+      # ─────────────────────────────────────────────────────────────────────────────────────
+      - name: shell syntax and lint (deploy and hook scripts)
+        run: |
+          set -euo pipefail
+          mapfile -t SCRIPTS < <(find deploy .githooks -type f \( -name '*.sh' -o -name 'pre-*' \) | sort -u)
+          if [ "${#SCRIPTS[@]}" -eq 0 ]; then
+            echo "::error::No shell scripts matched. A gate that checks nothing is not a gate."
+            exit 1
+          fi
+          echo "Checking ${#SCRIPTS[@]} shell scripts:"
+          printf '  %s\n' "${SCRIPTS[@]}"
+          for f in "${SCRIPTS[@]}"; do bash -n "$f"; done
+          shellcheck --severity=warning "${SCRIPTS[@]}"
 
   # ── Gate 3: unit tests (FR-005) ─────────────────────────────────────────────────────────
   test-unit:
@@ -210,7 +194,7 @@ jobs:
     # **A PostgreSQL service container, not a Neon branch.**
     #
     # These gates need *a real database*, which is what FR-005 and FR-069 ask for — not Neon
-    # specifically. Binding them to `db-branch` meant one unset repository secret
+    # specifically. Binding them to the old `db-branch` job meant one unset repository secret
     # (`NEON_API_KEY`) skipped every database-dependent check in the pipeline, and under
     # Principle VII a skip is not a pass: the checks that enforce this product's personal-data
     # guarantees had never executed once, across three merged features.
@@ -220,9 +204,11 @@ jobs:
     # other job can reach. `pnpm verify:clean` has always run these same suites against stock
     # `postgres:17` locally, so this is the environment they were already proved against.
     #
-    # Neon is still what the **preview** uses (`deploy-api`, `schema-diff`): a preview API
-    # outlives its job and needs a database that outlives it too. FR-067's "never point a
-    # preview at real attendee data" is unchanged, and `preview-base` is still its parent.
+    # **006 (T076) — this used to end "Neon is still what the preview uses". There is no
+    # preview and there is no Neon.** Both went with the vendor jobs (research D13), so this
+    # service container is now the only database CI touches — the same real PostgreSQL, per
+    # job. FR-067 is unchanged and now binds UAT instead of a preview (FR-485), enforced by
+    # `deploy/vm/_common.sh` rather than by a permanently data-free branch.
     # ─────────────────────────────────────────────────────────────────────────────────────
     services:
       postgres:
@@ -285,7 +271,7 @@ jobs:
     # **A PostgreSQL service container, not a Neon branch.**
     #
     # These gates need *a real database*, which is what FR-005 and FR-069 ask for — not Neon
-    # specifically. Binding them to `db-branch` meant one unset repository secret
+    # specifically. Binding them to the old `db-branch` job meant one unset repository secret
     # (`NEON_API_KEY`) skipped every database-dependent check in the pipeline, and under
     # Principle VII a skip is not a pass: the checks that enforce this product's personal-data
     # guarantees had never executed once, across three merged features.
@@ -295,9 +281,11 @@ jobs:
     # other job can reach. `pnpm verify:clean` has always run these same suites against stock
     # `postgres:17` locally, so this is the environment they were already proved against.
     #
-    # Neon is still what the **preview** uses (`deploy-api`, `schema-diff`): a preview API
-    # outlives its job and needs a database that outlives it too. FR-067's "never point a
-    # preview at real attendee data" is unchanged, and `preview-base` is still its parent.
+    # **006 (T076) — this used to end "Neon is still what the preview uses". There is no
+    # preview and there is no Neon.** Both went with the vendor jobs (research D13), so this
+    # service container is now the only database CI touches — the same real PostgreSQL, per
+    # job. FR-067 is unchanged and now binds UAT instead of a preview (FR-485), enforced by
+    # `deploy/vm/_common.sh` rather than by a permanently data-free branch.
     # ─────────────────────────────────────────────────────────────────────────────────────
     services:
       postgres:
@@ -357,9 +345,31 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # ─────────────────────────────────────────────────────────────────────────────────────
+      # T066 (006) — **`/api`, because client and API share one origin** (FR-476, research D6).
+      #
+      # Caddy serves this build and reverse-proxies `/api/*` to the API container, so a relative
+      # base is the whole configuration. The client's HTTP layer already defaults to a relative
+      # base (`apps/web/src/app/services.ts`), which is why this is configuration rather than
+      # code — and why the artifact this job uploads is the one `deploy.sh` ships.
+      #
+      # The configuration this replaces baked an absolute `*.fly.dev` address in here, and it is
+      # what made sign-in impossible: `fly.dev` and `pages.dev` are separate registrable domains
+      # on the Public Suffix List, so the `SameSite=Lax` session cookie was never sent at all.
+      # ─────────────────────────────────────────────────────────────────────────────────────
       - run: pnpm build
+        env:
+          VITE_API_BASE_URL: /api
       - name: asset budget
         run: node scripts/asset-budget.mjs
+      # ─────────────────────────────────────────────────────────────────────────────────────
+      # **This artifact has no consumer today, and saying so is the honest thing.**
+      #
+      # A comment here previously claimed it was "the one `deploy.sh` ships". It is not:
+      # `deploy.sh` runs its own `pnpm --filter @mynet/web build` and nothing downloads this.
+      # It is kept because it is genuinely useful for inspecting what a run produced, and
+      # because consuming it is the right way to close the provenance gap `deploy.sh` records.
+      # ─────────────────────────────────────────────────────────────────────────────────────
       - uses: actions/upload-artifact@v4
         with:
           name: web-dist
@@ -381,7 +391,7 @@ jobs:
     # **A PostgreSQL service container, not a Neon branch.**
     #
     # These gates need *a real database*, which is what FR-005 and FR-069 ask for — not Neon
-    # specifically. Binding them to `db-branch` meant one unset repository secret
+    # specifically. Binding them to the old `db-branch` job meant one unset repository secret
     # (`NEON_API_KEY`) skipped every database-dependent check in the pipeline, and under
     # Principle VII a skip is not a pass: the checks that enforce this product's personal-data
     # guarantees had never executed once, across three merged features.
@@ -391,9 +401,11 @@ jobs:
     # other job can reach. `pnpm verify:clean` has always run these same suites against stock
     # `postgres:17` locally, so this is the environment they were already proved against.
     #
-    # Neon is still what the **preview** uses (`deploy-api`, `schema-diff`): a preview API
-    # outlives its job and needs a database that outlives it too. FR-067's "never point a
-    # preview at real attendee data" is unchanged, and `preview-base` is still its parent.
+    # **006 (T076) — this used to end "Neon is still what the preview uses". There is no
+    # preview and there is no Neon.** Both went with the vendor jobs (research D13), so this
+    # service container is now the only database CI touches — the same real PostgreSQL, per
+    # job. FR-067 is unchanged and now binds UAT instead of a preview (FR-485), enforced by
+    # `deploy/vm/_common.sh` rather than by a permanently data-free branch.
     # ─────────────────────────────────────────────────────────────────────────────────────
     services:
       postgres:
@@ -457,7 +469,7 @@ jobs:
     # **A PostgreSQL service container, not a Neon branch.**
     #
     # These gates need *a real database*, which is what FR-005 and FR-069 ask for — not Neon
-    # specifically. Binding them to `db-branch` meant one unset repository secret
+    # specifically. Binding them to the old `db-branch` job meant one unset repository secret
     # (`NEON_API_KEY`) skipped every database-dependent check in the pipeline, and under
     # Principle VII a skip is not a pass: the checks that enforce this product's personal-data
     # guarantees had never executed once, across three merged features.
@@ -467,9 +479,11 @@ jobs:
     # other job can reach. `pnpm verify:clean` has always run these same suites against stock
     # `postgres:17` locally, so this is the environment they were already proved against.
     #
-    # Neon is still what the **preview** uses (`deploy-api`, `schema-diff`): a preview API
-    # outlives its job and needs a database that outlives it too. FR-067's "never point a
-    # preview at real attendee data" is unchanged, and `preview-base` is still its parent.
+    # **006 (T076) — this used to end "Neon is still what the preview uses". There is no
+    # preview and there is no Neon.** Both went with the vendor jobs (research D13), so this
+    # service container is now the only database CI touches — the same real PostgreSQL, per
+    # job. FR-067 is unchanged and now binds UAT instead of a preview (FR-485), enforced by
+    # `deploy/vm/_common.sh` rather than by a permanently data-free branch.
     # ─────────────────────────────────────────────────────────────────────────────────────
     services:
       postgres:
@@ -515,139 +529,45 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm db:migrate
-      # Everything except the accessibility suite, which reports as its own required check.
-      - run: pnpm exec playwright test --ignore-snapshots e2e/sign-in.spec.ts e2e/durability.spec.ts e2e/navigation.spec.ts e2e/responsive.spec.ts e2e/offline.spec.ts
+      # ───────────────────────────────────────────────────────────────────────────────────
+      # T079 (006) — **this line NAMED FIVE SPEC FILES WHILE ITS COMMENT SAID "EVERYTHING".**
+      #
+      # The comment read "everything except the accessibility suite". The list was 001's five,
+      # and neither 004 nor 005 added theirs — so ten spec files, including the whole identity
+      # journey, password recovery, saved sessions, session notes and the panel's keyboard
+      # behaviour, **have never run in CI once**. Every one of them passes locally under
+      # `pnpm verify:clean`, which is why nobody noticed: the gate was green and narrow.
+      #
+      # That is the silent-narrowing failure this codebase warns about repeatedly, and FR-490
+      # asks 006 to confirm no check was weakened — so it is fixed rather than merely observed.
+      #
+      # Derived from the directory now, minus the accessibility suite, which reports as its own
+      # required check. A spec added by a later feature is covered the moment it is written, and
+      # the emptiness guard means a glob that stops matching fails loudly instead of passing
+      # with nothing to run.
+      #
+      # **T079's actual question is answered by the two lines above this one**: `test-e2e` runs
+      # against `localhost:3000` with its own `postgres:17` service container and needs only
+      # `migrations`. It never depended on the preview, so deleting the preview does not touch
+      # it (research D13).
+      # ───────────────────────────────────────────────────────────────────────────────────
+      - name: end-to-end (every spec except the accessibility suite)
+        run: |
+          set -euo pipefail
+          mapfile -t SPECS < <(ls e2e/*.spec.ts | grep -v 'accessibility\.spec\.ts$')
+          if [ "${#SPECS[@]}" -eq 0 ]; then
+            echo "::error::No end-to-end specs matched. A gate that runs nothing is not a gate."
+            exit 1
+          fi
+          echo "Running ${#SPECS[@]} spec files:"
+          printf '  %s\n' "${SPECS[@]}"
+          pnpm exec playwright test --ignore-snapshots "${SPECS[@]}"
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
           name: e2e-report
           path: playwright-report
           retention-days: 7
-
-  # ── The ephemeral API for this pull request (plan.md Complexity Tracking) ────────────────
-  #
-  # A client preview with no API is a shell that cannot sign in, which is not the "working
-  # preview" FR-066 asks for. This deploys the pull request's own API, pointed at the pull
-  # request's own database branch — never at anything holding real attendee data (FR-067).
-  deploy-api:
-    name: deploy-api
-    if: github.event_name == 'pull_request' && github.event.action != 'closed'
-    needs: [db-branch, migrations, test-integration]
-    runs-on: ubuntu-latest
-    outputs:
-      api_url: ${{ steps.deploy.outputs.api_url }}
-    steps:
-      - uses: actions/checkout@v5
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v5
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: pnpm
-      - uses: superfly/flyctl-actions/setup-flyctl@master
-      - name: deploy an ephemeral API for this pull request
-        id: deploy
-        env:
-          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
-          APP_NAME: mynet-api-pr-${{ github.event.number }}
-          DATABASE_URL: ${{ needs.db-branch.outputs.db_url }}
-        run: |
-          set -euo pipefail
-          flyctl apps create "$APP_NAME" || echo "App already exists, redeploying."
-          flyctl secrets set --app "$APP_NAME" --stage \
-            DATABASE_URL="$DATABASE_URL" \
-            AUTH_PASSWORD_PEPPER="$AUTH_PASSWORD_PEPPER" \
-            AUTH_ATTEMPT_HASH_KEY="$AUTH_ATTEMPT_HASH_KEY" \
-            WEB_ORIGIN="https://pr-${{ github.event.number }}.${{ secrets.CLOUDFLARE_PAGES_PROJECT }}.pages.dev"
-          flyctl deploy --app "$APP_NAME" --config apps/api/fly.toml --dockerfile apps/api/Dockerfile --remote-only
-          echo "api_url=https://$APP_NAME.fly.dev" >> "$GITHUB_OUTPUT"
-      - name: seed the preview database
-        env:
-          DATABASE_URL: ${{ needs.db-branch.outputs.db_url }}
-        run: |
-          # Seeded throwaway attendees, so a reviewer can actually sign in to the preview.
-          # This script never runs against an environment holding real data (data-model.md).
-          pnpm install --frozen-lockfile
-          pnpm db:seed
-
-  # ── Gate 11: the preview a reviewer can open (FR-066, FR-067, SC-011) ───────────────────
-  deploy-preview:
-    name: deploy-preview
-    if: github.event_name == 'pull_request' && github.event.action != 'closed'
-    needs: [build, deploy-api]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v5
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      # Rebuilt rather than reusing the `build` artifact, because the client bakes its API
-      # address in at build time and that address is this pull request's ephemeral API. The
-      # artifact from `build` was compiled against a placeholder and would call the wrong host.
-      - name: build the client against this pull request's API
-        env:
-          VITE_API_BASE_URL: ${{ needs.deploy-api.outputs.api_url }}
-        run: pnpm --filter @mynet/web build
-      - name: publish the preview
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy apps/web/dist --project-name=${{ secrets.CLOUDFLARE_PAGES_PROJECT }} --branch=pr-${{ github.event.number }}
-
-  # ── Schema differences, as a review aid (T092) ──────────────────────────────────────────
-  #
-  # Not a gate. The constitution requires schema changes to be *reviewed*, and a reviewer
-  # cannot review what they cannot see — a generated migration is easy to approve by scrolling
-  # past. This posts the difference where the discussion is.
-  schema-diff:
-    name: schema-diff
-    if: github.event_name == 'pull_request' && github.event.action != 'closed'
-    needs: db-branch
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-      - uses: neondatabase/schema-diff-action@v1
-        with:
-          project_id: ${{ secrets.NEON_PROJECT_ID }}
-          compare_branch: pr-${{ github.event.number }}
-          api_key: ${{ secrets.NEON_API_KEY }}
-
-  # ── Clean-up (FR-067) ───────────────────────────────────────────────────────────────────
-  #
-  # An ephemeral resource that outlives its pull request is neither ephemeral nor free. Runs on
-  # close whether the pull request merged or not.
-  cleanup:
-    name: cleanup
-    if: github.event_name == 'pull_request' && github.event.action == 'closed'
-    runs-on: ubuntu-latest
-    steps:
-      # ─────────────────────────────────────────────────────────────────────────────────────
-      # Every step carries `if: always()`, because without it a transient failure in the first
-      # step skips the rest — leaving the Fly application alive, publicly reachable, and still
-      # holding its database URL and auth secrets as Fly secrets. The `|| true` that used to sit
-      # on the destroy step made the opposite mistake: it reported success while orphaning the
-      # application, so nobody found out until a billing statement.
-      #
-      # A cleanup job that only ever runs on `closed` also has no way to recover from its own
-      # past failures. `reconcile-orphans.yml` sweeps up what this misses.
-      # ─────────────────────────────────────────────────────────────────────────────────────
-      - name: delete the database branch
-        if: always()
-        uses: neondatabase/delete-branch-action@v3
-        with:
-          project_id: ${{ secrets.NEON_PROJECT_ID }}
-          branch: pr-${{ github.event.number }}
-          api_key: ${{ secrets.NEON_API_KEY }}
-      - if: always()
-        uses: superfly/flyctl-actions/setup-flyctl@master
-      - name: destroy the ephemeral API
-        if: always()
-        env:
-          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
-        run: flyctl apps destroy "mynet-api-pr-${{ github.event.number }}" --yes
 
   # ── The aggregate gate (FR-064, FR-071) ─────────────────────────────────────────────────
   #
@@ -663,17 +583,23 @@ jobs:
   verify:
     name: verify
     runs-on: ubuntu-latest
-    # ─────────────────────────────────────────────────────────────────────────────────────────
-    # **Pull requests only.** The eleven checks include a preview deployment, which exists only
-    # for a pull request. Asserting all eleven succeeded on a `push` meant `deploy-preview` was
-    # skipped, `skipped != success`, and every merge into `develop` or `main` produced a
-    # permanently red check on a protected branch.
+    # ═════════════════════════════════════════════════════════════════════════════════════════
+    # **T078 (006) — RECOMPOSED AROUND THE JOBS THAT REMAIN, WITH NOTHING WEAKENED.**
     #
-    # That is its own kind of FR-064 failure, arriving from the opposite direction: a signal
+    # The eleventh check was `deploy-preview`. It is gone with its vendor, and 001's FR-066 and
+    # SC-011 are withdrawn with it by constitution v3.0.0 — explicitly, as a retraction rather
+    # than as a quiet omission. **The other ten are unchanged**, and that is the property
+    # FR-490 asks this change to hold: five jobs were removed because they built environments,
+    # not because they were inconvenient.
+    #
+    # It also now runs on `push`. The eleven checks used to include a preview that exists only
+    # for a pull request, so asserting all eleven on a push left `deploy-preview` skipped,
+    # `skipped != success`, and every merge into a protected branch permanently red — a signal
     # that is always red teaches reviewers to ignore it, which is exactly as useless as one that
-    # is always green. `verify-push` below covers the post-merge path with the jobs that can
-    # genuinely run there.
-    # ─────────────────────────────────────────────────────────────────────────────────────────
+    # is always green. With the preview gone, all ten can genuinely run on both, so
+    # **`verify-push` is therefore no longer a reduced set**: it asserts the same ten, so a
+    # merge is held to exactly the standard the pull request was.
+    # ═════════════════════════════════════════════════════════════════════════════════════════
     if: always() && github.event_name == 'pull_request' && github.event.action != 'closed'
     needs:
       - typecheck
@@ -686,7 +612,6 @@ jobs:
       - test-accessibility
       - test-e2e
       - build
-      - deploy-preview
     steps:
       - name: assert every required check succeeded
         env:
@@ -695,9 +620,12 @@ jobs:
           echo "$RESULTS"
 
           count=$(echo "$RESULTS" | jq -r 'length')
-          if [ "$count" -ne 11 ]; then
-            echo "::error::Expected 11 required checks, found $count."
-            echo "FR-063 names eleven. A check removed from \`needs\` is a check that no longer gates."
+          if [ "$count" -ne 10 ]; then
+            echo "::error::Expected 10 required checks, found $count."
+            echo "A check removed from \`needs\` is a check that no longer gates (FR-490)."
+            echo "This count went 11 -> 10 exactly once, in 006, when \`deploy-preview\` was deleted"
+            echo "along with its vendor and 001's FR-066/SC-011 were withdrawn in constitution v3.0.0."
+            echo "It must not move again without an amendment."
             exit 1
           fi
 
@@ -709,18 +637,37 @@ jobs:
             exit 1
           fi
 
-          echo "All 11 required checks succeeded."
+          echo "All 10 required checks succeeded."
 
-  # ── The post-merge aggregate ────────────────────────────────────────────────────────────
+  # ── The post-merge aggregate (T078) ─────────────────────────────────────────────────────
   #
-  # After a squash merge the ephemeral per-pull-request resources are gone, so the checks that
-  # depend on them cannot run. These six can, and they are the ones that would catch a bad
-  # merge resolution. Same refusal to accept anything other than literal success.
+  # ═══════════════════════════════════════════════════════════════════════════════════════
+  # **THIS USED TO ASSERT SIX CHECKS. IT NOW ASSERTS THE SAME TEN `verify` DOES.**
+  #
+  # The six were the ones that could run after a squash merge, because the other five depended
+  # on ephemeral per-pull-request resources that were already destroyed. Those resources are
+  # gone (T076), and every remaining check runs on its own service container — so there is no
+  # longer any reason for a merge to be held to a lower standard than the pull request was.
+  #
+  # It is a genuine strengthening rather than a rename: `migrations`, `test-integration`,
+  # `test-accessibility` and `test-e2e` now gate `develop` and `main` as well, and they are the
+  # four that would catch a bad merge resolution against a real database.
+  # ═══════════════════════════════════════════════════════════════════════════════════════
   verify-push:
     name: verify-push
     runs-on: ubuntu-latest
     if: always() && github.event_name == 'push'
-    needs: [typecheck, lint, test-unit, test-component, contract, build]
+    needs:
+      - typecheck
+      - lint
+      - test-unit
+      - test-component
+      - contract
+      - migrations
+      - test-integration
+      - test-accessibility
+      - test-e2e
+      - build
     steps:
       - name: assert every post-merge check succeeded
         env:
@@ -729,8 +676,10 @@ jobs:
           echo "$RESULTS"
 
           count=$(echo "$RESULTS" | jq -r 'length')
-          if [ "$count" -ne 6 ]; then
-            echo "::error::Expected 6 post-merge checks, found $count."
+          if [ "$count" -ne 10 ]; then
+            echo "::error::Expected 10 post-merge checks, found $count."
+            echo "This went 6 -> 10 in 006, when the ephemeral preview resources were deleted and"
+            echo "every gate became runnable on a push. It must not go back down."
             exit 1
           fi
 
@@ -741,4 +690,118 @@ jobs:
             exit 1
           fi
 
-          echo "All 6 post-merge checks succeeded."
+          echo "All 10 post-merge checks succeeded."
+
+  # ── The deployment gate (T077, FR-484) ──────────────────────────────────────────────────
+  #
+  # ═══════════════════════════════════════════════════════════════════════════════════════
+  # **A CHANGE REACHES UAT ON MERGE TO `develop`, AND PRODUCTION ON MERGE TO `main`.**
+  #
+  # That matches the existing branch flow, in which promoting `develop` to `main` is already a
+  # reviewed pull request — so production is gated by a human review of a change that has been
+  # running on UAT, rather than by a second approval mechanism nobody would maintain.
+  #
+  # **Both jobs depend on `verify-push`**, which is the aggregate that runs on a push and which
+  # now asserts the same ten checks `verify` does. So nothing deploys from a red pipeline, and
+  # nothing deploys from a *skipped* one either — that aggregate refuses to accept a skipped
+  # dependency as success (FR-064), which is what stops "the tests were skipped" from becoming
+  # "the deploy went ahead".
+  #
+  # **They are deliberately inert until the environments exist**, and they say so rather than
+  # failing: no domain has been registered and no Azure subscription has been named — both are
+  # owner decisions the specification records as open (tasks T004, T006). A job that failed on
+  # every merge for a reason nobody can act on is the always-red signal `verify` was fixed to
+  # stop being.
+  # ═══════════════════════════════════════════════════════════════════════════════════════
+  deploy-uat:
+    name: deploy-uat
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+    needs: [verify-push]
+    environment: uat
+    # ═════════════════════════════════════════════════════════════════════════════════════════
+    # **ITS OWN GROUP, WITH CANCELLATION OFF — and that is a correction.**
+    #
+    # The workflow-level group sets `cancel-in-progress: true`, which is right for verification
+    # and wrong for a job that mutates a long-lived environment. Two merges in quick succession
+    # would cancel the first run *mid-deploy*, and `deploy.sh` raises the maintenance flag at
+    # step [1b/6] before touching anything: a cancelled job leaves a file on the VM that nothing
+    # else removes, so UAT serves a 503 to every visitor indefinitely while the second run
+    # deploys on top of it and reports green.
+    # ═════════════════════════════════════════════════════════════════════════════════════════
+    concurrency:
+      group: deploy-uat
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v5
+      # `deploy.sh` builds the client, so the toolchain has to be here. Without these the job
+      # fails at step [2/6] the first time it stops being inert.
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: deploy to UAT
+        env:
+          AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
+        run: |
+          set -euo pipefail
+          if [ -z "${AZURE_CREDENTIALS:-}" ]; then
+            echo "::notice::UAT is not provisioned yet, so there is nothing to deploy to."
+            echo "Blocked on two owner decisions the specification records as open:"
+            echo "  * no domain is registered   -> Caddy cannot obtain a certificate (FR-479)"
+            echo "  * no subscription is named  -> deploy/vm/envs/uat.env leaves SUBSCRIPTION blank"
+            echo ""
+            echo "AZURE_CREDENTIALS ALONE IS NOT ENOUGH to make this job work. deploy.sh reaches"
+            echo "the VM over SSH, and az login grants control-plane access, not SSH. Before"
+            echo "enabling this job you must ALSO:"
+            echo "  * add a DEPLOY_SSH_KEY secret and load it into an agent in this job;"
+            echo "  * add a SSH_KNOWN_HOSTS secret (verify the fingerprint through"
+            echo "    'az vm run-command invoke' first -- deploy.sh prints the exact commands);"
+            echo "  * admit the runner to port 22, since provision-vm.sh locks the NSG rule to the"
+            echo "    provisioning operator's address and hosted runners have dynamic egress."
+            echo "Recorded here rather than discovered at cutover."
+            exit 0
+          fi
+          az login --service-principal \
+            -u "$(echo "$AZURE_CREDENTIALS" | jq -r .clientId)" \
+            -p "$(echo "$AZURE_CREDENTIALS" | jq -r .clientSecret)" \
+            --tenant "$(echo "$AZURE_CREDENTIALS" | jq -r .tenantId)" >/dev/null
+          ./deploy/vm/deploy.sh uat --migrate
+
+  deploy-prod:
+    name: deploy-prod
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [verify-push]
+    environment: prod
+    # Its own group, cancellation off — see `deploy-uat` for why.
+    concurrency:
+      group: deploy-prod
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: deploy to production
+        env:
+          AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
+        run: |
+          set -euo pipefail
+          if [ -z "${AZURE_CREDENTIALS:-}" ]; then
+            echo "::notice::Production is not provisioned yet, so there is nothing to deploy to."
+            echo "See the deploy-uat job for the two owner decisions this is blocked on."
+            echo "Production additionally requires an EXERCISED RESTORE before it holds real"
+            echo "attendee data (SC-413) -- see deploy/vm/OPERATIONS-LOG.md."
+            exit 0
+          fi
+          az login --service-principal \
+            -u "$(echo "$AZURE_CREDENTIALS" | jq -r .clientId)" \
+            -p "$(echo "$AZURE_CREDENTIALS" | jq -r .clientSecret)" \
+            --tenant "$(echo "$AZURE_CREDENTIALS" | jq -r .tenantId)" >/dev/null
+          ./deploy/vm/deploy.sh prod --migrate

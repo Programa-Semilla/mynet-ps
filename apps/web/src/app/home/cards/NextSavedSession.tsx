@@ -43,7 +43,7 @@ const NextSavedSessionCard = ({ event }: EventCardProps) => {
     // through one — the cache makes them cheap without making them coupled.
     // ───────────────────────────────────────────────────────────────────────────────────────
     const [sessions, saved] = await Promise.all([
-      catalog.listSessions(event.id) as Promise<Session[]>,
+      catalog.listSessions(event.id),
       savedSessions.listSaved(event.id),
     ])
 

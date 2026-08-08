@@ -22,6 +22,20 @@ import { Agenda } from './destinations/Agenda.js'
  * The five **destinations** stay eager. Home and Agenda are the workspace; a spinner between
  * the rail and the thing it navigates to would be a worse product for a saving the budget does
  * not need.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ * **T130 (006) — THAT LAST PARAGRAPH IS NARROWED, AND THE NARROWING IS RECORDED RATHER THAN
+ * MADE QUIETLY.**
+ *
+ * The rule is now **"the destinations needed to render the workspace stay eager"**, which is
+ * what 004's reasoning actually said — Home and Agenda are named in it; "the five" was a
+ * shorthand that happened to be true while three of them were placeholders.
+ *
+ * 006 gives Discover real content and the initial shell went 2.9 KB over budget. The saving the
+ * budget did not need in 004 is one it needs now, and Discover fails 004's own test for staying
+ * eager: it is not the workspace, it is the second question the product answers, and it is
+ * reached by a deliberate navigation. Home and Agenda are unchanged.
+ * ─────────────────────────────────────────────────────────────────────────────────────────
  * ═════════════════════════════════════════════════════════════════════════════════════════
  */
 const SignUp = lazy(() => import('./auth/SignUp.js').then((m) => ({ default: m.SignUp })))
@@ -40,6 +54,30 @@ const ProfileEdit = lazy(() =>
   import('./profile/ProfileEdit.js').then((m) => ({ default: m.ProfileEdit })),
 )
 const Account = lazy(() => import('./profile/Account.js').then((m) => ({ default: m.Account })))
+
+/**
+ * T130 (006) — **the profile view is code-split too, and the asset budget is again why.**
+ *
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ * Discover pushed the initial shell 2.9 KB over the 150 KB budget, and the gate's own message
+ * says the alternative out loud: *do not raise it to make a red build green.* Splitting is the
+ * honest fix, and this is the right thing to split — the profile view meets the same test the
+ * twelve surfaces above do. It is reached **deliberately, once, by somebody who has decided to
+ * look at one person**, so paying for it on every cold load of Home is precisely the cost the
+ * budget exists to notice.
+ *
+ * **Discover itself is split as well** — see the narrowed rule in the block above. Splitting the
+ * profile view alone recovered 0.6 KB of the 2.9 KB; splitting the destination recovered the
+ * rest, and it is the change that matches what the budget is actually measuring, which is what
+ * an attendee downloads before **Home** is usable.
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ */
+const Discover = lazy(() =>
+  import('./destinations/Discover.js').then((m) => ({ default: m.Discover })),
+)
+const AttendeeProfile = lazy(() =>
+  import('./discover/AttendeeProfile.js').then((m) => ({ default: m.AttendeeProfile })),
+)
 
 /**
  * The five destinations, declared once (FR-012, FR-013).
@@ -172,10 +210,25 @@ export const DESTINATIONS: readonly Destination[] = [
     children: [{ path: ':sessionId', element: createElement(SessionPanel) }],
   },
   {
+    /*
+      T052, T087 (006) — **Discover has content now**, and it declares both of its addresses
+      here rather than in `routes.tsx`. That is FR-233 inherited: a destination owns its element
+      and its nested addresses, and the router names none of them. 007, 008 and 009 extend this
+      file the same way.
+
+      `purpose` already described what this destination would be, and it turns out to have been
+      accurate — so unlike Agenda's, it needs no correction. It is now a description rather than
+      placeholder text, because the placeholder is gone.
+    */
     path: '/discover',
     label: 'Discover',
     purpose: 'Attendees you might want to meet, with search and filters.',
     icon: Compass,
+    element: createElement(Discover),
+    // `/discover/<attendeeId>` — the profile view, rendered over the directory (FR-431). Nested
+    // rather than sibling, so the directory stays mounted behind it: closing is a navigation
+    // rather than a refetch, and Back closes the dialog through the browser's own mechanism.
+    children: [{ path: ':attendeeId', element: createElement(AttendeeProfile) }],
   },
   {
     path: '/messages',

@@ -36,3 +36,29 @@ also give two snapshots the same `prevId`, which `drizzle-kit` rejects as a coll
 006 diffs against `0004_snapshot.json` — the full current schema — and takes index 5, which is the
 number the roadmap reserves for it. Nothing needs adjusting; just do not hand-write a
 `0003_snapshot.json` to "fix" the gap.
+
+**Confirmed by 006**: it did exactly that. `0005_snapshot.json` re-parents onto `0004_snapshot.json`,
+the chain stayed contiguous, and the journal took index 5 with a `when` later than every entry.
+
+## This file breaks `drizzle-kit generate`, and you have to move it
+
+`drizzle-kit` reads **every** file in this directory as a snapshot and `JSON.parse`s it. This one is
+Markdown, so a generate run aborts before it does anything:
+
+```
+SyntaxError: Unexpected token '#', "# Migratio"... is not valid JSON
+```
+
+It names no file, so it reads like a corrupt snapshot rather than like a README. 006 lost time to it;
+here is the answer:
+
+```bash
+mv apps/api/migrations/meta/README.md /tmp/meta-README.md
+pnpm db:generate --name <your_migration_name>
+mv /tmp/meta-README.md apps/api/migrations/meta/README.md
+```
+
+**Move it, do not relocate it.** `CLAUDE.md`, the constitution and three feature specifications cite
+this path; a file that answers the question from somewhere else is a file the next reader does not
+find. The two minutes of moving it are cheaper than the broken references — and cheaper than
+rediscovering the error message, which is the actual cost.

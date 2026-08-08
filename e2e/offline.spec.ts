@@ -75,13 +75,34 @@ test.describe('offline', () => {
     await context.setOffline(true)
     await page.goto('/')
 
+    // ─────────────────────────────────────────────────────────────────────────────────────
     // FR-053 — refused, explained, and explicitly not lost. The message must not blame the
     // server: this is connectivity, and telling the attendee it is "a problem on our side"
     // would send them hunting for a fault that does not exist.
-    const failure = page.getByRole('alert')
+    //
+    // **006 — this named `getByRole('alert')` unqualified, and Home now has more than one.**
+    // That is the composition contract working rather than a regression: every card that reads
+    // the network owns its own failure state (FR-448), so an offline Home shows one alert per
+    // uncached card. The conferences card is the one this assertion has always been about.
+    // ─────────────────────────────────────────────────────────────────────────────────────
+    const failure = page.getByRole('alert').filter({ hasText: 'Your conferences' })
     await expect(failure).toBeVisible()
     await expect(failure).toContainText('need a connection')
     await expect(failure).toContainText('Nothing has been lost')
+
+    // …and the property generalised, which is what FR-053 actually asks for: **no** card may
+    // report a connectivity failure as a fault on our side. A card added later that gets this
+    // wrong fails here rather than being noticed by an attendee on a train.
+    const alerts = await page.getByRole('alert').allTextContents()
+    expect(alerts.length).toBeGreaterThan(0)
+    for (const text of alerts) {
+      expect(text, 'an offline failure must not be reported as a server fault').not.toMatch(
+        /problem on our side/i,
+      )
+      expect(text, 'an offline failure must say a connection is needed').toMatch(
+        /needs? a connection/i,
+      )
+    }
 
     await context.setOffline(false)
   })

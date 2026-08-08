@@ -39,6 +39,17 @@ export type {
   ProfileDraft,
   ProfileRepository,
 } from './profile.js'
+// 006 — the Discover directory. **Appended, never merged into this barrel**, for the reason
+// stated above: a new domain adds `./<domain>.js` here and nowhere else. Its own domain rather
+// than a third verb on `IdentityRepository`, because it is about people and not about
+// membership (research D1).
+export type {
+  DirectoryEntry,
+  DirectoryPage,
+  DirectoryQuery,
+  DirectoryRepository,
+  VisibleProfile,
+} from './directory.js'
 
 export {
   NotAuthenticatedError,
@@ -50,6 +61,7 @@ export {
 import type { SavedSessionRepository, SessionNotesRepository } from './agenda.js'
 import type { AttendeeRepository } from './attendee.js'
 import type { CatalogRepository } from './catalog.js'
+import type { DirectoryRepository } from './directory.js'
 import type { ActiveEventRepository, EventsRepository } from './events.js'
 import type { IdentityRepository } from './identity.js'
 import type { ProfileRepository } from './profile.js'
@@ -75,4 +87,8 @@ export interface Repositories {
   // capability worth having.
   readonly identity: IdentityRepository
   readonly profile: ProfileRepository
+  // 006 — the Discover directory. **Appended likewise, and deliberately NOT cached**: FR-466
+  // makes offline a refusal rather than a degraded read, so 005's decorator is not applied to
+  // this member and the composition root says so where the wiring happens.
+  readonly directory: DirectoryRepository
 }

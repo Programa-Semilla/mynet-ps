@@ -1,7 +1,7 @@
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type Page } from '@playwright/test'
 
-import { ADA, signIn } from './support/attendees.js'
+import { ADA, signIn, useConference } from './support/attendees.js'
 import { DESTINATIONS, WIDTHS } from './support/destinations.js'
 
 /**
@@ -95,6 +95,60 @@ test.describe('accessibility', () => {
       expect(
         blocking(violations),
         `conference menu at ${width.px}px:\n${describeViolations(blocking(violations))}`,
+      ).toEqual([])
+    })
+  }
+
+  /**
+   * T098 (006) — **Discover with a populated directory, and the profile view over it.**
+   *
+   * ═══════════════════════════════════════════════════════════════════════════════════════
+   * The destination sweep above already visits `/discover` at all three widths — and until 006
+   * it scanned a placeholder. It now scans a real directory, which is the point: the
+   * violations that matter here are the ones only rendered content produces. Contrast on the
+   * availability chip against its tinted background, the search field's focus ring, and the
+   * interest chips are all things a static check cannot see and an empty destination does not
+   * have.
+   *
+   * The profile view needs its own scan for the reason the conference menu does: it is a
+   * `<dialog>` that only exists once opened, so a suite that visits addresses at rest would
+   * never look at it — and a modal is precisely where a missing accessible name or an
+   * unreachable close control does the most harm.
+   * ═══════════════════════════════════════════════════════════════════════════════════════
+   */
+  test('Discover with a populated directory is clean', async ({ page }) => {
+    await page.goto('/')
+    await signIn(page, ADA)
+    // Pinned. The active conference is durable and earlier specs switch it — `useConference`
+    // records the run that taught us. Without this these pass only because this file happens to
+    // sort first, and a rename or a shard split turns them into failures from another file.
+    await useConference(page, 'Product & Design Summit')
+    await page.goto('/discover')
+    // Awaited on a CARD rather than on the heading: the heading renders while the directory is
+    // still loading, so scanning too early would scan a spinner and report it clean.
+    await expect(page.getByRole('heading', { name: 'Grace Hopper', level: 3 })).toBeVisible()
+
+    const { violations } = await scan(page)
+    expect(blocking(violations), describeViolations(blocking(violations))).toEqual([])
+  })
+
+  for (const width of WIDTHS) {
+    test(`the open profile view is clean at ${width.px}px (${width.layout})`, async ({ page }) => {
+      await page.setViewportSize({ width: width.px, height: 900 })
+      await page.goto('/')
+      await signIn(page, ADA)
+      await page.goto('/discover')
+
+      await page.getByRole('heading', { name: 'Grace Hopper', level: 3 }).getByRole('link').click()
+      await expect(page.getByRole('dialog')).toBeVisible()
+      await expect(
+        page.getByRole('dialog').getByRole('heading', { name: 'Grace Hopper', level: 2 }),
+      ).toBeVisible()
+
+      const { violations } = await scan(page)
+      expect(
+        blocking(violations),
+        `profile view at ${width.px}px:\n${describeViolations(blocking(violations))}`,
       ).toEqual([])
     })
   }

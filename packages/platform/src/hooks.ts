@@ -75,6 +75,24 @@ export const useProfileRepository = (): PlatformServices['repositories']['profil
   usePlatform().repositories.profile
 
 /**
+ * 006 — the Discover directory: co-attendees at the active conference.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ * **One hook, because it is one subject.** The pairs above exist where two capabilities are
+ * genuinely independent — saving is not noting, editing a profile is not deleting an account.
+ * Listing the directory and opening one of its entries are the same capability at two
+ * granularities, and a surface holding one has no reason to be denied the other.
+ *
+ * **`registry.tsx` needed no edit for this.** T009 replaced its hand-mirrored repository
+ * declarations with `@mynet/data`'s own `Repositories`, so a new domain is added to that
+ * aggregate and reaches this package by inference — which is exactly the property FR-496 was
+ * asking for, demonstrated by the first feature to add a repository after it.
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ */
+export const useDirectoryRepository = (): PlatformServices['repositories']['directory'] =>
+  usePlatform().repositories.directory
+
+/**
  * 005 — when the content on screen was retrieved, or `null` when it is live (FR-216).
  *
  * A component calls this to render the staleness stamp. It learns nothing about caching from
