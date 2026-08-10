@@ -265,9 +265,23 @@ describe('migration 0004 — saved sessions and notes', () => {
       tags.filter((tag) => tag.startsWith('0005_')),
       '0005 belongs to 006, and 006 has claimed it — exactly one migration, as reserved',
     ).toEqual(['0005_directory_indexes'])
+    // ─────────────────────────────────────────────────────────────────────────────────────
+    // **`0006` was asserted absent until 007 shipped, and is now asserted present** — the third
+    // time this line has been edited, and each time for the reason 005 wrote it: a feature
+    // claiming its reserved number must appear in a reviewed diff rather than happening
+    // quietly. This is 007's edit. `0007` remains reserved for 008.
+    //
+    // The tag is `0006_conversations_and_notifications` rather than the name `drizzle-kit`
+    // generated, matching the convention `0004_saved_sessions_and_notes` and
+    // `0005_directory_indexes` set; the journal entry was renamed with the file (T012).
+    // ─────────────────────────────────────────────────────────────────────────────────────
     expect(
       tags.filter((tag) => tag.startsWith('0006_')),
-      '0006 belongs to 007',
+      '0006 belongs to 007, and 007 has claimed it — exactly one migration, as reserved',
+    ).toEqual(['0006_conversations_and_notifications'])
+    expect(
+      tags.filter((tag) => tag.startsWith('0007_')),
+      '0007 belongs to 008',
     ).toEqual([])
     expect(
       tags.filter((tag) => tag.startsWith('0003_')),

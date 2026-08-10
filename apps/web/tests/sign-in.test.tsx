@@ -22,6 +22,10 @@ const noopDevices: PlatformServices['devices'] = {
     isSupported: () => false,
     requestPermission: async () => 'unsupported',
     show: async () => {},
+    // 007 — see `tests/support/services.tsx`. Nothing on this screen may reach them.
+    subscribe: async () => null,
+    unsubscribe: async () => {},
+    currentSubscription: async () => null,
   },
   calendar: { isSupported: () => false, addEvent: async () => {} },
   camera: { isSupported: () => false, capturePhoto: async () => null },
@@ -37,6 +41,8 @@ const noopDevices: PlatformServices['devices'] = {
     subscribe: () => () => {},
     reportReachability: () => {},
   },
+  // 007 — the seventh capability, visible by default. See `tests/support/services.tsx`.
+  visibility: { isVisible: () => true, subscribe: () => () => {} },
 }
 
 const renderSignIn = (overrides: Partial<PlatformServices> = {}) => {
@@ -94,6 +100,29 @@ const renderSignIn = (overrides: Partial<PlatformServices> = {}) => {
         list: async () => Promise.reject(new Error('not signed in')),
         get: async () => Promise.reject(new Error('not signed in')),
         readAvatar: async () => Promise.reject(new Error('not signed in')),
+      },
+      // 007 — signed out, so every one of these rejects. Messages, the safety controls and
+      // device registration are all behind authentication; nothing on this screen can reach
+      // them, and a resolving double here would let a defect that *did* reach them pass.
+      conversations: {
+        list: async () => Promise.reject(new Error('not signed in')),
+        hasUnread: async () => Promise.reject(new Error('not signed in')),
+        openWith: async () => Promise.reject(new Error('not signed in')),
+        markRead: async () => Promise.reject(new Error('not signed in')),
+      },
+      messages: {
+        list: async () => Promise.reject(new Error('not signed in')),
+        send: async () => Promise.reject(new Error('not signed in')),
+      },
+      blocks: {
+        list: async () => Promise.reject(new Error('not signed in')),
+        block: async () => Promise.reject(new Error('not signed in')),
+        unblock: async () => Promise.reject(new Error('not signed in')),
+      },
+      reports: { submit: async () => Promise.reject(new Error('not signed in')) },
+      pushSubscriptions: {
+        register: async () => Promise.reject(new Error('not signed in')),
+        unregister: async () => Promise.reject(new Error('not signed in')),
       },
     },
     freshness: { lastRetrieved: () => null },

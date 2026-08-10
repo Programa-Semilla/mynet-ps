@@ -4,6 +4,7 @@ import fp from 'fastify-plugin'
 import { prunePasswordResets } from './auth/password-reset.js'
 import { pruneAttempts, pruneSessions } from './auth/throttle.js'
 import { pruneVerifications } from './auth/verification.js'
+import { pruneExpiredReports, REPORT_RETENTION_DAYS } from './db/queries/reports.js'
 
 /**
  * Periodic retention sweeps.
@@ -88,6 +89,21 @@ export const RETENTION_SWEEPS: readonly RetentionSweep[] = [
       'FR-384, and it matters slightly more than verification: a consumed row is a record that ' +
       'a particular attendee recovered their account at a particular time, which nothing needs.',
     run: prunePasswordResets,
+  },
+  {
+    // T019 (007) — research R3.
+    table: 'abuse_reports',
+    window: `${REPORT_RETENTION_DAYS} days`,
+    reason:
+      'Cascade-reachable from BOTH attendees, so this is a second line — it covers the case ' +
+      'where neither party deletes. The window exists because **the row is not the record**: ' +
+      "the durable artifact is the operator's mail (FR-547), and the row's only job is to " +
+      'survive the gap between writing a report and dispatching it. Keeping it longer would ' +
+      "retain one attendee's free-text accusation about another indefinitely, in a table " +
+      'nothing in this product may read (FR-548). The accepted cost is recorded rather than ' +
+      'hidden: a report can be lost if dispatch fails and the reported attendee then deletes ' +
+      'their account — the erasure right was chosen over the evidence.',
+    run: pruneExpiredReports,
   },
 ]
 

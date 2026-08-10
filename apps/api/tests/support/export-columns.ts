@@ -86,4 +86,29 @@ export const EXPORTED_COLUMNS: Record<string, ExportTarget> = {
   'auth_sessions.last_used_at': { section: 'signInSessions', field: 'lastUsedAt' },
   'auth_sessions.expires_at': { section: 'signInSessions', field: 'expiresAt' },
   'auth_sessions.revoked_at': { section: 'signInSessions', field: 'revokedAt' },
+
+  // ═════════════════════════════════════════════════════════════════════════════════════════
+  // T018, T136 (007). Four sections, and the columns NOT here are the interesting half —
+  // `messages.author_id` (the exclusion is a WHERE clause), and the two `push_subscriptions`
+  // key columns (credentials, exported as a redacted presence). Both are declared with their
+  // reasoning in `tests/unit/export-coverage.test.ts`.
+  // ═════════════════════════════════════════════════════════════════════════════════════════
+  'messages.conversation_id': { section: 'messages', field: 'conversationId' },
+  'messages.body': { section: 'messages', field: 'body' },
+  'messages.sent_at': { section: 'messages', field: 'sentAt' },
+
+  'attendee_blocks.blocked_id': { section: 'blocks', field: 'blockedAttendeeId' },
+  'attendee_blocks.created_at': { section: 'blocks', field: 'createdAt' },
+
+  'abuse_reports.reported_id': { section: 'reports', field: 'reportedAttendeeId' },
+  'abuse_reports.reason': { section: 'reports', field: 'reason' },
+  'abuse_reports.message_ids': { section: 'reports', field: 'messageIds' },
+  'abuse_reports.created_at': { section: 'reports', field: 'createdAt' },
+
+  'push_subscriptions.endpoint': { section: 'pushSubscriptions', field: 'endpoint' },
+  'push_subscriptions.created_at': { section: 'pushSubscriptions', field: 'createdAt' },
+  'push_subscriptions.last_delivered_at': {
+    section: 'pushSubscriptions',
+    field: 'lastDeliveredAt',
+  },
 }

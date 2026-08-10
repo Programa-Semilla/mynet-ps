@@ -87,8 +87,23 @@ per-attendee, server-side state**. The prototype's local-only behaviour is a pro
 Shipped: the production foundation (001), event context and the session catalog (002), attendee
 identity and profile (004), Agenda as a personal schedule (005), and **Discover with the
 deployment platform it runs on** — feature 006, squash-merged to `develop` in
-[#13](https://github.com/Programa-Semilla/mynet-ps/pull/13). **007 (Messages) is next**; see
-`brainstorm/00-overview.md` for the queue.
+[#13](https://github.com/Programa-Semilla/mynet-ps/pull/13).
+
+**007 (Messages, and the notification delivery platform) is shipped** — conversations, the thread,
+block and report, unread state and Home's indicator, deletion honesty, and **Web Push that actually
+delivers**. Its Phase 7 was gated on a constitution amendment and is no longer: **v3.1.0** resolved
+register entry 10 in part, bringing delivery into scope for a received message and nothing else.
+
+**Notification delivery is real, not simulated.** `WebPushService` signs with a VAPID pair and POSTs
+to whichever push service the browser chose, and it has been verified end to end on a desktop:
+message sent → OS notification → activating it opens the conversation. The recording sink remains
+the fallback when no keys are configured, chosen by configuration alone so a local run is the
+production path rather than a special mode.
+
+**T148 — the by-hand `quickstart.md` walkthrough — was NOT completed before merge.** Scenario 5 was
+walked (twice, including a real desktop delivery); scenarios 1–4 and 6 were not. It carries forward
+as the outstanding validation for this feature, and it is also the only review the desktop and
+tablet layouts have had.
 
 **Nothing has been deployed yet, and that is not a gap in the code.** `deploy/vm/` is complete —
 two Azure VMs, Caddy with automatic TLS, a loopback-only PostgreSQL container, backups and a
@@ -103,10 +118,16 @@ next, what remains of the day, what is next from their saved sessions, and who i
 Agenda carries the whole programme with an All/Saved filter and an addressable session detail
 panel. Discover carries the attendee directory with an addressable profile view over it.
 
-**Still carrying no product content**: Messages and Network. Audience Q&A arrives in 009, as a
-third section on the panel 005 built.
+Messages carries private 1:1 conversations that are **permanent and independent of the active
+event**: any attendee sharing a current event may open one with any other, with no request and no
+acceptance step, and once open it stays open. The thread polls every three seconds while it is open
+and the tab is visible; blocking and reporting are server-enforced, and a report leaves the product
+as operator mail that nothing inside it can read.
 
-**Migrations claimed so far run to `0005`.** The journal lists `0003` before `0004` while carrying a
+**Still carrying no product content**: Network. Audience Q&A arrives in 009, as a third section on
+the panel 005 built.
+
+**Migrations claimed so far run to `0006`.** The journal lists `0003` before `0004` while carrying a
 later timestamp — `apps/api/migrations/meta/README.md` explains why both halves are load-bearing and
 what a regenerating feature must not "fix". Anyone regenerating must move that README aside first,
 because `drizzle-kit generate` JSON-parses every file in `meta/`.
@@ -158,7 +179,10 @@ refactor.
   Attendee state *about* conference content belongs in its own repository.
 - **The detail panel is a native `<dialog>` with `showModal()`** — focus trap, background inertness
   and Escape come from the platform. Focus restoration to the opener is explicit, because
-  `<dialog>` does not do it reliably.
+  `<dialog>` does not do it reliably. **007's confirmations reuse `ConfirmDialog` rather than
+  opening a second one**: the ordering is what is easy to get wrong (restore focus *after*
+  closing, because an inert element cannot take it), and a duplicate is a second place for it to
+  drift.
 
 **Directory (006)**
 
@@ -169,6 +193,75 @@ refactor.
 - **Pagination's guarantee is asymmetric by design**: no duplicate ever, omissions permitted.
   Keyset cannot cover a score that *falls* below the cursor; the only server-side fix is a snapshot
   nothing may retain. `useDirectory` de-duplicates against the list it is rendering — not a cache.
+
+**Messages (007)**
+
+- **Participation replaces event scope as the authorization predicate.** A conversation has two
+  owners and is cross-event, so `EventScope` cannot reach it — and worse, `event-scope-audit`
+  *silently passes* a route naming no conference. A branded `ConversationScope`, a
+  `requireParticipation` guard and a **second route audit** replace it. 008's appointments inherit
+  this.
+- **Refusals are indistinguishable by construction, and the shapes differ deliberately.** A
+  conversation you are not in is **404**, identical to one that does not exist (a 403 confirms two
+  specific people are talking). A blocked send is a **reasonless 409** (FR-537). A conversation
+  closed by the counterpart's deletion is **403 with an explanation** — a fact about a thread the
+  caller can already read in full.
+- **Nothing in Messages is cached, and the refusal is declared per member** at the composition
+  root. Message content is the most sensitive data in the product; the decorator revokes on age
+  alone, and every write here is refused rather than queued.
+- **Deleting an account removes its messages from every conversation**, including the other
+  person's view. The survivor keeps a one-sided read-only thread with `counterpart: null` — no
+  name, no avatar, no identifier. A conversation nobody is left in is removed, which no cascade
+  can do because `conversations` deliberately holds no attendee foreign key.
+- **The message cursor carries microseconds while the wire carries milliseconds.** A millisecond
+  bound silently skips every row sharing the page boundary's millisecond; it failed
+  *intermittently* until fixed.
+- **`VisibilityService` is a seventh device capability**, added for the visible-only poll and
+  argued in `packages/platform/src/interfaces/index.ts`. `substitution.test.ts` is what forced it to
+  be declared rather than added quietly; **v3.1.0 ratified it** into Principle V.
+- **Absences with tests**: no message edit or delete route or column (FR-516), no report read
+  surface anywhere (FR-548), no read receipt, delivery tick, typing indicator or presence (M5), no
+  notification bell or notification centre (FR-560), and **a received message is the only thing
+  that dispatches a notification** (FR-561). That last one is a source-level audit over
+  `apps/api/src`, and it exists to stop 008 and 009 adopting the platform for appointments and Q&A
+  without a decision: **a second trigger has to edit the test, and editing it is the conversation.**
+
+**Notification delivery (007)**
+
+- **The platform is vendor-free at the port, and there was never a vendor to choose.** `PushService`
+  in `apps/api/src/notifications/` returns `'delivered' | 'gone' | 'failed'` — the three outcomes
+  that differ in what the caller must *do*. Two implementations: `WebPushService` signs with the
+  VAPID pair and POSTs to the endpoint **the browser issued** (`fcm.googleapis.com` for Chromium,
+  Mozilla's for Firefox), and a **sink adapter** records rather than sends. The port is what made
+  the phase buildable before either existed.
+- **The adapter is selected by configuration, in every environment identically.** VAPID pair
+  present → real delivery; absent → the sink. No environment branch, so a local end-to-end test
+  exercises the production path. `web-push` is confined to `apps/api/src/notifications/` by the same
+  lint boundary that confines storage vendors.
+- **The service worker runs in `vite dev` too, and `main.tsx` registers it explicitly.** 001 left
+  `devOptions: { enabled: false }` because only `vite preview` needed a worker; **Web Push is
+  impossible without one**, so `pnpm start` could not test notifications at all. `injectRegister`
+  only injects at build time, which is why registration moved into source — it now happens
+  identically in dev and production.
+- **A dead subscription is discarded; a failing one is not.** The asymmetry is deliberate:
+  over-retrying a dead endpoint costs a request, while wrongly discarding a live one silently stops
+  that person receiving anything ever again.
+- **A subscription is keyed on the endpoint alone, never on `(attendee, endpoint)`.** The same
+  browser profile signed into two accounts in turn issues the *same* endpoint; keyed on the pair,
+  the first account's row survives and one attendee's messages are delivered through another
+  attendee's registration. Re-registering **reassigns** the device to whoever holds it now.
+- **The service worker is hand-written source** at `apps/web/src/sw.ts` (`injectManifest`, not
+  `generateSW`): a `push` handler is code and configuration cannot express one. Everything the
+  generated worker did is carried across explicitly, **the API denylist most of all** — without it
+  the HTML shell is served in answer to API requests, and a failed request looks like a successful
+  page load. It is typechecked by its own `tsconfig.sw.json`, because a `lib="webworker"` file
+  inside the application program redefines the application's DOM globals.
+- **Permission is explained before it is requested, by construction.** `NotificationPrompt.tsx` is
+  the only caller of `requestPermission` in the client, and a unit test asserts that. It renders
+  nothing at all once it has been answered — there is no bell to become.
+- **Denial is a complete outcome, not a degraded one.** It is recorded so nobody is asked twice, and
+  `push-denied-fallback.test.tsx` re-runs the US1–US4 surfaces with permission denied to assert they
+  are unchanged.
 
 **Deployment**
 
@@ -243,6 +336,25 @@ Decided explicitly. **Not open for re-inference.**
     major version. A change reaches UAT on merge to `develop`. **001's FR-067 survives**: no
     non-production environment may be connected to real attendee data, and that now binds UAT.
 
+**2026-08-08** (ratified in constitution v3.1.0):
+
+21. **Engagement notification delivery is in scope, for a received message and nothing else.**
+    Reverses the exclusion that has stood since 1.0.0. Three things survive unchanged and are what
+    keep it narrow: **the bell and an in-app notification centre stay forbidden**; a received
+    message is the *only* trigger, so a second one needs another amendment; and permission is
+    deniable, so an attendee who refuses gets a complete product rather than a degraded one.
+    Accepted and **not** solved: message content appears on a lock screen, and whether an attendee
+    may suppress it was not decided.
+22. **`VisibilityService` is a seventh device capability.** Added by an implementation rather than a
+    product decision: a poll must stop while the tab is hidden, and the only way to ask is a browser
+    API feature code may not call. The alternative was a lint exemption, which would have traded a
+    structural boundary for a poll interval.
+23. **A report leaves the product as operator mail and is readable from nowhere inside it.**
+    Reporting blocks in the same action; the mail carries identifiers and a timestamp, never message
+    text and never the reason; and a failed dispatch fails neither the block nor the record. **The
+    address is not decided** — it is an obligation the owner personally holds, because somebody has
+    to read that inbox.
+
 ## How work is done here
 
 ### Branching and change flow
@@ -273,10 +385,11 @@ open questions.
   layouts, empty/loading/failure states, accessibility, checklist items discharged, identity
   scoping, event scoping, register position, reserved migration number — declared in the spec, or
   presumed unmet. **None may be deferred to a later polish pass.**
-- **Out of product scope**: organizer administration, payment processing. **Engagement**
-  notification delivery and calendar integration stay out until a recorded decision brings them in
-  — their interfaces exist but must not be wired to real delivery, and **the notification bell must
-  not be reproduced**.
+- **Out of product scope**: organizer administration, payment processing. **Calendar integration**
+  stays out until a recorded decision brings it in — its interface exists but must not be wired.
+  **Engagement notification delivery came IN at v3.1.0** (standing decision 21), bounded to a
+  received message and nothing else; **the notification bell and an in-app notification centre
+  remain forbidden**, and that half of the old exclusion is unchanged.
 - Loading and failure states are required wherever data crosses the network.
 - Every interactive control has an accessible label, a visible focus state, and keyboard support.
   Modals need a clear close action and Escape handling.
@@ -365,8 +478,21 @@ is a working summary. Each names what it blocks, because *when* to ask matters a
   cost compounds with each feature.
 - **Real brand mark and application icons.** None exist here. Long lead time; blocks release
   readiness rather than any single feature.
-- **Notifications.** The prototype header shows a bell with an unread dot, but engagement
-  notifications are out of scope. Does not cover transactional account mail, which is in scope.
+- **v3.1.0 is ratified and Phase 7 of 007 is delivered.** It resolved register entry 10 in part
+  (delivery in, bell still out), added `VisibilityService` to Principle V, and made the reporting
+  disposal path binding. **Two values it deliberately left open are below.** Neither blocks
+  implementation — only delivery in a deployed environment, and `deploy/vm/.env.example` documents
+  both with what a blank value costs.
+- **VAPID key custody** — register entry 20. **The entry is worded as "the push provider", and that
+  half turned out not to exist**: Web Push signs with your own key pair and posts to whatever
+  endpoint the browser issued, with no account, SDK or third party involved. The constitution's
+  wording is unchanged and should probably be amended. What remains genuinely open is custody: who
+  holds the private key, where it lives per environment, and what happens on rotation — since
+  rotating it silently stops delivery for every attendee until their browser re-registers.
+- **The operator address abuse reports are sent to** — register entry 21. Not a vendor question but
+  an obligation the owner personally holds: the reporting dialog says a person will read it, and
+  that sentence is only true once somebody does. Until then a report still blocks and still records,
+  and the skipped dispatch is logged rather than dropped.
 - **Whether `requirements.md` is amended** or its divergence from the constitution simply recorded.
 - **What "PS" denotes** in `mynet-ps`.
 

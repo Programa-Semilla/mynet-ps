@@ -39,3 +39,33 @@ export * from './identity-tokens.js'
 // only `storage/db-adapter.ts` touches it, and it deliberately holds no foreign key, which is
 // the single case FR-370's structural guard exists to catch (research D3, D10).
 export * from './stored-objects.js'
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 007 — Messages, and the notification delivery platform it needs. Seven tables, and **every
+// one of them is cross-event** — the first feature where that is true of the whole set.
+//
+// They are also the first tables in this product that `EventScope` cannot reach. Conversations
+// have no event to scope by (FR-507), so the predicate is *participation* instead:
+// `plugins/participation.ts` mirrors `plugins/event-access.ts` in shape, and
+// `tests/unit/participation-audit.test.ts` is its audit. The event audit does not cover these
+// routes and would silently appear to — research R9 is why the second one exists.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+
+// The exchange, its pair constraint, and the participation that is this feature's whole
+// authorization predicate. `conversation_pairs` is a table rather than a column so that a
+// departed attendee's identifier is not retained by the thing enforcing uniqueness (R10).
+export * from './conversations.js'
+
+// What was said. `author_id`'s cascade is the entirety of M3 — see the file.
+export * from './messages.js'
+
+// The refusal of contact that makes open send shippable. Directional, deliberately unlike
+// `conversation_pairs`, and the file states why collapsing the two directions would be a bug.
+export * from './blocks.js'
+
+// Written, mailed, and read by nothing in this product (FR-548).
+export * from './reports.js'
+
+// Where a device can be reached. Two of its columns are credentials rather than content, and
+// the export redacts them to a presence (research R14).
+export * from './push-subscriptions.js'

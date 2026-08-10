@@ -19,6 +19,7 @@ import maintenance from './maintenance.js'
 import authContext from './plugins/auth-context.js'
 import errors from './plugins/errors.js'
 import eventAccess from './plugins/event-access.js'
+import participation from './plugins/participation.js'
 import ports, { type PortOverrides } from './plugins/ports.js'
 import securityHeaders from './plugins/security-headers.js'
 import swagger from './plugins/swagger.js'
@@ -162,6 +163,16 @@ export const buildApp = async (options: BuildAppOptions = {}): Promise<FastifyIn
   //     `EventScope` every per-event query demands. Must follow auth-context: it verifies a
   //     registration for `request.attendee`, so identity has to be bound first (002, FR-146).
   await app.register(eventAccess)
+
+  // 5a-bis. Participation access (007). Decorates the instance with `requireParticipation`,
+  //     which produces the `ConversationScope` every conversation and message query demands.
+  //     Follows auth-context for the same reason 5a does: it verifies a participation row for
+  //     `request.attendee` (FR-523).
+  //
+  //     **A sibling of 5a, never a substitute.** Conversations are cross-event (FR-507), so
+  //     `EventScope` has no event to verify and the existing route audit walks past these
+  //     routes reporting success — research R9. Two predicates, two guards, two audits.
+  await app.register(participation)
 
   // 5b. The two ports 004 introduces — durable binary content and transactional account mail
   //     (FR-352, FR-394). Appended after the guards and before maintenance: nothing in steps

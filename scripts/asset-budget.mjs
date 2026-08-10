@@ -61,6 +61,41 @@ const files = shellChunks()
   .map((file) => ({ file, bytes: gzipSync(readFileSync(join(DIST, file))).length }))
   .sort((a, b) => b.bytes - a.bytes)
 
+/**
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ * **T142 (007) — THE GATE REFUSES TO REPORT A NUMBER ABOUT A BUNDLE NO ATTENDEE RECEIVES.**
+ *
+ * `apps/web/vite.config.ts` sets `envDir: '../..'`, so Vite loads the **repository-root `.env`**
+ * when building the client — and that file (gitignored, seeded from `.env.example`) sets
+ * `NODE_ENV=development`. Vite honours it, and React, React DOM, React Router and the scheduler
+ * all resolve to their **development** builds: roughly 60 KB gzipped of extra warnings,
+ * `Object.freeze` calls and component stacks.
+ *
+ * CI has no `.env`, so it measures the production shell. The two differ by more than a third of
+ * the budget, which means a local `pnpm verify` was failing on a figure CI would never see —
+ * exactly the "green result that checks nothing", inverted into a red one that means nothing.
+ *
+ * Detecting it and **refusing to judge** is the honest response. The alternatives were each a
+ * decision rather than a fix, and 007's T003 recorded them as deliberately unclaimed: whether the
+ * web build should ignore the root `.env`'s `NODE_ENV`, whether `.env.example` should stop
+ * seeding it, and whether local end-to-end runs *want* the development build's diagnostics.
+ * Nothing here settles any of those; it stops the budget answering a question it was not asked.
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ */
+const developmentReact = files.some(({ file }) => {
+  const source = readFileSync(join(DIST, file), 'utf8')
+  // ───────────────────────────────────────────────────────────────────────────────────────
+  // Two markers, both of which exist **only** in React's development builds and neither of which
+  // minification removes: `jsxDEV`, the development JSX runtime entry point, and the text of a
+  // warning that is compiled out of production entirely.
+  //
+  // Matched on the bundled source rather than on `process.env`, because what matters is what was
+  // *emitted*: reading the environment would report the intent, and the whole defect here is
+  // that the intent and the artifact disagree.
+  // ───────────────────────────────────────────────────────────────────────────────────────
+  return source.includes('jsxDEV') || source.includes('Each child in a list')
+})
+
 const total = files.reduce((sum, entry) => sum + entry.bytes, 0)
 const kb = (bytes) => `${(bytes / 1024).toFixed(1)} KB`
 
@@ -68,6 +103,19 @@ console.log('Initial shell JavaScript, gzipped:\n')
 for (const { file, bytes } of files) console.log(`  ${kb(bytes).padStart(9)}  ${file}`)
 console.log(`\n  ${kb(total).padStart(9)}  total`)
 console.log(`  ${kb(BUDGET_BYTES).padStart(9)}  budget\n`)
+
+if (developmentReact) {
+  console.warn(
+    'This build bundles DEVELOPMENT React, so the figure above is not what an attendee\n' +
+      'downloads and the budget cannot be judged against it.\n\n' +
+      "  Cause:  apps/web/vite.config.ts sets envDir: '../..', so Vite loads the repository-root\n" +
+      '          .env, which sets NODE_ENV=development. CI has no .env and builds production.\n\n' +
+      '  Fix:    NODE_ENV=production pnpm build && pnpm budget\n\n' +
+      'Not failing: a red result about a bundle nobody receives is as useless as a green one.\n' +
+      'CI measures the production shell, and that is the number the gate is about (FR-072).',
+  )
+  process.exit(0)
+}
 
 if (total > BUDGET_BYTES) {
   console.error(

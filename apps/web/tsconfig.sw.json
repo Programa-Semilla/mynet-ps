@@ -1,0 +1,27 @@
+{
+  // T118 (007) — the service worker is typechecked **as a worker, in its own program**.
+  //
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // **A `lib="webworker"` FILE INSIDE THE APPLICATION PROGRAM REDEFINES THE APPLICATION'S GLOBALS.**
+  //
+  // TypeScript merges lib references across a whole program, not per file. With `src/sw.ts` in the
+  // main `tsconfig.json`, `WebWorkerGlobalScope`'s declarations merged into the DOM ones and
+  // `globalThis.addEventListener('keydown', …)` in `tests/setup.ts` stopped inferring
+  // `KeyboardEvent` — the worker's overloads have no `keydown`, so the handler's parameter widened
+  // to `Event` and `event.key` failed to compile. That error is the *visible* half; the invisible
+  // half is every other DOM global quietly acquiring a worker meaning across the entire client.
+  //
+  // So the worker gets its own program with its own libs, and the application excludes it. Both
+  // are typechecked — `pnpm --filter @mynet/web typecheck` runs this file too — so the worker is
+  // no less checked than anything else, only checked against the right globals.
+  //
+  // No `DOM` lib here on purpose: a worker has no `document` and no `window`, and a reference to
+  // either must fail to compile rather than fail at three in the morning on somebody's phone.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  "extends": "@mynet/config/tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2023", "WebWorker"],
+    "types": []
+  },
+  "include": ["src/sw.ts"]
+}

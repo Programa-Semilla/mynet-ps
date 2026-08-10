@@ -1,8 +1,8 @@
 import { OfflineError, type VisibleProfile } from '@mynet/data'
 import { useDirectoryRepository } from '@mynet/platform'
-import { X } from 'lucide-react'
+import { MessageSquare, X } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
-import { useNavigate, useOutletContext, useParams } from 'react-router'
+import { Link, useNavigate, useOutletContext, useParams } from 'react-router'
 
 import { Loading } from '../AsyncState.js'
 import { AvatarFallback } from '../profile/AvatarFallback.js'
@@ -317,16 +317,34 @@ const ProfileBody = ({ state }: { state: ProfileState }): ReactNode => {
       )}
 
       {/*
-        ─────────────────────────────────────────────────────────────────────────────────────
-        **The action row is deliberately empty, and its absence is a requirement** (FR-434).
+        ═════════════════════════════════════════════════════════════════════════════════════
+        T045 (007) — **the action row 006 left empty now has its first action** (FR-434, FR-568).
 
-        Messaging is 007 and card-sharing and appointments are 008. A disabled "Message" button
-        here would be an affordance for a capability that does not exist — the reader presses it
-        and learns the product is broken rather than that the feature is not built. This section
-        boundary is where those actions attach when they arrive, so neither feature edits the
-        body above it.
-        ─────────────────────────────────────────────────────────────────────────────────────
+        006 declared this boundary and rendered nothing in it, because a disabled "Message" button
+        would have been an affordance for a capability that did not exist: the reader presses it
+        and learns the product is broken rather than that the feature is not built. The action
+        appears now that the phase owning it has landed, which is what that arrangement was for —
+        and it attaches *here*, so 008's card-sharing and appointments extend the same row without
+        touching the body above it.
+
+        **A `Link`, not a button that opens a dialog.** The thread is an addressable surface
+        (FR-569), and the address it navigates to — `new/<attendeeId>` — is the one that
+        deliberately creates nothing (FR-503a): an attendee who follows it and leaves without
+        sending leaves no trace, and this person cannot tell it happened.
+
+        SC-501 counts the actions from here to a sent first message: open the profile, choose
+        Message, type, send. This link is action two of three.
+        ═════════════════════════════════════════════════════════════════════════════════════
       */}
+      <div className="mt-4 flex flex-wrap gap-2 border-t border-border-subtle pt-4">
+        <Link
+          to={`/messages/new/${profile.attendeeId}`}
+          className="focus-ring inline-flex min-h-11 items-center gap-2 rounded-sm bg-accent-strong px-4 py-2 text-sm font-medium text-text-inverse"
+        >
+          <MessageSquare aria-hidden="true" className="size-4" />
+          Message {profile.displayName}
+        </Link>
+      </div>
     </>
   )
 }

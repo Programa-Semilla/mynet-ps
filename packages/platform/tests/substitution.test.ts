@@ -8,8 +8,10 @@ import type {
   DeviceServices,
   NotificationService,
   SecureStorage,
+  VisibilityService,
 } from '../src/interfaces/index.js'
 import { webDevices } from '../src/web/devices.js'
+import { WebNotificationService } from '../src/web/notifications.js'
 
 /**
  * T103 — every device capability is substitutable (FR-047, User Story 5).
@@ -41,6 +43,20 @@ const doubles = () => {
     },
     show: async () => {
       calls.push('notifications.show')
+    },
+    // 007 — the three members M4 added. Present here because the registry is substituted **whole**:
+    // a method added to the interface and forgotten in this double fails to compile, which is the
+    // guard working rather than a chore.
+    subscribe: async () => {
+      calls.push('notifications.subscribe')
+      return null
+    },
+    unsubscribe: async () => {
+      calls.push('notifications.unsubscribe')
+    },
+    currentSubscription: async () => {
+      calls.push('notifications.currentSubscription')
+      return null
     },
   }
 
@@ -97,6 +113,7 @@ const doubles = () => {
   }
 
   const listeners = new Set<(online: boolean) => void>()
+  const visibilityListeners = new Set<(visible: boolean) => void>()
   const connectivity: ConnectivityService = {
     isOnline: () => {
       calls.push('connectivity.isOnline')
@@ -112,6 +129,21 @@ const doubles = () => {
     },
   }
 
+  // 007 — the seventh capability. Substituting the registry whole is what makes FR-047's claim
+  // testable in one object, so a member added to `DeviceServices` and forgotten here fails to
+  // compile — which is the guard working rather than a chore.
+  const visibility: VisibilityService = {
+    isVisible: () => {
+      calls.push('visibility.isVisible')
+      return true
+    },
+    subscribe: (listener) => {
+      calls.push('visibility.subscribe')
+      visibilityListeners.add(listener)
+      return () => visibilityListeners.delete(listener)
+    },
+  }
+
   const devices: DeviceServices = {
     notifications,
     calendar,
@@ -119,9 +151,10 @@ const doubles = () => {
     contactShare,
     secureStorage,
     connectivity,
+    visibility,
   }
 
-  return { devices, calls, listeners }
+  return { devices, calls, listeners, visibilityListeners }
 }
 
 /**
@@ -149,6 +182,30 @@ const methodsOf = (implementation: object): string[] => {
   return [...names].sort()
 }
 
+/**
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ * **SIX AT 001, SEVEN SINCE 007 — AND THE SEVENTH IS RECORDED HERE BECAUSE THIS TEST DEMANDED
+ * IT.**
+ *
+ * The list below used to be six, with a comment saying that a seventh appearing "without an
+ * amendment is a decision nobody recorded". That guard did exactly its job: 007 needed
+ * `visibility`, and this test is what stopped the addition being made silently.
+ *
+ * So it is made loudly instead. **`visibility` is a declared addition to Principle V's list, and
+ * it is an outstanding governance item** — the constitution names six capabilities and this makes
+ * seven, which is a smaller version of the same act as 007's push amendment and belongs in the
+ * same review.
+ *
+ * The reasoning, in full, is in `interfaces/index.ts` above `VisibilityService`. In short:
+ * research R4's poll must not run in a background tab, the only way to ask is
+ * `document.visibilityState`, and `mynet/no-direct-platform-access` correctly refuses that in
+ * feature code — so the choice was a capability or a lint exemption, and a lint exemption would
+ * have traded a structural boundary for a poll interval.
+ *
+ * **This list stays a fixed enumeration rather than being derived from `webDevices()`.** Deriving
+ * it would make the test tautological and delete the guard that produced this note.
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ */
 const CAPABILITIES = [
   'notifications',
   'calendar',
@@ -156,12 +213,15 @@ const CAPABILITIES = [
   'contactShare',
   'secureStorage',
   'connectivity',
+  // 007 — see the block above. Added with its reasoning, not merely added.
+  'visibility',
 ] as const
 
 describe('device capability substitution', () => {
-  it('names exactly the six capabilities the constitution fixes', () => {
-    // Principle V names these six. Not pluralised, not suffixed with `Provider`. A seventh
-    // appearing here without an amendment is a decision nobody recorded.
+  it('names exactly the capabilities the constitution fixes, plus those declared since', () => {
+    // Principle V names six. Not pluralised, not suffixed with `Provider`. An **eighth** appearing
+    // here without a recorded decision is a decision nobody recorded — which is what this
+    // assertion caught when 007 added the seventh.
     expect(Object.keys(webDevices()).sort()).toEqual([...CAPABILITIES].sort())
   })
 
@@ -226,16 +286,48 @@ describe('the web implementations honour their contracts (FR-046, T105, T107)', 
     await expect(devices.secureStorage.clear()).resolves.toBeUndefined()
   })
 
-  it('leaves notifications and calendar unwired to real delivery', async () => {
-    // T107 — both are out of product scope until a recorded decision brings them in
-    // (constitution, Technology and Architecture Constraints).
-    //
-    // `isSupported() === false` is the assertion that matters: it is what stops a future caller
-    // from building a feature on a capability the product has not agreed to have. If somebody
-    // wires real delivery, this test fails, and that failure is the conversation.
-    expect(devices.notifications.isSupported()).toBe(false)
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════════════════════
+   * **THIS TEST CLAIMED TO BE A GOVERNANCE GATE AND WAS VACUOUS.**
+   *
+   * It read: *"both are out of product scope until a recorded decision brings them in… if somebody
+   * wires real delivery, this test fails, and that failure is the conversation."* Constitution
+   * **v3.1.0 brought notification delivery in**, 007 wired `WebNotificationService` to a real
+   * `PushManager`, and **this test kept passing** — because `webDevices()` is called with no VAPID
+   * key and jsdom has neither `Notification` nor `PushManager`, so `isSupported()` returned false
+   * for four environmental reasons that say nothing about whether the capability is wired.
+   *
+   * The event it existed to catch happened without it firing, and its comment went on asserting a
+   * scope the constitution had reversed. Both halves are corrected below: calendar keeps the
+   * genuine unwired assertion, and notifications get a **contract** assertion that does not depend
+   * on what jsdom happens to lack.
+   * ═══════════════════════════════════════════════════════════════════════════════════════════
+   */
+  it('leaves CALENDAR unwired to real delivery, which is still true', () => {
+    // Calendar remains out of product scope: the constitution's exclusion is unchanged, and its
+    // interface exists but must not be wired. This half of the original assertion still means
+    // what it said.
     expect(devices.calendar.isSupported()).toBe(false)
-    expect(await devices.notifications.requestPermission()).toBe('unsupported')
+  })
+
+  it('reports notifications unsupported when no VAPID key is configured (register entry 20)', () => {
+    // The fourth condition in `isSupported()` is **ours, not the browser's**: with no key there is
+    // nothing to subscribe with, so offering a permission prompt would lead nowhere. This is the
+    // property that survives a real browser, unlike the three jsdom happens to supply.
+    expect(new WebNotificationService(undefined).isSupported()).toBe(false)
+    expect(new WebNotificationService('').isSupported()).toBe(false)
+  })
+
+  it('resolves rather than rejecting when a configured browser still cannot register', async () => {
+    // Constructed **with** a key, so `isSupported()`'s VAPID condition is satisfied and what is
+    // being tested is the capability's own contract rather than the absence of configuration.
+    // jsdom has no service worker, so this is the defined "cannot register" outcome — `null`,
+    // never a rejection, because FR-552 makes "this device is not registered" an ordinary result.
+    const configured = new WebNotificationService('BEl62iUYgUivxIkv69yViEuiBIa40HI')
+
+    await expect(configured.subscribe()).resolves.toBeNull()
+    await expect(configured.currentSubscription()).resolves.toBeNull()
+    await expect(configured.unsubscribe()).resolves.toBeUndefined()
   })
 
   it('stores nothing in secure storage, because nothing in this slice may', async () => {

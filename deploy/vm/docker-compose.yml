@@ -110,6 +110,15 @@ services:
       # a real environment wants — and the API says so on startup rather than pretending.
       MAIL_FROM: ${MAIL_FROM:-}
       MAIL_SMTP_URL: ${MAIL_SMTP_URL:-}
+      # 007 — where a conduct report is mailed (FR-547, register entry 21, still open). Blank
+      # stores the report and blocks the reported attendee anyway; only the mail is skipped.
+      MAIL_OPERATOR_ADDRESS: ${MAIL_OPERATOR_ADDRESS:-}
+      # Web Push (007, register entry 20, still open). Blank keeps the development sink: a
+      # notification is recorded and never delivered, and the client never asks for permission.
+      # Messages are unaffected — delivery is deniable by design (FR-552).
+      PUSH_VAPID_PUBLIC_KEY: ${PUSH_VAPID_PUBLIC_KEY:-}
+      PUSH_VAPID_PRIVATE_KEY: ${PUSH_VAPID_PRIVATE_KEY:-}
+      PUSH_VAPID_SUBJECT: ${PUSH_VAPID_SUBJECT:-mailto:no-reply@mynet.invalid}
       AVATAR_DIMENSION_PX: ${AVATAR_DIMENSION_PX:-512}
       AVATAR_CARD_DIMENSION_PX: ${AVATAR_CARD_DIMENSION_PX:-96}
     healthcheck:

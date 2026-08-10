@@ -22,10 +22,19 @@ import type { MailService } from './service.js'
  */
 
 export interface SentMessage {
-  readonly kind: 'verification' | 'password-reset'
+  readonly kind: 'verification' | 'password-reset' | 'abuse-report'
   readonly to: string
+  /**
+   * The link, for the two account messages.
+   *
+   * **An abuse report has none**, and that is the point rather than an omission: it carries
+   * identifiers and a timestamp only (research R11), so this field holds the report identifier
+   * and the record below carries no attendee-authored text at all.
+   */
   readonly link: string
   readonly at: Date
+  /** Present only for an abuse report. Identifiers, never content. */
+  readonly messageIds?: readonly string[]
 }
 
 export class SinkMailService implements MailService {
@@ -47,6 +56,39 @@ export class SinkMailService implements MailService {
 
   async sendPasswordReset(to: string, link: string): Promise<void> {
     this.#record('password-reset', to, link)
+  }
+
+  /**
+   * T080 (007) — the operator's copy, recorded rather than sent.
+   *
+   * **Nothing attendee-authored reaches this adapter**, so unlike the two above it is not
+   * holding credential material — a report identifier is not a capability. The reason string and
+   * the message bodies are deliberately absent from the signature, so this implementation could
+   * not log them even if it wanted to.
+   */
+  async sendAbuseReport(
+    to: string,
+    report: {
+      readonly reportId: string
+      readonly reportedAt: string
+      readonly messageIds: readonly string[]
+    },
+  ): Promise<void> {
+    this.#sent.push({
+      kind: 'abuse-report',
+      to,
+      link: report.reportId,
+      at: new Date(),
+      messageIds: [...report.messageIds],
+    })
+
+    console.warn(
+      `\n── development mail sink ─────────────────────────────────────────────\n` +
+        `   abuse report ${report.reportId} for ${to}\n` +
+        `   reported at ${report.reportedAt}, ${report.messageIds.length} message(s) cited\n` +
+        `   Nothing was sent. Register entry 18 — no mail provider is provisioned.\n` +
+        `─────────────────────────────────────────────────────────────────────\n`,
+    )
   }
 
   /**

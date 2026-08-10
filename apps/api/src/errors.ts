@@ -42,6 +42,22 @@ export type ErrorCode =
   | 'image_too_large'
   /** FR-347 (004) — not a decodable image of an accepted type, determined by inspection. */
   | 'image_unreadable'
+  /**
+   * FR-536, FR-537 (007) — a send that will not be delivered, **with no reason given**.
+   *
+   * See `contactRefused` below. This code deliberately says nothing about blocks, and the string
+   * `block` appears nowhere in the code, the message, or the contract description.
+   */
+  | 'refused'
+  /**
+   * FR-574 (007) — the conversation no longer accepts messages because the other participant
+   * deleted their account.
+   *
+   * **Deliberately distinguishable from `refused`.** This is a fact about a conversation the
+   * caller can already see and already has every message of; disclosing it discloses nothing
+   * about another attendee that the caller cannot observe anyway.
+   */
+  | 'conversation_closed'
 
 export class AppError extends Error {
   readonly statusCode: number
@@ -166,4 +182,48 @@ export const imageUnreadable = (): AppError =>
     'image_unreadable',
     415,
     'That file could not be read as an image. JPEG, PNG, WebP, AVIF and GIF are accepted.',
+  )
+
+/**
+ * FR-536, FR-537 (007) — **the one refusal for "this message will not be delivered", and it
+ * carries no reason.**
+ *
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ * **THE SILENCE IS THE REQUIREMENT, NOT A LACK OF EFFORT ON THE WORDING.**
+ *
+ * FR-537 forbids disclosing to a blocked attendee that a block exists. So this says the message
+ * did not send and stops — no cause, no "the recipient is unavailable", no hint that anything
+ * about the *other person* decided it. A sender who could tell a block from a fault would know
+ * they had been blocked, which is exactly the disclosure the requirement closes.
+ *
+ * **Produced from one factory for the reason `invalidCredentials` is** (FR-030's precedent):
+ * two call sites returning "the same" 409 drift, and on the day they do, the difference between
+ * them is a signal an attacker reads. There is exactly one 409 shape on this route pair, and
+ * both the block path and any future conflict take it.
+ *
+ * It is deliberately the shape a generic conflict would take, and the contract says so. The
+ * blocker's own client already knows — `state: 'blocked'` arrives on the conversation, which is
+ * *their* record about *their* choice — so nothing here has to explain anything to the one party
+ * entitled to know.
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ */
+export const contactRefused = (): AppError =>
+  new AppError('refused', 409, 'That message could not be sent.')
+
+/**
+ * FR-574 (007) — the counterpart has deleted their account, so nothing can be sent here again.
+ *
+ * **Explained, unlike `contactRefused`, and the difference is deliberate** (contract). A caller
+ * looking at a one-sided conversation can already see that half of it is gone; being told why
+ * the composer is unavailable discloses nothing further, and leaving them to guess would make a
+ * permanent state look like a transient failure they should retry.
+ *
+ * 403 rather than 404: the conversation exists and is the caller's to read. FR-524's
+ * indistinguishability is about conversations the caller is *not* in, and this one they are.
+ */
+export const conversationClosed = (): AppError =>
+  new AppError(
+    'conversation_closed',
+    403,
+    'This conversation is closed. The other person has deleted their account, so no new messages can be sent.',
   )

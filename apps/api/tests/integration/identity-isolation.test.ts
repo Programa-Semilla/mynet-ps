@@ -22,6 +22,17 @@ import {
  * T113 (004) — **every route this feature adds, unauthenticated and cross-attendee**
  * (FR-385, FR-386, SC-307).
  *
+ * **007 inherits this rather than reproducing it, and FR-525 is what it inherits.** That
+ * requirement — an attendee's identity for every message operation is bound from the sign-in
+ * session, and no conversation, message or unread operation accepts an attendee identifier from
+ * the client — is 001's rule restated for a new domain. It needs no test of its own precisely
+ * because this one reads the route table from the running application: 007's routes are covered
+ * by it the moment they register, and a route that took its acting attendee from the client
+ * would fail here as the wrong attendee reaching another's data.
+ *
+ * The `attendeeId` that `POST /conversations` and `POST /blocks` accept is the **counterpart**,
+ * never the caller. FR-525 is about who you are, not who you are addressing.
+ *
  * ═════════════════════════════════════════════════════════════════════════════════════════
  * **THE ROUTE LIST IS READ FROM THE RUNNING APPLICATION, NOT WRITTEN OUT BY HAND.**
  *
@@ -97,7 +108,13 @@ describe('every route is bound to the authenticated attendee (SC-307)', () => {
   }
 
   /** Every authenticated route, with its parameters filled in so it can actually be called. */
-  const authenticatedCalls = (): Array<{ method: string; url: string; label: string }> =>
+  const authenticatedCalls = (): Array<{
+    method: string
+    url: string
+    label: string
+    /** Whether Fastify will validate a body before the guard runs. See the 401 assertion. */
+    declaresBody: boolean
+  }> =>
     routes
       .filter((route) => preHandlersOf(route).includes(requireAttendee))
       .flatMap((route) =>
@@ -110,6 +127,7 @@ describe('every route is bound to the authenticated attendee (SC-307)', () => {
               .replace(':attendeeId', graceId)
               .replace(':sessionId', '00000000-0000-4000-8000-000000000000'),
             label: `${method} ${route.url}`,
+            declaresBody: (route.schema as { body?: unknown } | undefined)?.body !== undefined,
           })),
       )
 
@@ -149,11 +167,22 @@ describe('every route is bound to the authenticated attendee (SC-307)', () => {
   })
 
   it('answers 401 specifically wherever the guard is actually reached', async () => {
-    // GET and DELETE carry no body, so schema validation cannot pre-empt the guard and the
+    // ───────────────────────────────────────────────────────────────────────────────────────
+    // **Routes that declare no body**, so schema validation cannot pre-empt the guard and the
     // status is unambiguously about identity.
-    const bodyless = authenticatedCalls().filter(
-      (call) => call.method === 'GET' || call.method === 'DELETE',
-    )
+    //
+    // This used to select `GET` and `DELETE` by method, on the reasoning that neither carries a
+    // body. **007 falsified that**: `DELETE /blocks` and `DELETE /push/subscriptions` both take
+    // one, because a write route naming an attendee in its URL is forbidden outright by the route
+    // audit — so the target had to move into the body, and the method stopped predicting the
+    // shape.
+    //
+    // Read from the route's own schema instead, which is the fact the assertion actually depends
+    // on. The two body-carrying DELETEs are still covered by the "never succeeds" assertion
+    // above, which is the guarantee that matters; what they cannot support is the *stricter*
+    // claim about which refusal comes back first.
+    // ───────────────────────────────────────────────────────────────────────────────────────
+    const bodyless = authenticatedCalls().filter((call) => !call.declaresBody)
 
     expect(bodyless.length).toBeGreaterThan(5)
 

@@ -45,6 +45,19 @@ class FailingMailService implements MailService {
     this.calls += 1
     throw new Error('smtp: 421 service not available')
   }
+
+  /**
+   * 007 — the third message, failing the same way.
+   *
+   * Added here because `MailService` is substituted **whole**: a method added to the interface
+   * and forgotten in this double fails to compile, which is the same guard the client's registry
+   * relies on. `report-effects.test.ts` asserts what FR-549 requires of *this* failure — that
+   * the block and the row survive it.
+   */
+  async sendAbuseReport(): Promise<void> {
+    this.calls += 1
+    throw new Error('smtp: 421 service not available')
+  }
 }
 
 describe('mail failure does not fail the request that triggered it (FR-318a)', () => {

@@ -12,5 +12,8 @@
       "@/*": ["./src/*"]
     }
   },
-  "include": ["src", "tests", "vite.config.ts"]
+  "include": ["src", "tests", "vite.config.ts"],
+  // The service worker is typechecked by `tsconfig.sw.json`, not here. See that file: its
+  // `lib="webworker"` would otherwise redefine this program's DOM globals.
+  "exclude": ["src/sw.ts"]
 }

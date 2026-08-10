@@ -1,5 +1,6 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
+import { registerSW } from 'virtual:pwa-register'
 
 import { App } from './app/App.js'
 import { PRODUCT_NAME } from './app/branding.js'
@@ -31,6 +32,26 @@ if (!container) {
 // FR-049 — from the single branding constant. Set once at boot rather than in a React effect:
 // it is a property of the document, not of any component.
 document.title = PRODUCT_NAME
+
+/**
+ * ═════════════════════════════════════════════════════════════════════════════════════════════
+ * **REGISTERING THE SERVICE WORKER EXPLICITLY, SO IT HAPPENS IN `vite dev` TOO.**
+ *
+ * `injectRegister: 'auto'` injects a `registerSW.js` script into `index.html` **at build time**,
+ * which is why the worker existed under `vite preview` and not under `vite dev`. That was
+ * invisible while the worker only cached the shell — and became a wall with 007, because **Web
+ * Push cannot work without a registered worker**: `pnpm start` could not subscribe, could not
+ * receive, and could not walk `quickstart.md` scenario 5.
+ *
+ * `'auto'` means *inject unless the application registers it itself*. Importing the virtual module
+ * here is therefore the sanctioned way to take over, not a second registration racing the first —
+ * the plugin stops injecting once this import exists.
+ *
+ * No callbacks: `registerType: 'prompt'` is unchanged, so a new deployment still takes effect on
+ * the next launch rather than swapping assets under a live page (FR-055).
+ * ═════════════════════════════════════════════════════════════════════════════════════════════
+ */
+registerSW()
 
 createRoot(container).render(
   <StrictMode>

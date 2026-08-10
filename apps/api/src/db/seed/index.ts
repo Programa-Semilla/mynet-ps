@@ -3,6 +3,7 @@ import type { Database } from '../client.js'
 import { closeDb, getDb } from '../client.js'
 import { attendeeSeed, SEED_ATTENDEES, SEED_PASSWORD } from './attendees.js'
 import { catalogSeed } from './catalog.js'
+import { conversationSeed } from './conversations.js'
 import { eventSeed } from './events.js'
 
 /**
@@ -54,7 +55,16 @@ export interface SeedModule {
 }
 
 /** Insert order. Reverse is delete order. Append only. */
-export const SEED_MODULES: readonly SeedModule[] = [attendeeSeed, eventSeed, catalogSeed]
+export const SEED_MODULES: readonly SeedModule[] = [
+  attendeeSeed,
+  eventSeed,
+  catalogSeed,
+  // 007 — one conversation between the two seeded accounts, appended **last** because it
+  // references attendees and must therefore be cleared before them. See `conversations.ts` for
+  // why this is the first attendee-authored content the product seeds, and why it is one
+  // conversation rather than several.
+  conversationSeed,
+]
 
 /**
  * T069b (006) — **the seed refuses to run against anything but a development database**

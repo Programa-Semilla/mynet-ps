@@ -50,6 +50,16 @@ test.describe('saved sessions', () => {
     await goToAgenda(page)
 
     // ── Save two sessions ────────────────────────────────────────────────────────────────
+    //
+    // `allTextContents()` is a **snapshot, not an assertion**: it does not retry, so reading it
+    // straight after `goToAgenda` races the programme's arrival — `goToAgenda` only waits for the
+    // `<h1>`, which renders before the sessions do. This waited on nothing and passed on timing
+    // until the service-worker change in 007 shifted that timing enough to lose the race, at
+    // which point it failed with "the seeded programme has fewer than two sessions" against a
+    // page that had the whole programme on it a moment later.
+    //
+    // One retrying assertion first, and the snapshot becomes safe to take.
+    await expect(page.getByRole('heading', { level: 3 }).first()).toBeVisible()
     const titles = await page.getByRole('heading', { level: 3 }).allTextContents()
     const [first, second] = titles.map((title) => title.trim())
     if (!first || !second) throw new Error('The seeded programme has fewer than two sessions.')

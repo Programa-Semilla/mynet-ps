@@ -115,9 +115,35 @@ MAINT_ARGS=()
 
 echo "== [2/6] Building the client =="
 if [[ "$DO_BUILD" == "true" ]]; then
+  # ═══════════════════════════════════════════════════════════════════════════════════════════
+  # **THE VAPID PUBLIC KEY IS READ BACK OUT OF THE VM'S OWN `.env`, AND THAT IS THE POINT.**
+  #
+  # 007 needs the *public* half compiled into the client bundle, and the *private* half in the
+  # API's environment. The obvious arrangement — public key in `envs/<env>.env`, private key in
+  # the VM's `.env` — puts one key pair in two files, and a pair that drifts fails in the worst
+  # available way: the browser subscribes with one key, the server signs with another, the push
+  # service answers 403 for every delivery, and nothing anywhere looks broken.
+  #
+  # So there is one copy. This reads it over the SSH connection step [1/6] has already proved,
+  # before anything is built with it. Absent — no `.env` yet, or no keys chosen (register entry
+  # 20 is open) — the client is built without one, `isSupported()` is false, no permission is
+  # ever requested, and the product is complete minus notifications (FR-552).
+  #
+  # It is not a secret: `VITE_`-prefixed values are bundled and world-readable by construction,
+  # which is exactly why only the public half may carry that prefix.
+  # ═══════════════════════════════════════════════════════════════════════════════════════════
+  VAPID_PUBLIC="$(ssh -o BatchMode=yes -o ConnectTimeout=10 "$REMOTE" \
+    "sed -n 's/^PUSH_VAPID_PUBLIC_KEY=//p' '${COMPOSE_DIR}/.env' 2>/dev/null | tail -n1" || true)"
+  if [[ -n "$VAPID_PUBLIC" ]]; then
+    echo "   Web Push: building with the VAPID public key from ${COMPOSE_DIR}/.env"
+  else
+    echo "   Web Push: no PUSH_VAPID_PUBLIC_KEY on the VM — building without notifications."
+  fi
+
   # `VITE_API_BASE_URL=/api` (T066) — the only client-side configuration one origin needs. The
   # HTTP layer already defaults to a relative base, so this is configuration rather than code.
-  VITE_API_BASE_URL=/api pnpm --filter @mynet/web build
+  VITE_API_BASE_URL=/api VITE_PUSH_VAPID_PUBLIC_KEY="$VAPID_PUBLIC" \
+    pnpm --filter @mynet/web build
 fi
 [[ -d apps/web/dist ]] || { echo "ERROR: apps/web/dist is missing. Run without --no-build." >&2; exit 1; }
 

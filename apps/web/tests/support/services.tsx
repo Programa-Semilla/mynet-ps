@@ -12,11 +12,19 @@ import { AuthProvider } from '../../src/auth/useAuth.js'
  * abstraction would have failed — so tests reach for this and never for `vi.mock`.
  */
 
-const noopDevices: PlatformServices['devices'] = {
+export const noopDevices: PlatformServices['devices'] = {
   notifications: {
     isSupported: () => false,
     requestPermission: async () => 'unsupported',
     show: async () => {},
+    // 007 — the three members M4 added. Present because the registry is substituted **whole**
+    // (FR-047): a method added to the interface and forgotten here fails to compile.
+    //
+    // `null` throughout, which is the state of a browser that cannot subscribe — and by FR-552
+    // the state every other surface must behave identically in.
+    subscribe: async () => null,
+    unsubscribe: async () => {},
+    currentSubscription: async () => null,
   },
   calendar: { isSupported: () => false, addEvent: async () => {} },
   camera: { isSupported: () => false, capturePhoto: async () => null },
@@ -28,7 +36,24 @@ const noopDevices: PlatformServices['devices'] = {
     clear: async () => {},
   },
   connectivity: { isOnline: () => true, subscribe: () => () => {}, reportReachability: () => {} },
+  // 007 — the seventh capability. Visible by default: a component test renders into a jsdom
+  // document nobody is looking at, and reporting "hidden" would silently disable every behaviour
+  // gated on visibility — the open thread's poll, today — leaving the failure as an absence of
+  // requests rather than an error anybody sees.
+  visibility: { isVisible: () => true, subscribe: () => () => {} },
 }
+
+/**
+ * The device registry with some capabilities replaced.
+ *
+ * 007 — exported because the notification tests are the first that need a *capability* double
+ * rather than a repository one, and `testServices`' second parameter takes the whole `devices`
+ * object. Spreading `noopDevices` by hand in each test would mean a capability added later is
+ * silently absent from exactly the tests that care most about capabilities.
+ */
+export const devicesWith = (
+  overrides: Partial<PlatformServices['devices']>,
+): PlatformServices['devices'] => ({ ...noopDevices, ...overrides })
 
 export const SUMMIT = {
   id: 'event-summit',
@@ -123,6 +148,38 @@ export const testServices = (
       get: async () => null,
       readAvatar: async () => null,
     },
+    // 007 — an attendee who has spoken to nobody, blocked nobody and registered no device,
+    // which is what every account is until it is not. Every method resolves rather than
+    // throwing, for the reason 004's defaults record: a component test asserting a disabled
+    // send button must not be able to pass because the repository blew up first.
+    conversations: {
+      list: async () => [],
+      // **False, deliberately.** Home's unread indicator renders nothing at zero (FR-531), so
+      // the quiet default is also the one that keeps unrelated Home tests honest about what
+      // they are asserting.
+      hasUnread: async () => false,
+      openWith: async () => ({
+        conversationId: 'conversation-1',
+        messageId: 'message-1',
+        sentAt: '2026-09-14T09:00:00.000Z',
+      }),
+      markRead: async () => {},
+    },
+    messages: {
+      list: async () => ({
+        messages: [],
+        nextCursor: null,
+        state: 'open' as const,
+        // 007 — carried on the page (contract), so the thread's header, the composer's
+        // availability and the safety dialogs are satisfied by one request. `null` is the
+        // departed-counterpart case; the default here is simply "not loaded anybody".
+        counterpart: null,
+      }),
+      send: async () => ({ messageId: 'message-1', sentAt: '2026-09-14T09:00:00.000Z' }),
+    },
+    blocks: { list: async () => [], block: async () => {}, unblock: async () => {} },
+    reports: { submit: async () => {} },
+    pushSubscriptions: { register: async () => {}, unregister: async () => {} },
     ...overrides,
   },
   // 005 — content is live in a component test unless a test says otherwise, so no staleness

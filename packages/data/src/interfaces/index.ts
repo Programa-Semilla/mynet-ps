@@ -50,6 +50,33 @@ export type {
   DirectoryRepository,
   VisibleProfile,
 } from './directory.js'
+// 007 — Messages, the safety controls that make open send responsible, and where a device is
+// reachable. **Three domains, three files, appended**: messaging, safety and push registration
+// are three subjects, and 004's review recorded the cost of letting one interface span two
+// (`identity-repository-spans-two-subjects`).
+export type {
+  ConversationPreview,
+  ConversationRepository,
+  ConversationState,
+  ConversationSummary,
+  Counterpart,
+  Message,
+  MessagePage,
+  MessagePageQuery,
+  MessageRepository,
+  OpenedConversation,
+  SentMessage,
+} from './messages.js'
+export type {
+  AbuseReportDraft,
+  BlockedAttendee,
+  BlockRepository,
+  ReportRepository,
+} from './safety.js'
+export type { DeviceRegistration, PushSubscriptionRepository } from './notifications.js'
+
+/** The one runtime value 007 contributes: the message limit the composer's counter reads. */
+export { MESSAGE_MAX_LENGTH } from './messages.js'
 
 export {
   NotAuthenticatedError,
@@ -64,7 +91,10 @@ import type { CatalogRepository } from './catalog.js'
 import type { DirectoryRepository } from './directory.js'
 import type { ActiveEventRepository, EventsRepository } from './events.js'
 import type { IdentityRepository } from './identity.js'
+import type { ConversationRepository, MessageRepository } from './messages.js'
+import type { PushSubscriptionRepository } from './notifications.js'
 import type { ProfileRepository } from './profile.js'
+import type { BlockRepository, ReportRepository } from './safety.js'
 
 /**
  * Every repository, in one shape (research.md D10).
@@ -91,4 +121,29 @@ export interface Repositories {
   // makes offline a refusal rather than a degraded read, so 005's decorator is not applied to
   // this member and the composition root says so where the wiring happens.
   readonly directory: DirectoryRepository
+  // ───────────────────────────────────────────────────────────────────────────────────────
+  // 007 — **five members, appended, and not one of them is cached** (FR-563).
+  //
+  // A declaration rather than an omission, stated here and again at the composition root where
+  // the wiring happens. The reasons differ per member and each is worth having in writing:
+  //
+  // - `conversations` and `messages` are other people's words. 005's decorator revokes on age
+  //   alone, so a cached thread is a copy of somebody else's personal data ageing on a device
+  //   — with no offline capability worth having in exchange, because every write here is
+  //   refused rather than queued (FR-565) and a thread you cannot reply to is not a product.
+  // - `blocks` must take effect on the very next request (SC-506). Age is the wrong clock for
+  //   a refusal, exactly as 006 found it was for a discoverability setting.
+  // - `reports` is write-only, so there is nothing to cache.
+  // - `pushSubscriptions` holds credentials, and a stale copy would keep a revoked endpoint
+  //   alive locally after the browser had already replaced it.
+  //
+  // FR-567 — all five are registered **here**, in the aggregate every other domain already uses.
+  // Adding a repository stays one line per domain and `registry.tsx` is untouched, which is the
+  // append-only extension point 001 established and 004, 005 and 006 each extended in turn.
+  // ───────────────────────────────────────────────────────────────────────────────────────
+  readonly conversations: ConversationRepository
+  readonly messages: MessageRepository
+  readonly blocks: BlockRepository
+  readonly reports: ReportRepository
+  readonly pushSubscriptions: PushSubscriptionRepository
 }

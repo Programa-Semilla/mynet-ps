@@ -122,6 +122,59 @@ export default tseslint.config(
   },
 
   /**
+   * T016 (007) — the same three selectors for `ConversationScope` (FR-523, research R9).
+   *
+   * ═════════════════════════════════════════════════════════════════════════════════════════
+   * **A SIBLING BLOCK RATHER THAN THREE MORE SELECTORS IN THE ONE ABOVE, AND THAT IS
+   * DELIBERATE: THE TWO BRANDS HAVE DIFFERENT LEGITIMATE CONSTRUCTION SITES.**
+   *
+   * `ignores` exempts a whole file from every selector in its block. Folding these into the
+   * event block would mean listing `participation.ts` there too — and that file would then be
+   * free to assert `as EventScope`, while `event-access.ts` would be free to assert
+   * `as ConversationScope`. Each exemption would silently widen to cover a brand it has no
+   * business constructing.
+   *
+   * Two blocks, two ignore lists, each exempting exactly the one module that may construct the
+   * one brand. Everything else about the reasoning is the event block's, above, unchanged: the
+   * type assertion is the brand's single remaining escape hatch, this makes using it a lint
+   * failure rather than an invisible one, and it guards against forgetting rather than against
+   * a determined author.
+   * ═════════════════════════════════════════════════════════════════════════════════════════
+   */
+  {
+    name: 'mynet/conversation-scope-brand',
+    files: ['apps/api/**/*.{ts,tsx,mts,cts}'],
+    ignores: ['apps/api/src/plugins/participation.ts'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: 'TSAsExpression > TSTypeReference > Identifier[name="ConversationScope"]',
+          message:
+            'Do not assert a value to ConversationScope. It is proof that the attendee ' +
+            'participates in the conversation, and the only place that proof can be produced is ' +
+            'requireParticipation in plugins/participation.ts. An assertion here fabricates the ' +
+            "proof and reads somebody else's correspondence (FR-523, research R9).",
+        },
+        {
+          selector: 'TSTypeAssertion > TSTypeReference > Identifier[name="ConversationScope"]',
+          message:
+            'Do not assert a value to ConversationScope — see plugins/participation.ts (FR-523).',
+        },
+        {
+          // Same alias bypass the event rule had to close: `type A = ConversationScope` followed
+          // by `x as unknown as A` matches neither selector above, because both key on the name.
+          selector:
+            'TSTypeAliasDeclaration > TSTypeReference > Identifier[name="ConversationScope"]',
+          message:
+            'Do not alias ConversationScope. An alias defeats the assertion rules above, which ' +
+            'match on the type name. Use ConversationScope directly (FR-523).',
+        },
+      ],
+    },
+  },
+
+  /**
    * T017 (004) — **the `StorageService` boundary, made machine-checked** (FR-352, FR-393).
    *
    * ═════════════════════════════════════════════════════════════════════════════════════════
@@ -152,10 +205,25 @@ export default tseslint.config(
    * ═════════════════════════════════════════════════════════════════════════════════════════
    */
   {
-    name: 'mynet/storage-boundary',
+    name: 'mynet/vendor-boundary',
     files: ['apps/api/**/*.{ts,tsx,mts,cts}'],
     ignores: [
       'apps/api/src/storage/**',
+      // ─────────────────────────────────────────────────────────────────────────────────────
+      // 007 — the same exemption for the push adapter, and it is in **this** block rather than a
+      // block of its own for a reason worth knowing: ESLint flat config does not merge rule
+      // options. A second block setting `no-restricted-imports` for the same files silently
+      // *replaces* this one, so a separate push-boundary block looked correct, reported nothing,
+      // and disabled the storage boundary while it did — verified by probing it with a real
+      // violating import, which passed.
+      //
+      // The cost of folding them together is that this directory is also exempt from the storage
+      // patterns, and `storage/**` from the push one. Both are cross-vendor imports nobody has a
+      // reason to write, and both would be plain in review — a smaller risk than two boundaries
+      // where one quietly cancels the other.
+      // ─────────────────────────────────────────────────────────────────────────────────────
+      'apps/api/src/notifications/**',
+      'apps/api/tests/unit/web-push-adapter.test.ts',
       // The schema barrel re-exports every table by design, and the deletion-coverage guard
       // depends on it listing all of them — a table that could hide from the registry could
       // hide from the guard. Re-exporting is not consuming; the third pattern below is what
@@ -190,6 +258,15 @@ export default tseslint.config(
                 '`app.storage` instead. If this import is a NEW vendor being adopted, add it to ' +
                 "this list in the same change — a boundary that only names yesterday's vendors " +
                 'is a boundary that passes while checking nothing.',
+            },
+            {
+              group: ['web-push', 'web-push/**'],
+              message:
+                'The Web Push library is reachable only from apps/api/src/notifications/, which ' +
+                'is the one place PushService is implemented. Call `app.push` instead — going ' +
+                'direct bypasses the per-device timeout, the failure isolation, and the ' +
+                "gone-versus-failed mapping that decides whether somebody's device registration " +
+                'is discarded forever.',
             },
             {
               group: ['**/schema/stored-objects.js', '**/schema/stored-objects.ts'],
@@ -269,6 +346,28 @@ export default tseslint.config(
      */
     name: 'mynet/composition-root',
     files: ['apps/web/src/app/services.ts', 'apps/web/src/main.tsx'],
+    rules: {
+      'mynet/no-direct-platform-access': 'off',
+    },
+  },
+
+  {
+    /**
+     * The service worker — an adapter, like `packages/platform/src/web`, that happens to live in
+     * the client's source tree.
+     *
+     * 007 moved it from generated output to hand-written source (T118), and that move is what
+     * makes this exemption necessary rather than cosmetic. A service worker has no registry to
+     * reach through: `self.registration`, `self.clients` and `caches` are the only way to do
+     * anything at all inside one, and there is no React tree to inject an interface into. It is
+     * the same reasoning that puts `packages/platform/src/web` outside the block above.
+     *
+     * SC-008 counts violations in **feature code**, and this is not it: it renders nothing,
+     * imports nothing from the application, and runs in a different global scope — one that
+     * `tsconfig.sw.json` typechecks separately for the same reason.
+     */
+    name: 'mynet/service-worker',
+    files: ['apps/web/src/sw.ts'],
     rules: {
       'mynet/no-direct-platform-access': 'off',
     },

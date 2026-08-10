@@ -7,6 +7,8 @@ import { signOutRoutes } from './auth/sign-out.js'
 import { resetRoutes } from './auth/reset.js'
 import { signUpRoutes } from './auth/sign-up.js'
 import { verifyRoutes } from './auth/verify.js'
+import { blockRoutes } from './blocks.js'
+import { conversationRoutes } from './conversations.js'
 import { agendaRoutes } from './events/agenda.js'
 import { attendeeProfileRoutes } from './events/attendees.js'
 import { catalogRoutes } from './events/catalog.js'
@@ -15,6 +17,8 @@ import { joinRoutes } from './events/join.js'
 import { eventRoutes } from './events.js'
 import { healthRoutes } from './health.js'
 import { profileRoutes } from './profile.js'
+import { pushRoutes } from './push.js'
+import { reportRoutes } from './reports.js'
 import { activeEventRoutes } from './workspace/active-event.js'
 
 /**
@@ -86,4 +90,36 @@ export const ROUTES: readonly RoutePlugin[] = [
   // and therefore acquires `requireEventAccess` and the branded scope, which the route audit
   // fails the build for omitting (research D14).
   directoryRoutes,
+  // ─────────────────────────────────────────────────────────────────────────────────────────
+  // 007 — private 1:1 conversations. **Appended, never inserted**, for the reason every entry
+  // above states: the generated contract lists paths in observation order.
+  //
+  // **Registered here rather than under `routes/events/`, and that placement is a decision**
+  // (plan, Structure Decision 1). Conversations are cross-event (FR-507), so nesting them under
+  // `:eventId` would produce one of two bad outcomes: the event audit would demand
+  // `requireEventAccess` and fail the build, or somebody would satisfy it with a guard that
+  // verifies a registration having nothing to do with who may read the conversation — a check
+  // that looks like authorization and is not.
+  //
+  // What guards them instead is `requireParticipation` and its own audit, because the event
+  // audit **walks straight past a route naming no conference and reports success** (research R9).
+  // ─────────────────────────────────────────────────────────────────────────────────────────
+  conversationRoutes,
+  // 007 — **what makes open send responsible.** Anyone sharing an event may message anyone else
+  // with no request and no acceptance step, and once open a conversation stays open forever;
+  // that combination creates a contact path the recipient cannot otherwise close, in a product
+  // with public self sign-up and no moderator by construction. Blocking is the close.
+  //
+  // Neither names a conversation, and neither should: a block refuses contact that has not
+  // happened yet as well as contact that has, and a report concerns conduct rather than a
+  // thread. The participation audit therefore does not examine them, correctly.
+  blockRoutes,
+  // 007 — reporting conduct **out of** the product. One route, and the missing `GET` is a
+  // requirement rather than an omission (FR-548, SC-508).
+  reportRoutes,
+  // 007 — registering and surrendering a device for notification delivery. Appended likewise.
+  // Neither route names a conversation or a conference, and neither takes an attendee identifier:
+  // the endpoint is bound to the calling session, which is what stops one browser profile
+  // delivering one attendee's messages using another's registration (FR-555).
+  pushRoutes,
 ]

@@ -9,6 +9,7 @@ import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
 
 import { useAuth } from '../../auth/useAuth.js'
+import { Blocks } from './Blocks.js'
 import { ConfirmDialog } from './ConfirmDialog.js'
 import { WithdrawConference } from './WithdrawConference.js'
 
@@ -79,6 +80,14 @@ export const Account = () => {
         {profile && (
           <>
             <DiscoverabilityControl profile={profile} />
+            {/*
+              T085 (007) — who may reach you, beside who may find you. **Appended here rather
+              than given a sixth destination** (FR-541a): the five are fixed, and a list of blocks
+              is a setting somebody occasionally revisits rather than a place they go. It sits
+              directly after discoverability because it is the same kind of decision — who may
+              reach me, and on what terms — and before the two irreversible ones.
+            */}
+            <Blocks />
             {/*
               T112 — leaving a conference sits between "who can see me" and "delete everything",
               because that is where it belongs in severity: reversible in principle, and not
