@@ -1,7 +1,8 @@
 # Brainstorm Overview
 
-Last updated: 2026-08-10 (008 **implemented** — Network is the fifth destination to carry content,
-and the last empty one is gone; constitution v3.2.0 closed the register entries that gated it)
+Last updated: 2026-08-10 (#08 brainstormed the **brand mark and application icons** — the owner
+supplied a logo, which is the client decision that register entry has been waiting for, and 010
+stops being blocked on an asset that does not exist)
 
 The authoritative registers live elsewhere — open questions in `.specify/memory/constitution.md`,
 delivery sequence in `docs/superpowers/specs/2026-08-06-mynet-delivery-roadmap-design.md`. This file
@@ -20,6 +21,7 @@ win and this is stale.
 | 05 | 2026-08-07 | discover-and-the-deployment-platform | ratified in constitution **v3.0.0** | `specs/006-discover-and-deployment-platform/` |
 | 06 | 2026-08-07 | messages-and-notification-delivery | **implemented in full**, including Web Push; its amendment ratified in constitution **v3.1.0** | `specs/007-messages-and-notification-delivery/` |
 | 07 | 2026-08-10 | network-and-appointments | **specified, then implemented**; entries 7, 8 and 9 ratified in constitution **v3.2.0** | `specs/008-network-and-appointments/` |
+| 08 | 2026-08-10 | brand-mark-and-app-icons | active — decided, awaiting `/speckit-specify` as **010** | `brainstorm/08-brand-mark-and-app-icons.md` |
 
 Session 05 has no document of its own: 006 was specified without one, and the row records the
 session rather than a file.
@@ -73,7 +75,7 @@ the index, and it now differs from the roadmap in the ways #02 records.
 | 007 | Messages **and the notification-delivery platform** | **shipped** — squash-merged to `develop`. Web Push delivers for real, verified end to end on a desktop. T148's by-hand walkthrough is partial (scenario 5 only) and carries forward. Migration `0006` | 004 ✓, 006 ✓ |
 | 008 | Network & Appointments | **implemented** — 149 tasks, FR-601–FR-659. Migration `0007` adds three tables under **two different scoping rules**: `shared_cards` cross-event, `appointments` and `meeting_slots` per-event. A **third** branded scope and a **third** route audit (`CardScope`, `card-audit.test.ts`), because a card route names no conference and `event-scope-audit` walks past it. T148's by-hand walkthrough is outstanding | ~~connection model~~ ✓, ~~card-exchange semantics~~ ✓ |
 | 009 | Session Q&A | **unblocked** by v3.2.0 — questions are attributed, so Q&A is a personal-data surface. Migration `0008` | ~~question attribution~~ ✓ |
-| 010 | Launch Readiness | queued | brand assets; client validation of desktop |
+| 010 | Launch Readiness — **brand mark and application icons** | **brainstormed** (#08), awaiting `/speckit-specify`. Replaces the three deliberately-ugly provisional icons, adds the favicon and `apple-touch-icon` that `index.html` has **never had**, and puts the mark on the rail, top bar and five auth screens. Carries a standing decision and a constitution amendment. **No migration** | ~~brand assets~~ ✓ (owner supplied 2026-08-10); client validation of desktop still open |
 
 **002 carries the most leverage and the most risk in the queue, and #02 enlarged it further.** It is
 not only the event switcher: it commits to the Home card composition contract and the per-event
@@ -183,9 +185,18 @@ deployment or release.
   design, so the cost compounds per phase. **Now more urgent than when it was written**: absorbing
   the catalog means 002 builds the Home dashboard *and* the catalog screens before any desktop review
   happens, and the roadmap's gate — scheduled for "after 002–003" — now fires after 002 alone.
-  *Worth pulling forward* (from #01, escalated by #02)
-- **Real brand mark and application icons** — no logo exists in the repository. *Blocks 010, long
-  lead time* (from #01)
+  *Worth pulling forward* (from #01, escalated by #02). **Escalated again by #08**: 010 puts a brand
+  mark on the rail, the top bar and five auth screens across all three width bands, and a mark's
+  position and size is precisely the class of thing no behavioural gate can see — the same class as
+  the dialog that shipped in the top-left corner having passed 135 e2e tests and five review agents.
+- ~~**Real brand mark and application icons**~~ — **ANSWERED 2026-08-10 by #08.** The owner supplied
+  a brand board at `seeds/logo.png`: the MyNet mark (a round-capped "N" with two node terminals) on
+  navy and cream, horizontal and stacked lockups, scale tests to 16px, and a monochrome test. This
+  is the client decision the entry was waiting for, so 010 is no longer blocked on an asset that
+  does not exist. **Ratification is pending** — #08 chose to close the register entry with a
+  standing decision and a constitution amendment carried by the feature, as 008 did with v3.2.0.
+  Two things it deliberately did **not** settle, both recorded as open questions below: whether the
+  UI palette adopts the brand's navy and coral, and the vector redraw the raster crop defers.
 - **`GroundZero/requirements.md` is knowingly out of step** with the constitution on product name,
   delivery mode, persistence, authentication, and routing. Amend it, or record the divergence?
   (from #01)
@@ -242,6 +253,38 @@ deployment or release.
   is public, and `branches/develop/protection` returns **404 — no rule set**. Branch protection is
   free on public repositories, so this is a configuration task rather than an accepted risk
   (corrected 2026-08-06)
+
+### Design questions carried into 010's specification
+
+From #08. None blocks the specification. The brand decision itself is answered above.
+
+- **Whether `navy-800` and `coral-500` adopt the brand's values.** Measured from the board, they
+  disagree with the tokens: brand navy `#0d1942` against `navy-800 #1b2340`, brand coral `#fe6551`
+  against `coral-500 #e8634d`. Cream matches. **Deliberately deferred** — navy-800 is the primary
+  surface and coral-500 the accent, so adopting them repaints the whole product and the
+  accessibility suite must re-pass on new contrast ratios. The interim cost is knowingly accepted: a
+  visible seam between the icon plate and the token-derived `theme_color` on the splash screen.
+- **`seeds/` is the wrong home for the brand source, and the collision is not cosmetic.** In this
+  repository "seed" means database seed data (`pnpm db:seed`). Settle the path before a build script
+  references it. The file is currently **untracked**.
+- **Whether the mobile top bar carries the mark at all.** It is contextual by design — product name
+  at mobile widths, current destination above them — so a mark competes for the same small strip.
+- **The iOS splash device matrix**, which is the bulk of the extras bundle's cost and the whole of
+  its precache risk: `injectManifest` globs `**/*.png`, so every splash image is precached at
+  install unless deliberately excluded. Several megabytes, on a phone at a venue.
+- **Whether the asset budget (FR-072) counts `public/` assets.** It reads the entry chunk and its
+  static imports, so these probably fall outside it — meaning the extras bundle could add megabytes
+  to the install with **no gate objecting**. Confirm rather than assume.
+- **Whether `purpose: "monochrome"` is worth shipping.** Platform support is thin; the board's
+  monochrome test is suggestive, not decisive.
+- **Nothing asserts the manifest's declared icons exist on disk.** A manifest naming a missing file
+  passes every one of the ten correctness gates and fails only when a real device tries to install.
+  010 should close this in the spirit of `deletion-coverage` and `export-coverage` — derive the
+  expectation from the declaration, so a newly declared icon with no file **fails by existing**.
+- **The vector redraw is a follow-up that must be booked, not noted.** The mark measures 283×300px
+  in the board, so the two 512px assets are a 1.37× upscale while everything at or below 300px —
+  192, apple-touch 180, every favicon — is a pixel-exact downscale. Only the 512s are degraded, and
+  left unbooked they become permanent by default.
 
 ### Design questions carried into 008's specification
 
