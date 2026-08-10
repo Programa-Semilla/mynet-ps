@@ -121,13 +121,17 @@ entailment argument.
 **Planning did not wait for it. Implementation must.** Nothing below is licensed by an amendment a
 reviewer has not accepted.
 
-- [ ] T001 Draft the amendment to `.specify/memory/constitution.md` adding an exception clause under
+- [x] T001 Draft the amendment to `.specify/memory/constitution.md` adding an exception clause under
       Principle VIII covering public Q&A visibility — a question is visible to every attendee
       registered for the event, under a real name, **with no opt-out**, including an attendee who
       has turned discoverability off. Carry the three consequences with it (FR-735 verification is
       not consulted, FR-736 the name is not a route into the profile, FR-739 the attendee is told
       before they publish), and record that reporting from a question is what makes the absence of a
       moderator survivable on the product's first many-to-many surface
+      → **DRAFTED 2026-08-10 as v3.3.0.** Second recorded exception under Principle VIII, all three
+      consequences and the reporting clause under "Audience questions", the deletion obligation
+      3.2.0 left open now discharged by FR-760/FR-761, and **register entry 22** created for T003a's
+      conceded gap. **It is a DRAFT and the version footer says so — T002 is not satisfied by this**
 - [ ] T002 Confirm the amendment travels in this branch and PR, as 008's did, and that
       `.specify/memory/constitution.md` reads its new version before any implementation task begins
       (re-check after any rebase — that is when it is lost) (FR-733)
@@ -140,10 +144,11 @@ reviewer has not accepted.
       FR-756a, in the Offline row of the completeness declaration, and by closing Open Question 2.
       The writes are declared **pass-through**; FR-756 stands unchanged. **T003a below carries the
       half that must not be lost.**
-- [ ] T003a Record the conceded gap as a register entry against **010**: a cached conference can
+- [x] T003a Record the conceded gap as a register entry against **010**: a cached conference can
       stay readable for up to **24 hours** after the server begins refusing a withdrawn
       registration, and no undecorated repository — Messages, Discover, cards, profile or Q&A —
       purges on refusal. Write it where the next feature will meet it, not only in 009's spec
+      → **Register entry 22**, created by the v3.3.0 draft. Ratified with the rest of it
 
 ---
 
