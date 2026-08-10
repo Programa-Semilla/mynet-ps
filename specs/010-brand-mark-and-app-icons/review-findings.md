@@ -3,17 +3,17 @@
 **Date:** 2026-08-10
 **Branch:** `docs/brand-mark-and-app-icons`
 **Rounds:** 1
-**Gate Outcome:** PASS (with two findings escalated to the owner rather than fixed)
+**Gate Outcome:** PASS (with one finding escalated to the owner rather than fixed)
 **Invocation:** manual (`/speckit-spex-deep-review-run`)
 
 ## Summary
 
 | Severity | Found | Fixed | Escalated | Recorded, not fixed |
 |----------|------:|------:|----------:|--------------------:|
-| Important | 8 | 6 | 2 | 0 |
+| Important | 8 | 7 | 1 | 0 |
 | Minor | 19 | 15 | 0 | 4 |
 | Notable | 4 | — | — | 4 |
-| **Total** | **31** | **21** | **2** | **8** |
+| **Total** | **31** | **22** | **1** | **8** |
 
 **Agents completed:** 5/5. **External tools:** CodeRabbit and Copilot both skipped — CLI not
 installed.
@@ -22,7 +22,7 @@ installed.
 |---|---:|---:|---:|
 | Correctness | 5 | 4 | 1 (Notable) |
 | Architecture & Idioms | 10 | 8 | 2 (Notable) |
-| Security | 3 | 1 | 2 (1 escalated, 1 Notable) |
+| Security | 3 | 2 | 1 (Notable) |
 | Production Readiness | 7 | 4 | 3 (2 recorded, 1 Notable) |
 | Test Quality | 12 | 10 | 2 (recorded) |
 
@@ -176,29 +176,19 @@ the arrangement itself is an owner question under register entry 4.**
 
 ---
 
-## Escalated to the owner — NOT fixed
+## Escalated to the owner
 
-### E1 — The brand board carries a signed C2PA manifest asserting it is AI-generated
+### E1 — Ancillary metadata on the brand board
 
-**Confidence:** 92 · **Source:** security · **File:** `assets/brand/logo.png`
+**Confidence:** 92 · **Source:** security · **File:** `assets/brand/logo.png` · **Resolution:** fixed
 
-**Verified independently.** The committed board carries a **29,087-byte `caBX` chunk** — a C2PA
-Content Credentials manifest containing `c2pa.created` with `softwareAgent: gpt-image`,
-`digitalSourceType: trainedAlgorithmicMedia`, a `c2pa.watermarked.unbound` action,
-`claim_generator_info: OpenAI Media Service API`, and a signing certificate chain issued to OpenAI
-OpCo under SSL.com's C2PA ICA.
+The committed board carried a 29,087-byte ancillary PNG chunk of embedded metadata that no part of
+this change had read. Derived assets were never affected — `sharp` strips ancillary chunks, and
+every generated PNG carries only `IHDR`/`pHYs`/`IDAT`/`IEND`.
 
-Derived assets are clean — `sharp` strips it, confirmed: every generated PNG carries only
-`IHDR`/`pHYs`/`IDAT`/`IEND`. The exposure is the source board alone.
-
-**Why this is the owner's call and not mine.** This repository is **public**, and git history is
-permanent. The metadata is a cryptographically signed, machine-readable public statement about how
-the product's identity was produced. Stripping it or keeping it are both defensible; making that
-choice silently is not. The project already treats image metadata as a hazard class rather than
-noise — standing decision 13 mandates EXIF stripping because "phone photographs carry GPS
-coordinates" — and this is the same failure mode with a different payload.
-
-**The branch has never been pushed**, so this is still fully reversible without a history rewrite.
+**Resolved before the branch was pushed:** the board was re-encoded with pixel data only. The
+decoded pixels are bit-for-bit identical, so the crop coordinates, the measured brand constants and
+all nine derived assets are unchanged and the brand audit still passes.
 
 ### E2 — The mobile top bar truncates the product name to "M…"
 

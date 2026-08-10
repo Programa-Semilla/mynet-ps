@@ -146,7 +146,31 @@ the largest mark fitting a 512px maskable icon is 297.9px against a 300px native
 it to 80% of the *side* instead would have put the node terminals outside the safe zone to be
 clipped.
 
-**Its by-hand validation is outstanding, and this time it is the only thing outstanding.**
+**A deep review followed, and it is recorded in
+`specs/010-brand-mark-and-app-icons/review-findings.md`** — 31 findings, 22 fixed. Three of the
+five agents independently found the same defect, which is the single most useful thing it produced:
+**the only assertion for the precache exclusion could never run.** It was a unit test guarded by
+`it.skipIf(!existsSync('dist/sw.js'))`, and the unit layer is by definition the one that does not
+build — CI's `test-unit` job has no build step, and `pnpm verify` orders `test:unit` *before*
+`build`. It skipped on every CI run and, locally, asserted against a stale worker. In the feature
+whose thesis is that a check which did not execute has not passed.
+
+**Three things the review changed that are now invariants:**
+
+- **`scripts/brand-audit.mjs` is where build-output claims are asserted**, and it runs in
+  `pnpm verify` after `pnpm build` and as its own CI step. A missing worker is a **failure**, not a
+  skip. It also closed two guarantees that had no gate at all — regeneration is byte-identical
+  (FR-806/FR-803), and the built manifest matches its declarations with token-derived colours.
+- **Nothing is upscaled, and that is now enforced rather than asserted in prose.** One asset
+  contradicted it: `icon-512.png` rendered the mark 317px from a 300px master. Fixed by capping the
+  fill rather than weakening the claim. The in-app mark had the same fault from the other end — 96px
+  drawn at `h-10` is 1.25× on a 3× phone — and is now 160px.
+- **Install icons and favicons are NOT precached; the two in-app marks are.** Those requests are
+  issued by the browser process and never reach the service worker, so caching them was 79KB nobody
+  could use. `globIgnores` does **not** govern them — `vite-plugin-pwa` re-adds manifest icons after
+  the glob — `includeManifestIcons: false` does. Precache: 805KB → 715.85 KiB.
+
+**Its by-hand validation is outstanding, and it is the only thing outstanding.**
 Quickstart scenarios 5–9 — install on a device, the tab strip at 16px, the shell at three widths,
 the five auth screens, a screen-reader pass — have not been walked, because they need a phone and a
 person. Everything a machine can check is checked and green.
@@ -157,6 +181,14 @@ and has 43–58px **without the mark at all**, so it was already rendering as "M
 feature. The mark takes a further ~9px at 390px. FR-825 is satisfied (the label yields, no control
 moves) and 010 did not cause it, so it was recorded rather than fixed: redesigning the mobile top
 bar is register entry 4's territory and the owner's call.
+
+**A second layout question is open for the same reason.** The spec justified putting the mark in
+the tablet top bar with "the rail is desktop-only", and that is **false** — `TabletRail` is live
+768–1279px on the inverse surface, carrying navigation and no brand. `DesktopRail` is the
+desktop-only one. The shipped arrangement satisfies FR-823 and FR-824 either way, but the
+alternative — the mark at the head of `TabletRail` in coral, mirroring `DesktopRail` — was never
+weighed, because the spec recorded that surface as not existing. Corrected in the spec; the
+arrangement is an owner decision under register entry 4.
 
 A contact is somebody whose digital business card you hold. Sharing is **one-directional** — it
 gives your card and takes nothing — and a held card resolves the sharer's **live** profile under a
