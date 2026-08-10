@@ -232,6 +232,57 @@ test.describe('accessibility', () => {
     })
   }
 
+  /**
+   * T083 (009) — **the Q&A section with content, and with its nested dialog open.**
+   *
+   * ─────────────────────────────────────────────────────────────────────────────────────────
+   * The panel scan above already covers this section, but only in its **empty** state — no list,
+   * no upvote controls, no withdrawal control and no second dialog. Those are where this
+   * feature's accessibility risk actually is: a toggle whose pressed state is conveyed to
+   * assistive technology, a label composed from two elements, and a `<dialog>` opened on top of
+   * an already-modal one, which is the arrangement most likely to leave the background reachable.
+   *
+   * Scanned at mobile, where the controls are tightest and contrast is most likely to fall short.
+   * ─────────────────────────────────────────────────────────────────────────────────────────
+   */
+  test('the Q&A section is clean with questions and an open confirmation', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 900 })
+    await page.goto('/')
+    await signIn(page, ADA)
+    await useConference(page, 'Product & Design Summit')
+    await page.goto('/agenda')
+
+    await page.getByRole('heading', { level: 3 }).first().getByRole('link').click()
+    await expect(page.getByRole('dialog')).toBeVisible()
+
+    const question = `An accessible question. ${Date.now()}`
+    await page.getByRole('textbox', { name: /ask a question/i }).fill(question)
+    await page.getByRole('button', { name: /post question/i }).click()
+    await expect(page.getByText(question, { exact: true })).toBeVisible()
+
+    const populated = await scan(page)
+    expect(
+      blocking(populated.violations),
+      `Q&A with a question:
+${describeViolations(blocking(populated.violations))}`,
+    ).toEqual([])
+
+    // …and with the withdrawal confirmation open on top of the panel. Two dialogs in the top
+    // layer at once is the state no other test in this file reaches.
+    await page
+      .getByRole('button', { name: /^withdraw$/i })
+      .first()
+      .click()
+    await expect(page.getByRole('dialog', { name: /withdraw this question/i })).toBeVisible()
+
+    const nested = await scan(page)
+    expect(
+      blocking(nested.violations),
+      `Q&A with a nested confirmation:
+${describeViolations(blocking(nested.violations))}`,
+    ).toEqual([])
+  })
+
   test('the note editor is clean with a failure showing', async ({ page, context }) => {
     // The failure state carries an alert, a retry button and red-on-tinted text — the one
     // combination in this feature where contrast is most likely to fall short, and one that a

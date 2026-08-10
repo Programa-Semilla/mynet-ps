@@ -76,6 +76,17 @@ export interface MailService {
       readonly reportId: string
       readonly reportedAt: string
       readonly messageIds: readonly string[]
+      /**
+       * 009 (FR-783, FR-784) — the reported questions.
+       *
+       * **Identifiers, exactly like `messageIds`, and for the same reason the body is absent.**
+       * FR-784 permits identifiers and a timestamp; it forbids the question *text*, which has no
+       * parameter here and therefore cannot reach a provider by accident. Without these the
+       * operator receives a report naming a person and nothing else — on a surface where that
+       * person may have asked twenty questions — and the row carrying them is unreadable from
+       * inside the product by design and swept after 90 days.
+       */
+      readonly questionIds: readonly string[]
     },
   ): Promise<void>
 }

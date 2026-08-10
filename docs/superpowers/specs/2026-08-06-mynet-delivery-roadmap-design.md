@@ -364,7 +364,7 @@ parties' saved sessions, or a fixed grid. The prototype hardcodes `MEETING_SLOTS
 
 **Discharges**: digital-card sharing feedback; meeting scheduling and appointment creation.
 
-### 009 — Session Q&A · migration `0008` · ∥ 008
+### 009 — Session Q&A · migration `0008` · ∥ 008 — **SHIPPED**
 
 - Questions and votes. One vote per attendee per question. Ordered by upvotes.
 - Empty state.
@@ -373,6 +373,36 @@ parties' saved sessions, or a fixed grid. The prototype hardcodes `MEETING_SLOTS
 **Decision this phase must take:** whether questions are attributed to their author or anonymous.
 
 **Discharges**: Q&A behaviour.
+
+> ═══════════════════════════════════════════════════════════════════════════════════════════
+> **009 SHIPPED, AND WITH IT THE ROADMAP IS COMPLETE.** Every feature 001–009 is delivered, and
+> **every destination `requirements.md` names now answers its question.** What remains is 010,
+> which adds no schema and no feature — it is the validation pass.
+>
+> Four things landed differently from the sketch above, and each is recorded in the feature's
+> own artifacts rather than only here:
+>
+> - **Not a tab — a fourth stacked section.** 005 built the panel with sections rather than a
+>   tab strip, and `PanelNotes` says in its own header that it is the third "so 009 can add
+>   audience questions as a fourth". The prototype's tab strip is HOW, superseded.
+> - **The attribution decision was taken before this phase, not in it.** Constitution v3.2.0
+>   (N3) settled it: questions are attributed to their author. What 009 had to decide was the
+>   problem v3.2.0 left explicitly open — *what happens to a departing attendee's question that
+>   other people have upvoted* — answered by owner decision 1: it goes, and their votes go with
+>   it, with nothing left de-attributed.
+> - **It needed a constitution amendment after all.** Public Q&A visibility is the **second**
+>   recorded exception to Principle VIII's "private content stays private", ratified as v3.3.0
+>   on 2026-08-10. The spec's first draft claimed no amendment was needed; spec review reversed
+>   that, and implementation was gated on ratification exactly as 008's was on v3.2.0.
+> - **Safety came with it.** A question is reportable from the question itself (FR-781), which
+>   the sketch does not mention and which the spec review added — this is the product's first
+>   unmoderated many-to-many surface, and reporting is what makes it survivable without an
+>   organizer. That half shipped as PR-B.
+>
+> **Unlike 007 and 008 it introduced no new architectural concept**: no branded scope, no fourth
+> route audit, no cache classification, no notification trigger. Every mechanism it needed
+> already existed.
+> ═══════════════════════════════════════════════════════════════════════════════════════════
 
 ### 010 — Launch Readiness · no schema
 

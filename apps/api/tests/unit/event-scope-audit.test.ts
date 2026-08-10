@@ -76,8 +76,49 @@ const acceptsEventIdentifier = (route: RouteOptions): boolean =>
 
 const WRITE_METHODS = ['POST', 'PUT', 'PATCH', 'DELETE']
 
-/** Paths that hold seeded conference content, which nothing may write to (FR-132, FR-134). */
-const CONFERENCE_CONTENT = /\/(sessions|tracks|rooms|speakers)\b/
+/** The seeded conference-content collections, which nothing may write to (FR-132, FR-134). */
+const CONTENT_COLLECTIONS = new Set(['sessions', 'tracks', 'rooms', 'speakers'])
+
+/**
+ * Whether a path **addresses** seeded conference content, rather than merely passing through it.
+ *
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ * **T022 (009) — NARROWED FROM `/\/(sessions|tracks|rooms|speakers)\b/`, AND THE NARROWING IS
+ * A DECISION RATHER THAN A CONVENIENCE.**
+ *
+ * The old pattern matched any path *containing* one of those segments, which was exactly right
+ * for four features and became wrong at the fifth. 009 registers
+ * `POST /events/:eventId/sessions/:sessionId/questions` — a write to **attendee state about
+ * conference content**, which is 005's distinction and the reason `saved_sessions` and
+ * `session_notes` live outside `catalog.ts`. 005 dodged this only by accident of naming: its
+ * addresses are `/agenda/saved/:sessionId`, so the segment never appears. Q&A is the first
+ * feature whose attendee-owned resource genuinely nests under a session.
+ *
+ * The rule is now **what the path addresses**, which is what the requirement was always about:
+ * the last non-parameter segment. `…/sessions` and `…/sessions/:sessionId` address a session;
+ * `…/sessions/:sessionId/questions` addresses that session's questions, which no attendee shares
+ * ownership of with an organizer.
+ *
+ * **This does not widen what may be written.** Creating, editing or importing a programme still
+ * has to name a content collection last, and `catalog-read-only.test.ts` independently forbids a
+ * write method reaching `CatalogRepository` at all. The bulk-import assertion below is unchanged
+ * and still catches `/import`, `/bulk`, `/upload` and `/admin` anywhere in a path.
+ *
+ * `addressesConferenceContent` is exported to the test below rather than inlined, so the
+ * narrowing is checked against a table of paths that MUST still be caught — a guard whose
+ * predicate is only exercised by the routes that happen to exist is a guard that silently stops
+ * guarding when they change.
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ */
+export const addressesConferenceContent = (url: string): boolean => {
+  const segments = url.split('/').filter((segment) => segment.length > 0)
+
+  // The resource a path addresses is its last segment that is not a parameter. `/sessions/:id`
+  // addresses `sessions`; `/sessions/:id/questions` addresses `questions`.
+  const addressed = [...segments].reverse().find((segment) => !segment.startsWith(':'))
+
+  return addressed !== undefined && CONTENT_COLLECTIONS.has(addressed)
+}
 
 const methodsOf = (route: RouteOptions): string[] =>
   Array.isArray(route.method) ? route.method : [route.method]
@@ -207,7 +248,7 @@ describe('event scope route audit', () => {
    */
   it('exposes NO write route against conference content', () => {
     const writes = routes
-      .filter((route) => CONFERENCE_CONTENT.test(route.url))
+      .filter((route) => addressesConferenceContent(route.url))
       .filter((route) => methodsOf(route).some((method) => WRITE_METHODS.includes(method)))
       .map((route) => `${methodsOf(route).join('/')} ${route.url}`)
 
@@ -217,6 +258,118 @@ describe('event scope route audit', () => {
         'programme is organizer administration, which Principle III places out of product scope ' +
         'and which the constitution separately forbids without an amendment (FR-132, FR-134).',
     ).toEqual([])
+  })
+
+  /**
+   * T022 (009) — **the predicate above, checked against paths rather than against whatever
+   * routes happen to exist today.**
+   *
+   * The assertion it feeds passes when the list is empty, which is also what it does when the
+   * predicate stops recognising anything. That is a gate that cannot fail. 009 narrowed the
+   * predicate from a substring match to "what does this path address", so the narrowing itself
+   * needs a check — otherwise the next author widening it back, or breaking it entirely, gets a
+   * green suite either way.
+   */
+  it('still recognises a write to the programme, after 009 narrowed the predicate', () => {
+    const mustCatch = [
+      '/events/:eventId/sessions',
+      '/events/:eventId/sessions/:sessionId',
+      '/events/:eventId/tracks',
+      '/events/:eventId/tracks/:trackId',
+      '/events/:eventId/rooms/:roomId',
+      '/events/:eventId/speakers',
+      '/sessions/:sessionId',
+    ]
+
+    for (const url of mustCatch) {
+      expect(
+        addressesConferenceContent(url),
+        `${url} addresses seeded conference content and must still be caught (FR-132, FR-134)`,
+      ).toBe(true)
+    }
+  })
+
+  it('does not mistake attendee state about a session for the session itself', () => {
+    // ───────────────────────────────────────────────────────────────────────────────────────
+    // The other half, and the reason the narrowing exists. These are the attendee's own records
+    // *about* conference content — 005's distinction, and the reason `saved_sessions`,
+    // `session_notes` and 009's `session_questions` live outside `catalog.ts` and cascade from
+    // `attendees` rather than being seeded.
+    //
+    // If one of these ever starts returning true, a future feature's perfectly legitimate write
+    // fails a guard about organizer administration, and the likely fix is somebody adding an
+    // allow-list — which is how the real exclusion gets a hole in it.
+    // ───────────────────────────────────────────────────────────────────────────────────────
+    const mustNotCatch = [
+      '/events/:eventId/sessions/:sessionId/questions',
+      '/events/:eventId/questions/:questionId',
+      '/events/:eventId/questions/:questionId/vote',
+      '/events/:eventId/agenda/saved/:sessionId',
+      '/events/:eventId/agenda/notes/:sessionId',
+    ]
+
+    for (const url of mustNotCatch) {
+      expect(
+        addressesConferenceContent(url),
+        `${url} addresses the attendee's own state, not the programme (005's distinction)`,
+      ).toBe(false)
+    }
+  })
+
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════════════════
+   * T022 (009) — **every Q&A route names its conference, and this is the assertion that makes
+   * the absence of a fourth audit safe** (FR-742, research R12).
+   *
+   * The audit above examines a route **only if it declares an event parameter, and reports
+   * success otherwise.** That is not a flaw — it is the documented reason 007 built
+   * `participation-audit.test.ts` and 008 built `card-audit.test.ts`, each for a resource that
+   * genuinely names no conference.
+   *
+   * 009 needs neither, because a question always belongs to a session and a session to exactly
+   * one event. But that reasoning holds only while the addresses say so, and three of these five
+   * routes could find their question from `:questionId` alone. Somebody tidying
+   * `/events/:eventId/questions/:questionId` to `/questions/:questionId` would remove them from
+   * the audit's view entirely — **the whole suite would stay green** while the routes lost the
+   * only structural check on their scoping.
+   *
+   * So the naming rule gets its own assertion rather than being left as a comment. This is the
+   * cheapest of the three mechanisms 007 and 008 each had to build, and it is available only
+   * because the resource is genuinely per-event.
+   * ═══════════════════════════════════════════════════════════════════════════════════════
+   */
+  it('lets no Q&A route omit its conference from the address (T022, FR-742)', () => {
+    const qa = routes
+      .filter((route) => /\bquestions?\b/.test(route.url))
+      // Fastify registers a `HEAD` alongside every `GET`, so the route table carries six entries
+      // for the five routes this feature declares. Dropping it here keeps the count an assertion
+      // about the feature rather than about Fastify's conveniences.
+      .filter((route) => !methodsOf(route).every((method) => method === 'HEAD'))
+
+    // A gate that cannot fail is not a gate: if the routes were renamed or unregistered, the
+    // filter below would be empty and every assertion after it vacuous.
+    expect(qa.length, 'no Q&A routes were found to audit — has the registration moved?').toBe(5)
+
+    const unnamed = qa
+      .filter((route) => !EVENT_PARAM.test(route.url))
+      .map((route) => `${methodsOf(route).join('/')} ${route.url}`)
+
+    expect(
+      unnamed,
+      'These Q&A routes do not name their conference. `event-scope-audit` examines a route only ' +
+        'if it declares an event parameter and REPORTS SUCCESS otherwise — so a route without ' +
+        'one is not merely unconventional, it is invisible to the only guard covering this ' +
+        'feature. Naming the event costs one path segment and is why 009 needs no fourth branded ' +
+        'scope and no fourth audit (FR-742, research R12).',
+    ).toEqual([])
+
+    // …and naming it is only half. The guard must actually be attached, which the audit's own
+    // assertions cover — restated here so this test reads as the complete rule for the feature.
+    const unguarded = qa
+      .filter((route) => !preHandlersOf(route).includes(requireEventAccess))
+      .map((route) => `${methodsOf(route).join('/')} ${route.url}`)
+
+    expect(unguarded, 'These Q&A routes name a conference but do not verify it.').toEqual([])
   })
 
   it('exposes no route that could import conference content in bulk', () => {

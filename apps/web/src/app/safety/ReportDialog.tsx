@@ -46,6 +46,7 @@ export const ReportDialog = ({
   attendeeId,
   displayName,
   messageIds = [],
+  questionIds = [],
   returnFocusTo,
   onReported,
   onDismiss,
@@ -54,6 +55,18 @@ export const ReportDialog = ({
   displayName: string
   /** The messages being reported, if any. Conduct can be reported without citing one. */
   messageIds?: readonly string[]
+  /**
+   * 009 (FR-781, FR-783) — the questions being reported, if any.
+   *
+   * ───────────────────────────────────────────────────────────────────────────────────────
+   * **Its props were already destination-agnostic, which is what made the move cheap.** A
+   * reported attendee and an optional list of item identifiers describe a report from anywhere;
+   * nothing about this component was ever specific to a thread. This adds a second list beside
+   * the first rather than generalising both into one, because the route stores them in two
+   * columns and collapsing them here would mean re-deriving which was which.
+   * ───────────────────────────────────────────────────────────────────────────────────────
+   */
+  questionIds?: readonly string[]
   returnFocusTo: RefObject<HTMLElement | null>
   onReported: () => void
   onDismiss: () => void
@@ -73,7 +86,7 @@ export const ReportDialog = ({
     setFailed(false)
 
     reports
-      .submit({ attendeeId, reason: trimmed, messageIds })
+      .submit({ attendeeId, reason: trimmed, messageIds, questionIds })
       .then(() => onReported())
       .catch(() => setFailed(true))
       .finally(() => setWorking(false))

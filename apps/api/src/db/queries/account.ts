@@ -126,6 +126,8 @@ export type AccountExport = {
     readonly reportedAttendeeId: string
     readonly reason: string
     readonly messageIds: readonly string[]
+    /** T016 (009) — the reported questions, alongside the reported messages (FR-783). */
+    readonly questionIds: readonly string[]
     readonly createdAt: string
   }[]
 
@@ -202,6 +204,56 @@ export type AccountExport = {
   }[]
 
   /**
+   * ═══════════════════════════════════════════════════════════════════════════════════════
+   * T015 (009) — **audience questions asked, and votes cast, each naming its session**
+   * (FR-764).
+   *
+   * Two sections rather than one, because they are two different acts: writing a question is
+   * authoring content, and upvoting is an opinion about somebody else's. Collapsing them would
+   * force the reader to work out which rows were theirs to begin with.
+   *
+   * **Nothing is withheld from either** (contrast `messages` above, FR-578). A question is
+   * published to the whole conference under the attendee's own name — that is the exception
+   * constitution v3.3.0 records — so an attendee's own questions carry no second person's
+   * privacy interest the way a received message does.
+   *
+   * `sessionTitle` is what makes the document readable a year later, when the identifiers name
+   * nothing the attendee recognises. It is seeded conference content, not personal data, and is
+   * reproduced here for the same reason `savedSessions` reproduces it.
+   * ═══════════════════════════════════════════════════════════════════════════════════════
+   */
+  readonly questionsAsked: readonly {
+    readonly questionId: string
+    readonly sessionId: string
+    readonly sessionTitle: string
+    readonly eventId: string
+    readonly body: string
+    readonly askedAt: string
+  }[]
+
+  /**
+   * Votes this attendee cast, on their own questions and on other people's.
+   *
+   * ───────────────────────────────────────────────────────────────────────────────────────
+   * **The question's TEXT is deliberately absent here, and its author is never named**
+   * (FR-721, FR-769).
+   *
+   * A vote is a fact about the reader; the question it backs is somebody else's words, and no
+   * surface in this product names a voter to anybody but themselves. Reproducing the body would
+   * put another attendee's content into a file obtained through a self-service route they cannot
+   * see or object to — the same reasoning FR-578 gives for received messages, reached here by a
+   * different road. The identifier and the session are what make the record meaningful without
+   * that.
+   * ───────────────────────────────────────────────────────────────────────────────────────
+   */
+  readonly questionVotes: readonly {
+    readonly questionId: string
+    readonly sessionId: string
+    readonly sessionTitle: string
+    readonly votedAt: string
+  }[]
+
+  /**
    * T137 (007) — what this document deliberately leaves out, in the document (FR-578).
    *
    * An export that silently omits something is indistinguishable from an export of an attendee
@@ -266,6 +318,8 @@ export const assembleExport = async (
     cardsShared,
     cardsHeld,
     meetings,
+    questionsAsked,
+    questionVotes,
   ] = await Promise.all([
     db.execute<{
       company: string | null
@@ -341,9 +395,10 @@ export const assembleExport = async (
       reported_id: string
       reason: string
       message_ids: string[]
+      question_ids: string[]
       created_at: Date
     }>(sql`
-      SELECT reported_id, reason, message_ids, created_at
+      SELECT reported_id, reason, message_ids, question_ids, created_at
       FROM abuse_reports WHERE reporter_id = ${attendeeId}::uuid
       ORDER BY created_at
     `),
@@ -419,6 +474,47 @@ export const assembleExport = async (
       WHERE a.proposer_id = ${attendeeId}::uuid OR a.invitee_id = ${attendeeId}::uuid
       ORDER BY s.starts_at, a.id
     `),
+    // ─────────────────────────────────────────────────────────────────────────────────────
+    // T015 (009) — questions asked, each naming its session by title (FR-764).
+    //
+    // `attendee_id = the requester` is the whole filter, expressed as a WHERE clause for the
+    // reason the message export gives for its own: there is no shape of this query that could
+    // return somebody else's question, so the scoping cannot be undone by a later edit that
+    // forgets a `.filter()`.
+    //
+    // The join to `sessions` is what supplies the title and the event. It is an inner join
+    // safely: a question cannot exist without its session, because the foreign key cascades.
+    // ─────────────────────────────────────────────────────────────────────────────────────
+    db.execute<{
+      id: string
+      session_id: string
+      title: string
+      event_id: string
+      body: string
+      asked_at: Date
+    }>(sql`
+      SELECT q.id, q.session_id, s.title, s.event_id, q.body, q.asked_at
+      FROM session_questions q JOIN sessions s ON s.id = q.session_id
+      WHERE q.attendee_id = ${attendeeId}::uuid
+      ORDER BY q.asked_at, q.id
+    `),
+    // ─────────────────────────────────────────────────────────────────────────────────────
+    // T015 (009) — votes cast, likewise naming the session (FR-764).
+    //
+    // **`q.body` is deliberately not selected**, and neither is `q.attendee_id`. A vote is the
+    // reader's own act; the question it backs is another attendee's words and another
+    // attendee's name. See the `questionVotes` docblock for why that is an exclusion rather
+    // than an omission — and note it is *not* listed in `exclusions` below, because what is
+    // withheld is somebody else's content rather than a category of the reader's own.
+    // ─────────────────────────────────────────────────────────────────────────────────────
+    db.execute<{ question_id: string; session_id: string; title: string; voted_at: Date }>(sql`
+      SELECT v.question_id, q.session_id, s.title, v.voted_at
+      FROM question_votes v
+      JOIN session_questions q ON q.id = v.question_id
+      JOIN sessions s ON s.id = q.session_id
+      WHERE v.attendee_id = ${attendeeId}::uuid
+      ORDER BY v.voted_at, v.question_id
+    `),
   ])
 
   const profile = profiles[0]
@@ -491,6 +587,8 @@ export const assembleExport = async (
       reportedAttendeeId: row.reported_id,
       reason: row.reason,
       messageIds: row.message_ids,
+      // T016 (009) — the reported questions, alongside the reported messages (FR-783).
+      questionIds: row.question_ids,
       createdAt: iso(row.created_at) as string,
     })),
     pushSubscriptions: subscriptions.map((row) => ({
@@ -527,6 +625,22 @@ export const assembleExport = async (
       status: row.status,
       createdAt: iso(row.created_at) as string,
       answeredAt: iso(row.answered_at),
+    })),
+    // T015 (009) — FR-764's two sections. See the queries above for what each deliberately
+    // does not select.
+    questionsAsked: questionsAsked.map((row) => ({
+      questionId: row.id,
+      sessionId: row.session_id,
+      sessionTitle: row.title,
+      eventId: row.event_id,
+      body: row.body,
+      askedAt: iso(row.asked_at) as string,
+    })),
+    questionVotes: questionVotes.map((row) => ({
+      questionId: row.question_id,
+      sessionId: row.session_id,
+      sessionTitle: row.title,
+      votedAt: iso(row.voted_at) as string,
     })),
     /**
      * T137 (007) — the stated omissions (FR-578).

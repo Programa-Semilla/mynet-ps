@@ -73,8 +73,19 @@ export const writeReport = async (report: {
   readonly reportedId: string
   readonly reason: string
   readonly messageIds: readonly string[]
+  /**
+   * T011, T070 (009) — the reported questions (FR-783).
+   *
+   * **Required, like `messageIds`.** It was briefly optional while the column shipped in
+   * migration `0008` ahead of the PR-B route that supplies it; that route has landed and this is
+   * the only caller, so the optionality now only offers a future second caller a way to write an
+   * empty array by forgetting the argument. `question_ids` is `NOT NULL` with no database
+   * default — mirroring `message_ids` exactly — precisely so a forgetful caller fails loudly.
+   */
+  readonly questionIds: readonly string[]
 }): Promise<{ reportId: string; reportedAt: string } | null> => {
   const messageIds = report.messageIds.filter((id) => UUID.test(id))
+  const questionIds = report.questionIds.filter((id) => UUID.test(id))
 
   // ───────────────────────────────────────────────────────────────────────────────────────
   // The identifiers reach the statement as **one bound JSON parameter**, expanded by the
@@ -84,11 +95,19 @@ export const writeReport = async (report: {
   // empty case, because the column is `NOT NULL` and `array_agg` over nothing is `NULL`.
   // ───────────────────────────────────────────────────────────────────────────────────────
   const rows = await getDb().execute<{ id: string; created_at: string }>(sql`
-    INSERT INTO abuse_reports (reporter_id, reported_id, reason, message_ids)
+    INSERT INTO abuse_reports (reporter_id, reported_id, reason, message_ids, question_ids)
     SELECT ${report.reporterId}::uuid, ${report.reportedId}::uuid, ${report.reason.trim()},
            coalesce(
              (SELECT array_agg(value::uuid)
               FROM json_array_elements_text(${JSON.stringify(messageIds)}::json) AS value),
+             '{}'::uuid[]
+           ),
+           -- 009, FR-783. Same construction as message_ids above and for the same reasons: one
+           -- bound JSON parameter rather than an interpolated array literal, and coalesce
+           -- because the column is NOT NULL and array_agg over nothing is NULL.
+           coalesce(
+             (SELECT array_agg(value::uuid)
+              FROM json_array_elements_text(${JSON.stringify(questionIds)}::json) AS value),
              '{}'::uuid[]
            )
     WHERE EXISTS (SELECT 1 FROM attendees WHERE id = ${report.reportedId}::uuid)

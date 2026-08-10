@@ -93,6 +93,11 @@ export type {
   SharedCard,
 } from './interfaces/index.js'
 
+// 009 — audience questions on a session. Appended likewise, and its own domain rather than
+// methods on `CatalogRepository`: the catalog is read-only in perpetuity, and a question is
+// attendee state *about* conference content (FR-710, FR-772).
+export type { QuestionListItem, QuestionsRepository } from './interfaces/index.js'
+
 export {
   MESSAGE_MAX_LENGTH,
   NotAuthenticatedError,

@@ -158,6 +158,14 @@ const NOT_EXPORTED_COLUMNS: Record<string, string> = {
   // `EXPORTED_COLUMNS`, in **both roles**, which is what FR-653 asks for.
   'shared_cards.id': 'A surrogate key with no meaning outside this database.',
   'appointments.id': 'A surrogate key with no meaning outside this database.',
+
+  // T015, T016 (009). Both tables' author column is the requester, exactly as
+  // `session_notes.attendee_id` above — the export is keyed on one attendee, so this column is
+  // the same value on every row and is a WHERE clause rather than a projection.
+  'session_questions.attendee_id':
+    "The requester. `attendee_id = the requester` is the export query's WHERE clause, which is " +
+    'what makes the scoping structural rather than a filter applied afterwards.',
+  'question_votes.attendee_id': 'The requester, on every row of the votes section.',
 }
 
 interface Column {
@@ -297,6 +305,11 @@ describe('export coverage (T095, FR-377)', () => {
       cardsShared: true,
       cardsHeld: true,
       appointments: true,
+      // 009. Two sections, because authoring a question and backing somebody else's are two
+      // different acts — and `Record<keyof AccountExport, true>` means adding a section to the
+      // document without acknowledging it here fails to compile, which is how these arrived.
+      questionsAsked: true,
+      questionVotes: true,
       exclusions: true,
     }
 
@@ -339,6 +352,11 @@ describe('export coverage (T095, FR-377)', () => {
       cardsShared: true,
       cardsHeld: true,
       appointments: true,
+      // 009. Two sections, because authoring a question and backing somebody else's are two
+      // different acts — and `Record<keyof AccountExport, true>` means adding a section to the
+      // document without acknowledging it here fails to compile, which is how these arrived.
+      questionsAsked: true,
+      questionVotes: true,
       exclusions: true,
     }
 
