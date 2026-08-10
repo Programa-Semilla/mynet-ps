@@ -26,14 +26,18 @@ SC-608a, which read alike and guard opposite failures).
 
 ## ⚠️ Blocking precondition, before Phase 1
 
-**Implementation may not begin until `docs/unblock-008-network-and-appointments` is merged.** The
-owner ruled on 2026-08-10 that register entries 7 and 8 close by **constitution amendment**
-(v3.2.0), and that branch carries it along with brainstorm #07. Planning against an unmerged
-amendment is legitimate; building against one is not.
+The owner ruled on 2026-08-10 that register entries 7 and 8 close by **constitution amendment**
+(v3.2.0). **That amendment now travels in this same branch and pull request**, at the owner's
+direction — the governance and the specification it authorises are reviewed together rather than in
+two PRs.
+
+The precondition therefore becomes a review-order obligation rather than a merge-order one: **the
+amendment must be approved as part of this PR**, and nothing here is licensed by an amendment a
+reviewer has not accepted.
 
 - [ ] T001 Confirm `.specify/memory/constitution.md` on this branch reads **Version: 3.2.0** and
-      contains the "Networking relationships and appointments" section; stop and merge the docs
-      branch first if it does not
+      contains the "Networking relationships and appointments" and "Audience questions" sections
+      (satisfied by the governance merge; re-check after any rebase, which is when it could be lost)
 
 ---
 
