@@ -543,12 +543,16 @@ this is the product's first many-to-many surface in a product with no moderator 
   Nothing in Q&A invalidates the programme, saved sessions, notes or appointments, so a question or
   a vote has nothing legitimate to purge, and purging the conference on every upvote would drop the
   attendee's offline programme for a number that does not need to be exact.
-- **FR-756a**: A Q&A action **refused** by the server MUST still invalidate that conference, as
-  every other refused write does. The two halves are separated deliberately: the refusal purge is
-  what stops a cached programme staying readable after the server begins refusing a withdrawn
-  registration, and it is the half that would be silently lost by classifying these methods as
-  pass-through to satisfy FR-756. Satisfying one and not the other is the failure mode; Open
-  Question 2 is about **how**, not whether.
+- **FR-756a**: ~~A Q&A action **refused** by the server MUST still invalidate that conference, as
+  every other refused write does.~~ **WITHDRAWN 2026-08-10 by owner decision (tasks.md T003).** The
+  requirement asked Q&A to purge **other features'** caches on refusal — a cross-feature
+  responsibility **no other undecorated repository has**. Messages, Discover, cards and profile have
+  all refused without purging since they shipped, so meeting it here would add a mechanism to the
+  shared decorator, exercise it from one feature, and still leave the real hole open everywhere
+  else. **The underlying gap is real, product-wide, and predates this feature**: a cached conference
+  can outlive a withdrawn registration by up to 24 hours. It is recorded as a register entry against
+  010 rather than fixed by 009 alone. FR-756 stands unchanged; the methods are declared
+  pass-through.
 - **FR-757**: Any repository method here that takes an identifier as its first argument MUST NOT be
   allowed to reach the cache's write branch, which reads `args[0]` as an event id and would purge a
   prefix assembled from a question id — a purge that silently matches nothing and reads as correct.
@@ -679,7 +683,7 @@ require an organizer.
 
 | Obligation | Declaration |
 |---|---|
-| **Offline behaviour** (Principle VI) | **Nothing in this feature is cached, and the refusal is declared per member at the composition root** (FR-754) — following Messages and Discover rather than Agenda. Two reasons, both structural: a **vote count is a live number** that is wrong the moment it is stored, and a stale count carrying a "retrieved at" stamp is worse than no count at all; and a question is **another attendee's name and words**, which must not linger on a device after they withdraw it or delete their account. Reads are declared **live pass-through** rather than left unclassified, because omission enrols a read in the write branch and purges the whole conference (FR-755, FR-757). Writes must satisfy **both halves**: a success purges nothing (FR-756), a refusal still clears that conference (FR-756a). Neither existing classification does both, which is Open Question 2. **Every write is refused offline, never queued** (FR-758), and the typed text survives the refusal (FR-759). |
+| **Offline behaviour** (Principle VI) | **Nothing in this feature is cached, and the refusal is declared per member at the composition root** (FR-754) — following Messages and Discover rather than Agenda. Two reasons, both structural: a **vote count is a live number** that is wrong the moment it is stored, and a stale count carrying a "retrieved at" stamp is worse than no count at all; and a question is **another attendee's name and words**, which must not linger on a device after they withdraw it or delete their account. Reads are declared **live pass-through** rather than left unclassified, because omission enrols a read in the write branch and purges the whole conference (FR-755, FR-757). Writes purge nothing (FR-756); the refusal half, FR-756a, was **withdrawn by owner decision on 2026-08-10** because it asked one feature to carry a cross-feature responsibility no other undecorated repository has, and the gap it named is product-wide. Open Question 2 closes with it, and the gap is a register entry against 010. **Every write is refused offline, never queued** (FR-758), and the typed text survives the refusal (FR-759). |
 | **Desktop layout** (Principle IV) | Persistent left rail and contextual top bar unchanged. The panel remains a centred overlay; Q&A is a fourth stacked section within it, with the ask field full-width above the list and the vote control on the leading edge of each question. |
 | **Tablet layout** (Principle IV) | Reduced rail. The panel keeps its constrained width; the Q&A list stays single-column — questions are text, and a two-column list of prose is harder to scan, not easier. |
 | **Mobile layout** (Principle IV) | Compact header, bottom navigation, the panel full-width from the bottom edge as 005 established. Vote and withdraw controls at touch size (FR-776). A long question wraps; nothing scrolls horizontally (FR-775). |
@@ -742,16 +746,16 @@ many-to-many surface and that reporting from a question (FR-781) is what makes t
 moderator survivable there. **Nothing else in this feature is blocked by it, and planning may
 proceed in full.** Follows 008's precedent exactly, where v3.2.0 gated the first line of code.
 
-**2. What a Q&A write should do to the cache, given a success invalidates nothing and a refusal
-invalidates everything.** FR-756 and FR-756a state both halves; **no existing classification
-satisfies both.** Leaving writes unclassified purges the conference on every question and every
-upvote — it satisfies FR-756a and violates FR-756, dropping the attendee's offline programme for a
-single vote. Declaring them pass-through satisfies FR-756 and violates FR-756a, silently giving up
-the purge that stops a cached programme staying readable after the server begins refusing a
-withdrawn registration. The answer is most likely a **third classification — purge on refusal, not
-on success** — which does not exist yet and which would be useful to more than this feature. A
-planning decision, and the one most likely to produce a defect that no unit test sees, because 008's
-version of exactly this reached a browser.
+**2. ~~What a Q&A write should do to the cache~~ — CLOSED 2026-08-10 by owner decision.** The
+question was how to satisfy FR-756 (a success purges nothing) and FR-756a (a refusal purges the
+conference) at once, when no existing classification does both and a third — purge on refusal, not
+on success — did not exist. **FR-756a was withdrawn instead**, and the writes are declared
+pass-through: building the third classification would have added a mechanism to
+`packages/data/src/http/cached.ts`, a file every feature shares, exercised it from this one feature,
+and still left the hole open in Messages, Discover, cards and profile, none of which purge on
+refusal either. **What the withdrawal concedes is written down rather than lost**: a cached
+conference can stay readable for up to 24 hours after the server begins refusing a withdrawn
+registration. That is product-wide, predates 009, and is recorded as a register entry against 010.
 
 **3. Nesting two modal dialogs.** The withdrawal confirmation (FR-712) and the report dialog
 (FR-781) both open from **inside** the session panel, which is itself a `<dialog>` opened with

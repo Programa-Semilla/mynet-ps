@@ -131,11 +131,19 @@ reviewer has not accepted.
 - [ ] T002 Confirm the amendment travels in this branch and PR, as 008's did, and that
       `.specify/memory/constitution.md` reads its new version before any implementation task begins
       (re-check after any rebase — that is when it is lost) (FR-733)
-- [ ] T003 Raise the **FR-756a withdrawal** recorded in plan.md Complexity Tracking with the owner:
+- [x] T003 Raise the **FR-756a withdrawal** recorded in plan.md Complexity Tracking with the owner:
       the refusal-purge requirement is not met, meeting it would give Q&A a cross-feature
       responsibility no other undecorated repository has, and the underlying gap is product-wide.
       Either amend `spec.md` to withdraw FR-756a, or reject the recommendation — **do not implement
       against an unresolved MUST**
+      → **RESOLVED 2026-08-10: the owner withdrew FR-756a.** `spec.md` records the withdrawal at
+      FR-756a, in the Offline row of the completeness declaration, and by closing Open Question 2.
+      The writes are declared **pass-through**; FR-756 stands unchanged. **T003a below carries the
+      half that must not be lost.**
+- [ ] T003a Record the conceded gap as a register entry against **010**: a cached conference can
+      stay readable for up to **24 hours** after the server begins refusing a withdrawn
+      registration, and no undecorated repository — Messages, Discover, cards, profile or Q&A —
+      purges on refusal. Write it where the next feature will meet it, not only in 009's spec
 
 ---
 
