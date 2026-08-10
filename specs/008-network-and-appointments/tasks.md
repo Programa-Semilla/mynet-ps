@@ -12,7 +12,8 @@ description: "Task list for 008 — Network: contacts, exchanged cards, and appo
 
 **Tests**: **included and not optional here.** Principle VII requires ten correctness gates, and
 three of this feature's guarantees are *only* expressible as tests — the third route audit, the
-coverage classification that fails by existence, and the availability-privacy property (SC-608a).
+coverage classification that fails by existence, and the availability-privacy properties (SC-605 and
+SC-608a, which read alike and guard opposite failures).
 
 **Organization**: grouped by user story so each is independently implementable and testable.
 
@@ -58,7 +59,7 @@ external service — which is worth confirming rather than assuming.
 
 - [ ] T005 [P] Create `shared_cards` schema in `apps/api/src/db/schema/cards.ts` — cross-event,
       with `sharer_id`/`recipient_id` both `ON DELETE CASCADE`, `event_id` as a historical fact,
-      and `shared_at`
+      and `shared_at` (FR-605)
 - [ ] T006 [P] Add `unique (sharer_id, recipient_id)` and `check (sharer_id <> recipient_id)` in
       `apps/api/src/db/schema/cards.ts` (FR-604, FR-606)
 - [ ] T007 Document in `apps/api/src/db/schema/cards.ts` **why there is no ordered-pair
@@ -69,7 +70,7 @@ external service — which is worth confirming rather than assuming.
       per-event, `starts_at`/`ends_at` as absolute instants, `unique (event_id, starts_at)`
 - [ ] T009 Create `appointments` schema in `apps/api/src/db/schema/appointments.ts` — per-event,
       both participant references `ON DELETE CASCADE`, status enum
-      `pending|confirmed|declined|cancelled`
+      `pending|confirmed|declined|cancelled` (FR-630)
 - [ ] T010 Add to `apps/api/src/db/schema/appointments.ts` the `check (btrim(topic) <> '')` and
       `check (proposer_id <> invitee_id)` constraints, plus the partial unique on
       `(proposer_id, slot_id)` where status is pending or confirmed (data-model.md)
@@ -99,7 +100,9 @@ external service — which is worth confirming rather than assuming.
       007 already recorded why conflating predicates makes the failure message name the wrong
       requirement
 - [ ] T020 Create `apps/api/tests/unit/card-audit.test.ts` — the **third** route audit, failing any
-      route beneath `/cards` that lacks `requireHeldCard`
+      route beneath `/cards` that lacks `requireHeldCard` (**FR-641**, SC-613). FR-641 is the
+      requirement this whole guard exists to satisfy: a card route names no conference, so
+      `event-scope-audit` walks past it and reports success
 - [ ] T021 Match routes in `card-audit.test.ts` by **path shape** rather than parameter name, per
       the lesson recorded in `participation-audit.test.ts` — a gate keyed on a name is defeated by
       choosing another
@@ -123,13 +126,14 @@ external service — which is worth confirming rather than assuming.
       the two attendee-data tables
 - [ ] T028 Confirm **no** `RETENTION_SWEEPS` entry is needed — every new row is cascade-reachable —
       and record that in the migration comment
-- [ ] T029 Confirm **no column is added to `attendees`**; the contact line was withdrawn as a breach
-      of standing decision 16 (FR-619–FR-622)
+- [ ] T029 Confirm **no column is added to `attendees`**, and that no attendee-authored field with
+      its own audience is introduced anywhere; the contact line was withdrawn as a breach of
+      standing decision 16 (FR-619, FR-620, FR-621, FR-622)
 
 ### Repository interfaces and wiring
 
 - [ ] T030 [P] Create `packages/data/src/interfaces/cards.ts` in domain terms — share, list held,
-      read one, list shared. **No revoke method** (FR-618)
+      read one, list shared. **No revoke method** (FR-618, FR-650)
 - [ ] T031 [P] Create `packages/data/src/interfaces/appointments.ts` — slots, propose, list, accept,
       decline, cancel
 - [ ] T032 Export both from `packages/data/src/interfaces/index.ts`
@@ -149,11 +153,18 @@ external service — which is worth confirming rather than assuming.
       identical to an oversight
 - [ ] T039 Record in that comment that this **answers by refusal** the cache-key question 007
       deferred here, so no event-less key variant is needed (research R4)
+- [ ] T039a Component test in `apps/web/tests/unit/` asserting **every write in this feature is
+      refused offline and never queued** — share, propose, accept, decline, cancel (FR-649). The
+      decorator gives this for free, which is exactly why it can be lost silently; nothing else
+      verifies it
+- [ ] T039b Establish the failure-state contract for this feature's surfaces: a **connectivity
+      failure must be distinguishable from a server fault** (FR-657), and record the distinction
+      once so T060, T106 and T113 all render it the same way
 
 ### Throttling
 
 - [ ] T040 Add `card_share` and `appointment_propose` to `THROTTLE_ACTIONS` in
-      `apps/api/src/db/schema/sign-in-attempts.ts`
+      `apps/api/src/db/schema/sign-in-attempts.ts` (FR-609, FR-638)
 - [ ] T041 Give both thresholds `mayDeny: true` in `apps/api/src/auth/throttle.ts` (FR-638a) — the
       opposite of `reset_request` and `message_send`, because here the throttled action is the
       actor's own
@@ -206,15 +217,16 @@ lists A while A's Network is unchanged.
 
 - [ ] T055 [US1] Implement share and held-card queries in `apps/api/src/db/queries/cards.ts`
 - [ ] T056 [US1] Implement `POST /cards` and `GET /cards/held` in `apps/api/src/routes/cards.ts`,
-      guarded per T017
+      guarded per T017 — server-side authorization on every read and write, never client-side
+      filtering (FR-640)
 - [ ] T057 [US1] Register card routes in `apps/api/src/routes/index.ts`
 - [ ] T058 [US1] Resolve held cards against the sharer's **current** profile — no stored copy
       (FR-611)
 - [ ] T059 [US1] Regenerate and commit `contracts/openapi.json`
 - [ ] T060 [P] [US1] Build the contacts list in `apps/web/src/app/network/Contacts.tsx` with loading,
-      empty and failure states; empty offers a route to Discover (FR-617)
+      empty and failure states per T039b; empty offers a route to Discover (FR-610, FR-617, FR-657)
 - [ ] T061 [P] [US1] Add the share action to `apps/web/src/app/discover/AttendeeProfile.tsx`, in the
-      action boundary 006 declared and left empty
+      action boundary 006 declared and left empty (FR-601)
 - [ ] T062 [US1] Make the control's accessible name and its confirmation **both state whose card
       moves** (FR-603) — the most misreadable control in the feature
 - [ ] T063 [P] [US1] Component test asserting the share control's accessible name names the sharer's
@@ -273,11 +285,13 @@ proposal, and see it pending for both.
 - [ ] T073 [P] [US3] Integration test in `apps/api/tests/integration/appointments-slots.test.ts`:
       offered slots exclude the reader's saved sessions, sent pending proposals, and confirmed
       appointments (FR-625)
-- [ ] T074 [US3] **SC-608a measurement test**: for a fixed reader, the offered set is byte-identical
-      regardless of the invitee's saved sessions and appointments (FR-626) — the Principle VIII
-      property, asserted by comparison
-- [ ] T075 [P] [US3] Integration test: a **received** proposal removes no slot from the invitee, so
-      one attendee cannot consume another's day
+- [ ] T074 [US3] **SC-605 measurement test** — the privacy half: for a fixed reader, the offered set
+      is byte-identical regardless of the invitee's saved sessions and appointments (FR-626). This
+      is the Principle VIII property, asserted by comparison
+- [ ] T075 [P] [US3] **SC-608a measurement test** — the anti-griefing half, which is a *different*
+      guarantee: a **received** proposal removes no slot from the invitee, so no attendee's
+      availability can be reduced by another attendee's action (FR-625). Keep T074 and T075
+      distinct; they read alike and protect against opposite failures
 - [ ] T076 [P] [US3] Integration test: proposing while blocked is refused with a **reasonless** 409
       (FR-637)
 - [ ] T077 [P] [US3] Integration test: whitespace-only topic is refused server-side (FR-629 backstop)
@@ -294,7 +308,7 @@ proposal, and see it pending for both.
       **one query whose every input is reader-keyed** (research R10)
 - [ ] T082 [US3] Record at that query why an invitee-derived input is forbidden — it leaks their
       Agenda by omission — so the property is defended in prose as well as in test
-- [ ] T083 [US3] Implement propose in `apps/api/src/db/queries/appointments.ts`
+- [ ] T083 [US3] Implement propose in `apps/api/src/db/queries/appointments.ts` (FR-628)
 - [ ] T084 [US3] Create `apps/api/src/routes/events/appointments.ts` **beneath `:eventId`**, guarded
       by `requireEventAccess`
 - [ ] T085 [US3] Record at the route registration that the nesting is a **security** decision:
@@ -342,7 +356,8 @@ another and see the slot return to the proposer.
 
 ### Implementation for User Story 4
 
-- [ ] T100 [US4] Implement accept, decline and cancel in `apps/api/src/db/queries/appointments.ts`
+- [ ] T100 [US4] Implement accept, decline and cancel in `apps/api/src/db/queries/appointments.ts` —
+      cancel is available to **either** party on a confirmed appointment (FR-632)
 - [ ] T101 [US4] Implement the FR-633a conflict check at acceptance, with the reason-carrying 409
       that describes only the reader's own schedule
 - [ ] T102 [US4] Record beside it why **this** 409 carries a reason while the block 409s do not — it
@@ -352,7 +367,7 @@ another and see the slot return to the proposer.
       `apps/api/src/routes/events/appointments.ts`
 - [ ] T105 [US4] Regenerate and commit `contracts/openapi.json`
 - [ ] T106 [P] [US4] Build the appointments view in `apps/web/src/app/network/Appointments.tsx` with
-      loading, empty and failure states
+      loading, empty and failure states per T039b (FR-657)
 - [ ] T107 [US4] Route decline and cancel through the shared `ConfirmDialog`, **not** a second modal
       over the scheduling one (FR-656) — restore focus *after* closing, because an inert element
       cannot take it
@@ -380,12 +395,13 @@ source and confirm the rest of Home renders.
 
 ### Implementation for User Story 5
 
-- [ ] T113 [US5] Create `apps/web/src/app/home/cards/Appointments.tsx` owning its three states
+- [ ] T113 [US5] Create `apps/web/src/app/home/cards/Appointments.tsx` owning its three states per
+      T039b (FR-646, FR-657)
 - [ ] T114 [US5] Append one import and one entry to `apps/web/src/app/home/registry.ts` — nothing
       above it edited or reordered (standing decision 9)
 - [ ] T115 [US5] Scope the card to the active event (FR-639)
 - [ ] T116 [US5] Record in the card why it must surface pending proposals: **no notification
-      announces one**, so Home is the only way an attendee learns of it (FR-643, FR-645)
+      announces one**, so Home is the only way an attendee learns of it (FR-643, FR-645, SC-606)
 
 **Checkpoint**: a proposal is discoverable without any notification.
 
@@ -408,7 +424,7 @@ an account and confirm nothing survives on the other side.
 - [ ] T119 [P] [US6] Integration test: a block cancels pending proposals and future confirmed
       appointments and frees their slots (FR-637a)
 - [ ] T120 [P] [US6] Integration test: deleting an account removes the contact entirely from the
-      other side — **no nameless entry**, unlike 007's conversations (FR-651)
+      other side — **no nameless entry**, unlike 007's conversations (FR-651, SC-609)
 - [ ] T121 [P] [US6] Integration test: deleting an account removes every appointment for both
       (FR-652)
 - [ ] T122 [P] [US6] Integration test: the export contains cards shared, cards held, and
@@ -460,8 +476,8 @@ Each needs a test, because an absence that nobody asserted is an absence the nex
 - [ ] T139 [P] Assert there is **no route** creating or editing a meeting slot (FR-623)
 - [ ] T140 [P] Assert **no column was added to `attendees`** — the contact line stays withdrawn
       (FR-619–FR-622)
-- [ ] T141 [P] Assert contacts are **not** derived from conversations anywhere (constitution v3.2.0,
-      N1)
+- [ ] T141 [P] Assert contacts are **not** derived from conversations, from appointments, or from
+      any signal other than a held card (FR-610; constitution v3.2.0, N1)
 
 ### Success criteria with an explicit measurement task
 

@@ -47,6 +47,85 @@ are refused offline, never queued. No notification may be dispatched from this f
 **Scale/Scope**: Two API domains, two new repositories, one destination with two views, one Home
 card, one modal, three tables. Comparable to 006 in surface and smaller than 007.
 
+## Global Constraints
+
+**Every task inherits this section.** A task's implementer sees only their own task, so anything
+that binds the whole feature is copied here verbatim rather than left to be discovered in the spec.
+
+- **No content or primary action may require horizontal scrolling** at any supported width
+  (FR-659). Contacts/appointments is a segmented control, never a scrolling strip.
+- **Every write is refused when offline, never queued** (FR-649). No write queue, no optimistic
+  update, no conflict merging — anywhere in this feature.
+- **This feature dispatches no notification**, for any event, and **does not edit**
+  `apps/api/tests/unit/notification-triggers.test.ts` (FR-643).
+- **One visibility decision per attendee.** No field may have its own audience (FR-620, constitution
+  v3.2.0 N4). No column is added to `attendees`.
+- **Availability may be computed only from the reader's own commitments** (FR-626). Any input
+  derived from the invitee is a Principle VIII leak by omission and is forbidden.
+- **Refusals never disclose that a relationship exists** (FR-642): 404 for a card you do not hold or
+  an appointment you are not party to, indistinguishable from non-existence.
+- **All data access goes through repository interfaces**; no component calls the network or knows
+  transport details (FR-650).
+- **Every surface crossing the network has loading, empty and failure states**, and the failure
+  state **distinguishes a connectivity failure from a server fault** (FR-657).
+- **Every interactive control** has an accessible label, a visible focus state, and keyboard
+  operation (FR-658).
+- **Migration `0007` only.** Move `apps/api/migrations/meta/README.md` aside before any
+  `drizzle-kit generate`, and never "correct" the journal's `0003`/`0004` ordering.
+
+## Interfaces
+
+Names and shapes that cross a task boundary, so an implementer who sees only their own task knows
+what a neighbouring task exported.
+
+**`apps/api/src/plugins/card-access.ts`** (produced by T016–T018, consumed by T020, T056, T069)
+
+```ts
+export type CardScope = VerifiedCardScope          // nominal; class unexported, #private field
+export const requireHeldCard: (
+  request: FastifyRequest, reply: FastifyReply,
+) => Promise<void>                                  // attaches CardScope; 404 when not held
+export const cardScopeOf: (request: FastifyRequest) => CardScope
+```
+
+**`apps/api/src/db/queries/appointments.ts`** (produced by T124, consumed by T125 in `blocks.ts`)
+
+```ts
+export const cancelAppointmentsBetween: (
+  db: Db, attendeeA: string, attendeeB: string,
+) => Promise<void>   // cancels pending proposals and FUTURE confirmed appointments, both
+                     // directions, freeing slots. Called from db/queries/blocks.ts — the one
+                     // place 008 edits a file 007 owns (research R6).
+```
+
+**`packages/data/src/interfaces/cards.ts`** (produced by T030, consumed by T033, T060, T061)
+
+```ts
+export interface CardRepository {
+  share(attendeeId: string): Promise<SharedCard>          // idempotent; no revoke method exists
+  listHeld(): Promise<HeldCard[]>                          // cross-event; never filtered by event
+  getHeld(attendeeId: string): Promise<HeldCard>
+  listShared(): Promise<SharedCard[]>
+}
+```
+
+**`packages/data/src/interfaces/appointments.ts`** (produced by T031, consumed by T034, T088, T106,
+T113)
+
+```ts
+export interface AppointmentRepository {
+  slots(eventId: string, withAttendeeId: string): Promise<MeetingSlot[]>   // reader-keyed only
+  propose(eventId: string, input: ProposeInput): Promise<Appointment>
+  list(eventId: string): Promise<Appointment[]>            // `lapsed` derived, never stored
+  accept(eventId: string, id: string): Promise<Appointment>
+  decline(eventId: string, id: string): Promise<Appointment>
+  cancel(eventId: string, id: string): Promise<Appointment>
+}
+```
+
+**Throttle action names** (produced by T040, consumed by T041, T042, T056, T084):
+`card_share`, `appointment_propose` — both `mayDeny: true`.
+
 ## Constitution Check
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
