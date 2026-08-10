@@ -13,7 +13,7 @@
 
 ## Requirement Completeness
 
-- [ ] No [NEEDS CLARIFICATION] markers remain
+- [x] No [NEEDS CLARIFICATION] markers remain
 - [x] Requirements are testable and unambiguous
 - [x] Success criteria are measurable
 - [x] Success criteria are technology-agnostic (no implementation details)
@@ -31,24 +31,22 @@
 
 ## Notes
 
-**One item is deliberately left unchecked, and it is not an oversight.**
+**All items pass as of 2026-08-10.** The single outstanding marker was answered rather than waived.
 
-**`No [NEEDS CLARIFICATION] markers remain` — one marker survives, by instruction.** FR-619 carries
-it: whether a card-only, attendee-authored contact line breaches standing decision 16, which settled
-that profile visibility is all-or-nothing and recorded that per-field permissions were *considered
-and rejected*. This is a **WHAT-level conflict between the constitution and this design**, and
-`CLAUDE.md` requires those to be recorded and settled with the client rather than resolved by
-assumption. Resolving it here would be exactly the silent resolution Principle I forbids.
+**The one marker is resolved: the card-only contact line breached standing decision 16 and is
+withdrawn.** FR-619 through FR-622 are rewritten — a card carries exactly the directory profile,
+this feature introduces no new personal-data field, and there remains one visibility decision per
+attendee. The question was carried rather than assumed away precisely because it was a WHAT-level
+conflict between the constitution and this design, and the answer went against the reading the
+specification had provisionally taken. That is the mechanism working, not a defect.
 
-The marker is **contained by construction** so it does not block planning:
+**Two consequences worth noting for planning**: this feature's deletion and export obligation is now
+**two new tables and no new column**, and the test asserting a field's absence from the directory
+query is no longer needed, because the field does not exist.
 
-- It gates **FR-619 through FR-622 and nothing else**.
-- **FR-622 states the fallback explicitly** — if the field is withdrawn, a card carries exactly the
-  profile fields the directory shows and no other requirement changes.
-- It is recorded as Open Question 1 and in the Register position row.
-
-Planning may proceed against the specification as written. What must not happen is the contact-line
-column reaching a migration before the question is answered.
+**One precondition remains, and it is not a spec defect.** The owner ruled that entries 7 and 8
+close by **constitution amendment**. Planning may proceed; **implementation may not begin until that
+amendment is ratified.**
 
 **Two scoped qualifications on items marked as passing**, recorded so a later reader is not misled:
 

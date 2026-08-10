@@ -341,20 +341,25 @@ person's view.
   offers a route to Discover.
 - **FR-618**: The system MUST NOT provide any means to recall or revoke a shared card.
 
-#### The card's contact line *(gated — see Open Question 1)*
+#### What a card carries — settled 2026-08-10
 
-- **FR-619**: A card MUST carry an optional, attendee-authored contact line in addition to the
-  profile fields, visible **only** on a shared card and never in the directory
-  [NEEDS CLARIFICATION: does a card-only contact line breach standing decision 16, which settled
-  that profile visibility is all-or-nothing and recorded that per-field permissions were considered
-  and rejected? Only this field's existence turns on the answer; every other requirement in this
-  specification holds either way].
-- **FR-620**: If FR-619 is confirmed, the contact line MUST be absent from the directory listing,
-  and that absence MUST be asserted by test rather than left to inspection.
-- **FR-621**: If FR-619 is confirmed, the contact line MUST appear in the attendee's data export and
-  MUST be removed with their account.
-- **FR-622**: If FR-619 is withdrawn, a card carries exactly the profile fields the directory shows,
-  and no other requirement changes.
+**The card-only contact line is WITHDRAWN.** The project owner ruled that it *does* breach standing
+decision 16, which settled profile visibility as all-or-nothing and recorded that per-field
+permissions were considered and rejected. The reading this specification originally proceeded under
+— that decision 16 governs only the profile in the directory — is **not** the governing one.
+
+- **FR-619**: A card MUST carry **exactly** the profile fields the directory already shows —
+  display name, avatar, company, role, headline, interests. It MUST NOT carry any field that is
+  not visible in the directory.
+- **FR-620**: This feature MUST NOT introduce any attendee-authored field whose visibility differs
+  from the rest of the profile. There is one visibility decision per attendee and it is the
+  discoverability toggle.
+- **FR-621**: Consequently this feature introduces **no new personal-data field**. It adds no column
+  to the attendee record, needs no new export coverage beyond its own tables, and requires no test
+  asserting a field's absence from the directory — the field does not exist.
+- **FR-622**: A card's value is **durability, not disclosure**. It makes a person reachable after
+  the conference that introduced them has ended; it does not reveal anything about them that a
+  co-attendee could not already see.
 
 #### Meeting slots
 
@@ -491,8 +496,8 @@ person's view.
   topic, and a **stored** status of pending, confirmed, declined, or cancelled. **Per-event.**
   *Lapsed is not among them*: it is derived from the slot instant at read time (FR-634), so no
   scheduled job is needed to maintain it.
-- **Contact line** — an optional attendee-authored field carried only by a shared card, gated on
-  Open Question 1.
+*There is deliberately no "contact line" entity.* It was specified, then withdrawn on 2026-08-10 as
+a breach of standing decision 16. A card carries the directory profile and nothing more.
 
 ## Success Criteria *(mandatory)*
 
@@ -545,9 +550,9 @@ person's view.
 | **Accessibility** (Principle IV) | Scheduling and confirmation are native modal dialogs — focus trap, inert background and Escape from the platform, focus restored to the opener explicitly after closing (FR-655). Slot selection is a keyboard-operable group with visible focus. Every control has an accessible label; the share control names whose card moves (FR-603). The prototype's missing Escape and focus states are corrected, not reproduced. |
 | **Validation checklist discharged** (Principle VII) | Discharges **digital-card sharing feedback** and **meeting scheduling and appointment creation** — the last two behavioural items outstanding. Also contributes to keyboard focus visibility and accessible labels. Leaves to 009: session Q&A. Leaves to 010: the full end-to-end sweep and brand assets. |
 | **Identity scoping & server-side authorization** (Principle VIII) | Every read and write is bound to the requesting identity server-side (FR-640). **Appointments** compose event scope with a participant check. **Cards cannot use event scope at all** — they are cross-event, so a card route names no conference and the existing audit silently passes it; this feature introduces a predicate covering card routes and an audit that fails a route lacking it (FR-641). Refusals never disclose that a relationship exists (FR-642). |
-| **Deletion & export coverage** (Principle VIII) | **Shared cards**: cascade from `attendees` on both the sharer and recipient references, so deleting either party removes the record in both directions (FR-651) — no nameless survivor, unlike 007's conversations, because a card with no subject has nothing to preserve. **Appointments**: cascade from `attendees` on both participant references (FR-652). **Contact line**: a column on the existing attendee record, removed with the account and included in the export (FR-621). **Slot grid**: conference content, not attendee data — allow-listed with the reason written down (FR-654). Export covers cards shared, cards held, and appointments in both roles (FR-653). No retention clock is needed: every new record is reachable by a cascade. |
+| **Deletion & export coverage** (Principle VIII) | **Shared cards**: cascade from `attendees` on both the sharer and recipient references, so deleting either party removes the record in both directions (FR-651) — no nameless survivor, unlike 007's conversations, because a card with no subject has nothing to preserve. **Appointments**: cascade from `attendees` on both participant references (FR-652). **Slot grid**: conference content, not attendee data — allow-listed with the reason written down (FR-654). Export covers cards shared, cards held, and appointments in both roles (FR-653). No retention clock is needed: every new record is reachable by a cascade. **No column is added to the attendee record** — the contact line was withdrawn (FR-619–FR-622), so this feature's coverage obligation is two new tables and nothing else. |
 | **Event scoping** (Constraints — data scoping) | **Shared cards — cross-event.** Standing decision 7 names exchanged cards among the relationships that persist, and the durability is the feature's purpose. The event reference is a historical fact about where the exchange happened, explicitly **not** a scoping predicate. **Appointments — per-event.** Decision 7 names appointments among per-event content: an appointment is a time and a place at a specific conference (FR-639). **Meeting slots — per-event.** They belong to an event day and are seeded with it. |
-| **Register position** (Governance) | **Resolves entry 7** (the connection model behind Network contacts) and **entry 8** (what a card exchange records and whether it is mutual), both by brainstorm #07. **Blocked by neither.** Raises one new question for the register: whether the card-only contact line breaches standing decision 16 (Open Question 1) — which gates FR-619 through FR-622 and nothing else. Unaffected by entries 9, 20 and 21. |
+| **Register position** (Governance) | **Resolves entry 7** (the connection model behind Network contacts) and **entry 8** (what a card exchange records and whether it is mutual), both by brainstorm #07. **Blocked by neither.** The one question this feature raised — whether a card-only contact line breaches standing decision 16 — was **answered on 2026-08-10: it does**, and the field is withdrawn (FR-619–FR-622). This feature therefore raises **no** open register entry. **Its resolutions land by constitution amendment**, ruled by the owner on 2026-08-10, so the amendment must be ratified before implementation begins. Unaffected by entries 20 and 21. |
 | **Reserved migration number** (Branching — parallel work) | **`0007`**, from the delivery roadmap. Anyone regenerating the Drizzle snapshot must move `apps/api/migrations/meta/README.md` aside first — `drizzle-kit generate` JSON-parses every file in `meta/` — and must not "correct" the journal's deliberate `0003`/`0004` ordering. |
 
 ## Assumptions
@@ -576,14 +581,12 @@ person's view.
 
 ## Open Questions
 
-**1. Does the card-only contact line breach standing decision 16?** That decision settled profile
-visibility as all-or-nothing and recorded that per-field permissions were *considered and rejected*.
-The reading this specification proceeds under is that decision 16 governs **the profile in the
-directory**, which stays all-or-nothing, while the contact line is a second artifact reached only by
-a deliberate share. That reading is defensible but it is a WHAT-level conflict between the
-constitution and this design, and `CLAUDE.md` requires those to be recorded and settled with the
-client rather than resolved by assumption. **Gates FR-619 through FR-622 only**; FR-622 states the
-fallback, and every other requirement holds unchanged either way.
+**~~1. Does the card-only contact line breach standing decision 16?~~ ANSWERED 2026-08-10 — yes, it
+does.** The field is withdrawn and FR-619 through FR-622 are rewritten accordingly: a card carries
+exactly the directory profile, this feature introduces no new personal-data field, and there is one
+visibility decision per attendee. Retained here rather than deleted, because the *reasoning* is the
+governing one for any later feature tempted to give a field its own audience — a card is durability,
+not disclosure.
 
 **2. Does card resolution need its own branded scope and a fourth route audit, or can something
 existing be extended?** The hole is certain — `event-scope-audit` silently passes a route naming no
@@ -606,7 +609,9 @@ not. 007 left the analogous departed-counterpart copy open too.
 **6. Whether 008 splits into reviewable phases.** It carries two subsystems sharing only a
 destination. Worth deciding after planning against the concrete task list, as 007 did.
 
-**7. Whether closing register entries 7 and 8 needs a constitution amendment** or is binding as a
-client decision already taken. Precedent cuts both ways: #04's client decisions were binding
-immediately, while #06's landed as v3.1.0 before its specification was written. Open Question 1
-probably decides which.
+**~~7. Whether closing register entries 7 and 8 needs a constitution amendment.~~ ANSWERED
+2026-08-10 — yes, by amendment.** Following #06's precedent rather than #04's. **This is a
+precondition on implementation, not on planning**: the amendment must resolve entries 7 and 8, carry
+the withdrawal in Open Question 1 above, and be ratified before the first line of 008 is written.
+Entry 9 (audience-question attribution, answered *attributed* on the same day) belongs in the same
+amendment, since it unblocks 009 — this feature's parallel partner.
