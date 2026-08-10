@@ -61,6 +61,25 @@ column reaching a migration before the question is answered.
    Feature Declarations table and Open Question 2 assume familiarity with the project's shipped
    authorization invariants. Judged acceptable for the same reason as above.
 
-**Validation iterations**: one. Two success criteria (SC-610, SC-613) originally named internal
-tooling rather than the outcome it guarantees, and were rewritten before this checklist was
-finalised. No other item required a spec change.
+**Validation iterations**: two.
+
+*Iteration 1 (authoring)* — two success criteria (SC-610, SC-613) named internal tooling rather than
+the outcome it guarantees, and were rewritten.
+
+*Iteration 2 (review gate)* — three Important and four Minor findings, all fixed. The two that were
+decisions rather than wording:
+
+- **A received proposal reserves nothing** (FR-625), so no attendee's availability can be reduced by
+  another attendee's action. Double-booking is instead prevented at **acceptance** (FR-633a), where
+  the invitee is told about a conflict in *their own* schedule — which discloses nothing, unlike the
+  server-side auto-decline this specification already rejected. SC-608a makes the guarantee
+  testable.
+- **A block arriving after the fact cancels** any pending proposal and any future confirmed
+  appointment (FR-637a), rather than hiding them. Cards suspend and resume, following 007;
+  appointments cancel, because a meeting somebody would otherwise turn up to must be ended visibly.
+
+Also added: FR-643a (Network's addressability and nested addresses, which 005–007 each declared and
+this specification had omitted), FR-638a (these throttles may deny, the opposite of reset-request,
+because here the throttled action is the actor's own), FR-639a (no scheduling action for a contact
+absent from the active event), and FR-634's derivation rule for *lapsed*, which is what keeps this
+feature free of a scheduled job.

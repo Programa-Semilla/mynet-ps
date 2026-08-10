@@ -143,8 +143,10 @@ contact still resolves while they vanish from Discover.
    listed in B's Network with current details.
 2. **Given** B holds A's card, **When** A turns discoverability off, **Then** A disappears from
    Discover for everybody but remains a resolvable contact for B.
-3. **Given** B holds A's card, **When** A has never verified or later becomes unverified, **Then**
-   card resolution does not consult verification state at all.
+3. **Given** B holds A's card, **When** the card is resolved, **Then** verification state is not
+   consulted at any point in the resolution. Verified by inspecting the resolution path rather than
+   by producing an unverified state — no un-verify action exists, and this scenario exists to stop
+   one being *added* as a second use of verification.
 4. **Given** B holds A's card, **When** B looks at the contact, **Then** B can see which event they
    exchanged at and when.
 
@@ -205,6 +207,9 @@ confirmed appointment; repeat with a decline and confirm the slot is available t
    first.
 6. **Given** a proposal whose slot has already passed, **When** it is displayed, **Then** it is shown
    as lapsed and can no longer be accepted.
+7. **Given** the invitee acquired a conflicting commitment after the proposal arrived, **When** they
+   accept, **Then** acceptance is refused and they are told they already have something at that
+   time — a statement about their own schedule, disclosed to nobody else.
 
 ---
 
@@ -252,6 +257,9 @@ person's view.
    card resolves for either party and neither can share again or schedule.
 2. **Given** a block is later lifted, **When** it is, **Then** the card resolves again — blocking
    suspends the relationship rather than destroying the record.
+2a. **Given** a pending proposal or a future confirmed appointment between two attendees, **When**
+   either blocks the other, **Then** both are cancelled and the slots freed; and **When** the block
+   is later lifted, **Then** they stay cancelled and a new one must be proposed.
 3. **Given** B holds A's card, **When** A deletes their account, **Then** the contact is gone from
    B's Network entirely rather than becoming a nameless entry.
 4. **Given** A and B have appointments, **When** either deletes their account, **Then** those
@@ -267,9 +275,15 @@ person's view.
 - **Sharing with someone not registered for any event you share** — refused, and the refusal is
   indistinguishable from that person not existing, inheriting 006's four-way indistinguishability.
 - **Two proposals for the same slot with different people** — the second is not offered, because the
-  reader's own pending and confirmed appointments both remove a slot.
-- **Both parties propose to each other for the same slot** — each is a separate record; accepting
-  one removes the other's slot from availability, and the other lapses or is declined.
+  reader's own *sent* pending proposals remove a slot (FR-625).
+- **Both parties propose to each other for the same slot** — both are offered it, because a
+  *received* proposal reserves nothing. Each is a separate record; whoever accepts first creates the
+  appointment, and the other's acceptance is then refused by FR-633a, which tells them they already
+  have a commitment then.
+- **A block arriving between proposal and acceptance** — FR-637a cancels the proposal and frees the
+  slot. The invitee sees it cancelled rather than silently vanished.
+- **Being blocked while holding an appointment tomorrow** — the appointment is cancelled, not
+  hidden. A meeting you would otherwise turn up to must not disappear quietly.
 - **A proposal to somebody who then leaves the conference** — the appointment is per-event; what
   happens to it is Open Question 4.
 - **A held card whose sharer has left every event you share** — the card still resolves, because
@@ -349,7 +363,10 @@ person's view.
 - **FR-624**: Slots MUST be expressed in the venue's timezone, following the rule 002 established
   for day context.
 - **FR-625**: The slots offered to a reader MUST exclude those overlapping the **reader's own**
-  saved sessions, pending proposals, and confirmed appointments.
+  saved sessions, the reader's own **sent** pending proposals, and the reader's confirmed
+  appointments. A proposal the reader has **received** MUST NOT remove a slot — otherwise anybody
+  could consume another attendee's whole day by proposing into it, and the throttle would bound that
+  without preventing it.
 - **FR-626**: The slots offered MUST NOT be filtered by the invitee's saved sessions, appointments,
   or any other private state. Availability MUST disclose nothing about the invitee.
 - **FR-627**: When no slot is available to the reader, the scheduling surface MUST show an
@@ -364,16 +381,36 @@ person's view.
 - **FR-630**: A proposal MUST record both participants, the event, the slot, the topic, and a status.
 - **FR-631**: The invitee MUST be able to **accept** or **decline** a pending proposal.
 - **FR-632**: Either party MUST be able to **cancel** a confirmed appointment.
-- **FR-633**: Declining and cancelling MUST return the slot to availability for both parties.
+- **FR-633**: Declining or cancelling MUST return the slot to availability for whoever it was
+  unavailable to — the proposer in the case of a declined proposal, and both parties in the case of
+  a cancelled confirmed appointment.
+- **FR-633a**: Because a received proposal does not reserve anything (FR-625), acceptance MUST be
+  refused when the slot now conflicts with a saved session or confirmed appointment the **invitee**
+  holds. The refusal MUST tell the invitee they already have a commitment then. This discloses
+  nothing: it describes the reader's own schedule to the reader.
 - **FR-634**: A proposal whose slot has passed MUST be shown as lapsed and MUST NOT be acceptable.
+  Lapsed MUST be **derived** from the slot instant at read time, never stored — a stored value would
+  require a scheduled sweep to maintain, and this feature introduces no background job.
 - **FR-635**: Only the invitee may accept or decline; a proposer attempting it MUST be refused.
 - **FR-636**: A request for a proposal or appointment by an attendee who is neither participant MUST
   be refused indistinguishably from one that does not exist.
 - **FR-637**: Proposing MUST be refused, without a reason, when either party has blocked the other.
+- **FR-637a**: A block placed **after** a proposal or appointment already exists MUST cancel it —
+  any pending proposal and any future confirmed appointment between the two, in either direction —
+  and MUST free the affected slots. The records MUST be marked cancelled rather than deleted,
+  following 007, where blocking destroys nothing and is reversible. Lifting a block MUST NOT
+  resurrect them: a cancelled appointment stays cancelled, and a new one may be proposed.
 - **FR-638**: Proposing MUST be subject to a per-action throttle, bounding how many pending
   proposals one attendee may direct at another.
+- **FR-638a**: The throttles in FR-609 and FR-638 **may deny**, not merely delay. This is the
+  opposite of the reset-request rule, and deliberately so: there, an identifier-keyed denial only
+  harms the victim, whereas here the throttled action is the actor's own and denying it protects
+  the person being shared with or proposed to.
 - **FR-639**: Appointments MUST be scoped to their event and MUST NOT appear when a different event
   is active.
+- **FR-639a**: A contact who is not registered for the **active** event MUST NOT offer a scheduling
+  action at all. Appointments are per-event, so the action would have nowhere to go; its absence is
+  the visible consequence of FR-628 and must not be left to a refusal after the fact.
 
 #### Authorization and privacy
 
@@ -387,6 +424,14 @@ person's view.
 - **FR-643**: This feature MUST NOT dispatch a notification for any event — proposal, acceptance,
   decline, cancellation, or card share — and MUST NOT modify the audit that enforces the single
   permitted trigger.
+
+#### Addressability
+
+- **FR-643a**: Network MUST be individually addressable as a destination, and any surface opened
+  over it — the contacts and appointments views, and the scheduling dialog — MUST register its own
+  nested address through the append-only navigation registry, on Network's own entry. The router
+  MUST NOT name any of these addresses literally, and no neighbouring destination's entry may be
+  edited. This inherits the rule 005 established and 006 and 007 each followed.
 
 #### Home
 
@@ -443,7 +488,9 @@ person's view.
 - **Meeting slot** — a bookable interval belonging to an event day, in the venue's timezone. Seeded
   conference content.
 - **Appointment** — a proposed or confirmed meeting: both participants, the event, the slot, a short
-  topic, and a status covering pending, confirmed, declined, cancelled, and lapsed. **Per-event.**
+  topic, and a **stored** status of pending, confirmed, declined, or cancelled. **Per-event.**
+  *Lapsed is not among them*: it is derived from the slot instant at read time (FR-634), so no
+  scheduled job is needed to maintain it.
 - **Contact line** — an optional attendee-authored field carried only by a shared card, gated on
   Open Question 1.
 
@@ -468,7 +515,11 @@ person's view.
 - **SC-607**: A failure in the appointment summary leaves every other Home card rendered and
   interactive.
 - **SC-608**: Blocking stops card resolution and scheduling in both directions **immediately**, on
-  the next request rather than on a cache expiry.
+  the next request rather than on a cache expiry, and leaves **no** pending proposal or future
+  confirmed appointment standing between the two parties.
+- **SC-608a**: No attendee's slot availability can be reduced by another attendee's action. For a
+  fixed reader, the set of slots offered is a function of the reader's own commitments alone —
+  verifiable by proposing repeatedly into a reader's day and observing their offered set unchanged.
 - **SC-609**: After an account is deleted, **no** trace of its cards or appointments is reachable by
   the other party.
 - **SC-610**: An export contains every field this feature collects, with completeness established
@@ -506,9 +557,12 @@ person's view.
   recorded in Open Question 3 rather than a requirement here.
 - **Proposal lapse**: a proposal whose slot has passed is assumed to become non-acceptable and to be
   displayed as lapsed rather than deleted, so both parties can see what happened (FR-634).
-- **Block semantics**: blocking is assumed to **suspend** card resolution rather than delete the
-  card, so lifting a block restores the contact. This follows 007, where a block is reversible and
-  destroys nothing.
+- **Block semantics**: blocking **suspends** card resolution rather than deleting the card, so
+  lifting a block restores the contact — following 007, where a block is reversible and destroys
+  nothing. Appointments are treated differently and deliberately: a block **cancels** any pending
+  proposal and any future confirmed appointment (FR-637a), because a meeting you would otherwise
+  turn up to must be ended rather than hidden, and cancellation is a visible state rather than a
+  deletion. Lifting the block does not resurrect them.
 - **No co-attendance requirement for resolution**: a held card resolves even when the two attendees
   no longer share any event. This is the feature's purpose, not an oversight.
 - **Contacts list size**: a held-card list is bounded by deliberate human acts, so it is assumed not
