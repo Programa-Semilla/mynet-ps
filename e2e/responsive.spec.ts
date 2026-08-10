@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test'
 
-import { ADA, signIn, useConference } from './support/attendees.js'
+import { ADA, GRACE, signIn, useConference } from './support/attendees.js'
 import { DESTINATIONS, SCROLL_WIDTHS, WIDTHS } from './support/destinations.js'
 
 /**
@@ -191,6 +191,105 @@ test.describe('responsive layout', () => {
 
     const desktop = await measure(1440)
     expect(desktop, 'the desktop panel must stay a centred overlay').toBeLessThan(1440)
+  })
+
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════════════════
+   * **EVERY MODAL DIALOG IS CENTRED — WHICH THE TEST ABOVE DOES NOT CHECK, AND THAT IS HOW
+   * THIS SHIPPED BROKEN.**
+   *
+   * The test above measures the panel's *width* and never its *position*, so a dialog pinned
+   * to the top-left corner satisfies it completely. Two of them were: the user-agent
+   * stylesheet centres a `showModal()` dialog with `margin: auto`, Tailwind's Preflight sets
+   * `margin: 0` on every element, and `ConfirmDialog` and `ScheduleDialog` never carried the
+   * local `m-auto` that `SessionPanel` and `AttendeeProfile` had each rediscovered.
+   *
+   * It is a failure no behavioural test can see. The dialog opens, traps focus, closes on
+   * Escape and reads correctly to a screen reader; it is simply in the wrong place. Only an
+   * eye — or this — catches it, which is why the base rule now lives in `theme/tokens.css`
+   * and why this asserts the outcome rather than the class name.
+   * ═══════════════════════════════════════════════════════════════════════════════════════
+   */
+  test('every modal dialog is centred in the viewport, not pinned to a corner', async ({
+    page,
+    browser,
+  }) => {
+    /**
+     * Centred means the gaps on either side match. Compared with a tolerance rather than for
+     * equality because sub-pixel layout and a scrollbar both shift it slightly — and because
+     * the failure this catches is not a few pixels off, it is the dialog against the edge.
+     */
+    const expectCentred = async (on: Page, what: string) => {
+      const box = await on.getByRole('dialog').boundingBox()
+      expect(box, `${what}: the dialog must be laid out`).not.toBeNull()
+
+      const viewport = on.viewportSize()
+      expect(viewport).not.toBeNull()
+
+      const left = box!.x
+      const right = viewport!.width - (box!.x + box!.width)
+
+      expect(
+        Math.abs(left - right),
+        `${what}: the dialog is not centred — ${Math.round(left)}px to its left and ` +
+          `${Math.round(right)}px to its right. A modal <dialog> centres itself with the ` +
+          "user-agent's `margin: auto`, and Tailwind's Preflight zeroes it. See the `dialog` " +
+          'rule in theme/tokens.css.',
+      ).toBeLessThanOrEqual(2)
+
+      // Vertically too. A dialog shorter than the viewport is centred; a tall one is clamped by
+      // its own max-height and sits flush, so this only asserts it is not jammed at the top.
+      expect(box!.y, `${what}: the dialog is flush against the top edge`).toBeGreaterThan(0)
+    }
+
+    // Desktop, where a mispositioned dialog is most obvious and the gutters are widest.
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await signedIn(page)
+
+    // 005 — the session detail panel.
+    await page.goto('/agenda')
+    await page.getByRole('heading', { level: 3 }).first().getByRole('link').click()
+    await expect(page.getByRole('dialog')).toBeVisible()
+    await expectCentred(page, 'the session detail panel')
+    await page.keyboard.press('Escape')
+
+    // ─────────────────────────────────────────────────────────────────────────────────────
+    // 006 — the attendee profile. Grace specifically, because the last dialog below needs her
+    // to hold Ada's card and this test must not depend on another spec file having run first.
+    // Sharing is idempotent (FR-604), so a re-run is harmless.
+    // ─────────────────────────────────────────────────────────────────────────────────────
+    await page.goto('/discover')
+    await page.getByRole('heading', { name: GRACE.displayName, level: 3 }).getByRole('link').click()
+    const profile = page.getByRole('dialog')
+    await expect(profile.getByRole('heading', { name: GRACE.displayName })).toBeVisible()
+    await expectCentred(page, 'the attendee profile')
+
+    await profile.getByRole('button', { name: /share your card with/i }).click()
+    await expect(profile.getByRole('status')).toContainText(/your card is now with/i)
+    await page.keyboard.press('Escape')
+
+    // ─────────────────────────────────────────────────────────────────────────────────────
+    // 008 — the scheduling dialog. **This is the one that was reported**, and it needs a
+    // second attendee: proposing requires holding the invitee's card, and it is Grace who
+    // holds Ada's.
+    // ─────────────────────────────────────────────────────────────────────────────────────
+    // A second context rather than a sign-out, because Ada is still signed in on `page` and
+    // this needs a different attendee at the same width — the pattern `network.spec.ts` uses.
+    const graceContext = await browser.newContext({ viewport: { width: 1440, height: 900 } })
+    const gracePage = await graceContext.newPage()
+    await gracePage.goto('/')
+    await signIn(gracePage, GRACE)
+    await useConference(gracePage, 'Product & Design Summit')
+
+    await gracePage.goto('/network')
+    await gracePage
+      .getByRole('button', { name: /propose a meeting with/i })
+      .first()
+      .click()
+    await expect(gracePage.getByRole('dialog')).toBeVisible()
+    await expectCentred(gracePage, 'the scheduling dialog')
+
+    await graceContext.close()
   })
 
   test('the Agenda filter and save controls are touch-sized at mobile', async ({ page }) => {

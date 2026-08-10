@@ -3,6 +3,9 @@ import { beforeAll, describe, expect, it } from 'vitest'
 
 import { buildApp } from '../../src/app.js'
 import { requireAttendee } from '../../src/plugins/auth-context.js'
+// 008 — the third route predicate. Imported here only so the attendee-naming assertion below can
+// name it; every other guarantee about card routes lives in `card-audit.test.ts`.
+import { requireHeldCard } from '../../src/plugins/card-access.js'
 import { assertVerifiedScope, requireEventAccess } from '../../src/plugins/event-access.js'
 
 /**
@@ -269,15 +272,53 @@ describe('event scope route audit', () => {
     ).toEqual([])
   })
 
-  it('guards every read that names an attendee with the event access predicate', () => {
-    // The narrowing is only safe because these routes carry the guard. Without it the
-    // identifier would be reachable from outside any conference the reader belongs to.
+  /**
+   * ═════════════════════════════════════════════════════════════════════════════════════════
+   * **T056 (008) — WIDENED FROM ONE PREDICATE TO TWO, AND THE WIDENING IS RECORDED RATHER THAN
+   * PERFORMED QUIETLY** — exactly as 004 recorded its own narrowing directly above.
+   *
+   * This asserted `requireEventAccess` alone, which was right while every attendee-naming read
+   * was per-event. `GET /cards/held/:attendeeId` is the first that is not: a held card is
+   * **cross-event** (FR-614, standing decision 7), so there is no conference in the path and
+   * `requireEventAccess` has nothing to verify. Demanding it here would force 008 either to fail
+   * this build or to bolt a registration check onto a route where registration is precisely the
+   * thing that must **not** decide the answer — a check that looks like authorization and is not.
+   *
+   * The rule's **purpose** is intact and is the reason the widening is safe: *a read naming
+   * another attendee must sit behind a server-side predicate that proves the reader may see
+   * them.* `requireHeldCard` is that predicate, and it is **stronger** than event access rather
+   * than weaker:
+   *
+   *   - event access proves the reader shares a conference with **everybody** there;
+   *   - the held-card guard proves this **specific** person handed this **specific** reader their
+   *     card, which is a decision that individual took by hand.
+   *
+   * It is also directional (the reader must be the *recipient*, never the sharer) and it refuses
+   * with the same 404 (FR-616, FR-642). `tests/unit/card-audit.test.ts` is its audit.
+   *
+   * **The list of acceptable predicates is enumerated, not open.** A third entry here means a
+   * third way to read another attendee, and that is a decision worth making deliberately — which
+   * is the same discipline the allow-lists in this file and in `deletion-coverage.test.ts` apply.
+   * ═════════════════════════════════════════════════════════════════════════════════════════
+   */
+  it('guards every read that names an attendee with a server-side predicate', () => {
+    // The narrowing is only safe because these routes carry a guard. Without one the identifier
+    // would be reachable by anybody who could guess it.
+    const ACCEPTABLE = [requireEventAccess, requireHeldCard]
+
     const unguarded = routes
       .filter((route) => /:attendeeId|\{attendeeId\}/.test(route.url))
-      .filter((route) => !preHandlersOf(route).includes(requireEventAccess))
+      .filter((route) => !ACCEPTABLE.some((guard) => preHandlersOf(route).includes(guard)))
       .map((route) => route.url)
 
-    expect(unguarded).toEqual([])
+    expect(
+      unguarded,
+      'These routes name another attendee and prove nothing about whether the caller may read ' +
+        'them. Two predicates are acceptable, and only two: `requireEventAccess` (the reader is ' +
+        'registered for the conference the route names) and `requireHeldCard` (this specific ' +
+        'attendee handed this specific reader their card). A third one is a third way to read ' +
+        'somebody else, and needs the reasoning written down first.',
+    ).toEqual([])
   })
 
   /**

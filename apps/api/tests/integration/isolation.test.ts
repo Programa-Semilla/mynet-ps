@@ -238,7 +238,13 @@ describe('attendee data isolation', () => {
     interface EventRoute {
       /** The URL as the application declares it, which is what coverage is checked against. */
       readonly template: string
-      readonly method: 'GET' | 'PUT' | 'DELETE'
+      /**
+       * **008 widened this from `GET | PUT | DELETE`.** Appointments are answered by `POST` to a
+       * named sub-address — `…/accept`, `…/decline`, `…/cancel` — rather than by a `PATCH`
+       * carrying a status, so that the server makes three separate authorization decisions
+       * instead of branching on a value the client chose (FR-632, FR-635).
+       */
+      readonly method: 'GET' | 'PUT' | 'DELETE' | 'POST'
       readonly payload?: Record<string, unknown>
       /** What a legitimate request answers, so the "not over-refusing" half stays strict. */
       readonly ok: number
@@ -336,6 +342,73 @@ describe('attendee data isolation', () => {
           payload: { joinCode: SEED_EVENTS[0].joinCode },
         },
       },
+      // ═════════════════════════════════════════════════════════════════════════════════════
+      // 008 — meetings. **These five entries exist because the coverage assertion above demanded
+      // them**, which is the guard working exactly as 006's entry records: the routes were
+      // added, this suite failed, and the boundary had to be exercised before it could pass.
+      //
+      // They are the first per-event routes in this list that 008 could have avoided adding at
+      // all — registering them as `/appointments/:id` would have named no conference, kept them
+      // out of this list, and left them outside every guarantee it enforces. That shape was
+      // rejected deliberately (research R2): a route naming no conference is one
+      // `event-scope-audit` silently passes.
+      // ═════════════════════════════════════════════════════════════════════════════════════
+      { template: '/events/:eventId/appointments/slots', method: 'GET', ok: 200 },
+      { template: '/events/:eventId/appointments', method: 'GET', ok: 200 },
+      {
+        // ─────────────────────────────────────────────────────────────────────────────────
+        // **`ok: 400`, and the 400 is what proves the event guard let the request through.**
+        //
+        // The payload names a nonexistent invitee and a blank topic. Reaching the topic check
+        // at all means `requireEventAccess` passed and the handler ran — so a 400 here is
+        // strictly stronger evidence of "not over-refusing" than a 200 would be on a read: a
+        // 404 would be indistinguishable from the guard refusing, which is the whole point of
+        // the three assertions above.
+        //
+        // Whitespace rather than an empty string, because the route schema's `minLength: 1`
+        // would refuse `''` before the handler — and it is the *server-side* trim backstop
+        // (FR-629) this is meant to reach.
+        // ─────────────────────────────────────────────────────────────────────────────────
+        template: '/events/:eventId/appointments',
+        method: 'POST',
+        payload: {
+          inviteeId: '00000000-0000-0000-0000-000000000000',
+          slotId: '00000000-0000-0000-0000-000000000000',
+          topic: '   ',
+        },
+        ok: 400,
+      },
+      // ─────────────────────────────────────────────────────────────────────────────────────
+      // **The three answer routes legitimately answer 404, and that is a REQUIREMENT rather
+      // than a weakness in this fixture** (FR-636).
+      //
+      // A legitimate request here names an appointment that does not exist, and FR-636 makes
+      // that **deliberately indistinguishable** from an appointment the caller is not party to
+      // and from a conference they are not registered for. So the "not over-refusing" half
+      // cannot be demonstrated at this level for these three: the two answers are required to
+      // be identical, and a fixture that could tell them apart would be evidence of a defect.
+      //
+      // What this list still proves for them is the part that is about *events*: refusal parity
+      // between another attendee's conference and a nonexistent one, the same for a malformed
+      // identifier, and 401 without a session. The non-over-refusal half is proven with real
+      // fixtures in `appointments-answer.test.ts`, where an actual pending appointment exists to
+      // accept — which is the only place it can honestly be proven.
+      // ─────────────────────────────────────────────────────────────────────────────────────
+      {
+        template: '/events/:eventId/appointments/:appointmentId/accept',
+        method: 'POST',
+        ok: 404,
+      },
+      {
+        template: '/events/:eventId/appointments/:appointmentId/decline',
+        method: 'POST',
+        ok: 404,
+      },
+      {
+        template: '/events/:eventId/appointments/:appointmentId/cancel',
+        method: 'POST',
+        ok: 404,
+      },
     ]
 
     const NONEXISTENT = '00000000-0000-0000-0000-000000000000'
@@ -362,6 +435,9 @@ describe('attendee data isolation', () => {
         .replace(':eventId', eventId)
         .replace(':sessionId', sessionId)
         .replace(':attendeeId', attendeeId)
+        // 008 — always a nonexistent appointment. See the three answer entries in EVENT_ROUTES
+        // for why a real one could not make the legitimate case distinguishable anyway (FR-636).
+        .replace(':appointmentId', NONEXISTENT)
 
     beforeAll(async () => {
       const ada = await app.inject({

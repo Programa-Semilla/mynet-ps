@@ -108,6 +108,13 @@ describe('personal-data export', () => {
       payload: { image: image.toString('base64') },
     })
 
+    // ─────────────────────────────────────────────────────────────────────────────────────
+    // 008 **before** 007, and the order is load-bearing: `populate007Sections` inserts a block
+    // from Ada to Grace, and a block refuses both card sharing and meeting proposals (FR-608,
+    // FR-637). Driving 008's routes afterwards would silently populate nothing, and the emptiness
+    // guard below would then fail for a reason that looks like a missing export.
+    // ─────────────────────────────────────────────────────────────────────────────────────
+    await populate008Sections()
     await populate007Sections()
   })
 
@@ -196,6 +203,96 @@ describe('personal-data export', () => {
       authKey: 'an-auth-secret',
       lastDeliveredAt: new Date(),
     })
+  }
+
+  /**
+   * 008 — the three sections this feature added to the export (FR-653, SC-610).
+   *
+   * ═════════════════════════════════════════════════════════════════════════════════════════
+   * **DRIVEN THROUGH THE REAL ROUTES, WHICH IS THE OPPOSITE OF `populate007Sections` ABOVE —
+   * AND THE DIFFERENCE IS THE POINT.**
+   *
+   * 007's four sections had to be written straight to the database because the routes that would
+   * create them landed in later phases; its own comment records that as a compromise and names
+   * the round-trip version as follow-up work. 008 has no such excuse: sharing a card and
+   * proposing a meeting are both reachable by the time the export is assembled, so this fixture
+   * uses them.
+   *
+   * That buys a strictly stronger guarantee. Writing rows by hand proves the export **reads**
+   * what a test put there; driving the routes proves the export reads what the **product**
+   * writes — so a mismatch between the write path's column choices and the export's is caught
+   * here rather than surviving as two consistent halves of the same misunderstanding.
+   * ═════════════════════════════════════════════════════════════════════════════════════════
+   *
+   * All three directions are exercised, because `shared_cards` appears in the document **twice**
+   * and one row cannot populate both sections: Ada sharing with Grace fills `cardsShared`, Grace
+   * sharing back fills `cardsHeld`, and a proposal from Ada fills `appointments`.
+   */
+  const populate008Sections = async (): Promise<void> => {
+    await clearThrottle()
+    const grace = sessionCookieFrom(
+      await app.inject({
+        method: 'POST',
+        url: '/auth/sign-in',
+        payload: { email: GRACE, password: SEED_PASSWORD },
+      }),
+    ) as string
+
+    const graceId = (
+      await app.inject({ method: 'GET', url: '/auth/me', headers: { cookie: cookieHeader(grace) } })
+    ).json() as { id: string }
+    const adaId = (
+      await app.inject({ method: 'GET', url: '/auth/me', headers: { cookie: cookieHeader(ada) } })
+    ).json() as { id: string }
+
+    // Both directions. A→B and B→A are two different facts (research R5), and the export shows
+    // each from the side it belongs to.
+    await clearThrottle()
+    await app.inject({
+      method: 'POST',
+      url: '/cards',
+      headers: { cookie: cookieHeader(ada) },
+      payload: { attendeeId: graceId.id },
+    })
+    await clearThrottle()
+    await app.inject({
+      method: 'POST',
+      url: '/cards',
+      headers: { cookie: cookieHeader(grace) },
+      payload: { attendeeId: adaId.id },
+    })
+
+    const events = await app.inject({
+      method: 'GET',
+      url: '/events',
+      headers: { cookie: cookieHeader(ada) },
+    })
+    const eventId = (events.json() as Array<{ id: string; name: string }>).find(
+      (event) => event.name === SEED_EVENTS[0].name,
+    )?.id as string
+
+    const slots = await app.inject({
+      method: 'GET',
+      url: `/events/${eventId}/appointments/slots?attendeeId=${graceId.id}`,
+      headers: { cookie: cookieHeader(ada) },
+    })
+    const slotId = (slots.json() as { slots: Array<{ slotId: string }> }).slots[0]?.slotId
+
+    // A seeded conference in the future always has slots; if it ever does not, the emptiness
+    // guard below reports it as an unpopulated section rather than passing vacuously.
+    if (slotId) {
+      await clearThrottle()
+      await app.inject({
+        method: 'POST',
+        url: `/events/${eventId}/appointments`,
+        headers: { cookie: cookieHeader(ada) },
+        payload: {
+          inviteeId: graceId.id,
+          slotId,
+          topic: 'A meeting Ada proposed, which her export contains.',
+        },
+      })
+    }
   }
 
   afterAll(async () => {

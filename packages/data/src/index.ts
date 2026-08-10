@@ -77,6 +77,22 @@ export type {
   SentMessage,
 } from './interfaces/index.js'
 
+// 008 — Network: the cards you hold and the meetings you arrange. Appended likewise. **Two
+// domains rather than one**, because a card is cross-event and uncached while an appointment is
+// per-event and cached — a single interface spanning both would put a method that must never be
+// event-scoped beside one that must always be.
+export type {
+  Appointment,
+  AppointmentRepository,
+  AppointmentRole,
+  AppointmentStatus,
+  CardRepository,
+  HeldCard,
+  MeetingSlot,
+  ProposeInput,
+  SharedCard,
+} from './interfaces/index.js'
+
 export {
   MESSAGE_MAX_LENGTH,
   NotAuthenticatedError,

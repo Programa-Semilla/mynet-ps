@@ -1,6 +1,7 @@
 # Brainstorm Overview
 
-Last updated: 2026-08-08 (#06 — Messages built through User Story 6; Web Push gated)
+Last updated: 2026-08-10 (008 **implemented** — Network is the fifth destination to carry content,
+and the last empty one is gone; constitution v3.2.0 closed the register entries that gated it)
 
 The authoritative registers live elsewhere — open questions in `.specify/memory/constitution.md`,
 delivery sequence in `docs/superpowers/specs/2026-08-06-mynet-delivery-roadmap-design.md`. This file
@@ -18,6 +19,7 @@ win and this is stale.
 | 04 | 2026-08-07 | attendee-identity-and-profile | shipped (PR #12) | `specs/004-attendee-identity-and-profile/` |
 | 05 | 2026-08-07 | discover-and-the-deployment-platform | ratified in constitution **v3.0.0** | `specs/006-discover-and-deployment-platform/` |
 | 06 | 2026-08-07 | messages-and-notification-delivery | **implemented in full**, including Web Push; its amendment ratified in constitution **v3.1.0** | `specs/007-messages-and-notification-delivery/` |
+| 07 | 2026-08-10 | network-and-appointments | **specified, then implemented**; entries 7, 8 and 9 ratified in constitution **v3.2.0** | `specs/008-network-and-appointments/` |
 
 Session 05 has no document of its own: 006 was specified without one, and the row records the
 session rather than a file.
@@ -69,8 +71,8 @@ the index, and it now differs from the roadmap in the ways #02 records.
 | 005 | Agenda | **shipped** — 94/94 tasks, squash-merged to `develop` ([#8](https://github.com/Programa-Semilla/mynet-ps/pull/8)) | 002 ✓ |
 | 006 | Discover, and the deployment platform | **implemented** — awaiting the two owner decisions that gate the first deploy (a domain, an Azure subscription). Migration `0005`: five indexes and one extension, **no new table and no new column** | 004 ✓ |
 | 007 | Messages **and the notification-delivery platform** | **shipped** — squash-merged to `develop`. Web Push delivers for real, verified end to end on a desktop. T148's by-hand walkthrough is partial (scenario 5 only) and carries forward. Migration `0006` | 004 ✓, 006 ✓ |
-| 008 | Network & Appointments | queued (∥ 009) | connection model; card-exchange semantics |
-| 009 | Session Q&A | queued (∥ 008) | question attribution |
+| 008 | Network & Appointments | **implemented** — 149 tasks, FR-601–FR-659. Migration `0007` adds three tables under **two different scoping rules**: `shared_cards` cross-event, `appointments` and `meeting_slots` per-event. A **third** branded scope and a **third** route audit (`CardScope`, `card-audit.test.ts`), because a card route names no conference and `event-scope-audit` walks past it. T148's by-hand walkthrough is outstanding | ~~connection model~~ ✓, ~~card-exchange semantics~~ ✓ |
+| 009 | Session Q&A | **unblocked** by v3.2.0 — questions are attributed, so Q&A is a personal-data surface. Migration `0008` | ~~question attribution~~ ✓ |
 | 010 | Launch Readiness | queued | brand assets; client validation of desktop |
 
 **002 carries the most leverage and the most risk in the queue, and #02 enlarged it further.** It is
@@ -123,23 +125,59 @@ in a product with public self sign-up and no moderator by construction. Reportin
 **operator** mailbox rather than an in-product actor, which is what keeps it clear of the organizer
 exclusion — no admin interface, no privileged role, no reader inside the app.
 
+**008 was blocked by two register entries and #07 closed them with one decision.** A contact is
+**someone whose card you hold** — so sharing a digital business card becomes the only
+relationship-forming act in the product, and entries 7 and 8 stop being independent questions.
+Sharing is **one-directional** (it gives them yours; you get theirs when they share back), a held
+card is a **live pointer rather than a copy**, and a shared card is **standing consent that outlives
+both the event and the discoverability toggle**. Appointments are **proposed, then accepted or
+declined**, and their slots come from an event grid minus *the reader's own* conflicts.
+
+Two of those deserve to be read as departures rather than details. The acceptance step **breaks
+consistency with two prior refusals** — 007 for conversations, and #07 itself for cards — on the
+ground that reserving another person's time is a different act from messaging them; the asymmetry is
+deliberate and is recorded so it does not read as drift. And the roadmap's own suggestion for slot
+availability, *derived from both parties' saved sessions*, was **rejected on Principle VIII
+grounds**: a saved session is private state, so greying out the invitee's committed slots discloses
+their whole Agenda by omission. That eliminated it before it reached the client.
+
+What makes the model worth the trouble: Discover is per-event **and deliberately uncached**, so
+until now nothing durable survived the conference at all — and standing decision 7's own rationale
+promises that a contact made at last year's conference does not vanish. Network is the durable half
+of a product whose discovery surface is transient by design, and #07 is what makes that promise
+true.
+
 ## Open Threads
 
 ### Client decisions
 
 Each names the phase it blocks — when to ask matters as much as what to ask.
 
-- **The connection model behind Network contacts** — the prototype derives contacts from
-  conversations, with no connect or accept action, so there is no relationship to store.
-  *Blocks 008 entirely* (from #01 revisit). **#06 deliberately did not answer this**, choosing open
-  send precisely so the decision stays with the client — but it did make one half binding: under
-  open send a conversation is a *unilateral* act, so **008 must not derive contacts from
-  conversations**. Doing so would let a stranger insert themselves into another attendee's Network
-  (narrowed 2026-08-07 by #06)
-- **What a digital-card exchange records, and whether it is mutual.** *Blocks 008 entirely*
-  (from #01 revisit)
-- **Audience-question attribution** — attributed to the author or anonymous. Decides whether Q&A is
-  a personal-data surface under Principle VIII. *Blocks 009* (added 2026-08-06)
+**None of these blocks a feature any more.** Constitution **v3.2.0** closed the last three on
+2026-08-10, so 008 and 009 — a free parallel pair — are both buildable. What remains blocks
+deployment or release.
+
+- ~~**The connection model behind Network contacts**~~ — **RATIFIED in v3.2.0** as owner decision
+  N1. A contact is someone whose card you hold. #06 had already narrowed it by making the
+  prototype's answer unavailable — under open send a conversation is unilateral, so deriving
+  contacts from conversations would let a stranger insert themselves into another attendee's
+  Network. *Register entry 7, closed.*
+- ~~**What a digital-card exchange records, and whether it is mutual.**~~ **RATIFIED in v3.2.0** as
+  N2. One-directional: sharing gives them your card, and you hold theirs only when they share back.
+  The row records the exchange, not a copy of the person, and resolution runs under a standing
+  consent that outlives the event and the discoverability toggle. *Register entry 8, closed.*
+- ~~**Does the card-only contact line breach standing decision 16?**~~ — **ANSWERED 2026-08-10:
+  yes.** The owner rejected the reading #07 proceeded under, and the field was withdrawn from 008's
+  specification before any migration was written. Decision 16 is **sharpened** rather than changed:
+  there is one visibility decision per attendee, and no feature may give an individual field its own
+  audience, however that audience is reached. Recorded because the next feature will meet the same
+  temptation — and because the specification did the right thing by refusing to settle it silently.
+- ~~**Audience-question attribution**~~ — **RATIFIED in v3.2.0** as N3: **attributed**. Q&A is
+  therefore a personal-data surface under Principle VIII, with identity scoping, deletion cascade
+  and export coverage. *Register entry 9, closed — 009 is unblocked.* **Not solved, and 009 must
+  decide it**: what happens to a departing attendee's question that other people have upvoted.
+  007's answer for conversations does not transfer, because the votes belong to people who never
+  asked to lose anything.
 - **Desktop and tablet layouts have never been validated by the client**; the approved prototype is
   mobile-only at a fixed 390×844. Every desktop layout built before this is answered is unreviewed
   design, so the cost compounds per phase. **Now more urgent than when it was written**: absorbing
@@ -205,6 +243,37 @@ Each names the phase it blocks — when to ask matters as much as what to ask.
   free on public repositories, so this is a configuration task rather than an accepted risk
   (corrected 2026-08-06)
 
+### Design questions carried into 008's specification
+
+From #07. None blocks the specification. The one item that could — whether the card contact line
+breaches standing decision 16 — is a client decision and is listed above.
+
+- **Whether card resolution needs its own branded scope and a fourth route audit.** Cards are
+  cross-event, so `EventScope` cannot reach them and the event-scope audit would **silently pass** a
+  route naming no conference — the exact hole 007 found and closed with `ConversationScope`,
+  `requireParticipation` and a second audit. Appointments are per-event and may compose `EventScope`
+  with a participant check instead. Decide deliberately: the failure mode is silence.
+- **Whether Network caches anything offline** — see the narrowed 007 entry below; #07 leans
+  appointments yes, contacts no.
+- **What the slot grid is as seed data** — slot length, how many per day, whether it varies by
+  event. Conference content under standing decision 8, so seeded and versioned rather than
+  configured.
+- **Whether a proposal expires.** A proposal for a slot that has already passed is not an
+  appointment and should not sit in a list forever.
+- **How many pending proposals one attendee may send another.** Proposing is unilateral and cheap;
+  unbounded, it is a contact path that blocking closes only after the fact. 007's per-action
+  throttle is the existing mechanism.
+- **Whether an appointment survives the proposer withdrawing from the conference**, and what a held
+  card shows when the sharer has left every event you share. Neither is deletion — the account still
+  exists.
+- **Copy for a contact whose card resolves to nothing** because the sharer deleted their account.
+  The state is decided by cascade; the words are not, exactly as with 007's departed counterpart.
+- **Whether the contacts list needs pagination.** 006 needed a keyset cursor for a thousand
+  attendees; a held-card list is bounded by deliberate human acts. State it either way rather than
+  discovering it.
+- **Whether 008 splits into reviewable phases.** Two subsystems sharing only a destination. Decide
+  after planning against the concrete task list, as 007 did.
+
 ### Design questions carried into 007's specification
 
 From #06. None blocks the specification; all are for `/speckit-specify` and its review gate. The
@@ -227,6 +296,11 @@ three items that *do* block it are owner decisions and are listed above.
 - **Whether the offline cache key gains an event-less variant.** The decorator is keyed
   `(attendeeId, eventId, resource)` and threads are not event-scoped. #06's refusal to cache makes
   this moot for 007, but **008's cross-event contacts meet it again** with no such escape.
+  **#07 carries a leaning rather than an answer**: appointments are cacheable — the attendee's own
+  commitments, per-event, and the existing key fits them exactly as it fits saved sessions — while
+  contacts are not, because resolving a held card reads *other people's live profile data*, which is
+  the argument that made Discover uncached. If that holds, the question is answered by refusal and
+  the key never needs an event-less variant (narrowed 2026-08-10 by #07).
 - **Whether 007 splits into reviewable phases.** 004's expectation that it would need to was wrong;
   this feature is larger and carries two subsystems. Worth deciding after planning rather than
   before.
@@ -381,6 +455,32 @@ binding rather than provisional. They close the last three entries blocking 004.
   existing `EventScope` predicate, with a single discoverability toggle rather than per-field
   permissions.
 
+**2026-08-10, by brainstorm #07 — awaiting ratification in a constitution amendment**
+
+Closes the last two register entries that blocked a queued phase. Both were client decisions; the
+project owner has previously confirmed he speaks for the client on those, so they are binding rather
+than provisional — with the single exception noted under Client decisions above.
+
+- **The connection model behind Network contacts** — **a contact is someone whose card you hold.**
+  No connect verb and no accept step, because neither appears in `requirements.md` or the prototype.
+  *Closes entry 7.*
+- **What a card exchange records, and whether it is mutual** — **one-directional, and it records the
+  exchange rather than the person.** Sharing gives them your card; you hold theirs when they share
+  back. The stored row is sharer, recipient, instant, and the event it happened at, with details
+  resolving live from the sharer's current profile. *Closes entry 8.*
+- **A shared card is standing consent that outlives the event and the discoverability toggle** —
+  discoverability governs being *found*, not being *remembered*. This is the rule that makes a live
+  pointer viable instead of a snapshot, and it is a read path that deliberately bypasses 006's
+  visibility conditions while **not** re-checking verification, which gates discoverability and
+  nothing else.
+- **A card cannot be recalled; 007's block severs it** in both directions and prevents scheduling.
+  One existing server-enforced control rather than a second half-overlapping verb.
+- **Appointments are proposed, then accepted or declined**, and slots come from a seeded event grid
+  in venue time minus *the reader's own* conflicts — never the invitee's, which would leak their
+  Agenda by omission.
+- **No notification is dispatched for a proposal, acceptance, or decline.** The trigger set stays at
+  a received message and nothing else, and 008 does not edit the audit that enforces it.
+
 **Settled by delivering 001**
 
 - **Foundation packaging** — it shipped as a single pull request (#2), answering the open thread
@@ -390,12 +490,27 @@ binding rather than provisional. They close the last three entries blocking 004.
 
 ## Parked Ideas
 
-Ten entries in `brainstorm/idea-inbox.md` — six from the 001 deep review, four from 002's.
+**Twenty-three entries** in `brainstorm/idea-inbox.md` — six from the 001 deep review, four from
+002's, six from 004's, four from 006's, and three from 007's. #07 consumed none: every entry is a
+deep-review deferral, and none of them seeds Network. *(Count corrected 2026-08-10 by #07, which
+found this line still reading "ten".)*
 
 From 001: session topology and CSRF, security response headers, the production deployment path,
 readiness versus liveness, throttle clock provenance, and substitutability proven without the
 application. From 002: platform-registry structural typing, the seed production guard, the route
-audit's inability to see `$ref` schemas, and integration-test isolation coupling.
+audit's inability to see `$ref` schemas, and integration-test isolation coupling. From 004:
+verification proves reachability not ownership, platform-registry mirroring cost, the identity
+repository spanning two subjects, the join-code lookup that cannot use its index, avatar serving
+without a revalidation story, and dialog component tests that cannot see modality. From 006:
+directory-listing throttle, backups sharing a failure domain, unbounded directory accumulation, and
+the read-path avatar repair. From 007: a session write per request, an unthrottled read path, and
+VAPID config duplication.
+
+Three of these are now **more** urgent than when they were filed, because 008 touches what they
+describe: `avatar-serving-has-no-revalidation-story` (a contacts list renders avatars the same way
+the directory does), `directory-listing-throttle` (card sharing is a second unilateral write against
+another attendee), and `platform-registry-mirroring-cost` — though 006 already removed the casts
+that entry was counting.
 
 Two of them — **session topology and CSRF** and **security response headers** — are the same
 decision seen from two sides, and both are cheapest to settle before the first preview environment is

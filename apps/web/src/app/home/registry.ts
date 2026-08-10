@@ -1,3 +1,4 @@
+import { appointmentsCard } from './cards/Appointments.js'
 import { greetingDayContextCard } from './cards/GreetingDayContext.js'
 import { nextSavedSessionCard } from './cards/NextSavedSession.js'
 import { peopleToMeetCard } from './cards/PeopleToMeet.js'
@@ -58,6 +59,16 @@ export const HOME_CARDS: readonly HomeCard[] = [
   // the discriminated union is what stops it quietly acquiring a dependency on the active
   // conference.
   unreadMessagesCard,
+  // 008 — the appointment summary, completing the seventh and last element `requirements.md`
+  // names for the dashboard. **One line, and nothing above it touched** (standing decision 9).
+  //
+  // It is EVENT-scoped, which is the deliberate opposite of the card above it: an appointment is
+  // a time and a place at one conference (FR-639), where a conversation is cross-event. Both
+  // halves of the discriminated union are now load-bearing, one per feature.
+  //
+  // It is also the **only** way an attendee learns that somebody has proposed a meeting: this
+  // feature dispatches no notification, for any event (FR-643), and the bell remains forbidden.
+  appointmentsCard,
 ]
 
 /**

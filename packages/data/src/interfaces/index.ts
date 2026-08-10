@@ -74,6 +74,27 @@ export type {
   ReportRepository,
 } from './safety.js'
 export type { DeviceRegistration, PushSubscriptionRepository } from './notifications.js'
+// ─────────────────────────────────────────────────────────────────────────────────────────
+// 008 — Network. **Two domains, two files, appended**, for the reason every entry above states:
+// a new domain adds `./<domain>.js` here and nowhere else.
+//
+// They are separate because they are separate subjects and — unusually — because they obey
+// **different scoping rules**. A card is cross-event, so `CardRepository` takes no `eventId` at
+// all; an appointment is per-event, so every `AppointmentRepository` method takes one. Folding
+// them into one `NetworkRepository` would put a method that must never be event-scoped beside
+// one that must always be, in a single interface, which is precisely the confusion the
+// per-domain split exists to prevent (004's review recorded the cost of one interface spanning
+// two subjects).
+// ─────────────────────────────────────────────────────────────────────────────────────────
+export type { CardRepository, HeldCard, SharedCard } from './cards.js'
+export type {
+  Appointment,
+  AppointmentRepository,
+  AppointmentRole,
+  AppointmentStatus,
+  MeetingSlot,
+  ProposeInput,
+} from './appointments.js'
 
 /** The one runtime value 007 contributes: the message limit the composer's counter reads. */
 export { MESSAGE_MAX_LENGTH } from './messages.js'
@@ -86,7 +107,9 @@ export {
 } from './errors.js'
 
 import type { SavedSessionRepository, SessionNotesRepository } from './agenda.js'
+import type { AppointmentRepository } from './appointments.js'
 import type { AttendeeRepository } from './attendee.js'
+import type { CardRepository } from './cards.js'
 import type { CatalogRepository } from './catalog.js'
 import type { DirectoryRepository } from './directory.js'
 import type { ActiveEventRepository, EventsRepository } from './events.js'
@@ -146,4 +169,22 @@ export interface Repositories {
   readonly blocks: BlockRepository
   readonly reports: ReportRepository
   readonly pushSubscriptions: PushSubscriptionRepository
+  // ───────────────────────────────────────────────────────────────────────────────────────
+  // 008 — Network. **Two members, appended, and they DISAGREE about caching** — which is the
+  // first time that has been true of one feature's set, and is why the declaration is per
+  // member here and again at the composition root where the wiring happens.
+  //
+  // - `appointments` **is** cached, under the existing `(attendeeId, eventId, resource)` key
+  //   (FR-647). These are the attendee's own commitments at one conference, which is exactly
+  //   the shape that key was built for — the same fit saved sessions have.
+  // - `cards` is **not** (FR-648). Resolving a held card reads *another person's live profile*,
+  //   which is the argument that made Discover uncached in 006: the decorator revokes on age
+  //   alone, and age is the wrong clock for somebody else's personal data. Refusing also means
+  //   **no event-less cache key is needed**, which closes the question 007 deferred to this
+  //   feature rather than widening the cache contract to answer it (research R4).
+  //
+  // Every **write** in this feature is refused offline and never queued (FR-649), for both.
+  // ───────────────────────────────────────────────────────────────────────────────────────
+  readonly cards: CardRepository
+  readonly appointments: AppointmentRepository
 }

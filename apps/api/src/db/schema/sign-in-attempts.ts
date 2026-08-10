@@ -96,6 +96,23 @@ export const THROTTLE_ACTIONS = [
   // ───────────────────────────────────────────────────────────────────────────────────────
   'message_send',
   'conversation_create',
+
+  // ───────────────────────────────────────────────────────────────────────────────────────
+  // 008 — FR-609 and FR-638. **Two more actions, and unlike 007's pair they AGREE about
+  // denial** — both `mayDeny: true`, which is the opposite of `message_send` and of
+  // `reset_request`.
+  //
+  // Both are authenticated and keyed on the acting attendee's own identity, so a denial can
+  // only ever fall on the person doing the thing. That is the same reasoning `join_code`,
+  // `export`, `avatar_upload` and `conversation_create` are configured under, and it is what
+  // separates all five from `reset_request`, whose key is a **victim's** address.
+  //
+  // Separate counters for the reason every entry above is separate: sharing cards at a
+  // conference must not consume the allowance that bounds how many meetings one account can
+  // propose, and neither may slow anybody's sign-in.
+  // ───────────────────────────────────────────────────────────────────────────────────────
+  'card_share',
+  'appointment_propose',
 ] as const
 
 export type ThrottleAction = (typeof THROTTLE_ACTIONS)[number]

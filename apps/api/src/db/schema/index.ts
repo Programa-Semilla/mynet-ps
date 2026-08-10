@@ -69,3 +69,29 @@ export * from './reports.js'
 // Where a device can be reached. Two of its columns are credentials rather than content, and
 // the export redacts them to a presence (research R14).
 export * from './push-subscriptions.js'
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 008 — Network: contacts, exchanged cards, and appointments. **Three tables, and they do NOT
+// share a scoping rule** — which is the first time that has been true of one feature's set, and
+// is why the two files say which they are separately rather than under a shared header.
+//
+// `shared_cards` is **cross-event**: standing decision 7 names exchanged cards among the
+// relationships that persist, and constitution v3.2.0 (N1) makes holding a card the definition
+// of a contact. `appointments` and `meeting_slots` are **per-event**: an appointment is a time
+// and a place at a specific conference.
+//
+// That split decides the guards, and it is the opposite of what 007 predicted. Cards name no
+// conference, so `event-scope-audit` walks past them and reports success — they get a third
+// branded scope (`plugins/card-access.ts`) and a third audit (`tests/unit/card-audit.test.ts`).
+// Appointments name their event, so the audit that already exists covers them unchanged
+// (research R1, R2).
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+
+// The exchange rather than the person: sharer, recipient, where they met, and when. Directional
+// and deliberately unnormalised — the file states why copying `conversation_pairs`' ordered pair
+// would make a reciprocal exchange impossible.
+export * from './cards.js'
+
+// The meeting and the seeded grid of times it can claim. `lapsed` is derived from the slot
+// instant and stored nowhere, which is what keeps this feature free of any background job.
+export * from './appointments.js'

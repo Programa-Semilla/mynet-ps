@@ -132,6 +132,31 @@ export const usePushSubscriptionRepository =
     usePlatform().repositories.pushSubscriptions
 
 /**
+ * 008 — the cards you hold, and the meetings you have arranged.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ * **Two hooks rather than one, and the split is sharper here than anywhere above it.** The two
+ * repositories obey *different scoping rules* and *different offline rules*: a card is
+ * cross-event and uncached, an appointment is per-event and cached. A single `useNetwork…` hook
+ * would hand every surface a pair of capabilities with opposite constraints and invite a caller
+ * to assume they behaved alike.
+ *
+ * Home's appointment card is the reason that matters in practice: it needs appointments for the
+ * active conference and must never acquire the ability to read the contacts list, which is
+ * cross-event personal data it has no business touching to render a summary.
+ *
+ * **`registry.tsx` needed no edit for either**, as it has not since T009 (006) replaced its
+ * hand-mirrored declarations with `@mynet/data`'s own `Repositories` — the property FR-496 asked
+ * for, now demonstrated by a fourth feature in a row.
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ */
+export const useCardRepository = (): PlatformServices['repositories']['cards'] =>
+  usePlatform().repositories.cards
+
+export const useAppointmentRepository = (): PlatformServices['repositories']['appointments'] =>
+  usePlatform().repositories.appointments
+
+/**
  * 005 — when the content on screen was retrieved, or `null` when it is live (FR-216).
  *
  * A component calls this to render the staleness stamp. It learns nothing about caching from

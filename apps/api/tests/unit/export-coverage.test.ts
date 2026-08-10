@@ -83,6 +83,18 @@ const NOT_EXPORTED: Record<string, string> = {
     'the export does contain; `last_read_message_id` is a read position that FR-530 keeps ' +
     'private even from the other participant, and it describes UI state rather than anything ' +
     'the attendee authored.',
+
+  /**
+   * T027 (008) — the one table of this feature's three that the export does not reproduce.
+   *
+   * The other two — `shared_cards` and `appointments` — are covered column by column in
+   * `EXPORTED_COLUMNS`, each in **both roles** (FR-653). This one holds no attendee data at all,
+   * which is the same classification `deletion-coverage.test.ts` reaches for it independently.
+   */
+  meeting_slots:
+    'Seeded conference content (FR-623): an event, a start and an end, with no attendee ' +
+    'identifier. The grid is not data about anybody. The slot an attendee actually claimed IS ' +
+    'exported, as `slotId` with its instants inside each element of `appointments`.',
 }
 
 /**
@@ -141,6 +153,11 @@ const NOT_EXPORTED_COLUMNS: Record<string, string> = {
     'device. Exported as a redacted presence — see `keysRedacted` in the document.',
   'push_subscriptions.auth_key':
     'A credential, not content (research R14). See `p256dh_key` above.',
+
+  // T027 (008). Surrogate keys only — every other column of both tables is mapped in
+  // `EXPORTED_COLUMNS`, in **both roles**, which is what FR-653 asks for.
+  'shared_cards.id': 'A surrogate key with no meaning outside this database.',
+  'appointments.id': 'A surrogate key with no meaning outside this database.',
 }
 
 interface Column {
@@ -275,6 +292,11 @@ describe('export coverage (T095, FR-377)', () => {
       blocks: true,
       reports: true,
       pushSubscriptions: true,
+      // 008. Cards appear as two sections because one row is two different facts — a card you
+      // gave and a card you hold — and neither is derivable from the other (FR-653).
+      cardsShared: true,
+      cardsHeld: true,
+      appointments: true,
       exclusions: true,
     }
 
@@ -312,6 +334,11 @@ describe('export coverage (T095, FR-377)', () => {
       blocks: true,
       reports: true,
       pushSubscriptions: true,
+      // 008. Cards appear as two sections because one row is two different facts — a card you
+      // gave and a card you hold — and neither is derivable from the other (FR-653).
+      cardsShared: true,
+      cardsHeld: true,
+      appointments: true,
       exclusions: true,
     }
 

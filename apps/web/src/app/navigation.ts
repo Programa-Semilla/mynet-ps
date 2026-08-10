@@ -109,6 +109,32 @@ const Messages = lazy(() => import('./messages/Messages.js').then((m) => ({ defa
 const Thread = lazy(() => import('./messages/Messages.js').then((m) => ({ default: m.Thread })))
 
 /**
+ * T049 (008) — **Network is code-split, on the established rule rather than on a measurement.**
+ *
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ * The rule the Discover block narrowed — *the destinations needed to render the workspace stay
+ * eager* — decides this without needing to be reinterpreted, exactly as it decided Messages.
+ * Network is not the workspace. It is the third question the product answers ("where are my
+ * conversations, notes and appointments?"), reached by a deliberate navigation, and it goes on
+ * to carry a contacts list, an appointments view, a scheduling dialog and two confirmations —
+ * none of which an attendee looking at Home has asked for.
+ *
+ * Home and Agenda remain the only eager destinations, which is now three features in a row
+ * applying the same test rather than three separate judgements.
+ *
+ * **Home's appointment summary card is deliberately NOT part of this chunk.** It lives in
+ * `home/cards/`, is imported by the Home registry eagerly with every other card, and reads the
+ * appointments repository directly — so an attendee who never opens Network still gets the card,
+ * and opening Network does not pay for Home. Standing decision 9 requires each card to own its
+ * own states, and sharing a chunk with a destination would have made that a lie the first time
+ * the chunk failed to load.
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ */
+const Network = lazy(() =>
+  import('./destinations/Network.js').then((m) => ({ default: m.Network })),
+)
+
+/**
  * The five destinations, declared once (FR-012, FR-013).
  *
  * ─────────────────────────────────────────────────────────────────────────────────────────
@@ -121,9 +147,10 @@ const Thread = lazy(() => import('./messages/Messages.js').then((m) => ({ defaul
  * Order is deliberate and matches the prototype: Home first because it is the entry view, then
  * the attendee's own time (Agenda), then other people (Discover, Messages, Network).
  *
- * **Home and Agenda carry product content from 002.** Discover, Messages and Network remain
- * placeholders: each renders an identifiable region with a heading and `purpose` as an honest
- * statement that its content is not built yet, until the feature that owns it lands.
+ * **All five destinations now carry product content.** 002 gave Home and Agenda theirs, 006
+ * Discover, 007 Messages, and 008 Network — the last one. There is no placeholder destination
+ * left, so `purpose` is now a description on every entry rather than a statement that content is
+ * still to come.
  */
 
 /**
@@ -177,9 +204,10 @@ export interface Destination extends Addressable {
    * this change, not merely supplemented — so `routes.tsx` now has no address comparison
    * left in it at all.
    *
-   * **Optional, because a destination without content is not broken.** Discover, Messages and
-   * Network legitimately have no element yet; `undefined` means "render the placeholder",
-   * which is a real state rather than a missing one.
+   * **Optional, and every destination now declares one** — 008 added the last, for Network.
+   * The field stays optional deliberately rather than being tightened: a future destination
+   * lands before its content does, and `undefined` meaning "render the placeholder" is what
+   * makes that an honest intermediate state rather than a broken one.
    *
    * Built with `createElement` rather than JSX because this module is `.ts` and is read by the
    * router, all three navigation forms, and the tests. Renaming it to `.tsx` would churn a
@@ -301,10 +329,30 @@ export const DESTINATIONS: readonly Destination[] = [
     ],
   },
   {
+    /*
+      T047, T048 (008) — **Network has content now**, and it declares its element on this entry
+      and on nothing else (FR-643a). 006 and 007 each extended their own entry the same way, and
+      the pattern is the point: a destination owns its addresses, `routes.tsx` names none of
+      them, and no feature touches a neighbour's line.
+
+      T048 — `purpose` needs **no correction**, and that is worth recording rather than leaving
+      as a silent non-change. Agenda's had to be narrowed twice, in 002 and again in 005, because
+      it promised a personalised schedule before saving existed. This one has said "Saved
+      contacts, exchanged cards, and scheduled appointments" since 001 and turns out to have been
+      accurate — it is now a description rather than placeholder copy, because the placeholder is
+      gone. 006 and 007 each recorded exactly this about their own entries.
+
+      **No `children`, unlike the three entries above.** Nothing inside Network is separately
+      addressable: the contacts/appointments switch is a mobile-only view toggle rather than a
+      distinct thing to link to, and the scheduling dialog opens over whatever opened it rather
+      than at an address of its own. Adding a nested route for either would promise a shareable
+      link to a state that has no independent meaning.
+    */
     path: '/network',
     label: 'Network',
     purpose: 'Saved contacts, exchanged cards, and scheduled appointments.',
     icon: Users,
+    element: createElement(Network),
   },
 ] as const
 

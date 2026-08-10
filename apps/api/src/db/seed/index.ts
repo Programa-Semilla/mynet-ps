@@ -5,6 +5,7 @@ import { attendeeSeed, SEED_ATTENDEES, SEED_PASSWORD } from './attendees.js'
 import { catalogSeed } from './catalog.js'
 import { conversationSeed } from './conversations.js'
 import { eventSeed } from './events.js'
+import { networkSeed } from './network.js'
 
 /**
  * T003 (002) — the seed registry, replacing the single `db/seed.ts` (FR-182).
@@ -64,6 +65,15 @@ export const SEED_MODULES: readonly SeedModule[] = [
   // why this is the first attendee-authored content the product seeds, and why it is one
   // conversation rather than several.
   conversationSeed,
+  // 008 — the meeting-slot grid, appended **last**. It references events only, so it could sit
+  // anywhere after `eventSeed`; last is where an appended module belongs, and the registry is
+  // walked backwards to delete, so this clears first and disturbs no existing order.
+  //
+  // **The only thing 008 seeds is the impersonal half.** Cards and appointments are
+  // attendee-authored, and seeding them would fabricate personal data attributed to a real
+  // identity — so both seeded accounts begin with an empty Network, which is what puts the
+  // empty states on screen at first run. See `network.ts`.
+  networkSeed,
 ]
 
 /**

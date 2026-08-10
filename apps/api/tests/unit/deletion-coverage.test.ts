@@ -92,6 +92,33 @@ const NOT_ATTENDEE_DATA: Record<string, string> = {
     'R10). Participation lives in `conversation_participants`, which cascades; the pair ' +
     'constraint lives in `conversation_pairs`, which cascades. An empty conversation is removed ' +
     'by `deleteAccount` (FR-575), proven in tests/integration/conversation-empty-removal.test.ts.',
+
+  /**
+   * T025 (008) — **the only one of this feature's three tables that needs an entry here**
+   * (FR-654, data-model.md).
+   *
+   * ─────────────────────────────────────────────────────────────────────────────────────────
+   * `shared_cards` and `appointments` are classified by *cascading from `attendees`*, which this
+   * gate reads straight out of the schema — four attendee references between them, every one
+   * `ON DELETE CASCADE`. They need no line here and could only gain one by losing a cascade,
+   * which would fail the build. T026 proves that by running this test rather than by assuming it.
+   *
+   * This is the third table, and it holds nothing about anybody. A slot is `(event_id,
+   * starts_at, ends_at)` — seeded conference content, in exactly the sense `sessions` and `rooms`
+   * above are, and produced by the same mechanism: a committed seed module with **no write path
+   * at any privilege** (FR-623, Principle III).
+   *
+   * It is worth saying why it is *not* attendee data even though attendees choose slots. The
+   * choosing is recorded in `appointments`, which cascades. A slot is the grid, not the booking —
+   * removing an attendee must not remove a conference's 09:30 from everybody else's dialog.
+   * ─────────────────────────────────────────────────────────────────────────────────────────
+   */
+  meeting_slots:
+    'Seeded conference content (008, FR-623). `(event_id, starts_at, ends_at)` and nothing else ' +
+    '— no attendee identifier, and no route at any privilege creates, edits or deletes one. The ' +
+    'attendee-attributable half of scheduling lives in `appointments`, whose two participant ' +
+    'references both cascade. A slot is the grid, not the booking: removing an attendee must not ' +
+    "remove a conference's 09:30 from everybody else's scheduling dialog.",
 }
 
 /**

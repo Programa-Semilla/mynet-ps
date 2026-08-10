@@ -1,6 +1,9 @@
 import { sql } from 'drizzle-orm'
 
 import { getDb } from '../client.js'
+// 008 — the single cross-feature call this module makes. See `blockAttendee` for why blocking
+// must WRITE into appointments where it only READS against cards (FR-637a, research R6).
+import { cancelAppointmentsBetween } from './appointments.js'
 
 /**
  * T075 (007) — refusing contact (FR-535–FR-541a, data-model.md).
@@ -73,6 +76,15 @@ export type BlockOutcome = 'blocked' | 'self' | 'unreachable'
 export const blockAttendee = async (
   blockerId: string,
   blockedId: string,
+  /**
+   * 008 — where to record a failed appointment cancellation. Passed from the route rather than
+   * reached for, which is the shape 007's `dispatchToDevices` established for the same reason:
+   * a query module has no request and no logger of its own, and inventing one here would be a
+   * second place logging is configured.
+   *
+   * Optional so no existing caller changes; a caller that omits it loses only the diagnosis.
+   */
+  log?: { error: (details: Record<string, unknown>, message: string) => void },
 ): Promise<BlockOutcome> => {
   if (!UUID.test(blockedId)) return 'unreachable'
   // Refused rather than absorbed: the CHECK constraint would reject it anyway, and a caller who
@@ -122,7 +134,67 @@ export const blockAttendee = async (
     ) AS blocked
   `)
 
-  return rows[0]?.blocked === true ? 'blocked' : 'unreachable'
+  const outcome = rows[0]?.blocked === true ? 'blocked' : 'unreachable'
+
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // T125, T126 (008) — **the one call 008 adds to a file 007 owns** (FR-637a, research R6).
+  //
+  // A block ends any live meeting between the pair: pending proposals and **future** confirmed
+  // appointments are cancelled and their slots freed. `cancelAppointmentsBetween` is 008's
+  // function; this is its only call site, and it is here because **the only moment we know a
+  // block happened is when it is created.**
+  //
+  // ─────────────────────────────────────────────────────────────────────────────────────────
+  // **T126 — READ-TIME FILTERING WAS CONSIDERED AND REJECTED, AND THE REASON IS FR-637a
+  // ITSELF.**
+  //
+  // Treating appointments between blocked parties as cancelled *when displayed* would need no
+  // write at all, and it is what this feature does for **cards** one file over. It is wrong here
+  // for two reasons:
+  //
+  //   1. it leaves stored state disagreeing with displayed state — the meeting is `confirmed` in
+  //      the database and "cancelled" on screen, and the one that gets read decides whether the
+  //      slot is free; and
+  //   2. **lifting the block would resurrect the meeting**, which FR-637a forbids outright.
+  //
+  // That second point is the whole asymmetry the specification declares: blocking **suspends a
+  // relationship** (a card resolves again when the block is lifted — read-side, reversible, no
+  // write) and **ends a commitment** (a cancelled meeting stays cancelled). Those are different
+  // things, and this line is where the difference is implemented.
+  // ─────────────────────────────────────────────────────────────────────────────────────────
+  //
+  // Ordered **after** the block is established, so a failure here cannot leave somebody
+  // unblocked; and only when a block was actually created, so an unreachable target writes
+  // nothing at all.
+  if (outcome === 'blocked') {
+    // ─────────────────────────────────────────────────────────────────────────────────────
+    // **A FAILURE HERE MUST NOT BE SILENT, BECAUSE NOTHING ELSE WOULD EVER NOTICE IT.**
+    //
+    // The block is already committed by this point, deliberately — a failure must not leave
+    // somebody unblocked. The other ordering has a cost the original comment did not weigh: if
+    // this statement fails, the block stands and the meetings between the pair survive, and no
+    // read path filters them (appointments are severed by a WRITE, not read-side — that is the
+    // whole cards/appointments asymmetry). So the inconsistency is permanent and invisible.
+    //
+    // Rethrowing would be worse: it would answer 500 to a caller whose block *did* land, and
+    // the retry would find the block already present and skip this branch entirely. So the
+    // failure is caught, recorded, and the block reported as the success it was —
+    // `notifyRecipient` in 007's send path makes the same trade for the same reason.
+    //
+    // `cancelAppointmentsBetween` is idempotent, so an operator repairing this by hand simply
+    // re-runs the block.
+    // ─────────────────────────────────────────────────────────────────────────────────────
+    try {
+      await cancelAppointmentsBetween(blockerId, blockedId)
+    } catch (error) {
+      log?.error(
+        { err: error, blockerId, blockedId },
+        'appointment cancellation after a block failed — the block stands, the meetings do not',
+      )
+    }
+  }
+
+  return outcome
 }
 
 /**

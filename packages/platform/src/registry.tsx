@@ -37,7 +37,12 @@ import type { DeviceServices } from './interfaces/index.js'
  * ═════════════════════════════════════════════════════════════════════════════════════════
  */
 /** The conference content a surface can be reading, for the freshness question above. */
-export type ConferenceContent = 'programme' | 'tracks' | 'saved' | 'notes'
+// 008 — `appointments` appended. It is the fifth cacheable resource and the first this product
+// caches that is *about other people as well as the reader*, which is why the composition root
+// argues the decision per member: appointments are cached because they are the attendee's own
+// commitments at one conference, while contacts are refused because resolving one reads somebody
+// else's live profile (FR-647, FR-648).
+export type ConferenceContent = 'programme' | 'tracks' | 'saved' | 'notes' | 'appointments'
 
 export interface PlatformServices {
   readonly devices: DeviceServices

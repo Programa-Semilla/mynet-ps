@@ -26,6 +26,14 @@ export { HttpDirectoryRepository } from './directory-repository.js'
 export { HttpConversationRepository, HttpMessageRepository } from './messages-repository.js'
 export { HttpBlockRepository, HttpReportRepository } from './safety-repository.js'
 export { HttpPushSubscriptionRepository } from './push-repository.js'
+// 008 — Network. **The two files disagree about whether their addresses name a conference, and
+// that disagreement is the feature's central decision.** `cards-repository.ts` names none,
+// because a held card is cross-event and outlives the conference it was shared at — which is
+// exactly why the server needs a third route audit for it. `appointments-repository.ts` names
+// one in every path, because an appointment is a time at a specific conference, which puts it
+// inside the audit that already exists (research R1, R2).
+export { HttpCardRepository } from './cards-repository.js'
+export { HttpAppointmentRepository } from './appointments-repository.js'
 // 005 — the caching decorator. Applied at the composition root, so no component learns that a
 // cache exists (research D1, Principle V).
 export {

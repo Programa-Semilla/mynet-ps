@@ -124,6 +124,23 @@ const renderSignIn = (overrides: Partial<PlatformServices> = {}) => {
         register: async () => Promise.reject(new Error('not signed in')),
         unregister: async () => Promise.reject(new Error('not signed in')),
       },
+      // 008 — signed out, so every method rejects like the rest of the registry. Present because
+      // the registry is one object substituted whole (FR-047); absent members would not compile,
+      // which is the property that makes the substitutability claim testable in a single line.
+      cards: {
+        share: async () => Promise.reject(new Error('not signed in')),
+        listHeld: async () => Promise.reject(new Error('not signed in')),
+        getHeld: async () => Promise.reject(new Error('not signed in')),
+        listShared: async () => Promise.reject(new Error('not signed in')),
+      },
+      appointments: {
+        slots: async () => Promise.reject(new Error('not signed in')),
+        propose: async () => Promise.reject(new Error('not signed in')),
+        list: async () => Promise.reject(new Error('not signed in')),
+        accept: async () => Promise.reject(new Error('not signed in')),
+        decline: async () => Promise.reject(new Error('not signed in')),
+        cancel: async () => Promise.reject(new Error('not signed in')),
+      },
     },
     freshness: { lastRetrieved: () => null },
     auth: { signIn, signOut: async () => {} },

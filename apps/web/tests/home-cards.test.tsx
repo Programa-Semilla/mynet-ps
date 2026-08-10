@@ -16,6 +16,49 @@ import { aSession, EMPTY_PROFILE, SUMMIT, testServices, WithServices } from './s
 const PROFILE_DOUBLE = testServices().repositories.profile
 const PROFILE_WITH_INTERESTS = { ...EMPTY_PROFILE, interests: ['Design systems'] }
 
+/**
+ * 008 — the appointments double, and the two rows the card treats differently.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ * A **confirmed** meeting and a **proposal awaiting the reader** are not the same content:
+ * FR-645 requires the second to be visibly distinct and to offer a route to answer it, because
+ * this feature dispatches no notification (FR-643) and Home is the only place an attendee
+ * learns a proposal exists. The populated scenario carries both, so the card cannot pass by
+ * rendering only its quieter half.
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ */
+const APPOINTMENTS_DOUBLE = testServices().repositories.appointments
+
+const A_COUNTERPART = {
+  attendeeId: 'bbbbbbbb-2222-4222-8222-222222222222',
+  displayName: 'Grace Hopper',
+} as const
+
+const AN_APPOINTMENT = {
+  appointmentId: 'cccccccc-3333-4333-8333-333333333333',
+  role: 'proposer' as const,
+  counterpart: A_COUNTERPART,
+  slot: {
+    slotId: 'dddddddd-4444-4444-8444-444444444444',
+    startsAt: '2026-09-14T12:00:00.000Z',
+    endsAt: '2026-09-14T12:30:00.000Z',
+  },
+  topic: 'Design systems, briefly.',
+  status: 'confirmed' as const,
+  createdAt: '2026-09-13T09:00:00.000Z',
+  answeredAt: '2026-09-13T10:00:00.000Z',
+}
+
+const A_PROPOSAL_AWAITING_THE_READER = {
+  ...AN_APPOINTMENT,
+  appointmentId: 'eeeeeeee-5555-4555-8555-555555555555',
+  // The invitee is the reader, which is the only combination that demands anything of them.
+  role: 'invitee' as const,
+  slot: { ...AN_APPOINTMENT.slot, slotId: 'ffffffff-6666-4666-8666-666666666666' },
+  status: 'pending' as const,
+  answeredAt: null,
+}
+
 const SUGGESTION = {
   attendeeId: 'aaaaaaaa-1111-4111-8111-111111111111',
   displayName: 'Trina Three',
@@ -70,6 +113,12 @@ const SCENARIOS = {
       readAvatar: () => new Promise<never>(() => {}),
     },
     profile: { ...PROFILE_DOUBLE, getOwn: () => new Promise<never>(() => {}) },
+    // 008 — driven for the reason 005's and 006's are, and this file's own header predicted a
+    // third time: a card left reading an undriven default double sits in one state through all
+    // four scenarios, and the matrix records that as its answer. 008's card actually FAILED
+    // here rather than passing green, because its empty state renders text — which is the
+    // guard working better than it did for either predecessor.
+    appointments: { ...APPOINTMENTS_DOUBLE, list: () => new Promise<never>(() => {}) },
   }),
   populated: () => ({
     events: { listRegistered: async () => [SUMMIT] },
@@ -107,6 +156,12 @@ const SCENARIOS = {
       readAvatar: async () => null,
     },
     profile: { ...PROFILE_DOUBLE, getOwn: async () => PROFILE_WITH_INTERESTS },
+    // A confirmed meeting AND one awaiting an answer, so 008's card renders both of its
+    // populated halves rather than only the quieter one (FR-644, FR-645).
+    appointments: {
+      ...APPOINTMENTS_DOUBLE,
+      list: async () => [AN_APPOINTMENT, A_PROPOSAL_AWAITING_THE_READER],
+    },
   }),
   empty: () => ({
     events: { listRegistered: async () => [] },
@@ -120,6 +175,7 @@ const SCENARIOS = {
       readAvatar: async () => null,
     },
     profile: { ...PROFILE_DOUBLE, getOwn: async () => PROFILE_WITH_INTERESTS },
+    appointments: { ...APPOINTMENTS_DOUBLE, list: async () => [] },
   }),
   failed: () => ({
     events: {
@@ -150,6 +206,12 @@ const SCENARIOS = {
       readAvatar: async () => null,
     },
     profile: { ...PROFILE_DOUBLE, getOwn: async () => PROFILE_WITH_INTERESTS },
+    appointments: {
+      ...APPOINTMENTS_DOUBLE,
+      list: async () => {
+        throw new Error('server fault')
+      },
+    },
   }),
 } as const
 

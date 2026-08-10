@@ -5,7 +5,7 @@ Guidance for Claude Code (claude.ai/code) working in this repository.
 This file is the **working brief**: what the product is, what has been decided, and how work is
 done here. It is deliberately short. Depth lives elsewhere, and these are authoritative over it:
 
-1. **`.specify/memory/constitution.md` (v3.0.0)** — governance and the authoritative decision
+1. **`.specify/memory/constitution.md` (v3.2.0)** — governance and the authoritative decision
    register. Supersedes tool defaults, habit, and any conflicting statement in this file.
 2. **`docs/superpowers/specs/2026-08-06-mynet-delivery-roadmap-design.md`** — the decomposition of
    the remaining product into features, with dependency order, reserved migration numbers, and gate
@@ -124,10 +124,55 @@ acceptance step, and once open it stays open. The thread polls every three secon
 and the tab is visible; blocking and reporting are server-enforced, and a report leaves the product
 as operator mail that nothing inside it can read.
 
-**Still carrying no product content**: Network. Audience Q&A arrives in 009, as a third section on
-the panel 005 built.
+**008 (Network — contacts, exchanged cards, and appointments) is shipped**, squash-merged to
+`develop` in [#15](https://github.com/Programa-Semilla/mynet-ps/pull/15) — the spec, constitution
+v3.2.0 and the implementation in one PR, because the amendment gated the code. The fifth and last
+empty destination now carries content, so **every destination `requirements.md` names answers its
+question**. Audience Q&A arrives in 009, as a third section on the panel 005 built, and it is the
+last feature on the roadmap.
 
-**Migrations claimed so far run to `0006`.** The journal lists `0003` before `0004` while carrying a
+A contact is somebody whose digital business card you hold. Sharing is **one-directional** — it
+gives your card and takes nothing — and a held card resolves the sharer's **live** profile under a
+standing consent that outlives both the conference and the discoverability toggle. Appointments are
+proposed, then accepted or declined, over a seeded 30-minute slot grid whose availability is a
+function of the reader's own commitments alone. Home gained its seventh and last card, which is the
+**only** way an attendee learns somebody has proposed a meeting: this feature dispatches no
+notification, and the bell stays forbidden.
+
+**T148 — the by-hand `quickstart.md` walkthrough — was NOT completed for 008 either**, and it
+shipped without it. Everything it covers is asserted by integration, component and end-to-end
+tests, but the two-browser-profile walk has not been done, and neither have the desktop and tablet
+layout reviews it carries (T149). It joins 007's outstanding T148 rather than replacing it.
+
+**It stopped being a theoretical gap.** The owner opened the scheduling dialog and found it in the
+top-left corner of the viewport — a defect that had passed 135 e2e tests, five review agents and
+CodeRabbit, because every one of them checks behaviour and none of them looks at where a thing is.
+Two dialogs were affected. Whatever else T148 is worth, **layout is the part of this product no
+gate examines**, and the first person to look found something.
+
+**Both questions 008's spec left to planning were answered yes, and the answers are now
+invariants.** Card resolution did need a **third branded scope** — `CardScope` and a third route
+audit, because `event-scope-audit` reports success on a route naming no conference and walks
+straight past `/cards/…`. The meeting-slot grid is seeded as six 30-minute slots per conference
+day, in venue-local time.
+
+**A deep review followed implementation and is recorded in
+`specs/008-network-and-appointments/review-findings.md`** — 42 findings, 29 fixed. Two corrected
+the compliance claim itself (FR-647 was half-implemented, SC-604 unmet), and three defects were
+silent and serious: a cache purge on opening the scheduling dialog, an enumeration oracle on
+proposing, and an error classification that swallowed every message the routes wrote to be read.
+**One finding is deliberately unfixed and is an owner decision**: whether proposing a meeting
+should require the invitee to be discoverable, as sharing a card does. The agents' fix would
+contradict the spec's stated Assumptions, so the question was recorded rather than resolved.
+
+**The last two defects were found after the gate passed, and neither was findable by reading
+source.** The fix for the cache defect was right in reasoning and wrong in mechanics — it returned
+an unbound method, so a `#private` field failed against the Proxy and *nothing could be scheduled
+at all*; unit, component and integration were all green on it and only e2e caught it. Then the
+owner reported the scheduling dialog rendering in the **top-left corner**, which no behavioural
+test could see. Both are written up as invariants above.
+
+**Migrations claimed so far run to `0007`.** The journal lists `0003` before `0004` while carrying a
 later timestamp — `apps/api/migrations/meta/README.md` explains why both halves are load-bearing and
 what a regenerating feature must not "fix". Anyone regenerating must move that README aside first,
 because `drizzle-kit generate` JSON-parses every file in `meta/`.
@@ -177,6 +222,14 @@ refactor.
   directory is other people's personal data ageing on a device after they chose to be invisible.
 - **`CatalogRepository` is read-only in perpetuity**, asserted by name-shape over its exports.
   Attendee state *about* conference content belongs in its own repository.
+- **A modal `<dialog>` is centred by the base rule in `theme/tokens.css`, not by each dialog.**
+  The user agent centres a `showModal()` dialog with `margin: auto`; Tailwind's Preflight sets
+  `margin: 0` on every element and takes it away, pinning the dialog to the **top-left corner**.
+  005 and 006 each rediscovered this and patched it locally with `m-auto`; 004's `ConfirmDialog`
+  and 008's `ScheduleDialog` did not, and both shipped mispositioned. It is invisible to every
+  behavioural test — the dialog opens, traps focus, closes on Escape and reads correctly — so
+  `e2e/responsive.spec.ts` now measures the gap on either side. The existing width assertion
+  never looked at position, which is how it survived.
 - **The detail panel is a native `<dialog>` with `showModal()`** — focus trap, background inertness
   and Escape come from the platform. Focus restoration to the opener is explicit, because
   `<dialog>` does not do it reliably. **007's confirmations reuse `ConfirmDialog` rather than
@@ -262,6 +315,72 @@ refactor.
 - **Denial is a complete outcome, not a degraded one.** It is recorded so nobody is asked twice, and
   `push-denied-fallback.test.tsx` re-runs the US1–US4 surfaces with permission denied to assert they
   are unchanged.
+
+**Network (008)**
+
+- **A third branded scope, because a card route names no conference.** `CardScope` and
+  `requireHeldCard` mirror 007's participation guard, and `card-audit.test.ts` is a **third** route
+  audit — `event-scope-audit` examines a route only if it names an event and **reports success
+  otherwise**, so it walks straight past `/cards/…`. The predicate is **directional** where
+  participation is symmetric: it asks whether the reader holds a card *from* the named attendee,
+  never the reverse, which is what stops sharing your own card granting you a read of theirs.
+- **Appointments are per-event and deliberately named so in the URL.** `/events/:eventId/…` puts
+  them *inside* the guarantee that already exists. Registering them as `/appointments/:id` would
+  name no conference and the event audit would silently pass them. **007 predicted the opposite**
+  — that appointments would inherit its guard — and 008 corrected that comment in both files it
+  appears in.
+- **One feature, two scoping rules, and neither is the default.** `shared_cards` is cross-event;
+  `appointments` and `meeting_slots` are per-event. The client mirrors it exactly: `CardRepository`
+  takes no `eventId` **at all**, so no later edit can scope contacts to the conference on screen.
+- **The three absences in card resolution are the feature.** No discoverability condition
+  (FR-612), no verification condition (FR-613), no registration join (FR-614) — each looks like a
+  forgotten `WHERE`, and the directory query one file over has all three. Sharing checks them;
+  *resolving* must not. Discoverability governs being **found**, not being **remembered**.
+- **Availability is computed from the reader's commitments alone**, and a **received** proposal
+  consumes nothing. Two separate guarantees that read alike: one stops the reader learning the
+  invitee's schedule from which options vanish (a leak *by omission*), the other stops anyone
+  consuming a stranger's whole day by proposing into it. Double-booking is caught at acceptance
+  instead — the one refusal in this feature that **carries a reason**, because it describes the
+  reader's own diary to the reader.
+- **Blocking suspends a relationship and ends a commitment, and those are different.** A card is
+  severed **read-side**, so lifting the block restores the contact with no write; an appointment is
+  **cancelled** by a write and stays cancelled. Read-time filtering was rejected precisely because
+  lifting a block would resurrect a cancelled meeting. This is the single place 008 edits a file
+  007 owns — one call in `db/queries/blocks.ts`.
+- **`lapsed` is derived from the slot instant and stored nowhere**, which is what keeps this feature
+  free of any background job. A stored fifth status would need a sweep, and `RETENTION_SWEEPS` is
+  for data no cascade can reach — which this is not.
+- **A card cannot be recalled**, and appointments cascade away entirely with either account. Unlike
+  007's conversations there is **no one-sided survivor**: a conversation holds the survivor's own
+  words, a card whose subject is gone has nothing to preserve.
+- **Contacts must never be derived from conversations or appointments** (constitution v3.2.0 N1),
+  asserted over the source. 007's open send makes a conversation unilateral, so deriving them would
+  let a stranger insert themselves into somebody's Network with one message.
+- **Withdrawing from a conference cancels the live meetings you had at it**, in the same
+  transaction. Not doing so was the trap: the departing attendee fails `requireEventAccess` and so
+  can no longer see or cancel the meeting, while the other party can still accept it and turn up.
+  This is the **second** place 008 writes into a file another feature owns, after `blocks.ts` —
+  both are one statement, both are cancellations, both for FR-637a's reason.
+- **A read that must stay live has to SAY so.** The caching decorator treats every method not
+  named in `reads` as a **write**, and a write purges the whole conference prefix. `slots` is a
+  live read, and omitting it looked right while silently wiping the cached programme, saved
+  sessions and notes every time the scheduling dialog opened. `CacheOptions.passThrough` is the
+  declaration; the next uncached read must use it. **Its handler binds to `target`** like every
+  other branch — every HTTP repository holds its client in a `#private` field, and a Proxy does
+  not carry one, so returning the bare method throws `TypeError: Cannot read private member`. The
+  decorator's own test therefore uses a **class with a private field**, not an object literal:
+  the double's shape is the assertion.
+- **Client error classification branches on `error.code`, never on the class.** `ApiError extends
+  RequestRefusedError` and *every* non-2xx throws `ApiError`, so `instanceof` catches 400, 404,
+  429 and 500 alike — which rendered the deliberately reasonless refusal for all of them and
+  swallowed the messages routes wrote to be read.
+- **A refusal's follow-up question must be about the READER.** Asking whether the *invitee* was
+  registered, to choose between 400 and 404, made proposing an enumeration oracle for another
+  attendee's presence — the caller controls the slot, so the invitee was the only variable.
+- **The seed clears the whole Network domain, not only what it seeded.** `shared_cards.event_id` is
+  `ON DELETE NO ACTION` deliberately, so a surviving card refuses `DELETE FROM events` and breaks
+  the re-seed with an error naming neither table. The next feature with a non-cascading reference
+  to seeded content will meet this.
 
 **Deployment**
 
@@ -354,6 +473,35 @@ Decided explicitly. **Not open for re-inference.**
     text and never the reason; and a failed dispatch fails neither the block nor the record. **The
     address is not decided** — it is an obligation the owner personally holds, because somebody has
     to read that inbox.
+
+**2026-08-10** (ratified in constitution v3.2.0) — **these closed the last register entries blocking
+a queued phase**:
+
+24. **A contact is someone whose digital business card you hold.** No connect verb, no accept step —
+    neither appears in `requirements.md` or the prototype. **Contacts must never be derived from
+    conversations**: 007's open send made a conversation unilateral, so deriving them would let a
+    stranger insert themselves into another attendee's Network by sending one message. *Closes
+    register entry 7.*
+25. **Card sharing is one-directional, and records the exchange rather than the person.** It gives
+    the recipient your card and gives you nothing; you hold theirs when they share back. The stored
+    row is sharer, recipient, instant, and the event it happened at. A held card **resolves the
+    sharer's live profile**, under a **standing consent that outlives the event and the
+    discoverability toggle** — so resolution bypasses the directory's discoverability condition and
+    must never consult verification state. A card cannot be recalled; blocking severs it both ways
+    and also prevents scheduling. *Closes register entry 8.* Two things bind alongside it:
+    **appointments are proposed, then accepted or declined** (a deliberate asymmetry — an
+    appointment claims a slot of someone's time, which a message and a card do not), and **slot
+    availability must disclose nothing about the invitee**, which forbids deriving slots from their
+    saved sessions or auto-declining on their conflicts as a leak by omission.
+26. **Audience questions are attributed to their author.** Q&A is therefore a personal-data surface
+    under Principle VIII, carrying identity scoping, deletion cascade and export coverage. *Closes
+    register entry 9.* **Not solved**: what happens to a departing attendee's question that other
+    people have upvoted — 007's answer for conversations does not transfer, and 009 must decide it.
+
+**Sharpened at the same time, without reversing anything**: standing decision 16 now says
+explicitly that there is **one visibility decision per attendee** and that no feature may give an
+individual field its own audience. 008 had specified a contact line carried only by a shared card;
+the owner rejected that reading and the field was withdrawn before any migration was written.
 
 ## How work is done here
 
@@ -466,16 +614,19 @@ is a working summary. Each names what it blocks, because *when* to ask matters a
 
 ### Require a client decision
 
-- **The connection model behind Network contacts.** The prototype derives contacts from the
-  existence of a conversation. There is no connect or accept action, so no relationship to store.
-  **Blocks Network entirely.**
-- **Exchanged digital cards.** The prototype shows a transient confirmation and records nothing.
-  What an exchange creates, and whether it is mutual, is undefined. **Blocks Network entirely.**
-- **Audience-question attribution** — attributed or anonymous. Decides whether Q&A is a
-  personal-data surface under Principle VIII. **Blocks Q&A (009).**
+**No open question blocks any remaining feature.** v3.2.0 closed the last three — the connection
+model, card-exchange semantics, and Q&A attribution — so 008 shipped and 009 is buildable.
+Everything below blocks **deployment** or **release**, not code.
+
 - **Desktop and tablet layouts are unvalidated.** The approved prototype is mobile-only — a fixed
   390×844 frame. Every desktop layout built before this is answered is unreviewed design, so the
-  cost compounds with each feature.
+  cost compounds with each feature. **008 turned this from a risk into an observed defect**: the
+  first dialog a human looked at was rendering in the top-left corner, having passed every gate.
+- **Whether proposing a meeting should require the invitee to be discoverable**, as sharing a card
+  does. 008's deep review raised it; the spec's Assumptions say no, on the ground that holding
+  somebody's card is the stronger predicate — they handed it to you. Recorded rather than resolved
+  because changing it contradicts a written assumption, and that is the owner's call. **Blocks
+  nothing**: the product behaves as specified today.
 - **Real brand mark and application icons.** None exist here. Long lead time; blocks release
   readiness rather than any single feature.
 - **v3.1.0 is ratified and Phase 7 of 007 is delivered.** It resolved register entry 10 in part

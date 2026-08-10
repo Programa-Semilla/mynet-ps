@@ -415,6 +415,70 @@ describe('the caching decorator', () => {
     expect(entries.has(cacheKey('grace', 'summit', 'saved'))).toBe(true)
   })
 
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════════════════
+   * **A DECLARED LIVE READ IS CALLED ON THE REAL REPOSITORY, NOT ON THE PROXY** (FR-215,
+   * FR-647).
+   *
+   * `passThrough` names a read that must stay live: not served from the cache, not written to
+   * it, and — the reason it exists — **not treated as a write and therefore not purging the
+   * conference**.
+   *
+   * The first implementation returned the method itself, which is subtly wrong in a way no
+   * plain-object double can expose. Every HTTP repository in this package holds its client in a
+   * `#private` field, and a `#private` field lives on the instance, not on a Proxy wrapping it
+   * — so calling the bare method with the Proxy as `this` throws `TypeError: Cannot read
+   * private member`. It shipped, and the scheduling dialog told every attendee "Times could not
+   * be loaded" until an e2e walkthrough caught it.
+   *
+   * So this double is a **class with a private field**, deliberately, and not the object
+   * literal the rest of this file uses. The shape is the assertion.
+   * ═══════════════════════════════════════════════════════════════════════════════════════
+   */
+  it('calls a declared live read on the repository itself, private fields intact', async () => {
+    const { store, entries } = memoryStore()
+
+    class RepositoryWithPrivateState {
+      readonly #answer: readonly string[]
+
+      constructor(answer: readonly string[]) {
+        this.#answer = answer
+      }
+
+      async slots(_eventId: string): Promise<readonly string[]> {
+        return this.#answer
+      }
+
+      async listSaved(_eventId: string): Promise<readonly string[]> {
+        return this.#answer
+      }
+    }
+
+    const subject = cached(
+      new RepositoryWithPrivateState(['09:00']),
+      store,
+      { attendeeId: 'ada' },
+      READS,
+      { passThrough: ['slots'] },
+    )
+
+    // Populate the conference cache through a genuinely cached read...
+    await subject.listSaved('summit')
+    expect(entries.size).toBe(1)
+
+    // ...then the live read. It must not throw, must answer, and must leave the cache alone.
+    await expect(subject.slots('summit')).resolves.toEqual(['09:00'])
+
+    expect(
+      entries.has(cacheKey('ada', 'summit', 'saved')),
+      'A declared live read purged the conference. That is the write branch, and enrolling a ' +
+        "read in it destroys the attendee's cached programme, saved sessions and notes.",
+    ).toBe(true)
+
+    // Nor was its own answer stored.
+    expect(entries.size).toBe(1)
+  })
+
   it('passes through methods it was not told to cache', async () => {
     const { store, entries } = memoryStore()
     const { repository, calls } = repositoryThat({ listSaved: async () => ['a'] })

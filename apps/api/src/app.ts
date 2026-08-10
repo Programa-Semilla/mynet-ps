@@ -17,6 +17,7 @@ import { loadConfig } from './config.js'
 import { closeDb } from './db/client.js'
 import maintenance from './maintenance.js'
 import authContext from './plugins/auth-context.js'
+import cardAccess from './plugins/card-access.js'
 import errors from './plugins/errors.js'
 import eventAccess from './plugins/event-access.js'
 import participation from './plugins/participation.js'
@@ -173,6 +174,20 @@ export const buildApp = async (options: BuildAppOptions = {}): Promise<FastifyIn
   //     `EventScope` has no event to verify and the existing route audit walks past these
   //     routes reporting success — research R9. Two predicates, two guards, two audits.
   await app.register(participation)
+
+  // 5a-ter. Held-card access (008). Decorates the instance with `requireHeldCard`, which
+  //     produces the `CardScope` every card read demands. Follows auth-context for the reason
+  //     5a and 5a-bis do: it verifies a `shared_cards` row for `request.attendee` (FR-616).
+  //
+  //     **A third sibling, and its predicate is the first with a DIRECTION.** Event scope proves
+  //     a registration and participation proves a symmetric membership; this proves that the
+  //     reader holds a card *from* the named attendee, never the reverse — which is what stops
+  //     sharing your own card from granting you a read of somebody else's (FR-602).
+  //
+  //     It needs a third guard for the same structural reason 007 needed a second: card routes
+  //     name no conference, so `event-scope-audit` never examines them and reports success
+  //     (research R1, FR-641).
+  await app.register(cardAccess)
 
   // 5b. The two ports 004 introduces — durable binary content and transactional account mail
   //     (FR-352, FR-394). Appended after the guards and before maintenance: nothing in steps
