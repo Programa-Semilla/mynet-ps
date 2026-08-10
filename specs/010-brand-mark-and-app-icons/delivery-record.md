@@ -68,21 +68,44 @@ it is arguably redundant clutter rather than useful text. Options are to drop th
 mobile (keeping it for assistive technology), to give it more room by shrinking the switcher, or to
 leave it. All three are design calls.
 
-### 2. Two flaky test failures, neither reproducible, neither in this feature's code
+### 2. FR-826's arrangement was implemented wrong first, and the code review caught it
 
-Recorded because a flake that nobody writes down gets rediscovered as a defect.
+The mark was first added to the five authentication screens **left-aligned**, above headings that
+are themselves left-aligned. Every gate passed: one mark per screen, navy colourway, headings
+unchanged, no overflow at thirteen widths.
 
-- **`apps/web/tests/home-cards.test.tsx`** — "rest-of-day renders a DIFFERENT body in each of the
-  four states" failed once under full-suite load: the `failed` state still showed the loading body,
-  so 3 distinct bodies were seen instead of 4. Passed in isolation and in **three** subsequent full
-  component runs (539 tests each). The same suite at `HEAD` also passed.
-- **`e2e/messages-journey.spec.ts`** — FR-503a, "opening a thread and leaving without sending leaves
-  no trace", failed once: Grace's conversation count read 0 where 1 was expected. Passed on a
-  targeted re-run and on a **full 139-test re-run**.
+FR-826 says *"the **stacked** arrangement, mark centred above the existing heading"*, and the
+spec's desktop-layout declaration says *"mark centred above the heading in the existing centred
+card"*. Centring **only the image** — the literal reading — leaves it floating above a left-aligned
+wordmark, which reads as a misalignment rather than a lockup, and is not what the board draws.
 
-Both look like async-settlement races in shared state. Neither touches brand assets, the manifest,
-or any file 010 changed. **Not investigated further** — out of scope here, and worth a look by
-whoever next works on Messages or Home.
+**Resolved by the owner on 2026-08-10**: the header block is centred **as a unit** — mark, heading
+and, where present, tagline. Only alignment moves; every heading's text is unchanged, so SC-808
+still holds. Body copy below the heading stays left-aligned.
+
+Worth recording because it is the shape of defect this feature is about: the wrong version passed
+everything, and it took rendering the screen and looking at it.
+
+### 3. The suite is flaky — three distinct failures across five full runs, none reproducible
+
+Recorded because a flake that nobody writes down gets rediscovered as a defect, and because three
+*different* ones is a pattern rather than an accident.
+
+| Where | What failed | Outcome |
+|---|---|---|
+| `apps/web/tests/home-cards.test.tsx` | "rest-of-day renders a DIFFERENT body in each of the four states" — the `failed` state still showed the loading body, so 3 distinct bodies were seen instead of 4 | Passed in isolation and in **three** subsequent full component runs (539 each). The same suite at `HEAD` also passed |
+| `e2e/messages-journey.spec.ts` | FR-503a, "opening a thread and leaving without sending leaves no trace" — Grace's conversation count read 0 where 1 was expected | Passed on a targeted re-run and on **two** full 139-test runs |
+| `e2e/durability.spec.ts` | "attendee data survives redeployment of the API" — the conference heading never appeared after the API restart | Passed on a targeted re-run and on a full 139-test run |
+
+**None of the three touches brand assets, the manifest, or any file 010 changed**, and all three
+are in areas with shared external state: one async settlement in a card, one shared seeded
+database, one API process restart. Final state is a clean `pnpm verify` (exit 0) and a clean
+139-test end-to-end run.
+
+**Not investigated further** — out of scope for a brand-asset feature, and the fix belongs with
+whoever next works on Messages, Home, or the end-to-end harness. Flagged because a suite that fails
+one test in five runs for unrelated reasons will eventually be treated as noise, and then a real
+failure will be treated as noise too.
 
 ---
 

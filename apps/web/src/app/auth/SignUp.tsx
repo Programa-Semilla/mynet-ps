@@ -127,9 +127,12 @@ export const SignUp = () => {
   return (
     <main className="flex min-h-screen items-center justify-center bg-surface px-4 py-10">
       <div className="w-full max-w-md rounded-lg bg-surface-raised p-6 shadow-card sm:p-8">
-        <header className="mb-6">
-          {/* T042 (010) — the stacked mark, navy on this light card. The heading is unchanged. */}
-          <BrandMark colourway="navy" className="mb-3 h-10" />
+        {/*
+          T042 (010) — the stacked lockup, centred as a unit (FR-826). Navy on this light card.
+          The heading's text is unchanged; only its alignment moves.
+        */}
+        <header className="mb-6 text-center">
+          <BrandMark colourway="navy" className="mx-auto mb-3 block h-10" />
           <h1 className="font-display text-2xl font-semibold text-text-primary">
             Create your {PRODUCT_NAME} account
           </h1>

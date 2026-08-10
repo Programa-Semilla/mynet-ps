@@ -62,11 +62,16 @@ export const ResetRequest = () => {
   return (
     <main className="flex min-h-screen items-center justify-center bg-surface px-4 py-10">
       <div className="w-full max-w-md rounded-lg bg-surface-raised p-6 shadow-card sm:p-8">
-        {/* T044 (010) — the stacked mark, navy on this light card. The heading is unchanged. */}
-        <BrandMark colourway="navy" className="mb-3 h-10" />
-        <h1 className="mb-2 font-display text-2xl font-semibold text-text-primary">
-          Reset your password
-        </h1>
+        {/*
+          T044 (010) — the stacked lockup, centred as a unit (FR-826). Navy on this light card.
+          The heading's text is unchanged; only its alignment moves.
+        */}
+        <header className="mb-2 text-center">
+          <BrandMark colourway="navy" className="mx-auto mb-3 block h-10" />
+          <h1 className="font-display text-2xl font-semibold text-text-primary">
+            Reset your password
+          </h1>
+        </header>
 
         {submitted ? (
           <>

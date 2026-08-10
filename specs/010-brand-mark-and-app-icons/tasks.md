@@ -364,7 +364,10 @@ summary is that 1–4 and 10 are complete, 6–8 were done by *rendering and mea
       so before this feature; see the delivery record**
 - [ ] T069 Walk **scenario 8** — all five authentication screens carry the mark in the stacked
       arrangement, headings unchanged (SC-808) — **PARTLY: asserted structurally at component level
-      and for overflow at thirteen widths; not looked at**
+      and for overflow at thirteen widths, and rendered and looked at at 390px, which is how the
+      arrangement defect below was found. Not walked on all five by hand.** The mark was first
+      implemented left-aligned; the owner settled FR-826 as the header block centred **as a unit**,
+      and it was corrected. See the delivery record
 - [ ] T070 Walk **scenario 9** — screen reader: the mark is silent, everything else is unchanged —
       **NOT DONE: asserted by tests and axe, but no screen reader was run**
 - [X] T071 Update `spec.md` Status to reflect delivery, and record in the feature directory which
