@@ -133,10 +133,13 @@ that to the owner before implementation.
 
 **Two gate implementation and must be closed before the first line of code:**
 
-1. **The constitution amendment** recording public Q&A visibility as a **third exception** to
-   Principle VIII's "private content stays private". Principle VIII requires an exception to be
-   *recorded*, not entailed, and both existing exceptions were recorded by amendment. Decided at spec
-   review: an amendment is required. Planning proceeded; implementation may not. (T001, T002)
+1. **The constitution amendment** recording public Q&A visibility as the **second recorded
+   exception** to Principle VIII's "private content stays private". Principle VIII requires an
+   exception to be *recorded*, not entailed, and the one existing exception (D10, v2.3.0) was
+   recorded by amendment. Decided at spec review: an amendment is required. Planning proceeded;
+   implementation may not. **CLOSED — v3.3.0 ratified 2026-08-10.** (T001, T002)
+   *This was drafted as a "third exception" counting v3.2.0's N2 as a second; N2 is an exception to
+   discoverability, not to private content, and the count was corrected at ratification.*
 
 2. **Whether FR-756a is withdrawn**, per the deviation above. Implementing against an unresolved
    `MUST` is what T003 exists to prevent.

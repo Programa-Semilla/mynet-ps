@@ -113,7 +113,8 @@ the branded `EventScope` as its first parameter, as every function in `queries/a
 
 ## ⚠️ Blocking precondition, before Phase 1
 
-Public Q&A visibility is a **third exception** to Principle VIII's "private content stays private",
+Public Q&A visibility is a **second recorded exception** to Principle VIII's "private content stays
+private" — 009 drafted this as the *third*, and v3.3.0 corrected the count at ratification —
 and Principle VIII requires an exception to be **recorded**, not entailed. The owner ruled on
 2026-08-10 that this closes by **constitution amendment**, following 008's precedent rather than the
 entailment argument.
@@ -132,9 +133,13 @@ reviewer has not accepted.
       consequences and the reporting clause under "Audience questions", the deletion obligation
       3.2.0 left open now discharged by FR-760/FR-761, and **register entry 22** created for T003a's
       conceded gap. **It is a DRAFT and the version footer says so — T002 is not satisfied by this**
-- [ ] T002 Confirm the amendment travels in this branch and PR, as 008's did, and that
+- [x] T002 Confirm the amendment travels in this branch and PR, as 008's did, and that
       `.specify/memory/constitution.md` reads its new version before any implementation task begins
       (re-check after any rebase — that is when it is lost) (FR-733)
+      → **RATIFIED 2026-08-10 by the project owner**, who accepted the Principle VIII exception on
+      reading it. The version footer no longer says DRAFT, and the amendment is committed on
+      `spec/009-session-qa` so it travels in this PR as 008's did. **The re-check clause survives
+      ratification**: a rebase that drops the amendment commit un-licenses every task below
 - [x] T003 Raise the **FR-756a withdrawal** recorded in plan.md Complexity Tracking with the owner:
       the refusal-purge requirement is not met, meeting it would give Q&A a cross-feature
       responsibility no other undecorated repository has, and the underlying gap is product-wide.

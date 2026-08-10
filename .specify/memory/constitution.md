@@ -2,11 +2,12 @@
 SYNC IMPACT REPORT
 Version change: 3.2.0 → 3.3.0
 
-RATIFICATION STATUS: **DRAFT — awaiting the project owner.** Nothing in phase 009 is licensed until
-this is accepted; the phase's own task list (T002) makes that a precondition on the first line of
-code, and its plan records the gate as BLOCKED rather than conditional. Follows 3.2.0's precedent:
-the amendment travels in the feature branch and PR, so a reviewer reads the rule and the code that
-relies on it together.
+RATIFICATION STATUS: **RATIFIED 2026-08-10 by the project owner**, who accepted the Principle VIII
+exception on reading it at 009's implementation gate. Phase 009 is licensed from this point; the
+phase's own task list (T002) carried that precondition on the first line of code, and its plan
+recorded the gate as BLOCKED rather than conditional. Follows 3.2.0's precedent: the amendment
+travels in the feature branch and PR, so a reviewer reads the rule and the code that relies on it
+together — which means a rebase that drops it un-licenses the code, and T002 says to re-check.
 
 Rationale: MINOR. One recorded exception is added to an existing principle and one binding-constraint
 block is extended. No principle is removed or redefined, nothing delivered is retracted, and **no
@@ -15,15 +16,20 @@ content stays private" clause gains a second exception, and an exception to a pr
 change in what the product may do — not a clarification of what it already did.
 
 Owner decisions cited by this amendment (both 2026-08-10):
-  Q1. Public Q&A visibility is a THIRD exception to "private content stays private" and closes by
+  Q1. Public Q&A visibility is a further exception to "private content stays private" and closes by
       amendment rather than by entailment. Ruled at 009's spec review: Principle VIII requires an
-      exception to be *recorded*, not derived, and both existing exceptions were recorded by
+      exception to be *recorded*, not derived, and the one existing exception was recorded by
       amendment. The entailment argument — that attribution (N3, 3.2.0) already implies public
       visibility — was available and was not taken.
+      **Count corrected at ratification**: 009's artifacts called this the *third* exception, on the
+      reading that 3.2.0's N2 was a second. It was not. N2 makes a held card resolve the sharer's
+      live profile past the **discoverability toggle** under a standing consent — an exception to
+      being *found*, recorded under "Audience questions"' neighbouring blocks, never under "private
+      content stays private", which enumerates its exceptions in place. This is the **second**.
   Q2. FR-756a is withdrawn from 009. A refused Q&A action does not purge the conference cache,
       because meeting that would give one feature a cross-feature responsibility no other
       undecorated repository has. The gap it named is real, product-wide, and older than 009, so it
-      becomes register entry 18 rather than 009's to fix alone.
+      becomes register entry 22 rather than 009's to fix alone.
 
 Added binding constraints:
   - VIII. Attendee Data Is Personal Data — "Private content stays private" gains its **second
@@ -53,7 +59,7 @@ Register changes:
 Templates and dependent artifacts:
   - .specify/templates/spec-template.md, plan-template.md, tasks-template.md — ✅ no change required.
   - CLAUDE.md — ⚠ pending. Its standing-decisions list and open-questions summary do not yet carry
-    Q1, Q2 or entry 18. Already flagged as pending by 3.2.0 and still not reconciled.
+    Q1, Q2 or entry 22. Already flagged as pending by 3.2.0 and still not reconciled.
   - brainstorm/00-overview.md — ⚠ pending, same reason, since 3.2.0.
 
 Deferred: none. No placeholder tokens remain in this document.
@@ -1772,5 +1778,4 @@ so a gap in the source would silently render as the wrong number against a neigh
 stay consistent with this constitution and MUST NOT contain implementation plans, session tasks,
 progress updates, or invented requirements.
 
-**Version**: 3.3.0 (DRAFT — awaiting owner ratification; phase 009 is blocked until then) |
-**Ratified**: 2026-08-04 | **Last Amended**: 2026-08-10
+**Version**: 3.3.0 | **Ratified**: 2026-08-04 | **Last Amended**: 2026-08-10

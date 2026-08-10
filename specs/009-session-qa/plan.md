@@ -66,12 +66,13 @@ one file moved, three neighbours' files edited.
 | **V. Abstraction before platform and data APIs** | PASS — a new `QuestionsRepository` interface; no component touches the network. **Nothing added to `CatalogRepository`**, which is read-only in perpetuity. | PASS — no new device capability, so `substitution.test.ts`'s count is untouched and no amendment is owed on that ground. |
 | **VI. Web-first, offline explicit** | PASS — nothing cached, every write refused rather than queued. | **PASS — the one deviation is resolved.** FR-756a was not met; the owner **withdrew it** on 2026-08-10 rather than build a cross-feature purge from one feature. Nothing is cached, every write is refused rather than queued, and the conceded gap is recorded against 010 (T003a). |
 | **VII. Verified on Linux CI** | PASS — all ten gates apply unchanged. | PASS — discharges the **Q&A half of "session save + notes + Q&A"**, the last outstanding behavioural item on the whole-product checklist. |
-| **VIII. Attendee data is personal data** | **CONDITIONAL** — public Q&A visibility is a **third exception** to "private content stays private", and Principle VIII requires an exception to be *recorded*. | **CONDITIONAL, unchanged and deliberate.** The amendment is a precondition on implementation, not on planning (spec Open Question 1). Everything else passes: identity scoping through `EventScope`, both tables cascade-covered, both exported, no retention rule needed. |
+| **VIII. Attendee data is personal data** | **CONDITIONAL** — public Q&A visibility is a further exception to "private content stays private", and Principle VIII requires an exception to be *recorded*. | **PASS — the condition is discharged.** v3.3.0 was **ratified 2026-08-10**, recording public Q&A visibility as the **second** exception under Principle VIII with its three binding consequences. Everything else passes as before: identity scoping through `EventScope`, both tables cascade-covered, both exported, no retention rule needed. |
 | **IX. Every feature declares its own completeness** | PASS — all twelve rows of the spec's declaration table are filled. | PASS — the reporting requirements added at review are reflected in the Accessibility, Empty-states, Identity-scoping and Deletion rows. |
 
-**Gate result: PASS to proceed with planning and tasks. BLOCKED on implementation** until the
-Principle VIII amendment is ratified. This mirrors 008 exactly, where v3.2.0 gated the first line of
-code and planning ran ahead of it.
+**Gate result: PASS.** Planning and tasks proceeded ahead of the amendment; implementation was
+BLOCKED until the Principle VIII amendment was ratified, and **it was — v3.3.0, 2026-08-10**. This
+mirrors 008 exactly, where v3.2.0 gated the first line of code and planning ran ahead of it. The
+amendment travels in this branch, so a rebase that drops it re-opens the gate (tasks T002).
 
 ## Project Structure
 
