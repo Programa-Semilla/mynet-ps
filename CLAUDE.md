@@ -5,7 +5,7 @@ Guidance for Claude Code (claude.ai/code) working in this repository.
 This file is the **working brief**: what the product is, what has been decided, and how work is
 done here. It is deliberately short. Depth lives elsewhere, and these are authoritative over it:
 
-1. **`.specify/memory/constitution.md` (v3.0.0)** — governance and the authoritative decision
+1. **`.specify/memory/constitution.md` (v3.2.0)** — governance and the authoritative decision
    register. Supersedes tool defaults, habit, and any conflicting statement in this file.
 2. **`docs/superpowers/specs/2026-08-06-mynet-delivery-roadmap-design.md`** — the decomposition of
    the remaining product into features, with dependency order, reserved migration numbers, and gate
@@ -126,6 +126,16 @@ as operator mail that nothing inside it can read.
 
 **Still carrying no product content**: Network. Audience Q&A arrives in 009, as a third section on
 the panel 005 built.
+
+**008 is specified but not built**, at `specs/008-network-and-appointments/` — FR-601 to FR-659, its
+requirements checklist a clean 16/16, its spec review gate passed. **A contact is someone whose card
+you hold**, which is what makes Network the durable half of a product whose discovery surface (006)
+is per-event and deliberately uncached. Its governance landed first as **v3.2.0**, and that
+ordering was the owner's ruling rather than a convenience: implementation may not begin until the
+amendment is merged. Two things planning must still settle are recorded in the spec rather than
+assumed — whether card resolution needs a **third branded scope** (a card names no conference, so
+`event-scope-audit` silently passes its routes, exactly the hole 007 found) and the seeded shape of
+the meeting-slot grid.
 
 **Migrations claimed so far run to `0006`.** The journal lists `0003` before `0004` while carrying a
 later timestamp — `apps/api/migrations/meta/README.md` explains why both halves are load-bearing and
@@ -355,6 +365,35 @@ Decided explicitly. **Not open for re-inference.**
     address is not decided** — it is an obligation the owner personally holds, because somebody has
     to read that inbox.
 
+**2026-08-10** (ratified in constitution v3.2.0) — **these closed the last register entries blocking
+a queued phase**:
+
+24. **A contact is someone whose digital business card you hold.** No connect verb, no accept step —
+    neither appears in `requirements.md` or the prototype. **Contacts must never be derived from
+    conversations**: 007's open send made a conversation unilateral, so deriving them would let a
+    stranger insert themselves into another attendee's Network by sending one message. *Closes
+    register entry 7.*
+25. **Card sharing is one-directional, and records the exchange rather than the person.** It gives
+    the recipient your card and gives you nothing; you hold theirs when they share back. The stored
+    row is sharer, recipient, instant, and the event it happened at. A held card **resolves the
+    sharer's live profile**, under a **standing consent that outlives the event and the
+    discoverability toggle** — so resolution bypasses the directory's discoverability condition and
+    must never consult verification state. A card cannot be recalled; blocking severs it both ways
+    and also prevents scheduling. *Closes register entry 8.* Two things bind alongside it:
+    **appointments are proposed, then accepted or declined** (a deliberate asymmetry — an
+    appointment claims a slot of someone's time, which a message and a card do not), and **slot
+    availability must disclose nothing about the invitee**, which forbids deriving slots from their
+    saved sessions or auto-declining on their conflicts as a leak by omission.
+26. **Audience questions are attributed to their author.** Q&A is therefore a personal-data surface
+    under Principle VIII, carrying identity scoping, deletion cascade and export coverage. *Closes
+    register entry 9.* **Not solved**: what happens to a departing attendee's question that other
+    people have upvoted — 007's answer for conversations does not transfer, and 009 must decide it.
+
+**Sharpened at the same time, without reversing anything**: standing decision 16 now says
+explicitly that there is **one visibility decision per attendee** and that no feature may give an
+individual field its own audience. 008 had specified a contact line carried only by a shared card;
+the owner rejected that reading and the field was withdrawn before any migration was written.
+
 ## How work is done here
 
 ### Branching and change flow
@@ -466,13 +505,10 @@ is a working summary. Each names what it blocks, because *when* to ask matters a
 
 ### Require a client decision
 
-- **The connection model behind Network contacts.** The prototype derives contacts from the
-  existence of a conversation. There is no connect or accept action, so no relationship to store.
-  **Blocks Network entirely.**
-- **Exchanged digital cards.** The prototype shows a transient confirmation and records nothing.
-  What an exchange creates, and whether it is mutual, is undefined. **Blocks Network entirely.**
-- **Audience-question attribution** — attributed or anonymous. Decides whether Q&A is a
-  personal-data surface under Principle VIII. **Blocks Q&A (009).**
+**No open question blocks any remaining feature.** v3.2.0 closed the last three — the connection
+model, card-exchange semantics, and Q&A attribution — so 008 and 009 are both buildable. Everything
+below blocks **deployment** or **release**, not code.
+
 - **Desktop and tablet layouts are unvalidated.** The approved prototype is mobile-only — a fixed
   390×844 frame. Every desktop layout built before this is answered is unreviewed design, so the
   cost compounds with each feature.

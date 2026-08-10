@@ -1,6 +1,7 @@
 # Brainstorm Overview
 
-Last updated: 2026-08-10 (#07 — Network settled; register entries 7 and 8 answered together)
+Last updated: 2026-08-10 (#07 — Network settled and specified; **constitution v3.2.0 closes the last
+register entries blocking a queued phase**)
 
 The authoritative registers live elsewhere — open questions in `.specify/memory/constitution.md`,
 delivery sequence in `docs/superpowers/specs/2026-08-06-mynet-delivery-roadmap-design.md`. This file
@@ -18,7 +19,7 @@ win and this is stale.
 | 04 | 2026-08-07 | attendee-identity-and-profile | shipped (PR #12) | `specs/004-attendee-identity-and-profile/` |
 | 05 | 2026-08-07 | discover-and-the-deployment-platform | ratified in constitution **v3.0.0** | `specs/006-discover-and-deployment-platform/` |
 | 06 | 2026-08-07 | messages-and-notification-delivery | **implemented in full**, including Web Push; its amendment ratified in constitution **v3.1.0** | `specs/007-messages-and-notification-delivery/` |
-| 07 | 2026-08-10 | network-and-appointments | decided; **closes register entries 7 and 8**, subject to one register question | `brainstorm/07-network-and-appointments.md` |
+| 07 | 2026-08-10 | network-and-appointments | **specified**; entries 7, 8 and 9 ratified in constitution **v3.2.0** | `specs/008-network-and-appointments/` |
 
 Session 05 has no document of its own: 006 was specified without one, and the row records the
 session rather than a file.
@@ -70,8 +71,8 @@ the index, and it now differs from the roadmap in the ways #02 records.
 | 005 | Agenda | **shipped** — 94/94 tasks, squash-merged to `develop` ([#8](https://github.com/Programa-Semilla/mynet-ps/pull/8)) | 002 ✓ |
 | 006 | Discover, and the deployment platform | **implemented** — awaiting the two owner decisions that gate the first deploy (a domain, an Azure subscription). Migration `0005`: five indexes and one extension, **no new table and no new column** | 004 ✓ |
 | 007 | Messages **and the notification-delivery platform** | **shipped** — squash-merged to `develop`. Web Push delivers for real, verified end to end on a desktop. T148's by-hand walkthrough is partial (scenario 5 only) and carries forward. Migration `0006` | 004 ✓, 006 ✓ |
-| 008 | Network & Appointments | **unblocked** by #07 — a contact is someone whose card you hold; ready to specify. Migration `0007` | ~~connection model~~ ✓, ~~card-exchange semantics~~ ✓ (one register question outstanding, below) |
-| 009 | Session Q&A | queued (∥ 008) | question attribution |
+| 008 | Network & Appointments | **specified** — FR-601–FR-659, checklist 16/16, spec review gate passed. Governance ratified as **v3.2.0**, which the owner ruled must merge before implementation begins. Migration `0007` | ~~connection model~~ ✓, ~~card-exchange semantics~~ ✓ |
+| 009 | Session Q&A | **unblocked** by v3.2.0 — questions are attributed, so Q&A is a personal-data surface. Migration `0008` | ~~question attribution~~ ✓ |
 | 010 | Launch Readiness | queued | brand assets; client validation of desktop |
 
 **002 carries the most leverage and the most risk in the queue, and #02 enlarged it further.** It is
@@ -152,25 +153,31 @@ true.
 
 Each names the phase it blocks — when to ask matters as much as what to ask.
 
-- ~~**The connection model behind Network contacts**~~ — **SETTLED 2026-08-10 by #07.** A contact is
-  someone whose card you hold. #06 had already narrowed it by making the prototype's answer
-  unavailable — under open send a conversation is unilateral, so deriving contacts from
-  conversations would let a stranger insert themselves into another attendee's Network — and #07
-  supplies what replaces it. *Register entry 7; awaiting ratification.*
-- ~~**What a digital-card exchange records, and whether it is mutual.**~~ **SETTLED 2026-08-10 by
-  #07.** One-directional: sharing gives them your card, and you hold theirs only when they share
-  back. The row records the exchange, not a copy of the person. *Register entry 8; awaiting
-  ratification.*
-- **Does the card-only contact line breach standing decision 16?** #07 chose to put an optional,
-  attendee-authored contact line on a shared card that never appears in the directory. Decision 16
-  settled profile visibility as all-or-nothing and recorded that per-field permissions were
-  *considered and rejected*. The reading #07 proceeded under — that decision 16 governs the profile
-  in the directory, while the card is a second surface reached only by a deliberate share — is
-  defensible but is a WHAT-level conflict, which `CLAUDE.md` says is recorded rather than assumed
-  away. **Only the field's existence turns on this; the rest of #07 holds either way.**
-  *Blocks nothing until 008's specification names the column* (added 2026-08-10 by #07)
-- **Audience-question attribution** — attributed to the author or anonymous. Decides whether Q&A is
-  a personal-data surface under Principle VIII. *Blocks 009* (added 2026-08-06)
+**None of these blocks a feature any more.** Constitution **v3.2.0** closed the last three on
+2026-08-10, so 008 and 009 — a free parallel pair — are both buildable. What remains blocks
+deployment or release.
+
+- ~~**The connection model behind Network contacts**~~ — **RATIFIED in v3.2.0** as owner decision
+  N1. A contact is someone whose card you hold. #06 had already narrowed it by making the
+  prototype's answer unavailable — under open send a conversation is unilateral, so deriving
+  contacts from conversations would let a stranger insert themselves into another attendee's
+  Network. *Register entry 7, closed.*
+- ~~**What a digital-card exchange records, and whether it is mutual.**~~ **RATIFIED in v3.2.0** as
+  N2. One-directional: sharing gives them your card, and you hold theirs only when they share back.
+  The row records the exchange, not a copy of the person, and resolution runs under a standing
+  consent that outlives the event and the discoverability toggle. *Register entry 8, closed.*
+- ~~**Does the card-only contact line breach standing decision 16?**~~ — **ANSWERED 2026-08-10:
+  yes.** The owner rejected the reading #07 proceeded under, and the field was withdrawn from 008's
+  specification before any migration was written. Decision 16 is **sharpened** rather than changed:
+  there is one visibility decision per attendee, and no feature may give an individual field its own
+  audience, however that audience is reached. Recorded because the next feature will meet the same
+  temptation — and because the specification did the right thing by refusing to settle it silently.
+- ~~**Audience-question attribution**~~ — **RATIFIED in v3.2.0** as N3: **attributed**. Q&A is
+  therefore a personal-data surface under Principle VIII, with identity scoping, deletion cascade
+  and export coverage. *Register entry 9, closed — 009 is unblocked.* **Not solved, and 009 must
+  decide it**: what happens to a departing attendee's question that other people have upvoted.
+  007's answer for conversations does not transfer, because the votes belong to people who never
+  asked to lose anything.
 - **Desktop and tablet layouts have never been validated by the client**; the approved prototype is
   mobile-only at a fixed 390×844. Every desktop layout built before this is answered is unreviewed
   design, so the cost compounds per phase. **Now more urgent than when it was written**: absorbing

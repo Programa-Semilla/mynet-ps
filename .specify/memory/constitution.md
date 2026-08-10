@@ -1,5 +1,72 @@
 <!--
 SYNC IMPACT REPORT
+Version change: 3.1.0 → 3.2.0
+
+RATIFICATION STATUS: **RATIFIED 2026-08-10 by the project owner**, who answered three register
+entries directly and ruled that they close by amendment rather than as immediately-binding client
+decisions — following 3.1.0's precedent rather than 2.3.0's. Drafted at his request.
+
+Rationale: MINOR. Three register entries are resolved and two binding-constraint blocks are added.
+No principle is removed or redefined, nothing delivered is retracted, and **no work performed under
+3.1.0 is invalidated**. The sharpening of standing decision 16 is not a redefinition: it makes
+explicit a prohibition the clause already carried, and the only thing built against the other
+reading was an unimplemented requirement in a draft specification, withdrawn before any migration
+was written.
+
+**This amendment closes the last register entries blocking a queued phase.** After it, entries 7, 8
+and 9 are struck through and **no open entry blocks any remaining feature**. What stays open blocks
+deployment (a domain, an Azure subscription, VAPID custody, the operator address) and release (brand
+assets, desktop validation) — not code. That is a milestone worth recording, because for the life of
+this project until now at least one queued phase has been unbuildable by governance.
+
+Owner decisions cited by this amendment (all 2026-08-10; 7 and 8 recorded in
+brainstorm/07-network-and-appointments.md):
+  N1. A contact is someone whose digital business card you hold. No connect verb, no accept step.
+      Contacts MUST NOT be derived from conversations. (Resolves register entry 7.)
+  N2. Card sharing is one-directional and records the exchange, not the person. A held card resolves
+      the sharer's live profile under a standing consent that outlives the event and the
+      discoverability toggle. (Resolves register entry 8.)
+  N3. Audience questions are attributed to their author, making Q&A a personal-data surface under
+      Principle VIII. (Resolves register entry 9, unblocking 009 alongside 008.)
+  N4. A card-only contact line WOULD breach standing decision 16. The field is withdrawn, and the
+      clause is sharpened so the next feature does not re-litigate it.
+
+Modified constraints:
+  - "Attendee identity, personal data, and profile" — the profile-visibility clause is SHARPENED by
+    N4. One visibility decision per attendee; no feature may give an individual field its own
+    audience, however that audience is reached. Phase 008's rejected reading is recorded by name,
+    because a rejected reading is more useful to the next reader than the rule alone.
+
+Added binding constraints:
+  - "Networking relationships and appointments" — where entries 7 and 8 now live, on the same
+    principle 3.1.0 applied to entry 10: a resolved entry is not where anybody looks for a rule. It
+    binds the contact model, one-directional sharing, live resolution under standing consent, the
+    block as the only severing control, the proposed-then-accepted appointment, and the prohibition
+    on slot availability disclosing anything about the invitee.
+  - "Audience questions" — where entry 9 now lives. Attribution, the Principle VIII consequence
+    stated as operative rather than noted, and an explicit refusal to let the Q&A phase assume 007's
+    deletion answer transfers to a question other people have upvoted.
+
+Register changes:
+  - 7. RESOLVED by N1. Struck through in place; numbering stable.
+  - 8. RESOLVED by N2. Struck through in place; numbering stable.
+  - 9. RESOLVED by N3. Struck through in place; numbering stable.
+  - No entry is created by this amendment. Phase 008's specification raised one candidate — the
+    contact-line question — and it was answered in the same sitting rather than filed.
+
+Templates and dependent artifacts:
+  - .specify/templates/spec-template.md — ✅ no change required. Its "Register position" and
+    "Event scoping" rows already carry these obligations generically.
+  - .specify/templates/plan-template.md, tasks-template.md — ✅ no change required.
+  - CLAUDE.md — ⚠ pending. Its standing-decisions list and open-questions summary are a working
+    summary of this register and now understate what is settled.
+  - brainstorm/00-overview.md — ⚠ pending, same reason.
+
+Deferred: none. No placeholder tokens remain in this document.
+
+PRIOR REPORT (3.0.0 → 3.1.0), retained because its reasoning about MINOR versus MAJOR is the
+precedent this amendment relies on:
+
 Version change: 3.0.0 → 3.1.0
 
 RATIFICATION STATUS: **RATIFIED 2026-08-08 by the project owner**, who directed the implementing
@@ -949,6 +1016,103 @@ every subsequent feature. These close the last three register entries that block
   networking product in which nobody can see anybody does not work, but "you registered, so you are
   discoverable, permanently" is not a defensible position next to a self-serve deletion commitment.
 
+  **SHARPENED 3.2.0, after a feature tried to work around it.** There is **one visibility decision
+  per attendee**, and it is the discoverability toggle. **No feature may give an individual field
+  its own audience** — not a field shown only to some readers, not a field carried only by some
+  artifact, not a field disclosed only by some action. Phase 008 specified an attendee-authored
+  contact line carried **only** by a shared card and never by the directory, on the reading that
+  this clause governs the profile *in the directory* while a card is a second surface. **That
+  reading is rejected and the field was withdrawn.** A per-field audience is a per-field permission
+  however it is reached, and "all-or-nothing" means what it says.
+
+### Networking relationships and appointments
+
+*Added 3.2.0 by owner decisions taken 2026-08-10 and recorded in
+`brainstorm/07-network-and-appointments.md`. This block is where register entries 7 and 8 now live:
+both are struck through, and a struck-through entry is not where anybody looks for a rule.*
+
+- **A contact is someone whose digital business card you hold.** There is no connect verb and no
+  accept step, because neither appears in `GroundZero/requirements.md` or the prototype. Holding a
+  card is the whole relationship, which is why entries 7 and 8 close together rather than
+  separately.
+
+  **Contacts MUST NOT be derived from conversations.** Phase 007 made a conversation a *unilateral*
+  act — open send, no request, no acceptance — so deriving contacts from threads would let a
+  stranger insert themselves into another attendee's Network by sending one message. This half was
+  settled by 007 as a consequence of open send, before entry 7 itself was answered.
+
+- **Sharing a card is one-directional.** It gives the recipient the sharer's card and gives the
+  sharer nothing; you hold theirs when they share back. **Nothing about a person may become durable
+  without that person's own act** — the property worth protecting in a product with public self
+  sign-up and no moderator by construction.
+
+- **The stored record is the exchange, not the person**: sharer, recipient, the instant, and the
+  event it happened at. A held card MUST resolve the sharer's **current** profile at read time. A
+  snapshot is forbidden: it duplicates personal data, outlives the subject's own edits, and creates
+  a second source for one person.
+
+- **A shared card is standing consent that outlives both the event and the discoverability toggle.**
+  Resolution MUST therefore bypass the directory's discoverability condition, and MUST NOT require
+  the two attendees to share a current event. **Discoverability governs being *found*, not being
+  *remembered*.**
+
+  Resolution MUST NOT consult verification state. Verification gates discoverability and nothing
+  else, and re-checking it here would be a second use of it — which Principle VIII's shipped
+  invariant forbids.
+
+  *Rationale*: Discover is per-event **and deliberately uncached**, so before this nothing durable
+  survived a conference at all — while D1's own rationale already promised that "a contact made at
+  last year's conference must not vanish". Network is the durable half of a product whose discovery
+  surface is transient by design, and this clause is what makes the older promise true.
+
+- **A card cannot be recalled.** Blocking is the control: a block MUST sever card resolution in both
+  directions and MUST also prevent scheduling. Following 007, a block suspends and is reversible; it
+  destroys nothing.
+
+- **An appointment is proposed, then accepted or declined.** This takes an acceptance step that 007
+  refused for conversations and that this amendment refuses for cards, and **the asymmetry is
+  deliberate rather than drift**: a message and a card impose nothing on the other person, whereas
+  an appointment claims a slot of their time, and reserving another person's time is a different
+  act.
+
+- **Meeting-slot availability MUST disclose nothing about the invitee.** Deriving offered slots from
+  the invitee's saved sessions, appointments, or any other private state is **forbidden**, as is
+  auto-declining on their conflicts. Both leak a private schedule *by omission* — greying out
+  somebody's committed slots tells the reader where that person will be all day. Availability MUST
+  be a function of the reader's own commitments alone.
+
+  *Rationale*: this is a Principle VIII violation that looks like a feature, which is why it is
+  written down. The delivery roadmap proposed the forbidden variant by name, and a calendar product
+  would do exactly it.
+
+- **No appointment raises a notification.** Not a proposal, not an acceptance, not a decline, not a
+  cancellation. The trigger set stays at **a received message and nothing else**, per "Notification
+  delivery" below, and a feature wanting a second trigger MUST amend that block.
+
+### Audience questions
+
+*Added 3.2.0 by an owner decision taken 2026-08-10. This block is where register entry 9 now lives.*
+
+- **An audience question is attributed to its author.** Anonymous questions were the alternative and
+  were not chosen. A question therefore carries the asking attendee's identity, and so does a vote.
+
+- **Q&A is consequently a personal-data surface under Principle VIII**, and this is the operative
+  consequence rather than a note. Questions and votes MUST carry identity scoping enforced
+  server-side, MUST be reached by the deletion cascade, and MUST appear in the export — exactly like
+  any other attendee data. The feature that introduces them declares each, and the two coverage
+  tests fail its build until it does.
+
+  *Rationale*: entry 9 was phrased as deciding *whether* Q&A is a personal-data surface. It is now
+  decided that it is, so the phase building it inherits the full weight of Principle VIII rather
+  than a lighter regime for "just content".
+
+- **Deletion is harder here than the register anticipated, and this amendment does not solve it.** A
+  departing attendee's question may sit on a session other attendees have upvoted. 007 settled the
+  analogous problem for conversations — the departing party's words vanish, the survivor keeps their
+  own — but the three options do not resolve the same way for a question with other people's votes
+  attached to it. **The phase that builds Q&A MUST decide and declare this**; it is not licensed to
+  assume 007's answer transfers.
+
 ### Notification delivery
 
 *Added 3.1.0 by M4, M5 and M7. This block is where register entry 10's surviving half now lives:
@@ -1193,6 +1357,42 @@ Owner decisions taken on 2026-08-07 in brainstorm #05
   so a later feature wanting a second one must amend the constitution; and permission is deniable,
   so an attendee who refuses gets a complete product rather than a degraded one.
 
+**Resolved in 3.2.0**
+
+Owner decisions taken on 2026-08-10. Entries 7 and 8 come from brainstorm #07
+(`brainstorm/07-network-and-appointments.md`); entry 9 was answered alongside them so that 008 and
+009 — a free parallel pair — are unblocked by the same amendment.
+
+**This is the first amendment to close the last entries blocking a queued phase.** With 7, 8 and 9
+resolved, no register entry blocks any remaining feature. What remains open blocks *deployment* and
+*release*, not code.
+
+- ~~7. The connection model behind Network contacts~~ — **RESOLVED: a contact is someone whose card
+  you hold.** Written into "Networking relationships and appointments". No connect verb and no
+  accept step were invented, because neither appears in `requirements.md` or the prototype; and
+  contacts MUST NOT be derived from conversations, which 007's open send had already made
+  untenable.
+- ~~8. What an exchanged digital card records, and whether the exchange is mutual~~ — **RESOLVED:
+  one-directional, recording the exchange rather than the person.** Sharing gives the recipient the
+  sharer's card and gives the sharer nothing. A held card resolves the sharer's live profile under a
+  **standing consent that outlives the event and the discoverability toggle**, which is what makes
+  Network the durable half of a product whose discovery surface is deliberately transient.
+- ~~9. Audience-question attribution~~ — **RESOLVED: attributed.** Q&A is therefore a personal-data
+  surface under Principle VIII, with identity scoping, deletion cascade and export coverage. The
+  phase building it must still decide what happens to a departing attendee's question that other
+  people have upvoted — 007's answer for conversations does not transfer, and that is stated in
+  "Audience questions" rather than left to be discovered.
+
+**Sharpened in 3.2.0, without a decision being reversed**
+
+- **Standing decision 16 — profile visibility is all-or-nothing** — gains an explicit prohibition on
+  giving any individual field its own audience. Nothing is reversed: the clause meant this already.
+  It is sharpened because phase 008 specified a contact line carried only by a shared card, on the
+  reading that "all-or-nothing" governed the directory rather than the attendee. **The owner
+  rejected that reading and the field was withdrawn** before any migration was written. Recorded
+  because the *next* feature will meet the same temptation, and the specification that raised it did
+  the right thing by refusing to resolve it silently.
+
   What it costs is recorded rather than glossed: M7 puts message content on a lock screen, and
   whether an attendee may suppress it **was not decided**. It is deferred, not closed.
 
@@ -1238,15 +1438,23 @@ so a gap in the source would silently render as the wrong number against a neigh
    join code. Retained in place so the numbering stays stable; see "Resolved in 2.3.0" above.
 6. ~~**Data retention, deletion, and export obligations.**~~ **RESOLVED 2026-08-07 in 2.3.0** — full
    self-serve, written into Principle VIII. Retained in place; see "Resolved in 2.3.0" above.
-7. **The connection model behind Network contacts.** The prototype derives contacts from the
-   existence of a conversation; no explicit connect or accept action is defined, so there is no
-   relationship to store. Blocks the Network feature entirely.
-8. **What an exchanged digital card records, and whether the exchange is mutual.** Requirements
-   place exchanged cards in Network; the prototype shows a transient confirmation and stores
-   nothing. Blocks the Network feature entirely.
-9. **Audience-question attribution.** Whether a question asked in a session's Q&A is attributed to
-   its author or anonymous. It determines whether Q&A is a personal-data surface under Principle
-   VIII. Blocks the Q&A feature.
+7. ~~**The connection model behind Network contacts.**~~ **RESOLVED 2026-08-10 in 3.2.0** — a
+   contact is someone whose digital business card you hold. No connect verb, no accept step, and
+   contacts MUST NOT be derived from conversations. Now binding text under "Networking relationships
+   and appointments" above. Retained in place so the numbering stays stable; see "Resolved in 3.2.0"
+   below. Worth carrying forward: **half of this entry was closed by a different feature's decision**
+   — 007's open send made a conversation unilateral, which eliminated the prototype's answer before
+   anybody ruled on the entry itself. An entry can be narrowed by work that never names it.
+8. ~~**What an exchanged digital card records, and whether the exchange is mutual.**~~ **RESOLVED
+   2026-08-10 in 3.2.0** — one-directional, and it records the exchange rather than the person. Now
+   binding text under "Networking relationships and appointments" above. Retained in place; see
+   "Resolved in 3.2.0" below. **Entries 7 and 8 closed together with one decision**, having been
+   filed as two, which is a caution about how the remaining entries are phrased rather than a
+   criticism of these.
+9. ~~**Audience-question attribution.**~~ **RESOLVED 2026-08-10 in 3.2.0** — questions are
+   **attributed** to their author. The entry asked whether this makes Q&A a personal-data surface
+   under Principle VIII; it does, and that consequence is now binding text under "Audience
+   questions" above. Retained in place; see "Resolved in 3.2.0" below.
 10. ~~**Notifications.**~~ **RESOLVED IN PART 2026-08-08 in 3.1.0** by M4 — engagement
     notification delivery enters product scope **for a received message and nothing else**, and is
     now binding text under "Notification delivery" above rather than a register entry. **The bell
@@ -1396,4 +1604,4 @@ so a gap in the source would silently render as the wrong number against a neigh
 stay consistent with this constitution and MUST NOT contain implementation plans, session tasks,
 progress updates, or invented requirements.
 
-**Version**: 3.1.0 | **Ratified**: 2026-08-04 | **Last Amended**: 2026-08-08
+**Version**: 3.2.0 | **Ratified**: 2026-08-04 | **Last Amended**: 2026-08-10
