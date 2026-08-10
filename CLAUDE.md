@@ -139,9 +139,16 @@ function of the reader's own commitments alone. Home gained its seventh and last
 **only** way an attendee learns somebody has proposed a meeting: this feature dispatches no
 notification, and the bell stays forbidden.
 
-**009 (Session Q&A — audience questions and upvotes) is shipped**, and **with it the delivery
+**009 (Session Q&A — audience questions and upvotes) is shipped**, squash-merged to `develop` in
+[#17](https://github.com/Programa-Semilla/mynet-ps/pull/17) — the implementation and constitution
+v3.3.0 in one PR, because the amendment gated the code, as 008's did. **With it the delivery
 roadmap is complete**: every feature 001–009 is delivered and every destination `requirements.md`
 names answers its question. What remains is 010, which adds no schema and no feature.
+
+**Planned as two PRs and delivered as one.** The split existed so a reviewer could read the safety
+half as a unit; both halves were complete and green, and holding the first open would have shipped
+a Q&A surface with **no way to report anything on it** — which the Success Criteria forbid calling
+complete. The boundary survives as a reading order rather than as two merges.
 
 A question is asked on a session, published to **every attendee registered for the conference
 under the author's real name with no opt-out**, and ranked by upvotes. That visibility is the
