@@ -395,6 +395,21 @@ parties' saved sessions, or a fixed grid. The prototype hardcodes `MEETING_SLOTS
   takes the brand gate and nothing else; **every other item in the list above remains outstanding
   and still belongs to this phase.** It claims no migration, so it does not contend with 009's
   reserved `0008`.
+
+  **It is now built.** The mark reaches every surface that identifies the product: the three
+  install icons, an opaque 180px apple-touch icon, a favicon set and `favicon.ico`, the head links
+  `index.html` had never carried, the desktop rail, the top bar, all five authentication screens,
+  and manifest screenshots. Every asset is derived from `assets/brand/logo.png` by
+  `scripts/generate-brand-assets.mjs`, byte-identically. A new gate,
+  `apps/web/tests/unit/icon-declarations.test.ts`, fails a declared icon that has no file — the
+  hole where a manifest could name a missing path while all ten gates stayed green.
+
+  **Three items are booked, not done**, and are recorded per-item in
+  `specs/010-brand-mark-and-app-icons/follow-ups.md`: the iOS `apple-touch-startup-image` splash
+  matrix (FR-840), the `purpose: "monochrome"` variant (FR-841), and the vector redraw (FR-842).
+  The redraw's reason is **resolution independence for sizes not yet asked for, not present
+  degradation** — planning corrected the spec's "1.37× upscale" claim, and nothing 010 ships is
+  upscaled.
 - **The desktop and tablet experience has never been validated by the client.** The approved
   prototype is a mobile-only 390×844 frame. Every desktop layout built across 003–009 is unreviewed
   design, and discovering a mismatch at 010 is the expensive outcome. **Still open, and now
@@ -475,7 +490,7 @@ When to ask matters as much as what to ask.
 |---|---|---|---|
 | **Now** | Attendee identity model | 004 | Client |
 | **Now** | Data retention, deletion, export obligations | 004 | Client |
-| **Now** | Real brand mark and application icons | 010, long lead time | Client |
+| ~~**Now**~~ | ~~Real brand mark and application icons~~ — **ANSWERED 2026-08-10** (board supplied, v3.3.0, built) | — | Client |
 | After 002–003 lands | Client review of desktop and tablet experience | 003–009 build unreviewed desktop design | Client |
 | Before 008 | Connection model behind Network contacts | 008 entirely | Client |
 | Before 008 | What a card exchange records; whether it is mutual | 008 entirely | Client |

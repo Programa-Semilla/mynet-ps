@@ -1,7 +1,16 @@
 # Brainstorm: Brand mark and application icons
 
 **Date:** 2026-08-10
-**Status:** active
+**Status:** resolved — specified as
+[010](../specs/010-brand-mark-and-app-icons/spec.md), ratified as constitution v3.3.0
+
+> **This is a dated session record and its body is preserved as written.** Two things it describes
+> have since changed and are recorded here rather than edited into the text above, so that the
+> reasoning still reads as it was reasoned: the brand board is now tracked at
+> **`assets/brand/logo.png`** (the session argued for the move; 010 carried it out), and the
+> "1.37× upscale" this session assumed was **wrong** — the maskable safe zone is a *circle* of 80%
+> diameter, so nothing 010 ships is upscaled at all. See
+> [research R1](../specs/010-brand-mark-and-app-icons/research.md).
 
 ## Problem Framing
 

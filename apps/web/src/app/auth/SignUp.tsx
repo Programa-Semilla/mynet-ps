@@ -4,6 +4,7 @@ import { useId, useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router'
 
 import { useAuth } from '../../auth/useAuth.js'
+import { BrandMark } from '../../shell/BrandMark.js'
 import { PRODUCT_NAME, PRODUCT_TAGLINE } from '../branding.js'
 
 /**
@@ -127,6 +128,8 @@ export const SignUp = () => {
     <main className="flex min-h-screen items-center justify-center bg-surface px-4 py-10">
       <div className="w-full max-w-md rounded-lg bg-surface-raised p-6 shadow-card sm:p-8">
         <header className="mb-6">
+          {/* T042 (010) — the stacked mark, navy on this light card. The heading is unchanged. */}
+          <BrandMark colourway="navy" className="mb-3 h-10" />
           <h1 className="font-display text-2xl font-semibold text-text-primary">
             Create your {PRODUCT_NAME} account
           </h1>

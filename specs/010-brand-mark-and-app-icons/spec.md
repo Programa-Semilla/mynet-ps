@@ -5,8 +5,11 @@
 
 **Created**: 2026-08-10
 
-**Status**: Draft — constitution amendment **v3.3.0 ratified 2026-08-10**, satisfying FR-849's
-precondition that ratification precede implementation
+**Status**: **Implemented 2026-08-10** on constitution amendment **v3.3.0** (ratified the same day,
+satisfying FR-849's precondition that ratification precede implementation). Every automated gate is
+green. **The by-hand validation is outstanding** — quickstart scenarios 5–9 need a device and a
+person, and exactly what was and was not walked is recorded in
+[delivery-record.md](./delivery-record.md).
 
 **Input**: Brainstorm #08 (`brainstorm/08-brand-mark-and-app-icons.md`), which recorded the owner
 supplying a brand board and chose Approach A — one feature, a generated pipeline, the full spex

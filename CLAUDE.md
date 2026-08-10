@@ -131,20 +131,32 @@ empty destination now carries content, so **every destination `requirements.md` 
 question**. Audience Q&A arrives in 009, as a third section on the panel 005 built, and it is the
 last feature that adds behaviour.
 
-**010 (Brand mark and application icons) is specified, and its constitution amendment — v3.3.0 — is
-ratified.** No code is written yet. The owner supplied a brand board on 2026-08-10, which closed
-**register entry 2, the oldest in the register**: MyNet has had no logo for the whole life of this
-project, and the placeholder built under that gap is a coral disc **struck through by an amber
-diagonal band** precisely so it could never be mistaken for a decision. The feature replaces the
-three provisional icons, adds the favicon and `apple-touch-icon` that `index.html` has **never
-had**, puts the mark on the rail, the top bar and the five auth screens, and adds a gate nothing
-covers today — **a declared icon with no file currently fails nothing**, because a manifest can name
-a missing path while all ten correctness gates pass and the failure appears only when a real device
-tries to install. Scope is core-only: the iOS splash matrix, the monochrome variant and a vector
-redraw of the mark are **booked follow-ups**. **Nothing it ships is upscaled**: planning corrected
-the brainstorm's 1.37× figure — the maskable safe zone is a *circle* of 80% diameter, so the largest
-mark fitting a 512px maskable icon is 297.9px against a 300px native master, and sizing it to 80% of
-the *side* instead would have put the node terminals outside the safe zone to be clipped.
+**010 (Brand mark and application icons) is implemented**, on its constitution amendment v3.3.0.
+The owner supplied a brand board on 2026-08-10, which closed **register entry 2, the oldest in the
+register**: MyNet had no logo for the whole life of this project, and the placeholder built under
+that gap was a coral disc **struck through by an amber diagonal band** precisely so it could never
+be mistaken for a decision. **That placeholder is gone.** The three install icons are replaced at
+the same names and sizes, `index.html` gained the favicon and `apple-touch-icon` links it had
+**never had**, the mark is on the rail, the top bar and the five auth screens, and the manifest
+declares screenshots. Scope was core-only: the iOS splash matrix, the monochrome variant and a
+vector redraw are **booked**, per item, in
+`specs/010-brand-mark-and-app-icons/follow-ups.md`. **Nothing it ships is upscaled**: planning
+corrected the brainstorm's 1.37× figure — the maskable safe zone is a *circle* of 80% diameter, so
+the largest mark fitting a 512px maskable icon is 297.9px against a 300px native master, and sizing
+it to 80% of the *side* instead would have put the node terminals outside the safe zone to be
+clipped.
+
+**Its by-hand validation is outstanding, and this time it is the only thing outstanding.**
+Quickstart scenarios 5–9 — install on a device, the tab strip at 16px, the shell at three widths,
+the five auth screens, a screen-reader pass — have not been walked, because they need a phone and a
+person. Everything a machine can check is checked and green.
+
+**The first look at the shell did find something, and it is pre-existing rather than new.** At
+every mobile width the top bar's product-name label is truncated — it needs 60px to render "MyNet"
+and has 43–58px **without the mark at all**, so it was already rendering as "M…" before this
+feature. The mark takes a further ~9px at 390px. FR-825 is satisfied (the label yields, no control
+moves) and 010 did not cause it, so it was recorded rather than fixed: redesigning the mobile top
+bar is register entry 4's territory and the owner's call.
 
 A contact is somebody whose digital business card you hold. Sharing is **one-directional** — it
 gives your card and takes nothing — and a held card resolves the sharer's **live** profile under a
@@ -663,11 +675,11 @@ model, card-exchange semantics, and Q&A attribution — so 008 shipped and 009 i
   somebody's card is the stronger predicate — they handed it to you. Recorded rather than resolved
   because changing it contradicts a written assumption, and that is the owner's call. **Blocks
   nothing**: the product behaves as specified today.
-- ~~**Real brand mark and application icons.**~~ **ANSWERED 2026-08-10, ratified in v3.3.0** — the
-  owner supplied a brand board, closing the oldest entry in the register. **The mark is not in the
-  product yet**: 010 is specified, not implemented, so every icon on disk is still the provisional
-  placeholder with its amber band. What the answer buys is that nothing is blocked on the client any
-  more.
+- ~~**Real brand mark and application icons.**~~ **ANSWERED 2026-08-10, ratified in v3.3.0, and
+  now BUILT** — the owner supplied a brand board, closing the oldest entry in the register, and 010
+  carried it into the product. Every icon on disk is derived from that board; the amber-banded
+  placeholder and the script that drew it are deleted. What remains is a person looking at it on a
+  phone (quickstart scenarios 5–9).
 - **Whether `navy-800` and `coral-500` adopt the brand's values** (`#0d1942`, `#fe6551`) — new
   register entry 22, opened by the same amendment. Measured from the board, brand and tokens
   disagree on both; cream agrees. Adopting them makes the board the single source of truth for

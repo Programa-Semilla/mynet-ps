@@ -21,6 +21,26 @@ import { WEB_ORIGIN } from './e2e/support/env.js'
 export default defineConfig({
   testDir: './e2e',
 
+  /**
+   * T051 (010) — **the screenshot capture tool is never part of the suite.**
+   *
+   * `e2e/support/capture-screenshots.ts` regenerates the manifest's install-prompt images. It is
+   * written as a Playwright test because that is what gives it a browser, a built client, a
+   * running API and a seeded database in one command — but it asserts nothing about the product
+   * and it *writes files into the repository*, so running it as a gate would rewrite committed
+   * assets on every verification.
+   *
+   * Switching `testMatch` rather than skipping it inside the file is deliberate. A permanently
+   * skipped test in the suite reads as a disabled gate, and under this project's rules a check
+   * that did not execute has not passed. This way the capture tool is simply **not a test** on
+   * any ordinary run, and the suite is not a test on a capture run.
+   *
+   *     CAPTURE_SCREENSHOTS=1 pnpm exec playwright test
+   */
+  testMatch: process.env['CAPTURE_SCREENSHOTS']
+    ? '**/capture-screenshots.ts'
+    : '**/*.spec.@(ts|js)',
+
   globalSetup: './e2e/support/global-setup.ts',
   globalTeardown: './e2e/support/global-teardown.ts',
 

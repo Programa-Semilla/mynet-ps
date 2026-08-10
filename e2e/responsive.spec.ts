@@ -572,4 +572,94 @@ test.describe('responsive layout', () => {
     await expect(rows.first(), 'from tablet up both panes are on screen').toBeVisible()
     await expect(page.getByRole('textbox', { name: /message/i })).toBeVisible()
   })
+
+  /**
+   * T048 (010) — **exactly one brand mark is visible at every width** (FR-824, SC-805).
+   *
+   * ═══════════════════════════════════════════════════════════════════════════════════════
+   * The mark lives in two places — the desktop rail and the top bar — and at desktop width both
+   * are on screen at once. Two marks a few centimetres apart is worse than none, so the top bar
+   * hides its own above 1280px.
+   *
+   * That hiding is CSS, and CSS is exactly what the component suite cannot see: jsdom applies no
+   * stylesheet, so both marks are "present" there and always will be. This is the only layer
+   * that can tell one from two.
+   * ═══════════════════════════════════════════════════════════════════════════════════════
+   */
+  test('exactly one brand mark is visible at every width, and never two at desktop', async ({
+    page,
+  }) => {
+    await signedIn(page)
+
+    for (const width of SCROLL_WIDTHS) {
+      await page.setViewportSize({ width, height: 900 })
+      await page.goto('/')
+      await expect(page.getByRole('heading', { name: 'Home', level: 1 })).toBeVisible()
+
+      const marks = page.locator('[data-brand-mark]:visible')
+      await expect(marks, `at ${width}px the product must carry exactly one mark`).toHaveCount(1)
+
+      // And it must be the colourway that is visible against the surface it landed on: coral on
+      // the navy rail at desktop, navy on the raised top bar below it (FR-822, FR-823, SC-814).
+      await expect(marks, `at ${width}px`).toHaveAttribute(
+        'data-brand-mark',
+        width >= 1280 ? 'coral' : 'navy',
+      )
+    }
+  })
+
+  /**
+   * T049 (010) — **the mark displaced nothing at 320px** (FR-825, SC-806).
+   *
+   * The top bar's own source comment fixes the rule: at 320px the label, the conference
+   * switcher, the profile control and the sign-out control share one row, and something has to
+   * give — *a label rather than a control*. Adding a mark to that row is precisely the change
+   * that breaks it, so the three controls are named individually rather than trusting the
+   * overflow measurement alone. A control pushed off-screen and a control that merely truncated
+   * look identical to `scrollWidth`.
+   */
+  test('the brand mark displaces no control in the top bar at 320px', async ({ page }) => {
+    await signedIn(page)
+    await page.setViewportSize({ width: 320, height: 900 })
+    await page.goto('/')
+
+    const header = page.locator('header').first()
+    await expect(header.locator('[data-brand-mark]')).toBeVisible()
+
+    // The three controls the top bar carries at this width, each still on screen and reachable.
+    await expect(header.getByRole('button', { name: /conference|summit/i }).first()).toBeVisible()
+    await expect(header.getByRole('link', { name: /your profile/i })).toBeVisible()
+    await expect(header.getByRole('button', { name: 'Sign out' })).toBeVisible()
+
+    const { overflow, widest } = await horizontalOverflow(page)
+    expect(
+      overflow,
+      `The top bar overflows by ${overflow}px at 320px with the mark present. ` +
+        `Widest: ${JSON.stringify(widest)}`,
+    ).toBeLessThanOrEqual(0)
+  })
+
+  /**
+   * T049 (010) — and the same for the five authentication screens, which gained a stacked mark
+   * above a heading. None is behind a session, so each is reachable directly.
+   */
+  test('no authentication screen scrolls sideways with the mark above its heading', async ({
+    page,
+  }) => {
+    // `/` renders the sign-in screen when there is no session — `RequireAuth` renders it *at*
+    // the requested address rather than redirecting, which is why there is no `/sign-in`.
+    for (const path of ['/', '/sign-up', '/reset-password-request', '/reset-password', '/verify']) {
+      for (const width of SCROLL_WIDTHS) {
+        await page.setViewportSize({ width, height: 900 })
+        await page.goto(path)
+        await expect(page.locator('[data-brand-mark]').first()).toBeVisible()
+
+        const { overflow, widest } = await horizontalOverflow(page)
+        expect(
+          overflow,
+          `${path} overflows by ${overflow}px at ${width}px. Widest: ${JSON.stringify(widest)}`,
+        ).toBeLessThanOrEqual(0)
+      }
+    }
+  })
 })

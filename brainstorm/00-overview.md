@@ -190,14 +190,15 @@ deployment or release.
   position and size is precisely the class of thing no behavioural gate can see — the same class as
   the dialog that shipped in the top-left corner having passed 135 e2e tests and five review agents.
 - ~~**Real brand mark and application icons**~~ — **ANSWERED 2026-08-10 by #08.** The owner supplied
-  a brand board at `seeds/logo.png`: the MyNet mark (a round-capped "N" with two node terminals) on
+  a brand board, now tracked at `assets/brand/logo.png`: the MyNet mark (a round-capped "N" with
+  two node terminals) on
   navy and cream, horizontal and stacked lockups, scale tests to 16px, and a monochrome test. This
   is the client decision the entry was waiting for, so 010 is no longer blocked on an asset that
   does not exist. **RATIFIED 2026-08-10 as constitution v3.3.0** — standing decision 27, and the
   rule now lives in a binding block, "Brand identity and application icons", rather than in a
-  struck-through entry. The board moves to `assets/brand/` by owner decision: in this repository
-  "seed" means database seed data, and a brand board under `seeds/` reads as conference fixture
-  data. Two things it deliberately did **not** settle: whether the UI palette adopts the brand's
+  struck-through entry. The board was moved to `assets/brand/` by owner decision, and 010 carried
+  the move out: in this repository "seed" means database seed data, and a brand board filed beside
+  it reads as conference fixture data. Two things it deliberately did **not** settle: whether the UI palette adopts the brand's
   navy and coral — now **register entry 22** — and the vector redraw the raster crop defers, which
   010 books rather than notes.
 - **`GroundZero/requirements.md` is knowingly out of step** with the constitution on product name,
@@ -267,9 +268,10 @@ From #08. None blocks the specification. The brand decision itself is answered a
   surface and coral-500 the accent, so adopting them repaints the whole product and the
   accessibility suite must re-pass on new contrast ratios. The interim cost is knowingly accepted: a
   visible seam between the icon plate and the token-derived `theme_color` on the splash screen.
-- **`seeds/` is the wrong home for the brand source, and the collision is not cosmetic.** In this
-  repository "seed" means database seed data (`pnpm db:seed`). Settle the path before a build script
-  references it. The file is currently **untracked**.
+- ~~**The brand source is filed beside database seed data, and the collision is not cosmetic.**~~
+  **SETTLED by 010**: the board is tracked at `assets/brand/logo.png`, and the directory it arrived
+  in is gone. In this repository "seed" means database seed data (`pnpm db:seed`), so the path was
+  settled before any build script referenced it.
 - **Whether the mobile top bar carries the mark at all.** It is contextual by design — product name
   at mobile widths, current destination above them — so a mark competes for the same small strip.
 - **The iOS splash device matrix**, which is the bulk of the extras bundle's cost and the whole of

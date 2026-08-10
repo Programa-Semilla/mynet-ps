@@ -7,6 +7,7 @@ import { defineConfig } from 'vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
 import { PRODUCT_NAME, PRODUCT_SHORT_NAME, PRODUCT_TAGLINE } from './src/app/branding.js'
+import { ICONS, SCREENSHOTS } from './src/app/icons.js'
 import { devBranchLegend } from './src/dev/branch-plugin.js'
 
 const resolve = (path: string) => fileURLToPath(new URL(path, import.meta.url))
@@ -101,16 +102,23 @@ export default defineConfig({
         // Read from the token file rather than written here — see `readColourToken` (FR-008).
         background_color: readColourToken('color-cream-100'),
         theme_color: readColourToken('color-navy-800'),
-        icons: [
-          { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' },
-          { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png' },
-          {
-            src: '/icons/icon-maskable-512.png',
-            sizes: '512x512',
-            type: 'image/png',
-            purpose: 'maskable',
-          },
-        ],
+        /**
+         * T029, T029a (010) — declared once, in `src/app/icons.ts`, and read from there.
+         *
+         * The manifest used to spell these out here, where no test could see them: a manifest
+         * naming a file that is not on disk passes every one of this project's ten correctness
+         * gates and fails only when a real device tries to install. Sharing the module lets
+         * `tests/unit/icon-declarations.test.ts` derive its expectations from the declarations
+         * themselves, so a new icon is checked **by existing**.
+         *
+         * `readColourToken` deliberately stays here rather than moving with them — it does file
+         * I/O the browser program must never see, and FR-829 keeps `theme_color` and
+         * `background_color` derived from the token file rather than from the brand constants.
+         */
+        // Copied rather than passed by reference: the declarations are `readonly` on purpose —
+        // a manifest entry is a contract with a file on disk, not a list for a plugin to edit.
+        icons: [...ICONS],
+        ...(SCREENSHOTS.length > 0 ? { screenshots: [...SCREENSHOTS] } : {}),
       },
 
       /**
@@ -130,7 +138,12 @@ export default defineConfig({
         // are evicted. FR-055 without hand-written cache-versioning logic.
         globPatterns: ['**/*.{js,css,html,ico,png,svg,webmanifest}'],
         // Sourcemaps are for the reviewer, not the attendee.
-        globIgnores: ['**/*.map'],
+        //
+        // T054 (010) — and the install-prompt screenshots are for the **platform**, fetched when
+        // it offers to install and never again. They are the largest files in `public/`, so
+        // precaching them would put roughly 430KB of prompt illustration into the install
+        // download of every attendee who has already accepted the prompt (FR-815d).
+        globIgnores: ['**/*.map', 'screenshots/**'],
       },
 
       /**

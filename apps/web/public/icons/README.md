@@ -1,44 +1,121 @@
-# Application icons — PROVISIONAL, NOT BRANDING
+# Application icons
 
-**None of the files in this directory is approved branding. They exist so that the manifest
-validates and the application is installable (FR-050), and for no other reason.**
+**These are the real MyNet brand mark.** They replaced a deliberately-unusable placeholder — a
+navy square with a coral disc struck through by an amber diagonal band — which existed only so
+that the manifest validated and the application was installable while MyNet had no logo.
 
-MyNet has no logo. A real brand mark and application icons are an open **client decision** — see
-`CLAUDE.md` → "Open questions and known discrepancies", and the constitution's register. Drawing
-a mark here would quietly answer a question nobody asked us to answer, which Principle I forbids.
+MyNet had no logo for the entire life of this project. Constitution register entry 2 was the
+oldest entry in the register, open since 1.0.0, and it could not be closed from inside the
+repository because it needed an asset only the client could supply. **The owner supplied a brand
+board on 2026-08-10**, ratified as constitution v3.3.0, standing decision 27.
 
-## What they are
+## The source
 
-A navy square with a coral disc, struck through by an amber diagonal band.
-
-The band is deliberate. A tasteful placeholder is the dangerous kind: it looks finished, so it
-ships and nobody notices for a year. This one cannot be mistaken for a decision.
-
-| File                    | Size    | Purpose                                                                        |
-| ----------------------- | ------- | ------------------------------------------------------------------------------ |
-| `icon-192.png`          | 192×192 | Home screen, standard density                                                  |
-| `icon-512.png`          | 512×512 | Splash screen and store listings                                               |
-| `icon-maskable-512.png` | 512×512 | `purpose: maskable` — mark kept inside the 80% safe zone platforms may crop to |
+`assets/brand/logo.png` — the owner's brand board, 1254×1254. It is the **only** input to every
+file here, and to every other brand asset in `apps/web/public/`. There is no second source, no
+hand-exported variant, and no file in this directory that was edited by hand.
 
 ## How they are made
 
-Generated from the design tokens, not committed as opaque binaries:
-
 ```bash
-node scripts/generate-provisional-icons.mjs
+node scripts/generate-brand-assets.mjs
 ```
 
-The script is forty lines of PNG encoding with no dependencies. A reviewer can see exactly what
-these contain by reading it, rather than by opening a binary and trusting it.
+**Derived by a readable script, never committed as opaque binaries.** That is a governance rule,
+not a preference (constitution v3.3.0, "Brand identity and application icons"): a reviewer
+verifies the crop rectangle, the plate colour and the maskable safe-zone inset by _reading code_,
+rather than by opening a PNG and trusting it. Regeneration is byte-identical, so a hand-edited
+asset shows up as a diff that regeneration cannot reproduce.
 
-## Replacing them
+**The pipeline is one idea.** The board has no alpha channel, so the coral mark exists only as
+coral pixels composited against the board's navy — a naive crop drags that navy into every
+antialiased edge. Every pixel is `P = α·F + (1−α)·B`, so the compositing is undone algebraically:
+`α = (P − B) / (F − B)`, solved on the red channel where the coral/navy delta is 241 of 255. That
+recovers one alpha matte, and every asset below is that matte resampled and painted.
 
-When the client supplies a mark:
+## What is here, and where
 
-1. Replace the three files with real exports at the same names and sizes.
-2. Delete `scripts/generate-provisional-icons.mjs`.
-3. Delete this file, or rewrite it to record the source of the real assets.
-4. Check `background_color` and `theme_color` in the manifest (`apps/web/vite.config.ts`) still
-   suit the new mark — they are currently cream-100 and navy-800 from the token file.
+| File                      | Size    | Purpose                                                     |
+| ------------------------- | ------- | ----------------------------------------------------------- |
+| `icon-192.png`            | 192×192 | Home screen, standard density                               |
+| `icon-512.png`            | 512×512 | Splash screen and store listings                            |
+| `icon-maskable-512.png`   | 512×512 | `purpose: maskable` — see the safe-zone note below          |
+| `../apple-touch-icon.png` | 180×180 | iOS home screen. **Fully opaque**                           |
+| `../favicon-32.png`       | 32×32   | Tab, bookmark, pinned tab — the size hidpi displays ask for |
+| `../favicon-16.png`       | 16×16   | Tab at standard density                                     |
+| `../favicon.ico`          | 16 + 32 | Clients that guess `/favicon.ico` without reading the HTML  |
+| `../brand/mark-coral.png` | 91×96   | In-app mark for **inverse** surfaces — the desktop rail     |
+| `../brand/mark-navy.png`  | 91×96   | In-app mark for **light** surfaces — top bar, auth screens  |
+| `../screenshots/*.png`    | 6 files | Install-prompt illustrations. **Not precached**             |
 
-Until then, treat any screenshot containing these icons as a screenshot of unfinished work.
+### The maskable safe zone is a circle, and the obvious reading is wrong
+
+A maskable icon's guaranteed-visible region is a **circle whose diameter is 80% of the icon's
+smallest dimension** — not 80% of the side available to a bounding box. A rectangle's corners
+escape a circle: sized to 80% of the _side_, the mark's bounding box is 386×410 in a 512 icon and
+its corners sit 281.5px from centre against a safe radius of 204.8, so **an Android circular mask
+clips the two node terminals that are the whole point of the mark**.
+
+What must fit is the bounding box's **diagonal**, which gives a 297.9px mark in a 512 icon — a
+0.993× scale of the board's native 300px. **Nothing here is upscaled.** The geometry is pinned by
+`scripts/generate-brand-assets.test.mjs`, which asserts the wrong answer is wrong.
+
+### The apple-touch icon is not the maskable file renamed
+
+iOS ignores `purpose: maskable` and paints transparency **black**. A transparent apple-touch icon
+is therefore not a degraded icon, it is a black square. Its plate is fully opaque, asserted by
+pixel inspection rather than by inspection on a device.
+
+## Weight
+
+**Precached static assets grew from 8,281 to 91,927 bytes — an increase of 83,646 bytes (≈82 KiB)**
+in the install download. That is the honest cost of replacing three flat-colour placeholder PNGs
+with a real antialiased mark at seven sizes plus two in-app colourways.
+
+The six install-prompt screenshots add a further **436,591 bytes (≈426 KiB)** to the repository and
+the deployed site, and **zero** to the install download: `injectManifest.globIgnores` carries
+`'screenshots/**'`, and `apps/web/tests/unit/icon-declarations.test.ts` reads the built worker to
+confirm it. The platform fetches them when it offers to install, which is an online act.
+
+**No gate measures any of this.** `scripts/asset-budget.mjs` walks the build manifest's entry chunk
+and gzips only `.js`, so static assets are outside it entirely. The numbers above are recorded by
+hand for that reason; if this directory changes materially, re-measure and update them.
+
+## The plate colour is a brand constant, not a design token
+
+The icon plate is the brand's navy **`#0d1942`**, measured from the board. It is deliberately
+**not** `navy-800`, and it deliberately does not move when a design token moves.
+
+The two answer different questions. `navy-800` and `coral-500` are the _product's_ surface and
+accent, and may be retuned for contrast or a dark mode. The plate and the mark are the identity a
+person recognises on their home screen. A token change must not repaint the application icon.
+
+**They do not currently agree, and the seam is a known, accepted cost.** Re-checked at the time
+these assets were made:
+
+| Manifest value     | Source      | Value     | Suits the mark?                     |
+| ------------------ | ----------- | --------- | ----------------------------------- |
+| `background_color` | `cream-100` | `#fdf8f3` | **Yes** — the board's cream matches |
+| `theme_color`      | `navy-800`  | `#1b2340` | **Differs from the icon plate**     |
+| _(icon plate)_     | brand navy  | `#0d1942` | —                                   |
+
+So on the splash screen the plate and the surrounding `theme_color` are visibly different navies.
+**This is deliberate and recorded**, not an oversight: whether `navy-800` and `coral-500` should
+adopt the brand's values is **constitution register entry 22**, opened by v3.3.0 and explicitly
+left for the owner. Adopting them would make the board the single source of truth for colour and
+remove this seam — but `navy-800` is the primary surface and `coral-500` is both the accent and the
+focus ring, so it repaints the whole product and every contrast ratio must be re-verified. Feature
+010 was forbidden from resolving it.
+
+## Booked follow-ups
+
+Deliberately out of scope here, and recorded in
+`specs/010-brand-mark-and-app-icons/follow-ups.md` rather than left as a note in prose:
+
+1. **The iOS `apple-touch-startup-image` splash matrix** — many device-specific images, which must
+   carry the precache exclusion with them or they land in every install download.
+2. **A `purpose: "monochrome"` icon variant** — the board carries a monochrome test, but declaring
+   the purpose without a purpose-drawn asset lets platforms recolour the mark arbitrarily.
+3. **A vector redraw of the mark.** The reason is **resolution independence for sizes not yet
+   asked for**, and it is _not_ present degradation — nothing here is upscaled. A vector source
+   would also be the natural input for the monochrome variant.

@@ -7,6 +7,7 @@ import { Link, useLocation } from 'react-router'
 import { PRODUCT_NAME } from '../app/branding.js'
 import { destinationFor } from '../app/navigation.js'
 import { useAuth } from '../auth/useAuth.js'
+import { BrandMark } from './BrandMark.js'
 import { EventSwitcher } from './EventSwitcher.js'
 
 /**
@@ -76,12 +77,32 @@ export const TopBar = () => {
         name and the sign-out control share one row. Something has to give, and it must be a
         label rather than a control (FR-020, SC-006).
       */}
-        <span className="shrink truncate font-display text-lg font-semibold text-text-primary tablet:hidden">
-          {PRODUCT_NAME}
-        </span>
-        <span className="hidden shrink truncate font-display text-lg font-semibold text-text-primary tablet:inline">
-          {current?.label ?? 'Not found'}
-        </span>
+        <div className="flex min-w-0 shrink items-center gap-2">
+          {/*
+            T039, T040 (010) — the mark, in the **navy** colourway for this raised surface, at
+            the mobile and tablet bands only (FR-822, FR-823, FR-824).
+
+            `desktop:hidden` is what stops two marks appearing at once: above 1280px the rail
+            carries it, six centimetres to the left, and both showing is worse than neither.
+            The band is chosen in **CSS, never in JavaScript** (FR-827) — `display: none` takes
+            the hidden form out of the accessibility tree and the tab order as well as off the
+            page, and reading the viewport in feature code is a direct platform access that
+            `mynet/no-direct-platform-access` forbids.
+
+            It is `shrink-0` at a fixed 24px while the label beside it keeps `shrink truncate`,
+            so at 320px the **label** yields and the conference switcher, the profile control and
+            the sign-out control are all untouched — which is the rule this bar's own comment
+            already sets (FR-825).
+          */}
+          <BrandMark colourway="navy" className="h-6 desktop:hidden" />
+
+          <span className="shrink truncate font-display text-lg font-semibold text-text-primary tablet:hidden">
+            {PRODUCT_NAME}
+          </span>
+          <span className="hidden shrink truncate font-display text-lg font-semibold text-text-primary tablet:inline">
+            {current?.label ?? 'Not found'}
+          </span>
+        </div>
 
         {attendee && (
           <div className="flex min-w-0 shrink items-center gap-2 tablet:gap-3">
