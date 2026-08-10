@@ -5,7 +5,7 @@
 
 **Created**: 2026-08-10
 
-**Status**: **Implemented 2026-08-10** on constitution amendment **v3.3.0** (ratified the same day,
+**Status**: **Implemented 2026-08-10** on constitution amendment **v3.4.0** (ratified the same day,
 satisfying FR-849's precondition that ratification precede implementation). Every automated gate is
 green. **The by-hand validation is outstanding** — quickstart scenarios 5–9 need a device and a
 person, and exactly what was and was not walked is recorded in
@@ -591,9 +591,9 @@ describes what is actually on disk.
 
 #### Governance — the amendment this feature carries
 
-*FR-846 through FR-850 were **discharged on 2026-08-10**: the owner ratified constitution **v3.3.0**,
+*FR-846 through FR-850 were **discharged on 2026-08-10**: the owner ratified constitution **v3.4.0**,
 which strikes register entry 2 in place, adds the binding block "Brand identity and application
-icons", records standing decision 27, opens entry 22, and leaves entry 4 open and escalated. They
+icons", records standing decision 27, opens entry 23, and leaves entry 4 open and escalated. They
 are retained rather than deleted because they state what the amendment had to contain, and a later
 reader checking whether it does needs the list.*
 
@@ -681,7 +681,7 @@ reader checking whether it does needs the list.*
 | **Identity scoping & server-side authorization** (Principle VIII) | **Not applicable, and the reason is structural rather than an oversight.** This feature stores, reads and transmits **no attendee data** (FR-844). It adds no route, no query and no repository, so there is nothing to scope by identity and no authorization decision to place on the server. Every asset it ships is static and identical for every attendee, signed in or not. **One personal-data obligation does attach**: manifest screenshots depict product surfaces, so they must show seeded fixture data and never a real account's address, avatar or messages (FR-815e) — the repository is public, and a screenshot is world-readable the moment it is committed. |
 | **Deletion & export coverage** (Principle VIII) | **No table and no column are added** (FR-845), so `deletion-coverage` and `export-coverage` gain nothing to cover and neither needs an allow-list entry. No retention clock is required, because no record is created that a cascade could fail to reach. |
 | **Event scoping** (Standing decision 7) | **Neither rule applies, and that is itself the declaration standing decision 7 demands.** Decision 7 says every new **table** declares which rule applies; this feature adds none. The assets are product identity — not conference content and not a relationship — so they are identical at every event and do not swap on switch. |
-| **Register position** (Governance) | **Resolves register entry 2** — *"Real brand mark and application icons"*, the oldest entry in the register — answered by the owner supplying the brand board on 2026-08-10. **RATIFIED as constitution v3.3.0 on 2026-08-10**, before implementation as FR-849 requires, following the precedent of v3.1.0 and v3.2.0. Standing decision 27; the operative rule now lives in a binding block, *"Brand identity and application icons"*, because a struck-through entry is not where anybody looks for a rule. **Blocked by no entry.** **Opens one entry — 22**, whether the design tokens adopt the brand's navy and coral (FR-831 forbids this feature resolving it). Does not touch entries 20 (VAPID custody) or 21 (the operator address). **Register entry 4 — desktop and tablet layouts never validated by the client — is escalated by this feature and explicitly NOT closed by the amendment** (FR-848, Open Question 3). |
+| **Register position** (Governance) | **Resolves register entry 2** — *"Real brand mark and application icons"*, the oldest entry in the register — answered by the owner supplying the brand board on 2026-08-10. **RATIFIED as constitution v3.4.0 on 2026-08-10**, before implementation as FR-849 requires, following the precedent of v3.1.0 and v3.2.0. Standing decision 27; the operative rule now lives in a binding block, *"Brand identity and application icons"*, because a struck-through entry is not where anybody looks for a rule. **Blocked by no entry.** **Opens one entry — 22**, whether the design tokens adopt the brand's navy and coral (FR-831 forbids this feature resolving it). Does not touch entries 20 (VAPID custody) or 21 (the operator address). **Register entry 4 — desktop and tablet layouts never validated by the client — is escalated by this feature and explicitly NOT closed by the amendment** (FR-848, Open Question 3). |
 | **Reserved migration number** (Branching — parallel work) | **None claimed.** The roadmap reserves `0008` for 009 and this feature needs no schema change, so 009 may proceed in parallel without a rebase. Nothing here regenerates the Drizzle snapshot, so `apps/api/migrations/meta/README.md` is untouched. |
 
 ## Assumptions
@@ -731,7 +731,7 @@ reader checking whether it does needs the list.*
 ## Open Questions
 
 **1. Whether `navy-800` and `coral-500` adopt the brand board's values (`#0d1942`, `#fe6551`).**
-**Now constitution register entry 22**, opened by amendment v3.3.0 rather than left in this document
+**Now constitution register entry 23**, opened by amendment v3.4.0 rather than left in this document
 alone — it outlives the feature, and a question visible only in a feature spec is invisible to the
 register that governs it. Deliberately deferred, and **this feature must not resolve it** (FR-831). Adopting them would make
 the board the single source of truth and remove the splash-screen seam — but `navy-800` is the

@@ -28,7 +28,7 @@ green**, with the failure appearing only when a real device tries to install.
 
 **No breaking change.** No design token changes value, no accessible name or heading changes, no
 schema change, no migration, no route, no attendee data. The constitution amendment this carries —
-**v3.3.0** — is **already ratified**, closing register entry 2 and adding standing decision 27.
+**v3.4.0** — is **already ratified**, closing register entry 2 and adding standing decision 27.
 
 ## How It Works
 
@@ -165,7 +165,7 @@ else, but it is worth a reviewer's eyes on the actual images.
 
 ## Open Questions
 
-- **Register entry 22 — whether `navy-800` and `coral-500` adopt the brand values.** Opened by the
+- **Register entry 23 — whether `navy-800` and `coral-500` adopt the brand values.** Opened by the
   same amendment that closed entry 2. Blocks nothing; the product behaves as specified either way.
 - **Register entry 4 — desktop and tablet layouts have never been validated by the client.** This
   feature **escalates** it by adding a visible element to both unreviewed bands, and the amendment

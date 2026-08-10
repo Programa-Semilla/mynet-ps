@@ -223,6 +223,32 @@ export const testServices = (
         throw new Error('no appointment cancelled')
       },
     },
+    // ─────────────────────────────────────────────────────────────────────────────────────
+    // 009 — a session nobody has asked about, which is what every session is on first run:
+    // **nothing in this feature is seeded** (FR-762), so this default is also the state a
+    // reviewer meets first. That is deliberate, following 005 — the states most likely to be
+    // skipped are the ones on screen first — and it is why the empty state has its own test.
+    //
+    // An empty list is a **valid answer, not a failure** (FR-727), so `list` resolves. The four
+    // writes throw instead, matching 008's appointment defaults: a component test asserting a
+    // *disabled* post control must fail loudly if it somehow submits, rather than passing
+    // because a permissive double accepted the write.
+    // ─────────────────────────────────────────────────────────────────────────────────────
+    questions: {
+      list: async () => [],
+      ask: async () => {
+        throw new Error('no question asked')
+      },
+      withdraw: async () => {
+        throw new Error('no question withdrawn')
+      },
+      vote: async () => {
+        throw new Error('no vote cast')
+      },
+      unvote: async () => {
+        throw new Error('no vote withdrawn')
+      },
+    },
     ...overrides,
   },
   // 005 — content is live in a component test unless a test says otherwise, so no staleness

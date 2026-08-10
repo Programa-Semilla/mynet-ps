@@ -140,4 +140,28 @@ export const EXPORTED_COLUMNS: Record<string, ExportTarget> = {
   // others. `role` on each element says which, and `counterpartAttendeeId` names the other party.
   'appointments.proposer_id': { section: 'appointments', field: 'role' },
   'appointments.invitee_id': { section: 'appointments', field: 'counterpartAttendeeId' },
+
+  // ═════════════════════════════════════════════════════════════════════════════════════════
+  // T015, T016 (009) — questions asked and votes cast, in **two** sections (FR-764).
+  //
+  // Two rather than one because they are two different acts: authoring a question, and holding
+  // an opinion about somebody else's. Each names its session by title, which is what makes the
+  // document readable once the identifiers mean nothing to the person reading it.
+  //
+  // The columns NOT here are the interesting half, and both are declared with their reasoning in
+  // `tests/unit/export-coverage.test.ts`: each table's `attendee_id` is the requester, and
+  // `session_questions.body` is deliberately absent from the *votes* section because the question
+  // a vote backs is another attendee's words.
+  // ═════════════════════════════════════════════════════════════════════════════════════════
+  'session_questions.id': { section: 'questionsAsked', field: 'questionId' },
+  'session_questions.session_id': { section: 'questionsAsked', field: 'sessionId' },
+  'session_questions.body': { section: 'questionsAsked', field: 'body' },
+  'session_questions.asked_at': { section: 'questionsAsked', field: 'askedAt' },
+
+  'question_votes.question_id': { section: 'questionVotes', field: 'questionId' },
+  'question_votes.voted_at': { section: 'questionVotes', field: 'votedAt' },
+
+  // The reported questions, alongside `message_ids` above (FR-783). Same section, same shape,
+  // same absence of a foreign key.
+  'abuse_reports.question_ids': { section: 'reports', field: 'questionIds' },
 }

@@ -107,7 +107,7 @@ grep -c "icons/icon-512" apps/web/dist/sw.js     # expect 1
 4. **iOS**: the icon is opaque. Any black square means the apple-touch asset carried transparency.
 5. Launch from the home screen and watch the splash. **Expected**: the known navy seam between the
    icon plate (`#0d1942`) and `theme_color` (`navy-800 #1b2340`) — *and nothing else*. That seam is
-   accepted (register entry 22); anything else is a defect.
+   accepted (register entry 23); anything else is a defect.
 
 ---
 

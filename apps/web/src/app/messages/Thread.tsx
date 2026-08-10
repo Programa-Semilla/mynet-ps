@@ -12,7 +12,11 @@ import { Loading } from '../AsyncState.js'
 import { BlockConfirm } from './BlockConfirm.js'
 import { Composer } from './Composer.js'
 import { ClosedThread, StarterPrompt, ThreadFailed, ThreadOffline } from './MessagesEmptyStates.js'
-import { ReportDialog } from './ReportDialog.js'
+// 009 (T072, research R4) — moved to `app/safety/`. It had exactly one importer, and it now has
+// two: Q&A reports a question from the question itself (FR-781), so leaving the dialog here would
+// make Agenda depend on Messages for no reason a reader could reconstruct — the kind of import
+// that becomes a cycle later. `safety/` because reporting and blocking are one concern.
+import { ReportDialog } from '../safety/ReportDialog.js'
 import { useConversation, type Arrival } from './useConversation.js'
 
 /**

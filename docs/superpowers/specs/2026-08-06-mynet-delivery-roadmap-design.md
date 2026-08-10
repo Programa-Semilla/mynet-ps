@@ -364,7 +364,7 @@ parties' saved sessions, or a fixed grid. The prototype hardcodes `MEETING_SLOTS
 
 **Discharges**: digital-card sharing feedback; meeting scheduling and appointment creation.
 
-### 009 — Session Q&A · migration `0008` · ∥ 008
+### 009 — Session Q&A · migration `0008` · ∥ 008 — **SHIPPED**
 
 - Questions and votes. One vote per attendee per question. Ordered by upvotes.
 - Empty state.
@@ -373,6 +373,36 @@ parties' saved sessions, or a fixed grid. The prototype hardcodes `MEETING_SLOTS
 **Decision this phase must take:** whether questions are attributed to their author or anonymous.
 
 **Discharges**: Q&A behaviour.
+
+> ═══════════════════════════════════════════════════════════════════════════════════════════
+> **009 SHIPPED, AND WITH IT THE ROADMAP IS COMPLETE.** Every feature 001–009 is delivered, and
+> **every destination `requirements.md` names now answers its question.** What remains is 010,
+> which adds no schema and no feature — it is the validation pass.
+>
+> Four things landed differently from the sketch above, and each is recorded in the feature's
+> own artifacts rather than only here:
+>
+> - **Not a tab — a fourth stacked section.** 005 built the panel with sections rather than a
+>   tab strip, and `PanelNotes` says in its own header that it is the third "so 009 can add
+>   audience questions as a fourth". The prototype's tab strip is HOW, superseded.
+> - **The attribution decision was taken before this phase, not in it.** Constitution v3.2.0
+>   (N3) settled it: questions are attributed to their author. What 009 had to decide was the
+>   problem v3.2.0 left explicitly open — *what happens to a departing attendee's question that
+>   other people have upvoted* — answered by owner decision 1: it goes, and their votes go with
+>   it, with nothing left de-attributed.
+> - **It needed a constitution amendment after all.** Public Q&A visibility is the **second**
+>   recorded exception to Principle VIII's "private content stays private", ratified as v3.3.0
+>   on 2026-08-10. The spec's first draft claimed no amendment was needed; spec review reversed
+>   that, and implementation was gated on ratification exactly as 008's was on v3.2.0.
+> - **Safety came with it.** A question is reportable from the question itself (FR-781), which
+>   the sketch does not mention and which the spec review added — this is the product's first
+>   unmoderated many-to-many surface, and reporting is what makes it survivable without an
+>   organizer. That half shipped as PR-B.
+>
+> **Unlike 007 and 008 it introduced no new architectural concept**: no branded scope, no fourth
+> route audit, no cache classification, no notification trigger. Every mechanism it needed
+> already existed.
+> ═══════════════════════════════════════════════════════════════════════════════════════════
 
 ### 010 — Launch Readiness · no schema
 
@@ -388,7 +418,7 @@ parties' saved sessions, or a fixed grid. The prototype hardcodes `MEETING_SLOTS
 
 - ~~**No real brand mark or application icons exist** anywhere in this repository.~~ **ANSWERED
   2026-08-10.** The owner supplied a brand board, closing constitution register entry 2 by
-  amendment **v3.3.0**. Raising it early worked exactly as this line intended.
+  amendment **v3.4.0**. Raising it early worked exactly as this line intended.
 
   **The brand half of 010 has been split out and specified on its own**, at
   `specs/010-brand-mark-and-app-icons/` — a departure from this section that its spec declares. It
@@ -490,7 +520,7 @@ When to ask matters as much as what to ask.
 |---|---|---|---|
 | **Now** | Attendee identity model | 004 | Client |
 | **Now** | Data retention, deletion, export obligations | 004 | Client |
-| ~~**Now**~~ | ~~Real brand mark and application icons~~ — **ANSWERED 2026-08-10** (board supplied, v3.3.0, built) | — | Client |
+| ~~**Now**~~ | ~~Real brand mark and application icons~~ — **ANSWERED 2026-08-10** (board supplied, v3.4.0, built) | — | Client |
 | After 002–003 lands | Client review of desktop and tablet experience | 003–009 build unreviewed desktop design | Client |
 | Before 008 | Connection model behind Network contacts | 008 entirely | Client |
 | Before 008 | What a card exchange records; whether it is mutual | 008 entirely | Client |

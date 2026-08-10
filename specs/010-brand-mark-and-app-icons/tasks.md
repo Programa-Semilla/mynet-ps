@@ -33,9 +33,9 @@ diameter, so the mark's bounding-box **diagonal** must fit it: 297.9px in a 512p
 
 FR-849 requires the constitution amendment ratified **before** implementation begins.
 
-- [X] T001 Confirm `.specify/memory/constitution.md` reads **Version: 3.3.0** and contains the
+- [X] T001 Confirm `.specify/memory/constitution.md` reads **Version: 3.4.0** and contains the
       "Brand identity and application icons" section, that register entry 2 is struck through, that
-      entry 22 exists, and that entry 4 is **still open** — FR-846, FR-847, FR-848, FR-849 and
+      entry 23 exists, and that entry 4 is **still open** — FR-846, FR-847, FR-848, FR-849 and
       FR-850 respectively (satisfied 2026-08-10; re-check after any rebase, which is when it could
       be lost)
 
@@ -191,7 +191,7 @@ confirm the gate fails.
 - [X] T035a [US5] Perform the re-check the icons README's replacement checklist asks for: that
       `background_color` (cream-100) and `theme_color` (navy-800) still suit the mark (FR-830).
       **Record the finding** — that the icon plate `#0d1942` and `theme_color` `#1b2340` differ, and
-      that the seam is an accepted interim cost under register entry 22 — in the rewritten README
+      that the seam is an accepted interim cost under register entry 23 — in the rewritten README
       (T063). Performing it and not writing it down is how it gets rediscovered as a defect
 
 **Checkpoint**: a newly declared icon with no file **fails by existing**.

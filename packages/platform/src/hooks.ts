@@ -157,6 +157,23 @@ export const useAppointmentRepository = (): PlatformServices['repositories']['ap
   usePlatform().repositories.appointments
 
 /**
+ * 009 — a session's audience questions (FR-741).
+ *
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ * **`registry.tsx` needed no edit**, as it has not since T009 (006) replaced its hand-mirrored
+ * declarations with `@mynet/data`'s own `Repositories` — the property FR-496 asked for, now
+ * demonstrated by a fifth feature in a row and the last one on the roadmap.
+ *
+ * Its own hook rather than a Q&A capability folded into the agenda's, for the reason the cards
+ * and appointments pair records above: `useSessionNotesRepository` reads the attendee's own
+ * private text, and this reads a public list every co-attendee can see. A single hook handing out
+ * both would invite a caller to assume they behave alike, and they are opposites.
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ */
+export const useQuestionsRepository = (): PlatformServices['repositories']['questions'] =>
+  usePlatform().repositories.questions
+
+/**
  * 005 — when the content on screen was retrieved, or `null` when it is live (FR-216).
  *
  * A component calls this to render the staleness stamp. It learns nothing about caching from

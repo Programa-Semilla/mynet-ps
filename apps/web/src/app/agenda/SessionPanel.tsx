@@ -6,6 +6,7 @@ import { useNavigate, useOutletContext, useParams } from 'react-router'
 import { Loading } from '../AsyncState.js'
 import { PanelNotes } from './PanelNotes.js'
 import { PanelOverview } from './PanelOverview.js'
+import { PanelQuestions } from './PanelQuestions.js'
 import { PanelSpeakers } from './PanelSpeakers.js'
 
 /**
@@ -129,6 +130,25 @@ export const SessionPanel = () => {
       ref={dialogRef}
       aria-labelledby="session-panel-title"
       onCancel={(event) => {
+        // ═══════════════════════════════════════════════════════════════════════════════════
+        // **009 — ONLY THIS PANEL'S OWN CANCEL. React delivers a nested dialog's `cancel` here
+        // too, and research R2 predicted the opposite.**
+        //
+        // R2 reasoned that the platform sends `cancel` to the **topmost** dialog alone, so a
+        // confirmation opened inside this panel could never reach this handler — and said the
+        // point was worth asserting rather than assuming, because this handler *navigates*.
+        // The assertion (`e2e/session-qa.spec.ts`) found the reasoning wrong.
+        //
+        // The DOM event genuinely does not bubble. React's synthetic event system delivers it
+        // to ancestor handlers anyway, so one Escape on the withdrawal confirmation closed the
+        // confirmation **and** ran `close()` here — dismissing the panel and changing the
+        // address when the attendee meant to dismiss a confirmation.
+        //
+        // Comparing the target against this dialog is the whole fix. It is invisible to every
+        // component test, because jsdom has no top layer and nothing can nest inside anything.
+        // ═══════════════════════════════════════════════════════════════════════════════════
+        if (event.target !== dialogRef.current) return
+
         // T037 — Escape reaches the same close path as the button. Prevented so the platform
         // does not close the dialog underneath us while the address still names the session.
         event.preventDefault()
@@ -236,6 +256,27 @@ const PanelBody = ({
         eventId={context.eventId}
         sessionId={session.id}
         note={context.notes.get(session.id) ?? null}
+      />
+      {/*
+        T035 (009) — the fourth section, which is the whole of this feature's edit to 005's file.
+
+        `key` on the session id for exactly the reason `PanelNotes` above has one: switching
+        sessions must give the section a **fresh controller** rather than carrying one session's
+        draft question, its list, and its refusal into another's (FR-751). Without it, React
+        reuses this component across a session change and the reader sees the previous session's
+        questions under the new session's title.
+
+        The panel is deliberately **not** converted to a registry to accommodate this (research
+        R3): that would be a larger edit to this file than the line itself, for a fifth section
+        the roadmap says will never arrive.
+      */}
+      <PanelQuestions
+        // Prefixed, because `PanelNotes` above is keyed on the bare session id and the two are
+        // siblings in one fragment — React shares a key namespace across them and warns about
+        // the duplicate. The prefix keeps both remounts session-scoped while staying distinct.
+        key={`questions-${session.id}`}
+        eventId={context.eventId}
+        sessionId={session.id}
       />
     </>
   )

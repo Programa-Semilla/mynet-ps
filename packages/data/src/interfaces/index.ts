@@ -95,6 +95,15 @@ export type {
   MeetingSlot,
   ProposeInput,
 } from './appointments.js'
+// ─────────────────────────────────────────────────────────────────────────────────────────
+// 009 — audience questions. **One domain, one file, appended**, for the reason every entry above
+// states: a new domain adds `./<domain>.js` here and nowhere else.
+//
+// Its own domain rather than methods on `CatalogRepository`, which is read-only in perpetuity and
+// asserted by name-shape over its exports (FR-710, FR-772). A question is attendee state *about*
+// conference content — 005's distinction, unchanged — and the attendee owns it outright.
+// ─────────────────────────────────────────────────────────────────────────────────────────
+export type { QuestionListItem, QuestionsRepository } from './questions.js'
 
 /** The one runtime value 007 contributes: the message limit the composer's counter reads. */
 export { MESSAGE_MAX_LENGTH } from './messages.js'
@@ -117,6 +126,7 @@ import type { IdentityRepository } from './identity.js'
 import type { ConversationRepository, MessageRepository } from './messages.js'
 import type { PushSubscriptionRepository } from './notifications.js'
 import type { ProfileRepository } from './profile.js'
+import type { QuestionsRepository } from './questions.js'
 import type { BlockRepository, ReportRepository } from './safety.js'
 
 /**
@@ -187,4 +197,23 @@ export interface Repositories {
   // ───────────────────────────────────────────────────────────────────────────────────────
   readonly cards: CardRepository
   readonly appointments: AppointmentRepository
+  // ───────────────────────────────────────────────────────────────────────────────────────
+  // 009 — audience questions. **One member, appended, and NOT cached** (FR-754).
+  //
+  // A declaration rather than an omission, stated here and again at the composition root where
+  // the wiring happens — because "no cache" and "nobody got round to it" look identical in both
+  // places. The reason is 006's and 007's unchanged: a question is **another attendee's name and
+  // words**, and 005's decorator revokes on **age alone**, which is the wrong clock for content
+  // its author may have withdrawn a second ago.
+  //
+  // A vote count is worse still. It is a live number that is wrong the moment it is stored, and
+  // the staleness stamp answers "when did this device last receive this" — honest about the
+  // retrieval and silent about the number, which is the part that changed.
+  //
+  // **Leaving it undecorated makes FR-755 and FR-757 structural rather than classified**: an
+  // undecorated repository is never wrapped by the Proxy at all, so there is no `reads` map to
+  // omit a read from, no write branch to fall into, and no `args[0]` to be misread as an event
+  // id. 008's cache-purge defect is not merely avoided here — it is unreachable.
+  // ───────────────────────────────────────────────────────────────────────────────────────
+  readonly questions: QuestionsRepository
 }

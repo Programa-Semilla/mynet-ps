@@ -58,6 +58,24 @@ export type ErrorCode =
    * about another attendee that the caller cannot observe anyway.
    */
   | 'conversation_closed'
+  /**
+   * FR-714 (009) — the question now has an upvote, so it can no longer be withdrawn.
+   *
+   * **Deliberately explained, unlike `refused`**, and it passes the test every explained refusal
+   * in this product has to pass: *the follow-up question is about the reader, not about anybody
+   * else.* It describes the reader's **own question** to the reader, and the vote count is
+   * already on their screen. Nothing about another attendee is disclosed — not who voted, not
+   * how many, not when.
+   */
+  | 'question_has_votes'
+  /**
+   * FR-722 (009) — the caller is the question's author, so there is no vote of theirs to cast.
+   *
+   * Explained for the same reason as `question_has_votes`: it describes the reader's own
+   * authorship, which they already know. The interface hides the control on the reader's own
+   * question (FR-713's shape applied to voting), so reaching this means the control was bypassed.
+   */
+  | 'own_question'
 
 export class AppError extends Error {
   readonly statusCode: number
@@ -240,4 +258,41 @@ export const conversationClosed = (): AppError =>
     'conversation_closed',
     403,
     'This conversation is closed. The other person has deleted their account, so no new messages can be sent.',
+  )
+
+/**
+ * FR-714 (009) — withdrawal refused because somebody has upvoted the question.
+ *
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ * **ONE OF ONLY TWO REFUSALS IN 009 THAT EXPLAIN THEMSELVES, AND THE WORDING IS THE POINT.**
+ *
+ * 403 rather than 404: the question exists and is the caller's own. FR-743's indistinguishability
+ * is about questions the caller has no business seeing, and this is one they wrote.
+ *
+ * It says what happened and why it is permanent-ish without describing anybody else — no count,
+ * no voter, no timing. "Somebody has upvoted it" is the minimum that makes the refusal
+ * actionable; anything more would be a fact about another attendee, which is what
+ * `contactRefused` above exists to withhold.
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ */
+export const questionHasVotes = (): AppError =>
+  new AppError(
+    'question_has_votes',
+    403,
+    'This question cannot be withdrawn now that somebody has upvoted it. It belongs to the room as well as to you.',
+  )
+
+/**
+ * FR-722 (009) — the caller is trying to upvote their own question.
+ *
+ * Explained on the same reasoning as `questionHasVotes`: it is a fact about the reader, held by
+ * the reader. The interface omits the control on the reader's own question, so a caller reaching
+ * this bypassed the form — the same relationship the note limit and the report reason each have
+ * with their own 400.
+ */
+export const ownQuestion = (): AppError =>
+  new AppError(
+    'own_question',
+    403,
+    'You cannot upvote your own question. Asking it is already your vote for it.',
   )

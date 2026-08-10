@@ -76,7 +76,7 @@ tokens changed. Screenshots excluded from precache.
 | **VIII — Attendee data is personal data** | **PASS, with one live obligation.** The feature stores and transmits no attendee data, so identity scoping and cascade coverage are "not applicable, because…" rather than silence. **The obligation that does attach is FR-815e**: screenshots depict product surfaces, the repository is **public**, and a committed screenshot is world-readable forever. Seeded fixture data only — which the capture method guarantees by construction, since the end-to-end stack contains nothing else. |
 | **IX — Every feature declares its own completeness** | **PASS.** All nine obligations are declared in the spec's Feature Declarations table, five of them as explicit "not applicable, because…". Nothing is deferred to a later polish pass. |
 
-**Governance**: constitution **v3.3.0 ratified 2026-08-10**, closing register entry 2 and satisfying
+**Governance**: constitution **v3.4.0 ratified 2026-08-10**, closing register entry 2 and satisfying
 FR-849's precondition that ratification precede implementation. The rule now lives in the binding
 block *"Brand identity and application icons"*.
 

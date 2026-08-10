@@ -2957,6 +2957,8 @@ export interface paths {
                         reason: string;
                         /** @description The reported messages, if any. Stored as an array with no foreign key, so it degrades honestly into a list of things that no longer exist once M3 removes them. */
                         messageIds?: string[];
+                        /** @description 009 (FR-783) — the reported audience questions, if any. Mirrors `messageIds` exactly, **including having no foreign key**: a reported question will frequently be gone before anyone looks, because its author can withdraw it themselves while it has no votes (FR-712) — a route no message has. Reporting from a question is what makes conduct on this feature reportable **without opening a conversation first** (FR-781). */
+                        questionIds?: string[];
                     };
                 };
             };
@@ -3001,6 +3003,19 @@ export interface paths {
                         "application/json": {
                             code?: string;
                             message?: string;
+                        };
+                    };
+                };
+                /** @description 009 (FR-746) — throttled on `report_submit`, keyed on the reporter's own authenticated identity so a refusal can only inconvenience the person reporting. **This closes a gap 007 left**: reporting is the only action in this product that sends mail out of it, so an unthrottled route is an unthrottled relay pointed at the single address a human is supposed to read. Deliberately generous enough that somebody reporting two or three accounts in quick succession is never refused. */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                            retryAfterSeconds?: number;
                         };
                     };
                 };
@@ -4120,6 +4135,476 @@ export interface paths {
             };
         };
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/events/{eventId}/sessions/{sessionId}/questions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * A session's audience questions, ranked
+         * @description Ordered by vote count descending, then by ask time ascending — deterministic, so two readers with the same data see the same list and never the count alone (FR-725, FR-726). Unpaginated, permissively (FR-732): a session's questions are bounded by its audience. A session nobody has asked about answers with an empty array, which is a valid answer rendered as an invitation rather than a failure (FR-727).
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    eventId: string;
+                    sessionId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            questions: {
+                                /** Format: uuid */
+                                id: string;
+                                body: string;
+                                /** Format: date-time */
+                                askedAt: string;
+                                /** Format: uuid */
+                                authorId: string;
+                                /** @description The author's display name, present for **every** question — including one asked by an attendee who has turned discoverability off (FR-734). Attribution has no opt-out; that is the exception constitution v3.3.0 records. Opening that author's profile still refuses, from the existing profile route, unchanged (FR-736). */
+                                authorDisplayName: string;
+                                /** @description Computed at read time. Never stored — a counter column would be a second source of truth for a number the rows already answer. */
+                                votes: number;
+                                /** @description The reader's own state. **No field anywhere names any other voter**, and no route returns one (FR-721, FR-769). */
+                                votedByMe: boolean;
+                                /** @description `authorId === reader && votes === 0`. Sent rather than derived on the client so the control's absence and the server's refusal cannot disagree — but it is **not** the enforcement, which lives in the DELETE handler and is checked inside the deleting transaction (FR-714, FR-715). */
+                                canWithdraw: boolean;
+                            }[];
+                        };
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Not registered for that conference, **or** no such conference, **or** the session or question is not part of it, **or** it does not exist, **or** the identifier is malformed. All of them are deliberately indistinguishable — identical status and identical body — so an attendee cannot enumerate conferences, sessions or questions by watching which refusal comes back (FR-743). */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        /**
+         * Ask a question on a session
+         * @description Answers with the session's **whole re-ordered list** rather than the created question, which is what makes the asker's own action appear immediately without a second round trip in which the count could change again (FR-730, research R5). The question is attributed to the caller under their display name, visible to every attendee registered for the conference, **with no opt-out** — the interface tells them so before they publish (FR-739).
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    eventId: string;
+                    sessionId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** @description The question, 1–500 characters after trimming. Bounded here **and** by a CHECK on the column, because client-side presentation of a limit is never its enforcement (Principle VIII). The composer disables its post control while the field is empty or whitespace and shows the remaining allowance before the limit is reached (FR-704, FR-706), so a 400 here means the form was bypassed. */
+                        body: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            questions: {
+                                /** Format: uuid */
+                                id: string;
+                                body: string;
+                                /** Format: date-time */
+                                askedAt: string;
+                                /** Format: uuid */
+                                authorId: string;
+                                /** @description The author's display name, present for **every** question — including one asked by an attendee who has turned discoverability off (FR-734). Attribution has no opt-out; that is the exception constitution v3.3.0 records. Opening that author's profile still refuses, from the existing profile route, unchanged (FR-736). */
+                                authorDisplayName: string;
+                                /** @description Computed at read time. Never stored — a counter column would be a second source of truth for a number the rows already answer. */
+                                votes: number;
+                                /** @description The reader's own state. **No field anywhere names any other voter**, and no route returns one (FR-721, FR-769). */
+                                votedByMe: boolean;
+                                /** @description `authorId === reader && votes === 0`. Sent rather than derived on the client so the control's absence and the server's refusal cannot disagree — but it is **not** the enforcement, which lives in the DELETE handler and is checked inside the deleting transaction (FR-714, FR-715). */
+                                canWithdraw: boolean;
+                            }[];
+                        };
+                    };
+                };
+                /** @description Empty, whitespace-only or over-length. Reachable only by a client that bypassed the composer. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Not registered for that conference, **or** no such conference, **or** the session or question is not part of it, **or** it does not exist, **or** the identifier is malformed. All of them are deliberately indistinguishable — identical status and identical body — so an attendee cannot enumerate conferences, sessions or questions by watching which refusal comes back (FR-743). */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Throttled, keyed on the caller's own authenticated identity so a refusal can only inconvenience the person acting (FR-746). */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                            retryAfterSeconds?: number;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/events/{eventId}/questions/{questionId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Withdraw your own question, while nobody has upvoted it
+         * @description Authorship is checked **server-side regardless of what any interface offered** (FR-715), and the no-votes condition is re-checked inside the same transaction as the delete with the question row locked — checking before the transaction is the race FR-714 exists to close. Answers with the session's re-ordered list, for the same reason every write here does. **There is no edit route and no PATCH** (FR-709): withdrawal is the only retraction.
+         */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    eventId: string;
+                    questionId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            questions: {
+                                /** Format: uuid */
+                                id: string;
+                                body: string;
+                                /** Format: date-time */
+                                askedAt: string;
+                                /** Format: uuid */
+                                authorId: string;
+                                /** @description The author's display name, present for **every** question — including one asked by an attendee who has turned discoverability off (FR-734). Attribution has no opt-out; that is the exception constitution v3.3.0 records. Opening that author's profile still refuses, from the existing profile route, unchanged (FR-736). */
+                                authorDisplayName: string;
+                                /** @description Computed at read time. Never stored — a counter column would be a second source of truth for a number the rows already answer. */
+                                votes: number;
+                                /** @description The reader's own state. **No field anywhere names any other voter**, and no route returns one (FR-721, FR-769). */
+                                votedByMe: boolean;
+                                /** @description `authorId === reader && votes === 0`. Sent rather than derived on the client so the control's absence and the server's refusal cannot disagree — but it is **not** the enforcement, which lives in the DELETE handler and is checked inside the deleting transaction (FR-714, FR-715). */
+                                canWithdraw: boolean;
+                            }[];
+                        };
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Somebody has upvoted this question, so it can no longer be withdrawn (FR-714). **This refusal explains itself**, unlike the 404 — it describes the reader's own question to the reader, and the vote count is already on their screen. It names no voter and no count. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Not registered for that conference, **or** no such conference, **or** the session or question is not part of it, **or** it does not exist, **or** the identifier is malformed. All of them are deliberately indistinguishable — identical status and identical body — so an attendee cannot enumerate conferences, sessions or questions by watching which refusal comes back (FR-743). */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/events/{eventId}/questions/{questionId}/vote": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Upvote somebody else's question
+         * @description **Idempotent by the composite primary key** (FR-718), so a double-tap on a slow connection is the same request twice and no repetition can inflate a count. Answers with the re-ordered list, which is what lets the reader see their vote land and the question move without a second request (FR-730). Throttled an order of magnitude more loosely than asking: a reader working down a long list is the normal case, and this bounds a script rather than a person.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    eventId: string;
+                    questionId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            questions: {
+                                /** Format: uuid */
+                                id: string;
+                                body: string;
+                                /** Format: date-time */
+                                askedAt: string;
+                                /** Format: uuid */
+                                authorId: string;
+                                /** @description The author's display name, present for **every** question — including one asked by an attendee who has turned discoverability off (FR-734). Attribution has no opt-out; that is the exception constitution v3.3.0 records. Opening that author's profile still refuses, from the existing profile route, unchanged (FR-736). */
+                                authorDisplayName: string;
+                                /** @description Computed at read time. Never stored — a counter column would be a second source of truth for a number the rows already answer. */
+                                votes: number;
+                                /** @description The reader's own state. **No field anywhere names any other voter**, and no route returns one (FR-721, FR-769). */
+                                votedByMe: boolean;
+                                /** @description `authorId === reader && votes === 0`. Sent rather than derived on the client so the control's absence and the server's refusal cannot disagree — but it is **not** the enforcement, which lives in the DELETE handler and is checked inside the deleting transaction (FR-714, FR-715). */
+                                canWithdraw: boolean;
+                            }[];
+                        };
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description The caller wrote this question (FR-722). Explained for the same reason withdrawal is: it describes the reader's own authorship, which they already know. The interface omits the control on the reader's own question, so reaching this means it was bypassed. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Not registered for that conference, **or** no such conference, **or** the session or question is not part of it, **or** it does not exist, **or** the identifier is malformed. All of them are deliberately indistinguishable — identical status and identical body — so an attendee cannot enumerate conferences, sessions or questions by watching which refusal comes back (FR-743). */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Throttled, keyed on the caller's own authenticated identity so a refusal can only inconvenience the person acting (FR-746). */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                            retryAfterSeconds?: number;
+                        };
+                    };
+                };
+            };
+        };
+        /**
+         * Take your upvote back
+         * @description Idempotent in the other direction — succeeds whether or not a vote existed (FR-719). A question that loses its last vote becomes withdrawable by its author again, which falls out of the schema rather than being noticed by any code here. **There is no downvote and no reaction** (FR-723): this removes the caller's own upvote and cannot express anything else.
+         */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    eventId: string;
+                    questionId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            questions: {
+                                /** Format: uuid */
+                                id: string;
+                                body: string;
+                                /** Format: date-time */
+                                askedAt: string;
+                                /** Format: uuid */
+                                authorId: string;
+                                /** @description The author's display name, present for **every** question — including one asked by an attendee who has turned discoverability off (FR-734). Attribution has no opt-out; that is the exception constitution v3.3.0 records. Opening that author's profile still refuses, from the existing profile route, unchanged (FR-736). */
+                                authorDisplayName: string;
+                                /** @description Computed at read time. Never stored — a counter column would be a second source of truth for a number the rows already answer. */
+                                votes: number;
+                                /** @description The reader's own state. **No field anywhere names any other voter**, and no route returns one (FR-721, FR-769). */
+                                votedByMe: boolean;
+                                /** @description `authorId === reader && votes === 0`. Sent rather than derived on the client so the control's absence and the server's refusal cannot disagree — but it is **not** the enforcement, which lives in the DELETE handler and is checked inside the deleting transaction (FR-714, FR-715). */
+                                canWithdraw: boolean;
+                            }[];
+                        };
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Not registered for that conference, **or** no such conference, **or** the session or question is not part of it, **or** it does not exist, **or** the identifier is malformed. All of them are deliberately indistinguishable — identical status and identical body — so an attendee cannot enumerate conferences, sessions or questions by watching which refusal comes back (FR-743). */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Throttled, keyed on the caller's own authenticated identity so a refusal can only inconvenience the person acting (FR-746). */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                            retryAfterSeconds?: number;
+                        };
+                    };
+                };
+            };
+        };
         options?: never;
         head?: never;
         patch?: never;

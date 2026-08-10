@@ -16,6 +16,7 @@ import { attendeeProfileRoutes } from './events/attendees.js'
 import { catalogRoutes } from './events/catalog.js'
 import { directoryRoutes } from './events/directory.js'
 import { joinRoutes } from './events/join.js'
+import { questionRoutes } from './events/questions.js'
 import { eventRoutes } from './events.js'
 import { healthRoutes } from './health.js'
 import { profileRoutes } from './profile.js'
@@ -151,4 +152,17 @@ export const ROUTES: readonly RoutePlugin[] = [
   // no conference and that audit would silently pass them — the hole `cardRoutes` needs a third
   // audit to close. Do not "tidy" the nesting away.
   appointmentRoutes,
+  // ─────────────────────────────────────────────────────────────────────────────────────────
+  // 009 — audience questions on a session. **Appended, never inserted**, for the reason every
+  // entry above states: the generated contract lists paths in observation order.
+  //
+  // Registered under `/events/:eventId` like `appointmentRoutes` and unlike `cardRoutes`, and
+  // here the naming does more work than it looks. Three of these five routes could find their
+  // question from `:questionId` alone; they name the conference anyway, because
+  // `event-scope-audit.test.ts` examines a route only if it declares an event parameter and
+  // **reports success otherwise**. Naming it is what keeps this feature inside the guarantee that
+  // already exists, and is why 009 needs no fourth branded scope and no fourth audit — the thing
+  // both 007 and 008 had to build. Do not "tidy" the nesting away (research R12, FR-742).
+  // ─────────────────────────────────────────────────────────────────────────────────────────
+  questionRoutes,
 ]

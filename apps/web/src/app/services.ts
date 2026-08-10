@@ -18,6 +18,7 @@ import {
   HttpMessageRepository,
   HttpProfileRepository,
   HttpPushSubscriptionRepository,
+  HttpQuestionsRepository,
   HttpReportRepository,
   HttpSavedSessionRepository,
   HttpSessionNotesRepository,
@@ -284,6 +285,42 @@ export const createServices = (): PlatformServices => {
       // Cached, unlike its neighbour — see the decorator above for why the same feature answers
       // the offline question two different ways.
       appointments,
+      // ─────────────────────────────────────────────────────────────────────────────────────
+      // T031 (009) — **audience questions are NOT decorated with `cached`, and the refusal is
+      // written beside the member rather than achieved by leaving a line out** (FR-754).
+      //
+      // The fifth declaration of its kind here, after 004's profile, 006's directory, 007's five
+      // and 008's cards — each written in place because an omission and a decision look identical
+      // in a composition root.
+      //
+      // The reason is 006's and 007's unchanged. A question is **another attendee's name and
+      // words**, and the decorator revokes on **age alone** — the wrong clock entirely for
+      // content its author may have withdrawn a second ago, which they may do at any time while
+      // it has no votes (FR-712). A vote count is worse: it is a live number that is wrong the
+      // moment it is stored, and the staleness stamp answers "when did this device last receive
+      // this", which is honest about the retrieval and silent about the number.
+      //
+      // ═════════════════════════════════════════════════════════════════════════════════════
+      // **BEING UNDECORATED IS WHAT MAKES FR-755 AND FR-757 STRUCTURAL RATHER THAN CLASSIFIED,
+      // AND THAT IS THE LESSON 008 PAID FOR** (research R1).
+      //
+      // `cached` treats every method not named in `reads` as a **write**, and a write purges the
+      // whole conference prefix — which is how opening 008's scheduling dialog silently wiped the
+      // cached programme, saved sessions and notes. Every alternative here reproduces the risk:
+      // decorating with `reads: {}` adds a Proxy that does nothing and invites a later reader to
+      // "fix" the empty map, and decorating while leaving the four writes unclassified would
+      // purge the attendee's whole offline conference **on every upvote**.
+      //
+      // Not decorating removes the mechanism instead of configuring it. There is no `reads` map
+      // to omit a read from, no write branch to fall into, and no `args[0]` to misread as an
+      // event id. **Do not add `cached` here to gain `passThrough`** — passing through is what
+      // this line already does, with nothing to get wrong.
+      // ═════════════════════════════════════════════════════════════════════════════════════
+      //
+      // Every write is refused offline and **never queued**, which needs no mechanism at all:
+      // `HttpClient` refuses when connectivity reports offline, and there is no queue in this
+      // product to fall into.
+      questions: new HttpQuestionsRepository(http),
     },
     freshness: {
       lastRetrieved: (eventId, content) =>

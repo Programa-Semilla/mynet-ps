@@ -57,6 +57,13 @@
       "when": 1786347275627,
       "tag": "0007_network_and_appointments",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1786386825808,
+      "tag": "0008_session_qa",
+      "breakpoints": true
     }
   ]
 }

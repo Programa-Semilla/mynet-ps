@@ -141,6 +141,15 @@ const renderSignIn = (overrides: Partial<PlatformServices> = {}) => {
         decline: async () => Promise.reject(new Error('not signed in')),
         cancel: async () => Promise.reject(new Error('not signed in')),
       },
+      // 009 — signed out, so every method rejects like its neighbours. Present because the
+      // registry is one object substituted whole (FR-047); an absent member would not compile.
+      questions: {
+        list: async () => Promise.reject(new Error('not signed in')),
+        ask: async () => Promise.reject(new Error('not signed in')),
+        withdraw: async () => Promise.reject(new Error('not signed in')),
+        vote: async () => Promise.reject(new Error('not signed in')),
+        unvote: async () => Promise.reject(new Error('not signed in')),
+      },
     },
     freshness: { lastRetrieved: () => null },
     auth: { signIn, signOut: async () => {} },

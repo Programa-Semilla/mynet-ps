@@ -113,6 +113,35 @@ export const THROTTLE_ACTIONS = [
   // ───────────────────────────────────────────────────────────────────────────────────────
   'card_share',
   'appointment_propose',
+
+  // ───────────────────────────────────────────────────────────────────────────────────────
+  // 009 — FR-746. **Two actions, both keyed on the acting attendee, and both `mayDeny: true`.**
+  //
+  // Same reasoning as 008's pair and as `join_code`, `export`, `avatar_upload` and
+  // `conversation_create`: these are authenticated, so the identifier is the person doing the
+  // thing and a denial can only ever fall on them. That is what separates all of them from
+  // `reset_request`, whose key is a **victim's** address.
+  //
+  // Separate counters for the reason every entry above is separate: an attendee working down a
+  // long question list with the upvote control must not consume the allowance that bounds how
+  // much free text one account can publish to a whole conference — and neither may slow
+  // anybody's sign-in. The two are an order of magnitude apart on purpose; see `THRESHOLDS`.
+  // ───────────────────────────────────────────────────────────────────────────────────────
+  'question_ask',
+  'question_vote',
+
+  // ───────────────────────────────────────────────────────────────────────────────────────
+  // 009 — FR-746, and **this one closes a gap 007 left rather than one 009 opens.**
+  //
+  // Reporting has been unthrottled since it shipped. It is the only action in this product that
+  // **dispatches operator mail**, so unlimited reports are unlimited mail to an address a human
+  // is supposed to read — a spam vector aimed at the one safety channel the product has, in a
+  // product with public self sign-up and no moderator by construction.
+  //
+  // Blocking is unthrottled by comparison and harmlessly so: it writes a row and tells nobody.
+  // Tightest of the three actions 009 adds, because each request leaves the product.
+  // ───────────────────────────────────────────────────────────────────────────────────────
+  'report_submit',
 ] as const
 
 export type ThrottleAction = (typeof THROTTLE_ACTIONS)[number]

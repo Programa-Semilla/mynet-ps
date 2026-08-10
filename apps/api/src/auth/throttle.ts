@@ -55,6 +55,27 @@ import { signInAttempts, type ThrottleAction } from '../db/schema/sign-in-attemp
 const WINDOW_MS = 60 * 60 * 1000
 
 /**
+ * How many attempt rows one count reads.
+ *
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ * **THIS BOUND SILENTLY DISABLES ANY THRESHOLD SET ABOVE IT, AND TWO ALREADY WERE.**
+ *
+ * `countFailures` counts non-successes among the rows it reads, so the count it returns can
+ * never exceed this number. A `freeAttempts` above it therefore makes `delayFor` compute a
+ * negative excess forever: the dimension is **dead configuration** that reads as a working
+ * bound. It was 200 while `message_send.source` was 300 (007) and `question_vote.source` was
+ * 600 (009) — so the source dimension, which is the dimension an attacker actually occupies,
+ * did nothing at all for either action.
+ *
+ * Raised above every configured threshold rather than lowering the thresholds, because the
+ * numbers were chosen against a threat and the scan bound was chosen against a query cost.
+ * `tests/unit/throttle-actions.test.ts` now asserts the invariant, so the next entry above this
+ * line fails the build instead of quietly not binding.
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ */
+export const ATTEMPT_SCAN_LIMIT = 1_000
+
+/**
  * Identifier thresholds for sign-in. Escalation starts after 3 consecutive failures and grows
  * to a ceiling that caps sustained guessing at roughly 10 attempts per hour (research.md D9).
  */
@@ -336,6 +357,80 @@ export const THRESHOLDS: Record<ThrottleAction, ActionThreshold> = {
     source: { freeAttempts: 60, ceilingMs: SOURCE_MAX_DELAY_MS },
     mayDeny: true,
   },
+
+  /**
+   * T025 (009) — asking a question (FR-746, research R8).
+   *
+   * ─────────────────────────────────────────────────────────────────────────────────────────
+   * **The tightest of this feature's three question-side actions, and the one that publishes
+   * free text to a whole conference.** This is Q&A's `card_share`: keyed on the asker's own authenticated
+   * identity, so a denial can only inconvenience the person asking, and what it bounds is one
+   * account filling a session's question list — the first many-to-many surface in a product
+   * with public self sign-up and no moderator by construction.
+   *
+   * Ten is generous against the real behaviour it must not refuse: a curious attendee at a
+   * keynote asks one or two questions, not ten, and somebody who genuinely hits the ceiling
+   * waits a moment rather than losing anything.
+   * ─────────────────────────────────────────────────────────────────────────────────────────
+   */
+  question_ask: {
+    identifier: { freeAttempts: 10, ceilingMs: IDENTIFIER_MAX_DELAY_MS },
+    source: { freeAttempts: 100, ceilingMs: SOURCE_MAX_DELAY_MS },
+    mayDeny: true,
+  },
+
+  /**
+   * T025 (009) — upvoting (FR-746, research R8).
+   *
+   * ─────────────────────────────────────────────────────────────────────────────────────────
+   * **Looser than asking by an order of magnitude, and the gap is the point.**
+   *
+   * A vote is a single bit that publishes nothing and names nobody but its caster. A reader
+   * working down a long list at a well-attended keynote legitimately casts dozens in one sitting,
+   * so a bound near `question_ask`'s would refuse ordinary use. What this exists to stop is a
+   * script, not a person — and the composite primary key already makes repetition free of effect
+   * (FR-718), so volume here costs the product a statement rather than a row.
+   *
+   * `mayDeny: true` on the same reasoning as its neighbour: authenticated, keyed on the voter,
+   * so a refusal falls only on them.
+   * ─────────────────────────────────────────────────────────────────────────────────────────
+   */
+  question_vote: {
+    identifier: { freeAttempts: 60, ceilingMs: IDENTIFIER_MAX_DELAY_MS },
+    source: { freeAttempts: 600, ceilingMs: SOURCE_MAX_DELAY_MS },
+    mayDeny: true,
+  },
+
+  /**
+   * T071 (009) — submitting a report (FR-746, research R8).
+   *
+   * ═════════════════════════════════════════════════════════════════════════════════════════
+   * **THIS CLOSES A GAP 007 LEFT, NOT ONE 009 OPENS — AND IT IS TIGHTER THAN EVERY OTHER
+   * AUTHENTICATED ACTION, FOR A REASON NONE OF THEM HAS.**
+   *
+   * Reporting is the only action in this product that **sends mail out of it**. Every other
+   * throttle here bounds work the server does for itself; this one bounds messages arriving in
+   * an inbox a human is supposed to read, which is the single safety channel the product has and
+   * the one thing an attacker gains by flooding. Blocking, by contrast, is unthrottled and
+   * harmlessly so: it writes a row and tells nobody.
+   *
+   * `mayDeny: true` on the same reasoning as every authenticated action here — keyed on the
+   * reporter's own identity, so a refusal falls only on them.
+   * ═════════════════════════════════════════════════════════════════════════════════════════
+   *
+   * ─────────────────────────────────────────────────────────────────────────────────────────
+   * **Deliberately generous enough that a person in trouble is never refused.** Somebody being
+   * harassed may legitimately report two or three accounts in quick succession, and a bound that
+   * caught them would be a safety failure dressed as a rate limit. Five is well above any real
+   * sequence and far below a flood; the source allowance stays an order of magnitude higher so a
+   * conference venue behind one address is never the thing that trips it.
+   * ─────────────────────────────────────────────────────────────────────────────────────────
+   */
+  report_submit: {
+    identifier: { freeAttempts: 5, ceilingMs: IDENTIFIER_MAX_DELAY_MS },
+    source: { freeAttempts: 50, ceilingMs: SOURCE_MAX_DELAY_MS },
+    mayDeny: true,
+  },
 }
 
 export interface AttemptKey {
@@ -438,7 +533,7 @@ const countFailures = async (
       ),
     )
     .orderBy(desc(signInAttempts.occurredAt))
-    .limit(200)
+    .limit(ATTEMPT_SCAN_LIMIT)
 
   let count = 0
   let lastFailureAt: Date | undefined

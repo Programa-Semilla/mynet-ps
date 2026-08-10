@@ -56,6 +56,10 @@ export {
   useProfileRepository,
   // 007 — where this device is reachable for delivery.
   usePushSubscriptionRepository,
+  // 009 — a session's audience questions. Per-event and deliberately uncached (FR-754), and its
+  // own hook rather than part of the agenda's: notes are private to their author and this list is
+  // public to the conference, which are opposites worth keeping apart at the call site.
+  useQuestionsRepository,
   // 007 — reporting conduct out of the product. Write-only (FR-548).
   useReportRepository,
   useSavedSessionRepository,

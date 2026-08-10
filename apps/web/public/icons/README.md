@@ -7,7 +7,7 @@ that the manifest validated and the application was installable while MyNet had 
 MyNet had no logo for the entire life of this project. Constitution register entry 2 was the
 oldest entry in the register, open since 1.0.0, and it could not be closed from inside the
 repository because it needed an asset only the client could supply. **The owner supplied a brand
-board on 2026-08-10**, ratified as constitution v3.3.0, standing decision 27.
+board on 2026-08-10**, ratified as constitution v3.4.0, standing decision 27.
 
 ## The source
 
@@ -22,7 +22,7 @@ node scripts/generate-brand-assets.mjs
 ```
 
 **Derived by a readable script, never committed as opaque binaries.** That is a governance rule,
-not a preference (constitution v3.3.0, "Brand identity and application icons"): a reviewer
+not a preference (constitution v3.4.0, "Brand identity and application icons"): a reviewer
 verifies the crop rectangle, the plate colour and the maskable safe-zone inset by _reading code_,
 rather than by opening a PNG and trusting it. Regeneration is byte-identical, so a hand-edited
 asset shows up as a diff that regeneration cannot reproduce.
@@ -115,7 +115,7 @@ these assets were made:
 
 So on the splash screen the plate and the surrounding `theme_color` are visibly different navies.
 **This is deliberate and recorded**, not an oversight: whether `navy-800` and `coral-500` should
-adopt the brand's values is **constitution register entry 22**, opened by v3.3.0 and explicitly
+adopt the brand's values is **constitution register entry 23**, opened by v3.4.0 and explicitly
 left for the owner. Adopting them would make the board the single source of truth for colour and
 remove this seam — but `navy-800` is the primary surface and `coral-500` is both the accent and the
 focus ring, so it repaints the whole product and every contrast ratio must be re-verified. Feature

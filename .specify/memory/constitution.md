@@ -1,6 +1,6 @@
 <!--
 SYNC IMPACT REPORT
-Version change: 3.2.0 → 3.3.0
+Version change: 3.3.0 → 3.4.0
 
 RATIFICATION STATUS: **RATIFIED 2026-08-10 by the project owner**, who supplied the brand board on
 that date and ratified this amendment during the specification of feature 010. Drafted at his
@@ -32,7 +32,7 @@ specs/010-brand-mark-and-app-icons):
       and any other plate colour leaves a halo.
   B4. Whether the UI palette adopts the brand's navy and coral is DEFERRED, and the resulting seam
       between the icon plate and the token-derived theme_color is knowingly accepted. (Opens
-      register entry 22.)
+      register entry 23.)
   B5. Scope is core-only: install icons, apple-touch icon, favicons, the in-app mark and manifest
       screenshots. The iOS splash matrix, the monochrome variant and the vector redraw are booked
       follow-ups, not silent omissions.
@@ -69,6 +69,78 @@ document — the iOS splash matrix, the monochrome variant, and the vector redra
 scope decision inside a feature, not a rule of conduct.
 
 PRIOR REPORT (3.1.0 → 3.2.0):
+PRIOR REPORT (3.2.0 → 3.3.0), which landed on `develop` in feature 009 while this amendment
+was in flight. **Both were ratified on 2026-08-10 and both were drafted as 3.3.0.** 009 merged
+first, so it keeps that number and its register entry 22; this amendment renumbered to 3.4.0
+and its open question became entry 23. Nothing published was rewritten, and the two remain
+separate decisions because that is what they are — one licenses a Principle VIII exception for
+audience Q&A, the other closes the brand-mark entry.
+
+RATIFICATION STATUS: **RATIFIED 2026-08-10 by the project owner**, who accepted the Principle VIII
+exception on reading it at 009's implementation gate. Phase 009 is licensed from this point; the
+phase's own task list (T002) carried that precondition on the first line of code, and its plan
+recorded the gate as BLOCKED rather than conditional. Follows 3.2.0's precedent: the amendment
+travels in the feature branch and PR, so a reviewer reads the rule and the code that relies on it
+together — which means a rebase that drops it un-licenses the code, and T002 says to re-check.
+
+Rationale: MINOR. One recorded exception is added to an existing principle and one binding-constraint
+block is extended. No principle is removed or redefined, nothing delivered is retracted, and **no
+work performed under 3.2.0 is invalidated**. It is not PATCH because Principle VIII's "private
+content stays private" clause gains a second exception, and an exception to a privacy rule is a
+change in what the product may do — not a clarification of what it already did.
+
+Owner decisions cited by this amendment (both 2026-08-10):
+  Q1. Public Q&A visibility is a further exception to "private content stays private" and closes by
+      amendment rather than by entailment. Ruled at 009's spec review: Principle VIII requires an
+      exception to be *recorded*, not derived, and the one existing exception was recorded by
+      amendment. The entailment argument — that attribution (N3, 3.2.0) already implies public
+      visibility — was available and was not taken.
+      **Count corrected at ratification**: 009's artifacts called this the *third* exception, on the
+      reading that 3.2.0's N2 was a second. It was not. N2 makes a held card resolve the sharer's
+      live profile past the **discoverability toggle** under a standing consent — an exception to
+      being *found*, recorded under "Audience questions"' neighbouring blocks, never under "private
+      content stays private", which enumerates its exceptions in place. This is the **second**.
+  Q2. FR-756a is withdrawn from 009. A refused Q&A action does not purge the conference cache,
+      because meeting that would give one feature a cross-feature responsibility no other
+      undecorated repository has. The gap it named is real, product-wide, and older than 009, so it
+      becomes register entry 22 rather than 009's to fix alone.
+
+Added binding constraints:
+  - VIII. Attendee Data Is Personal Data — "Private content stays private" gains its **second
+    recorded exception**: audience questions are visible to every attendee registered for the event,
+    under a real name, with **no opt-out**. Recorded with the thing that makes it different from the
+    first: the profile exception (2.3.0, D10) is withdrawable and this one is not.
+  - "Audience questions" — extended with the visibility rule and the three consequences that travel
+    with it, so an exception is not recorded without its consequences and re-litigated later:
+    attribution does not consult verification state, the author's name is not a route into their
+    profile, and the attendee is told what will be published before they publish it. Records that
+    reporting from a question is what makes the absence of a moderator survivable on the product's
+    first many-to-many surface.
+  - "Audience questions" — the deletion question this block left explicitly unsolved in 3.2.0 is
+    **now answered by the phase that was told to answer it**, and the answer is recorded here rather
+    than only in the spec: a departing attendee's question is removed, and other people's votes on it
+    go with it. The obligation to decide is discharged, not deleted.
+
+Register changes:
+  - 22. CREATED by Q2. A cached conference can stay readable for up to 24 hours after the server
+    begins refusing a withdrawn registration, because no undecorated repository purges on refusal.
+    Against 010. This is the first entry created since 3.1.0, and it is created deliberately rather
+    than absorbed: 009 declined to fix a product-wide gap from inside one feature, and an undeclared
+    decline is indistinguishable from an oversight.
+  - No entry is resolved by this amendment. Entry 9 was already resolved in 3.2.0; this amendment
+    records the *consequence* the resolution carried, which is a different act.
+
+Templates and dependent artifacts:
+  - .specify/templates/spec-template.md, plan-template.md, tasks-template.md — ✅ no change required.
+  - CLAUDE.md — ⚠ pending. Its standing-decisions list and open-questions summary do not yet carry
+    Q1, Q2 or entry 22. Already flagged as pending by 3.2.0 and still not reconciled.
+  - brainstorm/00-overview.md — ⚠ pending, same reason, since 3.2.0.
+
+Deferred: none. No placeholder tokens remain in this document.
+
+PRIOR REPORT (3.1.0 → 3.2.0), retained because it is the precedent this amendment follows on both
+counts — an owner ruling that closes by amendment, and an amendment travelling in the feature branch
+whose code it gates:
 
 Version change: 3.1.0 → 3.2.0
 
@@ -854,10 +926,25 @@ migration.
 - **Collect only what a requirement names.** Fields not traceable to an authoritative source MUST
   NOT be stored merely because they might be useful.
 - **Private content stays private.** Messages, notes, and appointments are visible only to their
-  participants. Any exception requires a recorded client decision. **One such exception is
-  recorded** (2.3.0, D10): an attendee's profile is visible to attendees registered for the same
-  event, enforced server-side by the event-scoping predicate, and the attendee MUST be able to
-  withdraw from that visibility without deleting their account.
+  participants. Any exception requires a recorded client decision. **Two such exceptions are
+  recorded.**
+  - *First* (2.3.0, D10): an attendee's profile is visible to attendees registered for the same
+    event, enforced server-side by the event-scoping predicate, and the attendee MUST be able to
+    withdraw from that visibility without deleting their account.
+  - *Second* (3.3.0, Q1): an **audience question is visible to every attendee registered for the
+    event it was asked at, under the asker's real name, and there is no opt-out** — including for
+    an attendee who has turned discoverability off, because discoverability governs being *found*
+    in the directory, not being *seen* having spoken in a room. Enforced server-side by the same
+    event-scoping predicate as the first. **The two exceptions are not the same shape and the
+    difference is the point**: the first is withdrawable and the second is not, so an attendee who
+    wants to say nothing publicly must not ask, rather than ask and then retreat. What bounds it is
+    stated with it under "Audience questions" — the attendee is told before they publish, the name
+    is not a route into the profile, and the question is reportable.
+
+  An exception MUST be recorded here rather than **derived** from a rule elsewhere in this document.
+  This one could have been derived — attribution was already binding (3.2.0, N3) and a question on a
+  shared session is visibly public — and the owner ruled on 2026-08-10 that derivation is not
+  recording. A privacy exception nobody had to accept is one nobody has accepted.
 - **Deletion and export are standing commitments**, not features to be invented later. *Stated as
   recognised obligations in 2.0.0 and made concrete in 2.3.0 by D6.* Three rules bind every feature
   that stores attendee data:
@@ -1162,9 +1249,42 @@ both are struck through, and a struck-through entry is not where anybody looks f
 ### Audience questions
 
 *Added 3.2.0 by an owner decision taken 2026-08-10. This block is where register entry 9 now lives.*
+*Extended 3.3.0 by Q1, taken the same day at 009's spec review, with the visibility exception that
+attribution turned out to carry and the three consequences that bound it.*
 
 - **An audience question is attributed to its author.** Anonymous questions were the alternative and
   were not chosen. A question therefore carries the asking attendee's identity, and so does a vote.
+
+- **A question is public to the event, under a real name, with no opt-out.** This is the second
+  recorded exception to Principle VIII's "private content stays private", and it is recorded there
+  as well as here. Every attendee registered for the event sees every question asked at it, with
+  the asker's display name attached, **including questions asked by an attendee who has turned
+  discoverability off**. Three consequences bind alongside it, and an implementation that carries
+  the exception without them has not implemented this rule:
+  - **Attribution MUST NOT consult verification state.** Verification gates exactly one thing —
+    discoverability — and this constitution has held since 2.3.0 that no feature may use it for
+    anything else. A question is not a profile, and re-checking verification here would be a second
+    use of it.
+  - **The author's name MUST NOT be a route into their profile.** The name attributes the question;
+    it does not open the person. Q&A publishes that somebody spoke, not who they are — and a name
+    that navigates would hand the directory's own visibility decision to whoever reads a session.
+  - **The attendee MUST be told what will be published, before they publish it.** An exception with
+    no opt-out is only defensible if nobody meets it by surprise. The warning is part of asking, not
+    a setting somebody could have read beforehand.
+
+  *Rationale*: the exception is what the attribution decision actually cost, and it was nearly not
+  written down — attribution entails it, and entailment is exactly how an unaccepted privacy
+  exception ships. The three consequences are here rather than only in a feature specification
+  because a specification governs one phase and this governs every phase after it.
+
+- **Reporting from a question is what makes the absence of a moderator survivable.** Q&A is the
+  product's **first many-to-many surface**: until now, anything one attendee wrote reached one other
+  attendee (007) or nobody (notes). A question reaches the whole room, and organizer administration
+  is excluded by construction, so there is **no moderator and there will not be one**. A question
+  MUST therefore be reportable from the question itself, on the disposal path 3.1.0 made binding —
+  the report leaves the product as operator mail, blocks in the same action, and is readable from
+  nowhere inside the product. Blocking MUST make the two attendees invisible to each other in Q&A,
+  in both directions. **A public surface with no moderator and no report control MUST NOT ship.**
 
 - **Q&A is consequently a personal-data surface under Principle VIII**, and this is the operative
   consequence rather than a note. Questions and votes MUST carry identity scoping enforced
@@ -1176,12 +1296,23 @@ both are struck through, and a struck-through entry is not where anybody looks f
   decided that it is, so the phase building it inherits the full weight of Principle VIII rather
   than a lighter regime for "just content".
 
-- **Deletion is harder here than the register anticipated, and this amendment does not solve it.** A
-  departing attendee's question may sit on a session other attendees have upvoted. 007 settled the
-  analogous problem for conversations — the departing party's words vanish, the survivor keeps their
-  own — but the three options do not resolve the same way for a question with other people's votes
-  attached to it. **The phase that builds Q&A MUST decide and declare this**; it is not licensed to
-  assume 007's answer transfers.
+- **Deletion is harder here than the register anticipated, and 3.2.0 did not solve it.** A departing
+  attendee's question may sit on a session other attendees have upvoted. 007 settled the analogous
+  problem for conversations — the departing party's words vanish, the survivor keeps their own — but
+  the three options do not resolve the same way for a question with other people's votes attached to
+  it. **The phase that builds Q&A MUST decide and declare this**; it is not licensed to assume 007's
+  answer transfers.
+
+  **DECIDED in 3.3.0 by phase 009, which is the phase that was told to decide it.** A departing
+  attendee's question is **removed**, and **other people's votes on it are removed with it** — the
+  question cascades from `attendees` on its author reference, and a vote cascades from **both** the
+  voter and the question. There is **no one-sided survivor here, and that is where this parts
+  company with 007**: a conversation holds the survivor's own words, so something of theirs remains
+  to preserve; a vote holds nothing but agreement with a question that is gone. An orphaned count on
+  a vanished question would be a record of what somebody said, kept after they left, which is the
+  one thing Principle VIII's deletion rule exists to forbid. The obligation above is **discharged**,
+  and it is left standing rather than struck so the next reader sees what was asked as well as what
+  was answered.
 
 ### Notification delivery
 
@@ -1250,7 +1381,7 @@ construction — so the report goes to a human who acts out-of-band.
 
 ### Brand identity and application icons
 
-*Added 3.3.0 by B1–B5. This block is where register entry 2's answer now lives: the entry is struck
+*Added 3.4.0 by B1–B5. This block is where register entry 2's answer now lives: the entry is struck
 through, and a struck-through entry is not where anybody looks for a rule.*
 
 **The project owner's brand board is the single source of every brand asset**, supplied 2026-08-10.
@@ -1517,7 +1648,31 @@ resolved, no register entry blocks any remaining feature. What remains open bloc
   surface under Principle VIII, with identity scoping, deletion cascade and export coverage. The
   phase building it must still decide what happens to a departing attendee's question that other
   people have upvoted — 007's answer for conversations does not transfer, and that is stated in
-  "Audience questions" rather than left to be discovered.
+  "Audience questions" rather than left to be discovered. **Decided 2026-08-10 by phase 009 and
+  recorded in 3.3.0**: the question goes, and other people's votes on it go with it. There is no
+  one-sided survivor, because a vote holds nothing of the voter's but agreement with something that
+  no longer exists.
+
+**Recorded in 3.3.0**
+
+Owner decisions taken 2026-08-10 at phase 009's spec review and during its planning. **Neither
+resolves a register entry** — one records a consequence a resolved entry carried, the other creates
+an entry — which is why they sit here rather than above.
+
+- **Q1. Public Q&A visibility is a recorded exception to Principle VIII, not a derived one.**
+  Attribution was settled in 3.2.0 and *entails* that a question is seen, under a name, by the room
+  — so the exception could have been treated as already made. The owner ruled that it could not:
+  Principle VIII says an exception requires a *recorded* decision, both existing exceptions were
+  recorded by amendment, and **an exception nobody had to accept is one nobody has accepted.** It is
+  written into Principle VIII as the second recorded exception and into "Audience questions" with
+  the three consequences that bound it. **It differs from the first exception in the way that
+  matters**: profile visibility is withdrawable and this is not.
+- **Q2. FR-756a is withdrawn from phase 009, and the gap it named becomes register entry 22.** The
+  requirement asked a refused Q&A action to purge the conference cache. Meeting it would have given
+  one feature a cross-feature responsibility no other undecorated repository has, by way of a new
+  mechanism in a file every feature shares. **What was conceded is written down rather than lost**:
+  a cached conference stays readable for up to 24 hours after the server begins refusing a withdrawn
+  registration. That is product-wide, predates 009, and is not one feature's to fix alone.
 
 **Sharpened in 3.2.0, without a decision being reversed**
 
@@ -1551,7 +1706,7 @@ resolved, no register entry blocks any remaining feature. What remains open bloc
   rule is binding without it: a report still blocks and still records, and the skipped dispatch is
   logged rather than silently dropped.
 
-**Resolved in 3.3.0**
+**Resolved in 3.4.0**
 
 Owner decision taken on 2026-08-10, recorded in brainstorm #08
 (`brainstorm/08-brand-mark-and-app-icons.md`) and in the four scope answers given while
@@ -1568,14 +1723,14 @@ Owner decision taken on 2026-08-10, recorded in brainstorm #08
   for a year."* That instinct is the reusable part. An unanswered question is safest when the
   stand-in for it is impossible to mistake for an answer.
 
-**Opened in 3.3.0**
+**Opened in 3.4.0**
 
-- **22. Whether the design tokens adopt the brand's navy and coral.** Created by B4. See the entry
+- **23. Whether the design tokens adopt the brand's navy and coral.** Created by B4. See the entry
   below. Deliberately not answered by the amendment that created it: the two values involved are the
   primary surface and the accent, so adopting them repaints the product and re-opens every contrast
   ratio the accessibility gate checks.
 
-**Escalated in 3.3.0, without being answered**
+**Escalated in 3.4.0, without being answered**
 
 - **4. Desktop and tablet layouts have never been validated by the client.** Feature 010 puts a
   brand mark in the desktop rail and the tablet top bar, which is unreviewed design added to
@@ -1593,7 +1748,7 @@ rather than left as gaps because Markdown renderers ignore explicit ordinals and
 so a gap in the source would silently render as the wrong number against a neighbouring entry.
 
 1. **What "PS" denotes** in the repository name `mynet-ps`.
-2. ~~**Real brand mark and application icons.**~~ **RESOLVED 2026-08-10 in 3.3.0** — the project
+2. ~~**Real brand mark and application icons.**~~ **RESOLVED 2026-08-10 in 3.4.0** — the project
    owner supplied a brand board, and the supply is the client decision this entry was waiting for.
    See "Brand identity and application icons" under Technology and Architecture Constraints, which
    is now the binding statement. Carried forward from this entry's life: it was right that no mark
@@ -1772,7 +1927,31 @@ so a gap in the source would silently render as the wrong number against a neigh
     is that a person will read it. **That sentence is only true once this entry is answered.**
     Interacts with entry 18 (who sends it) and entry 19 (it is the nearest thing to a moderation
     path this product has).
-22. **Whether the design tokens adopt the brand's navy and coral.** *Added 2026-08-10 in 3.3.0,
+22. **A cached conference outlives a withdrawn registration by up to 24 hours.** *Added 2026-08-10
+    in 3.3.0, created by Q2. Against phase 010.* The offline caching decorator revokes on **age
+    alone** — a 24-hour lifetime keyed `(attendeeId, eventId, resource)` — so when the server begins
+    refusing an attendee who has withdrawn from a conference, or been removed from it, the
+    programme, saved sessions and notes already on their device stay readable until the entry
+    expires. **A refused write is the only moment the client learns the answer changed**, and no
+    undecorated repository purges on one: Messages, Discover, cards, profile and now Q&A all refuse
+    without purging, and have since each shipped.
+
+    **This entry exists because 009 declined to fix it, and the decline is deliberate.** 009 had a
+    requirement for it — FR-756a, that a refused Q&A action must invalidate that conference — and
+    withdrew it, because what the requirement asks of Q&A is to purge **other features'** caches: a
+    cross-feature responsibility no other undecorated repository carries, discharged from whichever
+    feature happened to notice. Building `purgeOnRefusalOnly` into
+    `packages/data/src/http/cached.ts` would add a mechanism to a file every feature shares,
+    exercise it from exactly one, and leave the hole open everywhere else. **The gap is
+    product-wide and older than 009**, and an undeclared decline is indistinguishable from an
+    oversight — which is the whole reason this is written down rather than absorbed.
+
+    What it is **not** is a data-retention breach: the data is the conference programme, not another
+    attendee's personal data, and Discover and Messages are uncached precisely so that other
+    people's data is never what ages on a device. It is a **stale-authorization** window, bounded at
+    24 hours, on content the attendee was legitimately shown.
+
+23. **Whether the design tokens adopt the brand's navy and coral.** *Added 2026-08-10 in 3.4.0,
     created by B4.* Measured from the supplied board, the brand and the tokens disagree: brand navy
     `#0d1942` against `navy-800 #1b2340`, brand coral `#fe6551` against `coral-500 #e8634d`. Cream
     agrees and is not at issue. Adopting the brand values would make the board the single source of
@@ -1787,4 +1966,4 @@ so a gap in the source would silently render as the wrong number against a neigh
 stay consistent with this constitution and MUST NOT contain implementation plans, session tasks,
 progress updates, or invented requirements.
 
-**Version**: 3.3.0 | **Ratified**: 2026-08-04 | **Last Amended**: 2026-08-10
+**Version**: 3.4.0 | **Ratified**: 2026-08-04 | **Last Amended**: 2026-08-10

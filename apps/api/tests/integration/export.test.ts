@@ -115,6 +115,7 @@ describe('personal-data export', () => {
     // guard below would then fail for a reason that looks like a missing export.
     // ─────────────────────────────────────────────────────────────────────────────────────
     await populate008Sections()
+    await populate009Sections()
     await populate007Sections()
   })
 
@@ -192,6 +193,10 @@ describe('personal-data export', () => {
       reportedId: graceId,
       reason: 'A report Ada filed.',
       messageIds: [],
+      // 009 — `question_ids` mirrors `message_ids`, NOT NULL with no database default, so an
+      // insert has to supply it. Populated here rather than left empty so the export's new field
+      // is exercised by a value rather than by an absence.
+      questionIds: [],
     })
 
     // `lastDeliveredAt` is set rather than left null so the column is exercised as a value the
@@ -291,6 +296,83 @@ describe('personal-data export', () => {
           slotId,
           topic: 'A meeting Ada proposed, which her export contains.',
         },
+      })
+    }
+  }
+
+  /**
+   * 009 — the two sections this feature added to the export (FR-764).
+   *
+   * ═════════════════════════════════════════════════════════════════════════════════════════
+   * **DRIVEN THROUGH THE REAL ROUTES, following 008 rather than 007.**
+   *
+   * The reasoning in `populate008Sections` above applies unchanged and is worth restating for
+   * the one thing it buys here: driving the routes proves the export reads what the **product**
+   * writes. If `askQuestion` ever stored a trimmed body while the export reproduced an untrimmed
+   * column, or if the ordering changed, a hand-written fixture would agree with the export and
+   * both would be wrong together.
+   *
+   * **Both attendees ask, because Ada cannot vote on her own question** (FR-722). One row cannot
+   * populate both sections: Ada's question fills `questionsAsked`, and her upvote of Grace's
+   * fills `questionVotes`. That is the same shape as the two card directions above, reached by a
+   * different rule.
+   * ═════════════════════════════════════════════════════════════════════════════════════════
+   */
+  const populate009Sections = async (): Promise<void> => {
+    await clearThrottle()
+    const grace = sessionCookieFrom(
+      await app.inject({
+        method: 'POST',
+        url: '/auth/sign-in',
+        payload: { email: GRACE, password: SEED_PASSWORD },
+      }),
+    ) as string
+
+    const events = await app.inject({
+      method: 'GET',
+      url: '/events',
+      headers: { cookie: cookieHeader(ada) },
+    })
+    const eventId = (events.json() as Array<{ id: string; name: string }>).find(
+      (event) => event.name === SEED_EVENTS[0].name,
+    )?.id as string
+
+    const programme = await app.inject({
+      method: 'GET',
+      url: `/events/${eventId}/sessions`,
+      headers: { cookie: cookieHeader(ada) },
+    })
+    const sessionId = (programme.json() as Array<{ id: string }>)[0]?.id as string
+
+    // Ada's own question — `questionsAsked`.
+    await clearThrottle()
+    await app.inject({
+      method: 'POST',
+      url: `/events/${eventId}/sessions/${sessionId}/questions`,
+      headers: { cookie: cookieHeader(ada) },
+      payload: { body: 'A question Ada asked, which her export contains.' },
+    })
+
+    // Grace's question, so Ada has something she is allowed to upvote — `questionVotes`.
+    await clearThrottle()
+    const asked = await app.inject({
+      method: 'POST',
+      url: `/events/${eventId}/sessions/${sessionId}/questions`,
+      headers: { cookie: cookieHeader(grace) },
+      payload: {
+        body: "A question Grace asked, which Ada's export must not reproduce the text of.",
+      },
+    })
+
+    const graces = (asked.json() as { questions: Array<{ id: string; body: string }> }).questions
+    const target = graces.find((question) => question.body.startsWith('A question Grace'))
+
+    if (target) {
+      await clearThrottle()
+      await app.inject({
+        method: 'POST',
+        url: `/events/${eventId}/questions/${target.id}/vote`,
+        headers: { cookie: cookieHeader(ada) },
       })
     }
   }
