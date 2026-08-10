@@ -3129,6 +3129,1002 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/cards": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Share your card with another attendee
+         * @description One-directional (FR-602): this gives the recipient YOUR card and gives you nothing. You hold theirs when they share back. `attendeeId` names the RECIPIENT, never the caller. Answers **201** when it created the exchange and **200** when one already existed, with the original `sharedAt` unchanged — a repeat must not refresh the timestamp, or re-sharing becomes a way to signal somebody repeatedly (FR-604). The conference recorded is the caller's active one, and it is a historical fact rather than a scoping predicate.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** @description The recipient. Not validated as a uuid at the schema, so a malformed identifier produces the same 404 as a real attendee who is not discoverable (FR-607). */
+                        attendeeId: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description The card had already been shared; nothing changed, including `sharedAt`. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** Format: uuid */
+                            attendeeId: string;
+                            displayName: string;
+                            /** Format: uuid */
+                            eventId: string;
+                            eventName: string;
+                            /** Format: date-time */
+                            sharedAt: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** Format: uuid */
+                            attendeeId: string;
+                            displayName: string;
+                            /** Format: uuid */
+                            eventId: string;
+                            eventName: string;
+                            /** Format: date-time */
+                            sharedAt: string;
+                        };
+                    };
+                };
+                /** @description The recipient is the caller (FR-606). */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description No such attendee, no conference in common, the recipient is not discoverable, a malformed identifier, **or the caller has joined no conference** — all with an IDENTICAL body. Distinguishing them would turn this route into an oracle for "is this identifier a real attendee", against a world-readable repository and public self sign-up (FR-607). */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Either party has blocked the other. **Reasonless, deliberately** (FR-608): a reason would confirm the block, and the shape is identical to any other conflict on this route. */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Throttled on the `card_share` counter, which **may deny** (FR-638a). Keyed on the caller's own authenticated identity, so a refusal can only inconvenience the person sharing — and what it bounds is one account pushing its card at an entire conference. */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                            retryAfterSeconds?: number;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/cards/held": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The contacts list — every card the attendee holds
+         * @description Cross-event, and **never filtered by the active conference** (FR-614). Also never filtered by the sharer's discoverability (FR-612) or verification state (FR-613): sharing a card places the sharer under a standing consent that outlives both. Each entry resolves the sharer's LIVE profile (FR-611) — there is no stored copy, so an edit they make is visible here with the holder doing nothing. Pairs with a block in either direction are excluded read-side, so lifting a block restores the contact with no write. Not paginated: the list is bounded by deliberate human acts.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            cards: {
+                                /** Format: uuid */
+                                attendeeId: string;
+                                displayName: string;
+                                company: string | null;
+                                role: string | null;
+                                headline: string | null;
+                                interests: string[];
+                                avatar: {
+                                    contentType: string;
+                                    base64: string;
+                                } | null;
+                                /** Format: uuid */
+                                eventId: string;
+                                /** @description Where the exchange happened (FR-615). A historical fact, **not** a filter — the contacts list is never scoped to the active conference. */
+                                eventName: string;
+                                /** Format: date-time */
+                                sharedAt: string;
+                                /** @description Whether this contact is registered for the reader's active conference. Not a visibility condition — the contact resolves either way (FR-614) — it exists so the client can omit the scheduling action entirely rather than offer it and refuse afterwards (FR-639a). */
+                                atActiveEvent: boolean;
+                            }[];
+                        };
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/cards/shared": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Cards the attendee has given away
+         * @description Read-only. **There is no `DELETE` here and there will not be one** (FR-618): a card cannot be recalled, because you cannot un-give what somebody already holds. Deliberately thinner than the held list — sharing your card does not entitle you to the recipient's profile, which is what "one-directional" means in practice.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            cards: {
+                                /** Format: uuid */
+                                attendeeId: string;
+                                displayName: string;
+                                /** Format: uuid */
+                                eventId: string;
+                                eventName: string;
+                                /** Format: date-time */
+                                sharedAt: string;
+                            }[];
+                        };
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/cards/held/{attendeeId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * One held card
+         * @description Behind the held-card guard, so the caller demonstrably holds a card FROM this attendee — never the reverse (FR-616). **This is the route the third route audit exists for**: it names no conference, so `event-scope-audit` would walk past it reporting success. Resolves the sharer's live profile under the same standing consent as the list.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    attendeeId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** Format: uuid */
+                            attendeeId: string;
+                            displayName: string;
+                            company: string | null;
+                            role: string | null;
+                            headline: string | null;
+                            interests: string[];
+                            avatar: {
+                                contentType: string;
+                                base64: string;
+                            } | null;
+                            /** Format: uuid */
+                            eventId: string;
+                            /** @description Where the exchange happened (FR-615). A historical fact, **not** a filter — the contacts list is never scoped to the active conference. */
+                            eventName: string;
+                            /** Format: date-time */
+                            sharedAt: string;
+                            /** @description Whether this contact is registered for the reader's active conference. Not a visibility condition — the contact resolves either way (FR-614) — it exists so the client can omit the scheduling action entirely rather than offer it and refuse afterwards (FR-639a). */
+                            atActiveEvent: boolean;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description No such card, **or** one the caller does not hold — deliberately indistinguishable, with an identical status and an identical body (FR-616, FR-642). A 403 would confirm that two specific people exchanged cards, to somebody holding nothing but an attendee identifier. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/events/{eventId}/appointments/slots": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Slots the reader may offer
+         * @description Computed from the **reader's own commitments alone** — their saved sessions, the pending proposals they sent, and their confirmed appointments (FR-625). **The invitee is not a parameter of this route at all** (FR-626): filtering out times the invitee is busy would disclose their Agenda by omission, and the strongest form of that guarantee is having no way to name them here. A **received** proposal consumes nothing either, so no attendee's availability can be reduced by another attendee's action (SC-608a); double-booking is caught at acceptance instead (FR-633a). An empty array is a legitimate answer and drives the no-slots state (FR-627).
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    eventId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            slots: {
+                                /** Format: uuid */
+                                slotId: string;
+                                /** Format: date-time */
+                                startsAt: string;
+                                /** Format: date-time */
+                                endsAt: string;
+                            }[];
+                        };
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description No such appointment, **or** one the caller is not party to, **or** a conference they are not registered for — deliberately indistinguishable, with an identical status and an identical body (FR-636). A 403 would confirm that two specific people have a meeting. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/events/{eventId}/appointments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Every meeting the reader is party to at this conference
+         * @description Both roles. `lapsed` is **derived** from the slot instant on every read rather than stored (FR-634) — a stored fifth status would need a scheduled sweep, and this feature introduces no background job.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    eventId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            appointments: {
+                                /** Format: uuid */
+                                appointmentId: string;
+                                /**
+                                 * @description Which side the reader is on. It decides which actions exist, not merely how the entry reads: only the invitee may accept or decline (FR-635), while either party may cancel a confirmed appointment (FR-632).
+                                 * @enum {string}
+                                 */
+                                role: "proposer" | "invitee";
+                                /** @description Always present, unlike a conversation counterpart. Deleting an account removes the appointment for both (FR-652), so there is no one-sided survivor to render. **No avatar**: nothing renders one, and this list is read on Home's first viewport by every attendee on every load — 007 built `/conversations/unread` as its own address for exactly that reason. */
+                                counterpart: {
+                                    /** Format: uuid */
+                                    attendeeId: string;
+                                    displayName: string;
+                                };
+                                slot: {
+                                    /** Format: uuid */
+                                    slotId: string;
+                                    /** Format: date-time */
+                                    startsAt: string;
+                                    /** Format: date-time */
+                                    endsAt: string;
+                                };
+                                topic: string;
+                                /**
+                                 * @description **`lapsed` is DERIVED from the slot instant at read time and is stored nowhere** (FR-634). The four stored statuses are the others; a stored fifth would need a scheduled sweep, and this feature introduces no background job.
+                                 * @enum {string}
+                                 */
+                                status: "pending" | "confirmed" | "declined" | "cancelled" | "lapsed";
+                                /** Format: date-time */
+                                createdAt: string;
+                                /** Format: date-time */
+                                answeredAt: string | null;
+                            }[];
+                        };
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description No such appointment, **or** one the caller is not party to, **or** a conference they are not registered for — deliberately indistinguishable, with an identical status and an identical body (FR-636). A 403 would confirm that two specific people have a meeting. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        /**
+         * Propose a meeting
+         * @description Creates a **pending** proposal; the invitee accepts or declines it (FR-628, FR-630). Deliberately unlike sharing a card, which needs no answer — an appointment claims a slot of somebody else's time. `inviteeId` names the OTHER party; the proposer is the sign-in session (FR-640).
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    eventId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        inviteeId: string;
+                        slotId: string;
+                        /** @description 1–200 characters after trimming. The client keeps its confirm control **disabled** until a slot and a non-blank topic are present (FR-629), so a refusal here is a backstop rather than the mechanism. */
+                        topic: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** Format: uuid */
+                            appointmentId: string;
+                            /**
+                             * @description Which side the reader is on. It decides which actions exist, not merely how the entry reads: only the invitee may accept or decline (FR-635), while either party may cancel a confirmed appointment (FR-632).
+                             * @enum {string}
+                             */
+                            role: "proposer" | "invitee";
+                            /** @description Always present, unlike a conversation counterpart. Deleting an account removes the appointment for both (FR-652), so there is no one-sided survivor to render. **No avatar**: nothing renders one, and this list is read on Home's first viewport by every attendee on every load — 007 built `/conversations/unread` as its own address for exactly that reason. */
+                            counterpart: {
+                                /** Format: uuid */
+                                attendeeId: string;
+                                displayName: string;
+                            };
+                            slot: {
+                                /** Format: uuid */
+                                slotId: string;
+                                /** Format: date-time */
+                                startsAt: string;
+                                /** Format: date-time */
+                                endsAt: string;
+                            };
+                            topic: string;
+                            /**
+                             * @description **`lapsed` is DERIVED from the slot instant at read time and is stored nowhere** (FR-634). The four stored statuses are the others; a stored fifth would need a scheduled sweep, and this feature introduces no background job.
+                             * @enum {string}
+                             */
+                            status: "pending" | "confirmed" | "declined" | "cancelled" | "lapsed";
+                            /** Format: date-time */
+                            createdAt: string;
+                            /** Format: date-time */
+                            answeredAt: string | null;
+                        };
+                    };
+                };
+                /** @description An empty or whitespace-only topic, or a slot no longer available **to the caller** — a fact about their own schedule, so saying so discloses nothing (FR-629). */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description The invitee is not registered for this conference, does not exist, or the identifier is malformed — indistinguishably. This is also why the client offers no scheduling action at all for a contact absent from the active event (FR-639a). */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Either party has blocked the other. **Reasonless, deliberately** (FR-637) — a reason would confirm the block. Contrast the 409 on `/accept`, which carries an explanation because it describes the reader to themselves. */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Throttled on the `appointment_propose` counter, which **may deny** (FR-638a): keyed on the proposer's own authenticated identity, so a refusal falls only on them. */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                            retryAfterSeconds?: number;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/events/{eventId}/appointments/{appointmentId}/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Accept a proposal
+         * @description **Invitee only** (FR-635); a proposer attempting it is refused with 403. Confirms the meeting for both parties (FR-631).
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    eventId: string;
+                    appointmentId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** Format: uuid */
+                            appointmentId: string;
+                            /**
+                             * @description Which side the reader is on. It decides which actions exist, not merely how the entry reads: only the invitee may accept or decline (FR-635), while either party may cancel a confirmed appointment (FR-632).
+                             * @enum {string}
+                             */
+                            role: "proposer" | "invitee";
+                            /** @description Always present, unlike a conversation counterpart. Deleting an account removes the appointment for both (FR-652), so there is no one-sided survivor to render. **No avatar**: nothing renders one, and this list is read on Home's first viewport by every attendee on every load — 007 built `/conversations/unread` as its own address for exactly that reason. */
+                            counterpart: {
+                                /** Format: uuid */
+                                attendeeId: string;
+                                displayName: string;
+                            };
+                            slot: {
+                                /** Format: uuid */
+                                slotId: string;
+                                /** Format: date-time */
+                                startsAt: string;
+                                /** Format: date-time */
+                                endsAt: string;
+                            };
+                            topic: string;
+                            /**
+                             * @description **`lapsed` is DERIVED from the slot instant at read time and is stored nowhere** (FR-634). The four stored statuses are the others; a stored fifth would need a scheduled sweep, and this feature introduces no background job.
+                             * @enum {string}
+                             */
+                            status: "pending" | "confirmed" | "declined" | "cancelled" | "lapsed";
+                            /** Format: date-time */
+                            createdAt: string;
+                            /** Format: date-time */
+                            answeredAt: string | null;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description The caller is a participant but not the one who may take this action — a proposer trying to accept or decline (FR-635), or an appointment already answered or lapsed (FR-634). **Distinguishable from a 404 deliberately**: the caller can already see this appointment and its state, so concealing why would make a legible situation look broken. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description No such appointment, **or** one the caller is not party to, **or** a conference they are not registered for — deliberately indistinguishable, with an identical status and an identical body (FR-636). A 403 would confirm that two specific people have a meeting. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description The invitee has since acquired a conflicting commitment (FR-633a). **This 409 carries a reason, deliberately** — it describes the reader's own schedule to the reader, so it discloses nothing. Contrast the reasonless 409s on sharing and proposing, which would confirm a fact about somebody else. */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/events/{eventId}/appointments/{appointmentId}/decline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Decline a proposal
+         * @description **Invitee only** (FR-635). Frees the slot **for the proposer**, who was the only party it was ever unavailable to — a received proposal consumes none of the invitee's availability (FR-633, SC-608a).
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    eventId: string;
+                    appointmentId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** Format: uuid */
+                            appointmentId: string;
+                            /**
+                             * @description Which side the reader is on. It decides which actions exist, not merely how the entry reads: only the invitee may accept or decline (FR-635), while either party may cancel a confirmed appointment (FR-632).
+                             * @enum {string}
+                             */
+                            role: "proposer" | "invitee";
+                            /** @description Always present, unlike a conversation counterpart. Deleting an account removes the appointment for both (FR-652), so there is no one-sided survivor to render. **No avatar**: nothing renders one, and this list is read on Home's first viewport by every attendee on every load — 007 built `/conversations/unread` as its own address for exactly that reason. */
+                            counterpart: {
+                                /** Format: uuid */
+                                attendeeId: string;
+                                displayName: string;
+                            };
+                            slot: {
+                                /** Format: uuid */
+                                slotId: string;
+                                /** Format: date-time */
+                                startsAt: string;
+                                /** Format: date-time */
+                                endsAt: string;
+                            };
+                            topic: string;
+                            /**
+                             * @description **`lapsed` is DERIVED from the slot instant at read time and is stored nowhere** (FR-634). The four stored statuses are the others; a stored fifth would need a scheduled sweep, and this feature introduces no background job.
+                             * @enum {string}
+                             */
+                            status: "pending" | "confirmed" | "declined" | "cancelled" | "lapsed";
+                            /** Format: date-time */
+                            createdAt: string;
+                            /** Format: date-time */
+                            answeredAt: string | null;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description The caller is a participant but not the one who may take this action — a proposer trying to accept or decline (FR-635), or an appointment already answered or lapsed (FR-634). **Distinguishable from a 404 deliberately**: the caller can already see this appointment and its state, so concealing why would make a legible situation look broken. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description No such appointment, **or** one the caller is not party to, **or** a conference they are not registered for — deliberately indistinguishable, with an identical status and an identical body (FR-636). A 403 would confirm that two specific people have a meeting. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/events/{eventId}/appointments/{appointmentId}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel a confirmed meeting
+         * @description **Either party** (FR-632), and it frees the slot **for both** (FR-633) — the asymmetry with decline is the point: a declined proposal was never on the invitee's calendar to free.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    eventId: string;
+                    appointmentId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** Format: uuid */
+                            appointmentId: string;
+                            /**
+                             * @description Which side the reader is on. It decides which actions exist, not merely how the entry reads: only the invitee may accept or decline (FR-635), while either party may cancel a confirmed appointment (FR-632).
+                             * @enum {string}
+                             */
+                            role: "proposer" | "invitee";
+                            /** @description Always present, unlike a conversation counterpart. Deleting an account removes the appointment for both (FR-652), so there is no one-sided survivor to render. **No avatar**: nothing renders one, and this list is read on Home's first viewport by every attendee on every load — 007 built `/conversations/unread` as its own address for exactly that reason. */
+                            counterpart: {
+                                /** Format: uuid */
+                                attendeeId: string;
+                                displayName: string;
+                            };
+                            slot: {
+                                /** Format: uuid */
+                                slotId: string;
+                                /** Format: date-time */
+                                startsAt: string;
+                                /** Format: date-time */
+                                endsAt: string;
+                            };
+                            topic: string;
+                            /**
+                             * @description **`lapsed` is DERIVED from the slot instant at read time and is stored nowhere** (FR-634). The four stored statuses are the others; a stored fifth would need a scheduled sweep, and this feature introduces no background job.
+                             * @enum {string}
+                             */
+                            status: "pending" | "confirmed" | "declined" | "cancelled" | "lapsed";
+                            /** Format: date-time */
+                            createdAt: string;
+                            /** Format: date-time */
+                            answeredAt: string | null;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description The caller is a participant but not the one who may take this action — a proposer trying to accept or decline (FR-635), or an appointment already answered or lapsed (FR-634). **Distinguishable from a 404 deliberately**: the caller can already see this appointment and its state, so concealing why would make a legible situation look broken. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description No such appointment, **or** one the caller is not party to, **or** a conference they are not registered for — deliberately indistinguishable, with an identical status and an identical body (FR-636). A 403 would confirm that two specific people have a meeting. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {

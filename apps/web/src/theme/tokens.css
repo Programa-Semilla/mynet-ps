@@ -331,3 +331,26 @@ body {
   overflow-x: clip;
   max-width: 100%;
 }
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════════════════════
+ * **A MODAL `<dialog>` CENTRES ITSELF, AND TAILWIND'S RESET TAKES THAT AWAY.**
+ *
+ * The user-agent stylesheet centres a dialog opened with `showModal()` by giving it
+ * `margin: auto` inside a `position: fixed; inset: 0` containing block. Preflight sets
+ * `margin: 0` on every element, so the auto margins vanish and the dialog collapses into the
+ * **top-left corner** of the viewport.
+ *
+ * It is a silent failure: the dialog opens, traps focus, closes on Escape and passes every
+ * behavioural test — it is simply in the wrong place. 005 and 006 each rediscovered it and
+ * patched it locally with `m-auto`; 004's `ConfirmDialog` and 008's `ScheduleDialog` did not,
+ * and shipped mispositioned. Restoring it here instead of in four class strings is what stops
+ * the fifth dialog from being the same bug again.
+ *
+ * `e2e/responsive.spec.ts` asserts the behavioural half — that an open dialog is actually
+ * centred, at every width.
+ * ═══════════════════════════════════════════════════════════════════════════════════════════
+ */
+dialog {
+  margin: auto;
+}

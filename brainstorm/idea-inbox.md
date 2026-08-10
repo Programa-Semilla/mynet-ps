@@ -236,3 +236,57 @@ An entry is removed once a brainstorm document has been written from it.
 - **Summary**: Two of the four server-side `push` config members exist only to police each other. `PUSH_VAPID_SUBJECT` is read by nothing, and the API's `PUSH_VAPID_PUBLIC_KEY` is a second copy of a value the client reads from its own `VITE_` variable.
 
 > Not a defect while the sink adapter is the only implementation — reserving the VAPID triple is a reasonable hedge for register entry 20. Worth settling when the real adapter lands: confirm it reads all three, and decide whether the API should *serve* the public key to the client rather than having it duplicated across two environment variables that nothing checks agree. Two sources for one key is the drift this codebase refuses elsewhere.
+
+### proposer-cannot-withdraw-a-proposal
+
+- **Source**: deep-review
+- **Date**: 2026-08-10
+- **Reference**: feat/008-network-and-appointments
+- **Summary**: A pending proposal consumes the proposer's own slot, and there is no product action that releases it. Propose to somebody who never opens the app and the slot is gone for that conference day, until the instant passes and it derives to `lapsed`.
+
+> Consistent with the spec as written — FR-632 names only *confirmed* appointments as cancellable — so this is not a defect against requirements. It is a reachable dead end in the state machine, and the asymmetry it creates is the reverse of the one FR-633 argues for: a slot should return to whoever it was unavailable to, and here the only party it was ever unavailable to has no way to release it. The client makes it visible without making it actionable ("Waiting for X to answer", no control). Candidate shapes: a `withdraw` transition (pending → cancelled, proposer only), or a proposal expiry shorter than the slot instant. Both amend FR-632, so both need a decision rather than an implementation.
+
+### card-read-surfaces-without-consumers
+
+- **Source**: deep-review
+- **Date**: 2026-08-10
+- **Reference**: feat/008-network-and-appointments
+- **Summary**: `CardRepository.getHeld` and `listShared`, and the routes behind them, have no product consumer. `GET /cards/held/:attendeeId` is the only route `requireHeldCard` guards — so a third branded scope, a third route audit and a WeakSet exist to protect one route nothing calls.
+
+> Arguably the right call: the branded scope is what makes adding a card-named route later safe by default, and the argument for a third module rather than a widened second is sound. Worth making it a recorded decision rather than an accident of building the full interface before its surfaces. Two questions attach to it. Should `listShared` get a surface? FR-618 makes a card irrevocable, and an attendee currently cannot see what they have irrevocably given away — a "cards you have given" view is the natural counterpart to that honesty argument. And should `getHeld` exist at all if the contacts list is the only entry point?
+
+### unverified-accounts-can-share-a-card
+
+- **Source**: deep-review
+- **Date**: 2026-08-10
+- **Reference**: feat/008-network-and-appointments
+- **Summary**: `shareCard` requires the **recipient** to be discoverable and verified, but places no verification requirement on the **sharer** — whose profile the row makes permanently readable.
+
+> The project invariant is that "verification gates exactly one thing: discoverability, so any profile that can be read already carries a verified address". Card resolution deliberately omits the verification condition (FR-613), which is correct *if* a card could only have been created by a verified attendee — and nothing establishes that. An account created with an address its holder does not control can join by code, share its card, and install a live-resolving profile bearing a chosen name and face into a verified attendee's Network, irrevocably (FR-618). Note this would be a check on the **actor at write time**, so it does not conflict with FR-612/FR-613, which govern read-time resolution. Decide whether the invariant is meant to hold here.
+
+### proposing-requires-no-relationship
+
+- **Source**: deep-review
+- **Date**: 2026-08-10
+- **Reference**: feat/008-network-and-appointments
+- **Summary**: Any co-attendee holding an attendee's identifier can propose a meeting — writing an attacker-chosen topic string plus their identity into a stranger's Network, and obtaining a durable live read of that stranger's display name — including after the target has turned discoverability off.
+
+> This is what the spec asks for: its Assumptions say scheduling does not require holding a card, and User Story 3 is "From a contact or a profile". So it is a scope question rather than a defect, and the fix the review agents proposed (require a held card) would contradict the spec. The narrower options are worth weighing: require the invitee to be *discoverable* at propose time, as `shareCard` already does for its recipient — which preserves proposing from a Discover profile while closing the path for somebody who has chosen to be invisible; or accept it and record why. Bounded today by the `appointment_propose` throttle and by co-attendance.
+
+### appointments-cache-holds-another-attendees-name
+
+- **Source**: deep-review
+- **Date**: 2026-08-10
+- **Reference**: feat/008-network-and-appointments
+- **Summary**: The cached appointments list is justified at the composition root as "the attendee's own commitments", but each row carries the counterpart's display name, which is written to device storage with a 24-hour age-based lifetime.
+
+> The contacts list one member over refuses caching for precisely this reason, in the same file, in the same commit — "a cached contact is a second copy of somebody else's name, company, role and face ageing on this device". The avatar has since been removed from the payload, so what remains is a name rather than a face, and the trade may well be right. It was not consciously made: the declared justification does not mention the third-party field at all. Either state it explicitly or resolve the counterpart live and fall back to initials offline.
+
+### unbounded-contacts-list
+
+- **Source**: deep-review
+- **Date**: 2026-08-10
+- **Reference**: feat/008-network-and-appointments
+- **Summary**: `GET /cards/held` has no limit, no cursor and no server-side cap, and embeds a base64 avatar per row. Response size is a pure function of how many people have shared a card with the reader.
+
+> The spec justifies it as "bounded by deliberate human acts", which bounds the *rate* — each row needs another attendee's act, and `card_share` is throttled — but places no ceiling on the *total*, which accumulates across every conference forever and can never be deleted (FR-618, cross-event by design). Fine at the 10–50 contacts a realistic attendee accumulates in a year; at 500 it is roughly 1.5–2.5 MB on the wire and 500 image buffers held per concurrent request on a two-vCPU VM. It degrades with no warning and no back-pressure, and the failure mode is the Network landing view timing out rather than paging. Worth deciding the ceiling deliberately — even a documented `LIMIT` makes the tail a product decision rather than an outage.

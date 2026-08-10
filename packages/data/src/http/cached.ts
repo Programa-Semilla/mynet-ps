@@ -171,6 +171,27 @@ const isRefusal = (error: unknown): boolean =>
 export interface CacheOptions {
   readonly now?: Clock
   readonly freshness?: FreshnessRegistry
+  /**
+   * ═════════════════════════════════════════════════════════════════════════════════════════
+   * **READS THAT ARE DELIBERATELY NOT CACHED — AND THE REASON THIS OPTION HAD TO EXIST** (008).
+   *
+   * Everything not named in `reads` falls into the write branch below, which **purges the whole
+   * conference prefix on success**. That was safe while every unnamed method really was a write,
+   * which was true for 005, 004 and 006.
+   *
+   * 008 added the first *read* that must not be cached: `AppointmentRepository.slots`. A stale
+   * offered set would invite a proposal for a slot the reader has since filled, so leaving it
+   * out of `reads` was correct — and leaving it out of `reads` **also enrolled it in the write
+   * branch**, so opening the scheduling dialog silently destroyed the attendee's cached
+   * programme, tracks, saved sessions, notes and appointments for that conference. FR-215 and
+   * FR-647 both failed on the next disconnection, with nothing on screen to say why.
+   *
+   * The classification was by omission, so there was no way to say "this is a read, and it is
+   * live". This is that way. A method named here is passed straight through: not served from
+   * the cache, not written to it, and **not purging anything**.
+   * ═════════════════════════════════════════════════════════════════════════════════════════
+   */
+  readonly passThrough?: readonly string[]
 }
 
 const isFresh = (entry: CachedEntry<unknown>, now: number): boolean => {
@@ -198,6 +219,7 @@ export const cached = <T extends object>(
 ): T => {
   const now = options.now ?? (() => Date.now())
   const freshness = options.freshness
+  const passThrough = new Set(options.passThrough ?? [])
   /**
    * In-flight reads, keyed by cache key. Cleared the moment the request settles, so this
    * dedupes concurrent callers and holds nothing between renders — the *cache* is the store,
@@ -214,6 +236,21 @@ export const cached = <T extends object>(
       if (typeof original !== 'function' || typeof property !== 'string') return original
 
       const resource = reads[property]
+
+      // ── A live read: not cached, and NOT a write ───────────────────────────────────────
+      // Declared rather than inferred. See `CacheOptions.passThrough` for what inferring it
+      // cost. Nothing is served, nothing is stored, and nothing is purged.
+      //
+      // **Bound to `target`, exactly as the two branches below apply to `target`.** Returning
+      // the bare function instead invokes it with the *Proxy* as `this`, and every HTTP
+      // repository here holds its client in a `#private` field — which a Proxy does not carry,
+      // so the call throws `TypeError: Cannot read private member`. It reached the browser: the
+      // scheduling dialog rendered "Times could not be loaded" for every attendee, and only the
+      // e2e walkthrough caught it, because a plain-object double in a unit test has no private
+      // field to fail on.
+      if (resource === undefined && passThrough.has(property)) {
+        return (original as (...a: unknown[]) => unknown).bind(target)
+      }
 
       // ── A write ────────────────────────────────────────────────────────────────────────
       if (resource === undefined) {

@@ -150,7 +150,7 @@ export const blockRoutes = async (app: FastifyInstance): Promise<void> => {
       const attendee = request.attendee
       if (!attendee) throw notAuthenticated()
 
-      const outcome = await blockAttendee(attendee.id, request.body.attendeeId)
+      const outcome = await blockAttendee(attendee.id, request.body.attendeeId, request.log)
 
       // **No 404 here any more.** An unreachable or nonexistent target takes the same 204 a
       // successful block does — see `blockAttendee`: the 404/204 split was an attendee-existence

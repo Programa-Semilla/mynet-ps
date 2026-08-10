@@ -111,4 +111,33 @@ export const EXPORTED_COLUMNS: Record<string, ExportTarget> = {
     section: 'pushSubscriptions',
     field: 'lastDeliveredAt',
   },
+
+  // ═════════════════════════════════════════════════════════════════════════════════════════
+  // T027 (008) — **`shared_cards` appears TWICE, and that is FR-653 rather than a duplication.**
+  //
+  // A card row is one fact seen from two sides: it is *a card you shared* to its sharer and *a
+  // card you hold* to its recipient. An export keyed on one attendee therefore has to reproduce
+  // the same table in two sections, filtered by a different column each time — which is why the
+  // two identifier columns land in different places below rather than one being "the requester".
+  //
+  // `appointments` is the same shape for the same reason: the export lists them in both roles.
+  // ═════════════════════════════════════════════════════════════════════════════════════════
+  'shared_cards.event_id': { section: 'cardsShared', field: 'eventId' },
+  'shared_cards.shared_at': { section: 'cardsShared', field: 'sharedAt' },
+  // The counterpart in each direction. In `cardsShared` the recipient is the other person; in
+  // `cardsHeld` the sharer is. Each is mapped to the section where it is somebody else.
+  'shared_cards.recipient_id': { section: 'cardsShared', field: 'recipientAttendeeId' },
+  'shared_cards.sharer_id': { section: 'cardsHeld', field: 'sharerAttendeeId' },
+
+  'appointments.event_id': { section: 'appointments', field: 'eventId' },
+  'appointments.slot_id': { section: 'appointments', field: 'slotId' },
+  'appointments.topic': { section: 'appointments', field: 'topic' },
+  'appointments.status': { section: 'appointments', field: 'status' },
+  'appointments.created_at': { section: 'appointments', field: 'createdAt' },
+  'appointments.answered_at': { section: 'appointments', field: 'answeredAt' },
+  // Both roles are exported, so neither identifier is "the requester" the way
+  // `attendee_blocks.blocker_id` is: the reader is the proposer on some rows and the invitee on
+  // others. `role` on each element says which, and `counterpartAttendeeId` names the other party.
+  'appointments.proposer_id': { section: 'appointments', field: 'role' },
+  'appointments.invitee_id': { section: 'appointments', field: 'counterpartAttendeeId' },
 }

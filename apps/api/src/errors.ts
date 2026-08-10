@@ -206,9 +206,23 @@ export const imageUnreadable = (): AppError =>
  * *their* record about *their* choice — so nothing here has to explain anything to the one party
  * entitled to know.
  * ═════════════════════════════════════════════════════════════════════════════════════════
+ *
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ * **008 — THE SENTENCE IS A PARAMETER; THE `code` IS NOT.**
+ *
+ * The reasonless-ness lives in `code: 'refused'` and in the 409 being the shape any conflict on
+ * the route would take — not in the wording. 008 refuses a blocked **card share** and a blocked
+ * **meeting proposal** through this same factory, and inheriting "that message could not be
+ * sent" made the body a false statement about what was attempted, in a response the committed
+ * contract also documents.
+ *
+ * Every caller still produces one indistinguishable shape *per route*, which is what FR-608 and
+ * FR-637 actually require: a caller must not be able to tell a block from any other conflict on
+ * the route they used. There is no route on which two different sentences can both appear.
+ * ─────────────────────────────────────────────────────────────────────────────────────────
  */
-export const contactRefused = (): AppError =>
-  new AppError('refused', 409, 'That message could not be sent.')
+export const contactRefused = (what = 'That message could not be sent.'): AppError =>
+  new AppError('refused', 409, what)
 
 /**
  * FR-574 (007) — the counterpart has deleted their account, so nothing can be sent here again.

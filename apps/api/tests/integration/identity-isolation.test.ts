@@ -235,6 +235,35 @@ describe('every route is bound to the authenticated attendee (SC-307)', () => {
     }
   })
 
+  /**
+   * The body every probe below sends.
+   *
+   * ═════════════════════════════════════════════════════════════════════════════════════════
+   * **IT HAS TO SATISFY EVERY ROUTE'S SCHEMA, OR THESE TESTS MEASURE VALIDATION INSTEAD OF
+   * SCOPING.**
+   *
+   * Fastify validates the body **before** `preHandler` runs, so a route whose required fields are
+   * missing answers 400 and the guard never executes — and the assertion that every event-scoped
+   * route refuses with 404 then fails for a reason that has nothing to do with authorization.
+   *
+   * Extra properties are harmless: Fastify's ajv is configured with `removeAdditional`, so a route
+   * declaring `additionalProperties: false` silently strips the fields it does not want rather than
+   * refusing. That is why one shared body can serve every route, and why this list simply grows by
+   * a field per feature — `body` for messages and notes, `joinCode` for joining, and 008's three
+   * for proposing a meeting.
+   * ═════════════════════════════════════════════════════════════════════════════════════════
+   */
+  const PROBE_BODY = {
+    body: 'x',
+    joinCode: 'x',
+    // 008 — `POST /events/:eventId/appointments` requires all three. Without them it answered 400
+    // from schema validation before `requireEventAccess` ever ran, which is exactly the confusion
+    // this constant exists to prevent.
+    inviteeId: '00000000-0000-4000-8000-000000000000',
+    slotId: '00000000-0000-4000-8000-000000000000',
+    topic: 'x',
+  } as const
+
   it('never lets one attendee reach another conference through a path parameter', async () => {
     // Ada is not registered for Grace's own conference. Every event-scoped route must refuse,
     // identically to a conference that does not exist (FR-148).
@@ -260,7 +289,7 @@ describe('every route is bound to the authenticated attendee (SC-307)', () => {
         method: call.method as 'GET',
         url: call.url,
         headers: { cookie: cookieHeader(ada) },
-        payload: { body: 'x', joinCode: 'x' },
+        payload: PROBE_BODY,
       })
       expect(response.statusCode, `${call.label} let Ada into Grace's conference`).toBe(404)
     }
@@ -283,7 +312,7 @@ describe('every route is bound to the authenticated attendee (SC-307)', () => {
         method: call.method as 'PUT',
         url: call.url,
         headers: { cookie: cookieHeader(ada) },
-        payload: { ...smuggled, discoverable: true, body: 'x', joinCode: 'x' },
+        payload: { ...smuggled, discoverable: true, ...PROBE_BODY },
       })
     }
 

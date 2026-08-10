@@ -3,6 +3,7 @@ import type { FastifyReply, FastifyRequest } from 'fastify'
 
 import type { MailService } from '../mail/service.js'
 import type { PushService } from '../notifications/service.js'
+import type { CardScope } from '../plugins/card-access.js'
 import type { EventScope } from '../plugins/event-access.js'
 import type { ConversationScope } from '../plugins/participation.js'
 import type { StorageService } from '../storage/service.js'
@@ -52,6 +53,21 @@ declare module 'fastify' {
      * (research R9).
      */
     conversationScope?: ConversationScope
+    /**
+     * 008 — proof that the attendee **holds a card from** the attendee named in the path
+     * (FR-616, FR-641).
+     *
+     * Set only by `requireHeldCard`, the only module that can construct one. A handler reads it
+     * through `cardScopeOf` rather than directly.
+     *
+     * **The third sibling, and the one whose predicate has a direction.** `eventScope` proves a
+     * registration; `conversationScope` proves a symmetric membership; this proves a
+     * *one-directional* fact — the reader holds a card **from** the named attendee, never the
+     * reverse. Card routes name no conference, so `event-scope-audit` walks past them reporting
+     * success, which is why `tests/unit/card-audit.test.ts` is a third audit rather than a
+     * widening of either existing one (research R1).
+     */
+    cardScope?: CardScope
   }
 
   interface FastifyInstance {
@@ -69,6 +85,15 @@ declare module 'fastify' {
      * exists, which is the metadata this destination exists to keep private.
      */
     requireParticipation: (request: FastifyRequest, reply: FastifyReply) => Promise<void>
+    /**
+     * 008 — route-level held-card guard. Verifies a `shared_cards` row where the named attendee
+     * is the **sharer** and the caller is the **recipient**, and populates `request.cardScope`,
+     * or refuses with **404 rather than 403** (FR-616, FR-642) — a 403 would confirm that two
+     * specific people exchanged cards, to somebody holding nothing but an attendee identifier.
+     *
+     * Directional, deliberately, unlike `requireParticipation`. See `plugins/card-access.ts`.
+     */
+    requireHeldCard: (request: FastifyRequest, reply: FastifyReply) => Promise<void>
     /**
      * 004 — durable binary content, behind a project-owned port (FR-352, research D3).
      *

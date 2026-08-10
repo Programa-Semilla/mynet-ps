@@ -336,7 +336,13 @@ until a recorded decision brings it in.
 
 **Discharges**: message composition.
 
-### 008 — Network & Appointments · migration `0007`
+### 008 — Network & Appointments · migration `0007` — **SHIPPED** (PR #15)
+
+> Delivered as specified, with migration `0007` as reserved. Both questions its spec left to
+> planning were answered yes: card resolution needed a third branded scope, and the slot grid is
+> six 30-minute slots per conference day in venue-local time. **009 is now the only feature
+> remaining on this roadmap**, and the suggested `develop → main` promotion below is due.
+
 
 - Appointments: participants, event, time slot, topic, status.
 - Scheduling modal: slot selection, short topic field, disabled confirm when empty, clear success

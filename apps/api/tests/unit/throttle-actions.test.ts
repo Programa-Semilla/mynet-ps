@@ -86,4 +86,60 @@ describe('throttle actions', () => {
     // is enforced. This assertion exists to carry the sentence.
     expect(THRESHOLDS.conversation_create.mayDeny).toBe(true)
   })
+
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════════════════
+   * T042 (008) — **both of this feature's actions may deny, and that is asserted rather than
+   * assumed** (FR-609, FR-638, FR-638a).
+   *
+   * The flag is deliberate in both directions here. This table now holds two delay-only entries
+   * and six denying ones, and the difference between the groups is a single question: **who
+   * does a denial fall on?** `reset_request` is keyed on a victim's address, so a denial is the
+   * attack. `message_send` is delay-only for an unrelated product reason. Everything else,
+   * including these two, is keyed on the acting attendee's own authenticated identity, so a
+   * refusal can only inconvenience the person doing the thing.
+   *
+   * Asserted separately from the generic "every action has a threshold" case above, because a
+   * threshold with the wrong `mayDeny` satisfies that one perfectly.
+   * ═══════════════════════════════════════════════════════════════════════════════════════
+   */
+  it('lets card sharing actually refuse (FR-609, FR-638a)', () => {
+    expect(
+      THRESHOLDS.card_share.mayDeny,
+      'FR-638a — a bound on mass card-sharing has to be a cap. Each share plants a durable ' +
+        "entry in a stranger's Network that they did not ask for and cannot delete (FR-618), " +
+        'so a delay-only bound would not bound it — it would spread it over the afternoon.',
+    ).toBe(true)
+  })
+
+  it('lets meeting proposals actually refuse (FR-638, FR-638a)', () => {
+    expect(
+      THRESHOLDS.appointment_propose.mayDeny,
+      "FR-638a — a proposal asks for a slot of somebody else's time and arrives needing an " +
+        "answer. Keyed on the proposer's own identity, so a refusal falls only on them.",
+    ).toBe(true)
+  })
+
+  it('keeps the delay-only set to exactly the two actions that earned it', () => {
+    // ─────────────────────────────────────────────────────────────────────────────────────
+    // The inverse of the assertions above, and the one that fails when a **future** feature
+    // adds an action and copies the wrong neighbour's flag. Delay-only is the exceptional
+    // configuration: it is correct only when a denial could fall on somebody other than the
+    // actor (FR-331), or when a refused action is a failure the actor cannot act on (FR-511a).
+    //
+    // If you are here because this failed, do not add your action to the list to make it pass.
+    // Say which of those two arguments applies to it, in its own entry in `THRESHOLDS`, and
+    // then add it here.
+    // ─────────────────────────────────────────────────────────────────────────────────────
+    const delayOnly = THROTTLE_ACTIONS.filter((action) => !THRESHOLDS[action].mayDeny).sort()
+
+    expect(
+      delayOnly,
+      'The set of delay-only throttle actions has changed. `reset_request` (FR-331, keyed on a ' +
+        "victim's address) and `message_send` (FR-511a, a refused message at a conference is a " +
+        'failure nobody can act on) are the two that have earned it. Anything else here is ' +
+        'either a new requirement that needs recording, or a flag copied from the wrong ' +
+        'neighbour.',
+    ).toEqual(['message_send', 'reset_request'])
+  })
 })

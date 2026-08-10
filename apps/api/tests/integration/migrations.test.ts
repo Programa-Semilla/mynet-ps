@@ -279,10 +279,20 @@ describe('migration 0004 — saved sessions and notes', () => {
       tags.filter((tag) => tag.startsWith('0006_')),
       '0006 belongs to 007, and 007 has claimed it — exactly one migration, as reserved',
     ).toEqual(['0006_conversations_and_notifications'])
+    // ─────────────────────────────────────────────────────────────────────────────────────
+    // **`0007` was asserted absent until 008 shipped, and is now asserted present** — the
+    // fourth time this pair of lines has been edited, and each time for the reason 005 wrote
+    // it: a feature claiming its reserved number must appear in a **reviewed diff** rather than
+    // happening quietly. This is 008's edit. `0008` is reserved for 009 by the roadmap and is
+    // not asserted here, because there is nothing yet to assert it against.
+    //
+    // The tag matches the convention every entry above sets: the feature's subject, not
+    // `drizzle-kit`'s generated name.
+    // ─────────────────────────────────────────────────────────────────────────────────────
     expect(
       tags.filter((tag) => tag.startsWith('0007_')),
-      '0007 belongs to 008',
-    ).toEqual([])
+      '0007 belongs to 008, and 008 has claimed it — exactly one migration, as reserved',
+    ).toEqual(['0007_network_and_appointments'])
     expect(
       tags.filter((tag) => tag.startsWith('0003_')),
       '0003 belongs to 004, and 004 has claimed it',

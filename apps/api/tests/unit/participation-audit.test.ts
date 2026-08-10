@@ -28,8 +28,26 @@ import {
  *
  * The event audit's own header says why it was written: *"seven features after this one will
  * add exactly that shape of route, and each of them will be written by someone who has not read
- * this file."* The same sentence applies here, and 008's appointments — which are also
- * cross-event and also two-party — are the first that will inherit it.
+ * this file."* The same sentence applies here.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ * **T024 (008) — A CORRECTION. This used to end "and 008's appointments — which are also
+ * cross-event and also two-party — are the first that will inherit it".** Both halves of that
+ * were wrong, and leaving them would send the next reader to the wrong guard.
+ *
+ * **Appointments are per-event** (standing decision 7, constitution v3.2.0). 008 registers them
+ * beneath `/events/:eventId`, so the *event* audit examines them and the reasoning above does
+ * not apply — the route shape is chosen precisely so that it does not.
+ *
+ * The heir is **cards**. A held card is cross-event and two-party (FR-614), its routes name no
+ * conference, and the event audit therefore walks past them reporting success — the failure
+ * described above, arriving a second time. `tests/unit/card-audit.test.ts` is the third audit
+ * that answers it, and it matches by **path shape** because of the lesson recorded immediately
+ * below.
+ *
+ * One thing is genuinely different there: **participation is symmetric, and holding a card is
+ * directional.** That is why it is a third guard rather than this one with a table swapped.
+ * ─────────────────────────────────────────────────────────────────────────────────────────
  *
  * **Widening the event audit was considered and rejected** (research R9): it would conflate two
  * different predicates in one test and make the failure message name the wrong requirement.
@@ -50,7 +68,11 @@ import {
  * `:id` is at least as natural a parameter name as `:conversationId`, and a new author has no
  * reason to prefer one. That is the same failure this whole file exists to correct one level up:
  * `event-scope-audit` *silently passes* a route naming no conference, which is why the spec calls
- * this audit its replacement — and 008's appointments are declared to inherit it.
+ * this audit its replacement.
+ *
+ * **008 inherited this lesson rather than re-learning it**: `tests/unit/card-audit.test.ts`
+ * matches card routes by path shape from the outset, and asserts its own matcher against
+ * `/cards/held/:id` for exactly the reason recorded here.
  *
  * Matching on **path shape** rather than parameter name removes the naming dependency entirely.
  * The old pattern is kept as a second alternative so a conversation identifier appearing in some

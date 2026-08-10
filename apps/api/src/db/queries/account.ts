@@ -147,6 +147,61 @@ export type AccountExport = {
   }[]
 
   /**
+   * ═══════════════════════════════════════════════════════════════════════════════════════
+   * T127 (008) — **cards in both directions, because one row is two different facts**
+   * (FR-653, SC-610).
+   *
+   * A `shared_cards` row is *a card you gave* to its sharer and *a card you hold* to its
+   * recipient. Neither section is derivable from the other, and collapsing them into one list of
+   * "cards" would force the reader to work out which side of each row they were on.
+   *
+   * **Unlike `messages`, nothing is withheld here** (contrast FR-578). A held card is not the
+   * sharer's private content — it is a thing they deliberately gave to this attendee, under the
+   * standing consent constitution v3.2.0 (N2) established. What the export reproduces is the
+   * *exchange* — who, when, and at which conference — never a snapshot of the other person's
+   * profile, which resolves live and belongs to them.
+   * ═══════════════════════════════════════════════════════════════════════════════════════
+   */
+  readonly cardsShared: readonly {
+    readonly recipientAttendeeId: string
+    readonly eventId: string
+    readonly eventName: string
+    readonly sharedAt: string
+  }[]
+
+  readonly cardsHeld: readonly {
+    readonly sharerAttendeeId: string
+    readonly eventId: string
+    readonly eventName: string
+    readonly sharedAt: string
+  }[]
+
+  /**
+   * T127 (008) — appointments **in both roles** (FR-653).
+   *
+   * One list rather than two, unlike cards, because an appointment is a single shared fact
+   * rather than two directional ones: both parties are party to the same meeting. `role` says
+   * which side the reader was on, which is what a proposal and an invitation differ by.
+   *
+   * `status` is the **stored** status. `lapsed` is derived from the slot instant at read time
+   * and stored nowhere (FR-634), so it is deliberately absent here: an export is a record of
+   * what the product holds, and the product holds no such value.
+   */
+  readonly appointments: readonly {
+    readonly role: 'proposer' | 'invitee'
+    readonly counterpartAttendeeId: string
+    readonly eventId: string
+    readonly eventName: string
+    readonly slotId: string
+    readonly slotStartsAt: string
+    readonly slotEndsAt: string
+    readonly topic: string
+    readonly status: string
+    readonly createdAt: string
+    readonly answeredAt: string | null
+  }[]
+
+  /**
    * T137 (007) — what this document deliberately leaves out, in the document (FR-578).
    *
    * An export that silently omits something is indistinguishable from an export of an attendee
@@ -208,6 +263,9 @@ export const assembleExport = async (
     blocks,
     reports,
     subscriptions,
+    cardsShared,
+    cardsHeld,
+    meetings,
   ] = await Promise.all([
     db.execute<{
       company: string | null
@@ -300,6 +358,67 @@ export const assembleExport = async (
       FROM push_subscriptions WHERE attendee_id = ${attendeeId}::uuid
       ORDER BY created_at
     `),
+    // ─────────────────────────────────────────────────────────────────────────────────────
+    // T127 (008) — **the same table read twice, from the two sides of a directional fact**
+    // (FR-653).
+    //
+    // `sharer_id = the requester` is *cards you gave*; `recipient_id = the requester` is *cards
+    // you hold*. Two statements rather than one with a `CASE`, for the reason the message export
+    // gives for its own `WHERE`: the filter is what makes each section's meaning structural, and
+    // a single query returning both sides would need application code to sort them back out.
+    //
+    // **No discoverability or verification condition on either**, matching `queries/cards.ts`.
+    // An export is the attendee's own record of an exchange that happened; a contact who has
+    // since turned discoverability off has not un-given their card (FR-612, FR-613).
+    // ─────────────────────────────────────────────────────────────────────────────────────
+    db.execute<{ recipient_id: string; event_id: string; event_name: string; shared_at: Date }>(sql`
+      SELECT c.recipient_id, c.event_id, e.name AS event_name, c.shared_at
+      FROM shared_cards c JOIN events e ON e.id = c.event_id
+      WHERE c.sharer_id = ${attendeeId}::uuid
+      ORDER BY c.shared_at, c.id
+    `),
+    db.execute<{ sharer_id: string; event_id: string; event_name: string; shared_at: Date }>(sql`
+      SELECT c.sharer_id, c.event_id, e.name AS event_name, c.shared_at
+      FROM shared_cards c JOIN events e ON e.id = c.event_id
+      WHERE c.recipient_id = ${attendeeId}::uuid
+      ORDER BY c.shared_at, c.id
+    `),
+    // ─────────────────────────────────────────────────────────────────────────────────────
+    // T127 (008) — appointments in **both** roles, in one statement (FR-653).
+    //
+    // One query rather than two, unlike cards above, because an appointment is one shared fact
+    // rather than two directional ones — both parties are party to the same meeting, and the
+    // `role` column is what tells the reader which side they were on.
+    //
+    // `status` is the stored value. `lapsed` is derived at read time (FR-634) and is deliberately
+    // not reconstructed here: an export records what the product holds.
+    // ─────────────────────────────────────────────────────────────────────────────────────
+    db.execute<{
+      role: 'proposer' | 'invitee'
+      counterpart_id: string
+      event_id: string
+      event_name: string
+      slot_id: string
+      slot_starts_at: Date
+      slot_ends_at: Date
+      topic: string
+      status: string
+      created_at: Date
+      answered_at: Date | null
+    }>(sql`
+      SELECT
+        CASE WHEN a.proposer_id = ${attendeeId}::uuid THEN 'proposer' ELSE 'invitee' END AS role,
+        CASE WHEN a.proposer_id = ${attendeeId}::uuid THEN a.invitee_id ELSE a.proposer_id END
+          AS counterpart_id,
+        a.event_id, e.name AS event_name,
+        a.slot_id, s.starts_at AS slot_starts_at, s.ends_at AS slot_ends_at,
+        a.topic, a.status, a.created_at, a.answered_at
+      FROM appointments a
+      JOIN events e ON e.id = a.event_id
+      JOIN meeting_slots s ON s.id = a.slot_id
+      WHERE a.proposer_id = ${attendeeId}::uuid OR a.invitee_id = ${attendeeId}::uuid
+      ORDER BY s.starts_at, a.id
+    `),
   ])
 
   const profile = profiles[0]
@@ -382,6 +501,32 @@ export const assembleExport = async (
       // some code decided. If the keys were ever exported this line would have to be deleted,
       // which is a visible act.
       keysRedacted: true as const,
+    })),
+    // T127 (008) — FR-653's two card sections and the appointments list. See the queries above.
+    cardsShared: cardsShared.map((row) => ({
+      recipientAttendeeId: row.recipient_id,
+      eventId: row.event_id,
+      eventName: row.event_name,
+      sharedAt: iso(row.shared_at) as string,
+    })),
+    cardsHeld: cardsHeld.map((row) => ({
+      sharerAttendeeId: row.sharer_id,
+      eventId: row.event_id,
+      eventName: row.event_name,
+      sharedAt: iso(row.shared_at) as string,
+    })),
+    appointments: meetings.map((row) => ({
+      role: row.role,
+      counterpartAttendeeId: row.counterpart_id,
+      eventId: row.event_id,
+      eventName: row.event_name,
+      slotId: row.slot_id,
+      slotStartsAt: iso(row.slot_starts_at) as string,
+      slotEndsAt: iso(row.slot_ends_at) as string,
+      topic: row.topic,
+      status: row.status,
+      createdAt: iso(row.created_at) as string,
+      answeredAt: iso(row.answered_at),
     })),
     /**
      * T137 (007) — the stated omissions (FR-578).
@@ -525,6 +670,42 @@ export const withdrawFromConference = async (unverified: EventScope): Promise<vo
   const scope = assertVerifiedScope(unverified)
 
   await getDb().transaction(async (tx) => {
+    // ═════════════════════════════════════════════════════════════════════════════════════════
+    // **008 — LEAVING A CONFERENCE CANCELS THE MEETINGS YOU HAD AT IT** (FR-637a's reasoning,
+    // data-model.md's carried-over open item).
+    //
+    // `data-model.md` left this to be confirmed during implementation, and the confirmation is
+    // that doing nothing was **not** safe. The record is per-event and the account still exists,
+    // so nothing cascades — but every read of it goes through `requireEventAccess`, which the
+    // departing attendee now fails. So without this:
+    //
+    //   * the person who left can no longer see the meeting at all, and cannot cancel it; and
+    //   * the **other** party still sees it as pending or confirmed, can still accept it, and
+    //     would turn up to meet somebody who is no longer at the conference.
+    //
+    // That is the exact failure FR-637a names for blocking — *a meeting you would otherwise turn
+    // up to must be ended rather than hidden* — arriving through a second door. Cancelling is
+    // also the honest state: it happened, and it is over, which is what the surface shows.
+    //
+    // **Pending and future confirmed only**, matching `cancelAppointmentsBetween`: a meeting that
+    // has already taken place is a fact about the past, and rewriting it would be the same
+    // mistake blocking avoids by deleting no message (FR-538).
+    //
+    // Written inline rather than by calling 008's own function, because this runs **inside a
+    // transaction** with the deletes below and must not commit separately — a cancellation that
+    // survived a rolled-back withdrawal would be worse than either outcome alone.
+    // ═════════════════════════════════════════════════════════════════════════════════════════
+    await tx.execute(sql`
+      UPDATE appointments a
+      SET status = 'cancelled', answered_at = now()
+      FROM meeting_slots s
+      WHERE a.slot_id = s.id
+        AND a.event_id = ${scope.eventId}::uuid
+        AND a.status IN ('pending', 'confirmed')
+        AND (a.status = 'pending' OR s.starts_at > now())
+        AND (a.proposer_id = ${scope.attendeeId}::uuid OR a.invitee_id = ${scope.attendeeId}::uuid)
+    `)
+
     await tx.execute(sql`
       DELETE FROM saved_sessions ss
       USING sessions s

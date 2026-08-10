@@ -1,7 +1,7 @@
 # Brainstorm Overview
 
-Last updated: 2026-08-10 (#07 — Network settled and specified; **constitution v3.2.0 closes the last
-register entries blocking a queued phase**)
+Last updated: 2026-08-10 (008 **implemented** — Network is the fifth destination to carry content,
+and the last empty one is gone; constitution v3.2.0 closed the register entries that gated it)
 
 The authoritative registers live elsewhere — open questions in `.specify/memory/constitution.md`,
 delivery sequence in `docs/superpowers/specs/2026-08-06-mynet-delivery-roadmap-design.md`. This file
@@ -19,7 +19,7 @@ win and this is stale.
 | 04 | 2026-08-07 | attendee-identity-and-profile | shipped (PR #12) | `specs/004-attendee-identity-and-profile/` |
 | 05 | 2026-08-07 | discover-and-the-deployment-platform | ratified in constitution **v3.0.0** | `specs/006-discover-and-deployment-platform/` |
 | 06 | 2026-08-07 | messages-and-notification-delivery | **implemented in full**, including Web Push; its amendment ratified in constitution **v3.1.0** | `specs/007-messages-and-notification-delivery/` |
-| 07 | 2026-08-10 | network-and-appointments | **specified**; entries 7, 8 and 9 ratified in constitution **v3.2.0** | `specs/008-network-and-appointments/` |
+| 07 | 2026-08-10 | network-and-appointments | **specified, then implemented**; entries 7, 8 and 9 ratified in constitution **v3.2.0** | `specs/008-network-and-appointments/` |
 
 Session 05 has no document of its own: 006 was specified without one, and the row records the
 session rather than a file.
@@ -71,7 +71,7 @@ the index, and it now differs from the roadmap in the ways #02 records.
 | 005 | Agenda | **shipped** — 94/94 tasks, squash-merged to `develop` ([#8](https://github.com/Programa-Semilla/mynet-ps/pull/8)) | 002 ✓ |
 | 006 | Discover, and the deployment platform | **implemented** — awaiting the two owner decisions that gate the first deploy (a domain, an Azure subscription). Migration `0005`: five indexes and one extension, **no new table and no new column** | 004 ✓ |
 | 007 | Messages **and the notification-delivery platform** | **shipped** — squash-merged to `develop`. Web Push delivers for real, verified end to end on a desktop. T148's by-hand walkthrough is partial (scenario 5 only) and carries forward. Migration `0006` | 004 ✓, 006 ✓ |
-| 008 | Network & Appointments | **specified** — FR-601–FR-659, checklist 16/16, spec review gate passed. Governance ratified as **v3.2.0**, which the owner ruled must merge before implementation begins. Migration `0007` | ~~connection model~~ ✓, ~~card-exchange semantics~~ ✓ |
+| 008 | Network & Appointments | **implemented** — 149 tasks, FR-601–FR-659. Migration `0007` adds three tables under **two different scoping rules**: `shared_cards` cross-event, `appointments` and `meeting_slots` per-event. A **third** branded scope and a **third** route audit (`CardScope`, `card-audit.test.ts`), because a card route names no conference and `event-scope-audit` walks past it. T148's by-hand walkthrough is outstanding | ~~connection model~~ ✓, ~~card-exchange semantics~~ ✓ |
 | 009 | Session Q&A | **unblocked** by v3.2.0 — questions are attributed, so Q&A is a personal-data surface. Migration `0008` | ~~question attribution~~ ✓ |
 | 010 | Launch Readiness | queued | brand assets; client validation of desktop |
 

@@ -8,8 +8,10 @@ import { resetRoutes } from './auth/reset.js'
 import { signUpRoutes } from './auth/sign-up.js'
 import { verifyRoutes } from './auth/verify.js'
 import { blockRoutes } from './blocks.js'
+import { cardRoutes } from './cards.js'
 import { conversationRoutes } from './conversations.js'
 import { agendaRoutes } from './events/agenda.js'
+import { appointmentRoutes } from './events/appointments.js'
 import { attendeeProfileRoutes } from './events/attendees.js'
 import { catalogRoutes } from './events/catalog.js'
 import { directoryRoutes } from './events/directory.js'
@@ -122,4 +124,31 @@ export const ROUTES: readonly RoutePlugin[] = [
   // the endpoint is bound to the calling session, which is what stops one browser profile
   // delivering one attendee's messages using another's registration (FR-555).
   pushRoutes,
+  // ─────────────────────────────────────────────────────────────────────────────────────────
+  // 008 — digital business cards, and the contacts holding one creates. **Appended, never
+  // inserted**, for the reason every entry above states: the generated contract lists paths in
+  // observation order.
+  //
+  // **Registered here rather than under `routes/events/`, and that placement is a decision**
+  // (research R1). A held card is cross-event — it outlives the conference it was shared at
+  // (FR-614) — so nesting it under `:eventId` would produce one of two bad outcomes: the event
+  // audit would demand `requireEventAccess` and fail the build, or somebody would satisfy it
+  // with a guard that verifies a registration having nothing to do with whether the reader holds
+  // the card, which is a check that looks like authorization and is not.
+  //
+  // What guards them instead is `requireHeldCard` and a **third** audit, because the event audit
+  // walks straight past a route naming no conference and reports success — the same finding 007
+  // recorded for conversations, met again here.
+  // ─────────────────────────────────────────────────────────────────────────────────────────
+  cardRoutes,
+  // 008 — meetings. **Appended likewise, and registered under `/events/:eventId` deliberately**
+  // — the exact opposite of `cardRoutes` above, and the two together are this feature's central
+  // structural decision (research R2).
+  //
+  // Appointments are per-event, so naming the conference in the path puts them **inside** the
+  // guarantee that already exists: `event-scope-audit.test.ts` examines them and fails the build
+  // if `requireEventAccess` is ever dropped. Registering them as `/appointments/:id` would name
+  // no conference and that audit would silently pass them — the hole `cardRoutes` needs a third
+  // audit to close. Do not "tidy" the nesting away.
+  appointmentRoutes,
 ]

@@ -36,7 +36,26 @@ import { notAuthenticated, notFound } from '../errors.js'
  * That is why research R9 called this the most important structural finding in the feature, and
  * why `tests/unit/participation-audit.test.ts` exists as a second audit rather than as a
  * widening of the first. Two predicates, two audits, two failure messages that each name the
- * right thing. 008's appointments are the first feature that will inherit this.
+ * right thing.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ * **T023 (008) — A CORRECTION. This paragraph used to end "008's appointments are the first
+ * feature that will inherit this", and that prediction was wrong.**
+ *
+ * **Appointments are per-event.** Standing decision 7 puts them on the per-event side and
+ * constitution v3.2.0 reinforces it, so 008 registers them beneath `/events/:eventId` where
+ * `requireEventAccess` and the *existing* event audit already cover them. Nothing about them
+ * needs this module.
+ *
+ * What did inherit the pattern is **cards**, which are cross-event and two-party — a held card
+ * outlives the event it was shared at (FR-614) — so a card route names no conference and the
+ * event audit walks past it exactly as described above. 008 therefore adds a **third** branded
+ * scope in `plugins/card-access.ts` and a **third** audit in `tests/unit/card-audit.test.ts`.
+ *
+ * The one thing that is genuinely different there, and the reason it is a third module rather
+ * than a widened second: **participation is symmetric and holding a card is directional.** Either
+ * owner of a conversation may read it; a card is held by exactly one side.
+ * ─────────────────────────────────────────────────────────────────────────────────────────
  * ─────────────────────────────────────────────────────────────────────────────────────────
  * ═════════════════════════════════════════════════════════════════════════════════════════
  */

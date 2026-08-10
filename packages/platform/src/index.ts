@@ -27,12 +27,17 @@ export type { ConferenceContent, PlatformServices, PlatformProviderProps } from 
 
 export {
   useActiveEventRepository,
+  // 008 — the meetings you have arranged. Per-event and cached, which is the deliberate opposite
+  // of `useCardRepository` below — see `hooks.ts` for why the two are separate hooks.
+  useAppointmentRepository,
   useAttendeeRepository,
   useAuthGateway,
   // 007 — refusing contact.
   useBlockRepository,
   useCalendar,
   useCamera,
+  // 008 — the cards you hold. Cross-event and deliberately uncached (FR-648).
+  useCardRepository,
   useCatalogRepository,
   useConnectivity,
   useContactShare,

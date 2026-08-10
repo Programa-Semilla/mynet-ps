@@ -1,10 +1,15 @@
 import { OfflineError, type VisibleProfile } from '@mynet/data'
 import { useDirectoryRepository } from '@mynet/platform'
-import { MessageSquare, X } from 'lucide-react'
+import { CalendarClock, MessageSquare, X } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link, useNavigate, useOutletContext, useParams } from 'react-router'
 
 import { Loading } from '../AsyncState.js'
+// 008 — the second action in the row this file declared empty in 006. Imported here rather than
+// built here, because Network's contact entries offer the same act and the label is the one
+// thing in this feature that must not be written twice (FR-603).
+import { ScheduleDialog } from '../network/ScheduleDialog.js'
+import { ShareCardAction } from '../network/ShareCardAction.js'
 import { AvatarFallback } from '../profile/AvatarFallback.js'
 import { availabilityLabelFor, intentLabelFor } from '../profile/labels.js'
 
@@ -36,9 +41,19 @@ import { availabilityLabelFor, intentLabelFor } from '../profile/labels.js'
  * updates identically however the dialog was dismissed.
  * ─────────────────────────────────────────────────────────────────────────────────────────
  *
- * **Structured so 007 and 008 can register actions without editing this file.** The header, the
- * body and the (currently empty) action row are separate; a later feature appends to the row.
- * Today it renders nothing, because FR-434 forbids a dead or permanently-disabled control.
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ * **The action row is a bounded region features append to — by editing this file.**
+ *
+ * 006 declared it and left it empty, because FR-434 forbids a dead or permanently-disabled
+ * control and none of its actions existed yet. 007 added *Message*; 008 added *Share your card*
+ * and *Propose a meeting*. Each edited this file and touched neither the header nor the body,
+ * which is what the separation buys.
+ *
+ * It is **not** a registry, and an earlier version of this paragraph claimed it was. `navigation.ts`
+ * and `home/registry.ts` are registries — a feature adds a line and its own file, and this one is
+ * not reached at all. Here a feature appends JSX. Saying otherwise set an expectation the next
+ * feature would have found unmet.
+ * ─────────────────────────────────────────────────────────────────────────────────────────
  */
 
 /** What Discover hands down to its nested child route. */
@@ -212,6 +227,17 @@ export const AttendeeProfile = () => {
 }
 
 const ProfileBody = ({ state }: { state: ProfileState }): ReactNode => {
+  /**
+   * 008 — whether the scheduling dialog is open over this profile, and the control that opened
+   * it so focus returns there (FR-655).
+   *
+   * Declared before the early returns below, because hooks must not be conditional. The state is
+   * meaningless in every status but `ready`, and unreachable from them — there is no control to
+   * press.
+   */
+  const [scheduling, setScheduling] = useState(false)
+  const scheduleOpener = useRef<HTMLButtonElement>(null)
+
   if (state.status === 'loading') return <Loading label="Loading this profile…" />
 
   if (state.status === 'offline') {
@@ -344,7 +370,67 @@ const ProfileBody = ({ state }: { state: ProfileState }): ReactNode => {
           <MessageSquare aria-hidden="true" className="size-4" />
           Message {profile.displayName}
         </Link>
+
+        {/*
+          ═══════════════════════════════════════════════════════════════════════════════════
+          T061 (008) — **the second action in the row 006 declared and left empty** (FR-601).
+
+          It attaches here and edits nothing above it, which is what that arrangement was for:
+          006 built the boundary, 007 put the first action in it, and this appends beside it.
+
+          **A button rather than a `Link`, unlike its neighbour, and the difference is the
+          point.** Messaging navigates to an address that deliberately creates nothing until
+          something is said (FR-503a); sharing a card *is* the act — one request, immediately
+          durable, and **irrevocable** (FR-618). An address for it would suggest a place you can
+          go and come back from.
+
+          SC-601 counts the actions from Discover to a contact: open the profile, share, done.
+          This is action two of two, which is what keeps the journey inside three deliberate
+          acts.
+          ═══════════════════════════════════════════════════════════════════════════════════
+        */}
+        <ShareCardAction attendeeId={profile.attendeeId} displayName={profile.displayName} />
+
+        {/*
+          ═══════════════════════════════════════════════════════════════════════════════════
+          008 — **the third action, and the one that keeps the core journey completable**
+          (SC-604, User Story 3: "From a contact or a profile").
+
+          The spec's Assumptions are explicit that *scheduling does not require holding a card*,
+          and without this control that sentence is false in the product: sharing is
+          one-directional (FR-602), so sharing your card with somebody you just met gives you
+          nothing, they do not become your contact, and Network — the only other surface with a
+          scheduling action — never lists them. The journey *discover → share → schedule* would
+          dead-end at step three.
+
+          No registration check is needed and none is possible to get wrong here: this view is
+          reached at `/discover/<attendeeId>` under the active conference and reads the profile
+          through the event-scoped route, so the subject is registered for it by construction.
+          That is the same reasoning that lets `Contacts` gate on `atActiveEvent` — the
+          difference is that here the answer is always yes.
+          ═══════════════════════════════════════════════════════════════════════════════════
+        */}
+        <button
+          type="button"
+          ref={scheduleOpener}
+          onClick={() => setScheduling(true)}
+          aria-label={`Propose a meeting with ${profile.displayName}`}
+          className="focus-ring inline-flex min-h-11 items-center gap-2 rounded-sm border border-accent-strong px-4 py-2 text-sm font-medium text-accent-strong"
+        >
+          <CalendarClock aria-hidden="true" className="size-4" />
+          Propose a meeting
+        </button>
       </div>
+
+      {scheduling && (
+        <ScheduleDialog
+          attendeeId={profile.attendeeId}
+          displayName={profile.displayName}
+          onClose={() => setScheduling(false)}
+          onProposed={() => setScheduling(false)}
+          returnFocusTo={scheduleOpener}
+        />
+      )}
     </>
   )
 }

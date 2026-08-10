@@ -272,6 +272,70 @@ export const THRESHOLDS: Record<ThrottleAction, ActionThreshold> = {
     source: { freeAttempts: 60, ceilingMs: SOURCE_MAX_DELAY_MS },
     mayDeny: true,
   },
+
+  /**
+   * T041 (008) — sharing your card with somebody (FR-609, FR-638a).
+   *
+   * ═════════════════════════════════════════════════════════════════════════════════════════
+   * **`mayDeny: true`, and this entry states its reasoning rather than inheriting it from the
+   * neighbour above.**
+   *
+   * The rule this table actually runs on is *who a denial falls on*. `reset_request` is keyed on
+   * a **victim's** address, so a denial there **is** the attack and the action is delay-only.
+   * `message_send` is delay-only for a different reason again — a refused message at the moment
+   * the contact mattered is a failure the attendee cannot act on.
+   *
+   * Neither applies here. This action is authenticated and keyed on the **sharer's own
+   * identity**, so a refusal can only ever inconvenience the person sharing; there is no third
+   * party for a denial to harm. And unlike a message, a card share is not time-critical to a
+   * conversation in progress — somebody who has hit the ceiling meets the next person a minute
+   * later with everything intact.
+   *
+   * What it bounds is the shape FR-609 names: **one account working through a conference's
+   * whole directory, pushing its card at everybody.** Each share plants a durable entry in a
+   * stranger's Network that they did not ask for and cannot delete (FR-618) — so a bound that
+   * merely *slowed* mass sharing would not bound it at all, it would spread it over the
+   * afternoon. That is the same argument `conversation_create` makes, and it lands harder here
+   * because what is left behind is permanent.
+   * ═════════════════════════════════════════════════════════════════════════════════════════
+   *
+   * Deliberately close to `conversation_create`'s numbers: giving somebody your card is the same
+   * kind of considered, per-person act as opening a conversation with them, and the two are
+   * often the same encounter. Generous enough for a busy hallway hour; nowhere near enough to
+   * paper a conference.
+   */
+  card_share: {
+    identifier: { freeAttempts: 10, ceilingMs: IDENTIFIER_MAX_DELAY_MS },
+    source: { freeAttempts: 60, ceilingMs: SOURCE_MAX_DELAY_MS },
+    mayDeny: true,
+  },
+
+  /**
+   * T041 (008) — proposing a meeting (FR-638, FR-638a).
+   *
+   * ─────────────────────────────────────────────────────────────────────────────────────────
+   * **`mayDeny: true`, on the same reasoning as `card_share` above, and for a harm that is one
+   * step larger.**
+   *
+   * Keyed on the proposer's own authenticated identity, so a denial falls only on them. What it
+   * bounds is proposal spam: an appointment **asks for a slot of somebody else's time**, and it
+   * arrives in their Network needing an answer. Unanswered proposals accumulate on the invitee's
+   * surface, which is a cost imposed on a person who did nothing.
+   *
+   * The design already removes the worst version of that: a **received** proposal consumes none
+   * of the invitee's availability (SC-608a), so no volume of proposals can reduce what anybody
+   * else is offered. This bounds the remaining nuisance rather than the griefing, which is why
+   * it can be a plain per-actor ceiling.
+   *
+   * Tighter than `card_share` on the identifier: proposing a specific time to a specific person
+   * is a more deliberate act than handing over a card, and nobody legitimately does it often.
+   * ─────────────────────────────────────────────────────────────────────────────────────────
+   */
+  appointment_propose: {
+    identifier: { freeAttempts: 6, ceilingMs: IDENTIFIER_MAX_DELAY_MS },
+    source: { freeAttempts: 60, ceilingMs: SOURCE_MAX_DELAY_MS },
+    mayDeny: true,
+  },
 }
 
 export interface AttemptKey {

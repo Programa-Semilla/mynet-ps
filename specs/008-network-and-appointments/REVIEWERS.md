@@ -147,9 +147,12 @@ design.
 
 **None block implementation.** Two are recorded for the implementing session:
 
-1. **What happens to an appointment when a participant withdraws from the conference** — not
-   deletion, since the account still exists. The design position is that the record survives and the
-   surface stops offering actions on it; it needs an integration test either way.
+1. ~~**What happens to an appointment when a participant withdraws from the conference**~~ —
+   **RESOLVED during implementation, and the answer is the opposite of the design position.**
+   Leaving the record alone was not safe: the departing attendee fails `requireEventAccess`, so they
+   cannot see or cancel the meeting, while the other party can still accept it and turn up.
+   Withdrawing now **cancels** live meetings at that conference, in the same transaction, on
+   FR-637a's reasoning. See `data-model.md` and the integration test that proves it.
 2. **Whether 008 splits into reviewable PRs.** Deferred to the phase-split hook against the real
    task list, as 007 did. The natural seam is cards | appointments | safety and polish, since the
    two API domains share only Phase 2. Weigh it against `develop` being squash-merge only, so a
@@ -176,3 +179,77 @@ design.
 ---
 
 <!-- Code phase sections are appended below this line by the phase-manager command -->
+
+## Code Review — implementation (2026-08-10)
+
+**149 of 151 tasks complete.** T148 (the by-hand `quickstart.md` walk with two browser profiles) and
+T149 (recording desktop and tablet findings from it) are **not done**, and they are the same two 007
+left open. Everything the walkthrough covers is asserted automatically; the walk itself is not a
+formality, because 007's scenario 5 found two defects nothing else could.
+
+### The deep review changed this branch — read its findings first
+
+[review-findings.md](./review-findings.md) records 40 findings from five agents, 27 fixed in one
+round. **Two corrected the compliance claim**: FR-647 was half-implemented and SC-604 was unmet, so
+the core journey did not complete. Three defects were serious and silent — a cache purge on opening
+the scheduling dialog, an enumeration oracle on proposing, and an error classification that swallowed
+every server message. One Important finding is **deliberately not fixed** and is a decision for the
+owner: whether proposing should require the invitee to be discoverable.
+
+### Where to start reading
+
+Read these three in order — they are the feature's argument:
+
+1. `apps/api/src/plugins/card-access.ts` — why a **third** branded scope exists, and why the
+   predicate is *directional* where participation is symmetric.
+2. `apps/api/src/db/queries/cards.ts` — the three **absences** that are the feature (no
+   discoverability, no verification, no registration join), and why the neighbouring directory
+   query having all three is not evidence that this one is incomplete.
+3. `apps/api/src/db/queries/appointments.ts` — availability, and the two properties that read alike
+   and guard opposite failures.
+
+### Four gates fired during implementation, and each was the gate working
+
+None was a surprise, and all four are worth a reviewer's attention because each records a decision
+rather than a fix:
+
+1. **`event-scope-audit.test.ts` had to be widened**, not satisfied. It demanded
+   `requireEventAccess` on every attendee-naming read, and `GET /cards/held/:attendeeId` is
+   cross-event by design. The acceptable predicates are now **enumerated** — event access *or* a
+   held card — with the reasoning beside 004's own narrowing. **A third entry there is a third way
+   to read another attendee**, which is the thing to push back on if one ever appears.
+2. **The seed broke on `DELETE FROM events`.** `shared_cards.event_id` is deliberately
+   `ON DELETE NO ACTION`, so a surviving card refuses the events delete with an error naming neither
+   table. `seed/network.ts` clears the whole Network domain rather than only what it seeded.
+3. **Home's four-state matrix failed rather than passing green.** `home-cards.test.tsx` warns that a
+   card left reading an undriven default records one state four times; 008's card actually failed,
+   because its empty state renders text.
+4. **An end-to-end run found a real gap**: proposing a meeting from the contacts pane left the
+   appointments pane beside it unchanged until a reload, which reads as the proposal having failed.
+   `Network.tsx` now tells the second pane to re-read.
+
+### The two cross-feature edits, both cancellations
+
+008 writes into a file another feature owns in exactly **two** places, and a reviewer should be
+satisfied with both:
+
+- `db/queries/blocks.ts` — one call, cancelling live meetings on a block (FR-637a, research R6).
+- `db/queries/account.ts` — one statement in `withdrawFromConference`, cancelling live meetings at
+  the conference being left. **This was not in the plan**; it resolves the open question above, and
+  it is inline rather than a call to 008's own function because it must share that transaction.
+
+### What is asserted, and where
+
+| Property | Where |
+|---|---|
+| Sharing is one-directional; the sharer gains nothing | `cards-share.test.ts` |
+| Discoverability governs being found, not remembered | `cards-durability.test.ts` |
+| Verification is never consulted in resolution | `cards-durability.test.ts`, by source inspection |
+| Availability discloses nothing about the invitee (SC-605) | `appointments-slots.test.ts` |
+| A received proposal consumes nothing (SC-608a) | `appointments-slots.test.ts` — **kept separate** |
+| The conflict 409 describes only the reader's own diary | `appointments-answer.test.ts` |
+| `lapsed` is derived and no sweep exists | `appointments-answer.test.ts` |
+| Lifting a block restores the contact, not the meeting | `network-block.test.ts` |
+| Contacts are never derived from conversations | `apps/web/tests/unit/network-absences.test.ts` |
+| No notification is dispatched by any path | both `network-absences` files |
+| A block binds on the next request (SC-608) | `e2e/network.spec.ts` |

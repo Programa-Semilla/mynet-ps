@@ -155,10 +155,35 @@ against invitee state would have to be added deliberately, not reached by accide
 
 ---
 
-## Open item carried from research
+## Open item carried from research — **RESOLVED during implementation (2026-08-10)**
 
-**R4 in the spec — an appointment when a participant withdraws from the conference.** The record is
-per-event and survives the withdrawal; the account still exists, so nothing cascades. The design
-position: the surface stops offering actions on it and shows it as no longer actionable, on the same
-reasoning as `lapsed` — the fact happened and hiding it would be dishonest. **Confirm during
-implementation**; it needs an integration test either way.
+**R4 in the spec — an appointment when a participant withdraws from the conference.**
+
+The design position recorded here was that the record survives and *"the surface stops offering
+actions on it"*. Implementation showed that doing nothing was **not safe**, and the resolution is
+the opposite: **withdrawing from a conference cancels the live appointments you had at it.**
+
+The reasoning is FR-637a's, arriving through a second door. The record is per-event and the account
+still exists, so nothing cascades — but every read of an appointment passes through
+`requireEventAccess`, which the departing attendee now fails. So without a write:
+
+- the person who left **cannot see the meeting at all**, and therefore cannot cancel it; and
+- the **other party still sees it as pending or confirmed**, can still accept it, and would turn up
+  to meet somebody who is no longer at the conference.
+
+That is precisely what FR-637a forbids for blocking — *a meeting you would otherwise turn up to must
+be ended rather than hidden*. Cancelling is also the honest state: it happened, and it is over.
+
+**Pending and future confirmed only**, matching `cancelAppointmentsBetween`; a meeting that has
+already taken place is a fact about the past, and rewriting it would be the mistake blocking avoids
+by deleting no message (FR-538). **Rejoining is not an undo**, exactly as lifting a block is not.
+
+Implemented inline in `withdrawFromConference` rather than by calling 008's own function, because it
+must run **inside that transaction**: a cancellation surviving a rolled-back withdrawal would be
+worse than either outcome alone. Proven by
+`tests/integration/network-block.test.ts` — *"cancels live meetings when a participant withdraws
+from the conference"*.
+
+**This makes `withdrawFromConference` the second place 008 writes into a file another feature owns**,
+after `db/queries/blocks.ts`. Both are one statement, both are cancellations, and both exist for the
+same reason.

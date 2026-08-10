@@ -4,9 +4,11 @@ import {
   conferencePrefix,
   createFreshnessRegistry,
   HttpActiveEventRepository,
+  HttpAppointmentRepository,
   HttpAttendeeRepository,
   HttpAuthGateway,
   HttpBlockRepository,
+  HttpCardRepository,
   HttpCatalogRepository,
   HttpClient,
   HttpConversationRepository,
@@ -146,6 +148,42 @@ export const createServices = (): PlatformServices => {
     { freshness },
   )
 
+  // ─────────────────────────────────────────────────────────────────────────────────────────
+  // T037 (008) — **appointments ARE cached, under the key that already exists** (FR-647).
+  //
+  // The decorator is keyed `(attendeeId, eventId, resource)`. Appointments are per-event and are
+  // the attendee's **own commitments**, so that key fits them exactly as it fits saved sessions —
+  // no new key shape, no widening of the cache contract.
+  //
+  // Only `list` is cached. `slots` is deliberately left live: an offered set that had gone stale
+  // would invite a proposal for a slot the reader has since filled, and the refusal would arrive
+  // after the attendee had typed a topic. Every **write** below passes straight through, because
+  // `cached` only intercepts the methods named here — writes are refused offline and never
+  // queued (FR-649), which needs no new mechanism.
+  // ─────────────────────────────────────────────────────────────────────────────────────────
+  const appointments = cached(
+    new HttpAppointmentRepository(http),
+    store,
+    identity.scope,
+    { list: 'appointments' },
+    {
+      freshness,
+      // ─────────────────────────────────────────────────────────────────────────────────────
+      // **`slots` is a READ that must stay live, and saying so is not optional.**
+      //
+      // Omitting it from `reads` was the obvious way to keep it uncached and was silently
+      // destructive: the decorator classifies anything unnamed as a **write**, and a write
+      // purges the whole conference prefix on success. Opening the scheduling dialog therefore
+      // wiped the cached programme, tracks, saved sessions, notes and appointments — FR-215 and
+      // FR-647 both broken, with the loss only visible on the next disconnection.
+      //
+      // `passThrough` exists for exactly this: not served from the cache, not written to it, and
+      // not purging anything.
+      // ─────────────────────────────────────────────────────────────────────────────────────
+      passThrough: ['slots'],
+    },
+  )
+
   return {
     devices,
     repositories: {
@@ -212,6 +250,40 @@ export const createServices = (): PlatformServices => {
       blocks: new HttpBlockRepository(http),
       reports: new HttpReportRepository(http),
       pushSubscriptions: new HttpPushSubscriptionRepository(http),
+      // ─────────────────────────────────────────────────────────────────────────────────────
+      // T038, T039 (008) — **cards are NOT decorated with `cached`, and this refusal is written
+      // beside the member rather than achieved by leaving a line out** (FR-648).
+      //
+      // An omission and a decision look identical in a composition root, which is why 006 and
+      // 007 each declared theirs here and why this one is declared too.
+      //
+      // The reason is 006's, unchanged: **resolving a held card reads another person's live
+      // profile** (FR-611). 005's decorator revokes on **age alone**, so a cached contact is a
+      // second copy of somebody else's name, company, role and face ageing on this device — and
+      // it would go on rendering after they edited any of it. There is no offline capability
+      // worth buying with that: every write in this feature is refused rather than queued
+      // (FR-649), and a contacts list you cannot act on is a list of stale strangers.
+      //
+      // The staleness stamp cannot rescue it either. It answers "when did this device last
+      // receive this", which is honest about *the retrieval* and silent about *the person* — and
+      // the person is what changed.
+      //
+      // ═════════════════════════════════════════════════════════════════════════════════════
+      // **T039 — THIS ANSWERS, BY REFUSAL, THE CACHE-KEY QUESTION 007 DEFERRED TO THIS FEATURE**
+      // (research R4).
+      //
+      // Cards are cross-event, so caching them would have needed an **event-less key variant** —
+      // the decorator's key is `(attendeeId, eventId, resource)` and there is no conference to
+      // put in it. 007 left that open rather than invent one for a member it did not have.
+      //
+      // Refusing closes it without widening the cache contract at all. **No event-less key
+      // variant is needed, and none should be added** on this feature's account: the next author
+      // who needs one is arriving with a different requirement and should have to argue it.
+      // ═════════════════════════════════════════════════════════════════════════════════════
+      cards: new HttpCardRepository(http),
+      // Cached, unlike its neighbour — see the decorator above for why the same feature answers
+      // the offline question two different ways.
+      appointments,
     },
     freshness: {
       lastRetrieved: (eventId, content) =>

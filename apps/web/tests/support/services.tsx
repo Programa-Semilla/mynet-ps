@@ -180,6 +180,49 @@ export const testServices = (
     blocks: { list: async () => [], block: async () => {}, unblock: async () => {} },
     reports: { submit: async () => {} },
     pushSubscriptions: { register: async () => {}, unregister: async () => {} },
+    // ─────────────────────────────────────────────────────────────────────────────────────
+    // 008 — an attendee who holds nobody's card and has arranged no meetings, which is what
+    // every account is until somebody hands them one. **Nothing here is seeded**, deliberately,
+    // so this default is also what a reviewer sees on first run — which is why the two empty
+    // states are the ones most worth having tests for.
+    //
+    // Every method resolves rather than throwing, for the reason 004's defaults record: a
+    // component test asserting a *disabled* confirmation must not be able to pass because the
+    // repository blew up first.
+    // ─────────────────────────────────────────────────────────────────────────────────────
+    cards: {
+      share: async () => ({
+        attendeeId: 'attendee-grace',
+        displayName: 'Grace Hopper',
+        eventId: SUMMIT.id,
+        eventName: SUMMIT.name,
+        sharedAt: '2026-09-14T09:00:00.000Z',
+      }),
+      listHeld: async () => [],
+      getHeld: async () => {
+        throw new Error('no card held')
+      },
+      listShared: async () => [],
+    },
+    appointments: {
+      // An empty slot list is a **legitimate** answer, not a failure (FR-627) — but it is not
+      // the useful default, because it renders the no-slots state rather than the grid. A test
+      // wanting to exercise the dialog says so explicitly.
+      slots: async () => [],
+      propose: async () => {
+        throw new Error('no appointment proposed')
+      },
+      list: async () => [],
+      accept: async () => {
+        throw new Error('no appointment accepted')
+      },
+      decline: async () => {
+        throw new Error('no appointment declined')
+      },
+      cancel: async () => {
+        throw new Error('no appointment cancelled')
+      },
+    },
     ...overrides,
   },
   // 005 — content is live in a component test unless a test says otherwise, so no staleness
