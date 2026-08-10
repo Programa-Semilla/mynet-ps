@@ -42,6 +42,17 @@ process.env['AUTH_MAX_SERVED_DELAY_MS'] ??= '20'
  */
 process.env['AUTH_RESET_BRANCH_BUDGET_MS'] ??= '1'
 
+/**
+ * 007 — likewise for push delivery. `push-gone.test.ts` drives a push service that **hangs**,
+ * which is the common failure mode of an HTTP push service and the one a `try/catch` alone does
+ * not handle — so the timeout is the thing under test rather than an incidental wait. Paying the
+ * real ten seconds proves nothing the twenty-millisecond version does not, and does it once per
+ * hanging endpoint.
+ *
+ * Production cannot take this value: it is read from the environment and nothing sets it there.
+ */
+process.env['PUSH_DISPATCH_TIMEOUT_MS'] ??= '20'
+
 export { IDENTIFIER_FREE_ATTEMPTS, SOURCE_FREE_ATTEMPTS } from '../../src/auth/throttle.js'
 
 export const SEED_PASSWORD = 'correct-horse-battery-staple'
@@ -105,13 +116,57 @@ export const setupTestApp = async (
  *
  * `stored_objects` is the exception, for exactly the reason it is the exception everywhere
  * else: no foreign key reaches it (research D3, D10). It is cleared explicitly.
+ *
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ * **007 — `conversations` IS THE SECOND EXCEPTION, AND IT COST A FLAKY SUITE TO FIND.**
+ *
+ * The paragraph above states the invariant this function has relied on since 004: every table
+ * cascades from `attendees`, so clearing attendees clears everything and this function need
+ * name nothing. **007 is the first feature for which that is false.** `conversations` holds no
+ * attendee foreign key at all — deliberately, because a row that named a departed attendee
+ * would breach FR-573, which is the entire reason `conversation_pairs` exists as a separate
+ * table (research R10). Nothing cascades to it, so nothing removed it.
+ *
+ * The symptom was worse than a leak. Orphaned conversations accumulated one per reset, and the
+ * integration suite failed **intermittently** depending on how many had built up and in what
+ * order files ran — five tests failing on one run and none on the next, from the same tree.
+ *
+ * Cleared before `seed()` and by explicit delete, which cascades to `conversation_pairs`,
+ * `conversation_participants` and `messages` and so needs no companion lines. Anything a later
+ * feature adds that holds no attendee foreign key belongs here too, and the fact that this list
+ * now has two entries rather than one is the warning that the invariant is not self-maintaining.
+ *
+ * **This is a test-harness fix and not FR-575's.** Removing a conversation whose last
+ * participant has left is the product's own obligation, implemented in `deleteAccount` (T131).
+ * A helper that hid the residue would have made that requirement harder to test, not easier.
+ * ═════════════════════════════════════════════════════════════════════════════════════════
  */
 export const resetDatabase = async (): Promise<void> => {
   const db = getDb()
   await db.delete(signInAttempts)
   await db.delete(authSessions)
   await db.execute(sql`DELETE FROM stored_objects`)
+  await db.execute(sql`DELETE FROM conversations`)
   await seed()
+
+  // ═════════════════════════════════════════════════════════════════════════════════════════
+  // **T144 (007) — the seeded conversation is removed AFTER seeding, and the asymmetry is
+  // deliberate.**
+  //
+  // 007's seed adds one conversation between Ada and Grace so the destination is not empty on a
+  // fresh clone — a *development-experience* fixture, and the only way Home's unread indicator
+  // and the list's marker are reachable at first run without two browser profiles.
+  //
+  // The integration suite wants the opposite: a known-empty baseline. Every conversation test
+  // constructs exactly the fixture it is asserting about, and a pre-existing conversation turns
+  // "opening a conversation answers 201" into 200 and every count off by one — not because
+  // anything is wrong, but because the test was written against a different starting point.
+  //
+  // Removed here rather than by making the seed conditional, because a seed that behaves
+  // differently under test is a seed nobody can reason about — and because the *product's*
+  // fixture is the one that should stay simple. A test that wants a conversation makes one.
+  // ═════════════════════════════════════════════════════════════════════════════════════════
+  await db.execute(sql`DELETE FROM conversations`)
 }
 
 /** Test seam: the seeded conferences' join codes, so a test never hard-codes one. */

@@ -38,13 +38,33 @@ const PID_FILE = fileURLToPath(new URL('../../test-results/.api-pid', import.met
  */
 export const API_LOG = fileURLToPath(new URL('../../test-results/api.log', import.meta.url))
 
-/** Polls `/health` until the API answers, or gives up. */
+/**
+ * Polls `/ready` until the API can actually serve, or gives up.
+ *
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ * **`/ready`, NOT `/health`, AND THIS WAS WAITING ON THE WRONG ONE.**
+ *
+ * The distinction is one the codebase already makes, in the deployment platform's own words: *a
+ * container with an unreachable database answers `/health` perfectly and every attendee request
+ * with a failure.* `/health` says the process is listening. `/ready` says the database is
+ * reachable, which is the only question a caller about to make a request has.
+ *
+ * The harness was asking the first and acting on the answer to the second, so `redeployApi()`
+ * could return while the new process's pool was still connecting. The very next `page.reload()`
+ * would then load a workspace whose reads had failed, and `durability.spec.ts` would fail on a
+ * missing greeting — **intermittently**, only in a full-suite run, and never in isolation, which
+ * is the signature of exactly this kind of race.
+ *
+ * It is the same mistake a deployment would make, caught in the harness that exists to prove
+ * redeployment is survivable.
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ */
 const waitForHealth = async (timeoutMs = 60_000): Promise<void> => {
   const deadline = Date.now() + timeoutMs
 
   while (Date.now() < deadline) {
     try {
-      const response = await fetch(`${API_ORIGIN}/health`)
+      const response = await fetch(`${API_ORIGIN}/ready`)
       if (response.ok) return
     } catch {
       // Not listening yet. Keep waiting — this is the expected state for the first second or so.
@@ -53,7 +73,7 @@ const waitForHealth = async (timeoutMs = 60_000): Promise<void> => {
   }
 
   throw new Error(
-    `The API did not become healthy at ${API_ORIGIN}/health within ${timeoutMs}ms. ` +
+    `The API did not become ready at ${API_ORIGIN}/ready within ${timeoutMs}ms. ` +
       'Check that DATABASE_URL points at a reachable database.',
   )
 }

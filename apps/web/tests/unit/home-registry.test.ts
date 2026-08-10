@@ -64,7 +64,24 @@ describe('the Home card registry, after 005 and 006 appended to it', () => {
     // "005's card is last" to "005's card is fifth" for the obvious reason: a second contributor
     // arrived. What it is actually protecting — that nobody reorders anybody else's line — is
     // unchanged and is now checked over the whole prefix rather than over one position.
-    expect(ids.at(-1), '006’s card is last, because it was appended').toBe('people-to-meet')
+    expect(ids[5], '006’s card follows 005’s').toBe('people-to-meet')
+
+    // ───────────────────────────────────────────────────────────────────────────────────────
+    // T099 (007) — **and the "…is last" assertion is retired outright**, rather than moved on
+    // again to the newest card.
+    //
+    // It has now been rewritten twice for the same reason, which is the signal that it was
+    // asserting the wrong thing: "the most recent contributor is last" is a claim only the most
+    // recent contributor can satisfy, so every future feature inherits an edit to somebody
+    // else's assertion — in a file whose entire purpose is that features do not edit each
+    // other's lines.
+    //
+    // What FR-226 actually protects is that **the established prefix is unchanged**, and that is
+    // what the assertions above check. Growth at the end needs no assertion; it is the one thing
+    // appending is allowed to do.
+    // ───────────────────────────────────────────────────────────────────────────────────────
+    expect(ids.length, 'the registry only ever grows').toBeGreaterThanOrEqual(6)
+    expect(new Set(ids).size, 'and no card is registered twice').toBe(ids.length)
   })
 
   /**

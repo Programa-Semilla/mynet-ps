@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test'
 
-import { ADA, signIn } from './support/attendees.js'
+import { ADA, signIn, useConference } from './support/attendees.js'
 import { DESTINATIONS, SCROLL_WIDTHS, WIDTHS } from './support/destinations.js'
 
 /**
@@ -242,9 +242,15 @@ test.describe('responsive layout', () => {
       await expect(navigations, `at ${width}px`).toHaveCount(1)
 
       // And every destination is reachable from whichever form it is.
+      //
+      // **`exact`, since 007.** Playwright matches an accessible name by substring, and Home now
+      // carries an unread-message card whose link is named "You have unread messages…" — which
+      // matched the query for the *Messages* destination and made this a strict-mode violation.
+      // The nav links are named exactly for their destination, so the exact form is what this
+      // assertion always meant; the loose form merely had nothing to collide with before.
       for (const destination of DESTINATIONS) {
         await expect(
-          page.getByRole('link', { name: destination.label }),
+          page.getByRole('link', { name: destination.label, exact: true }),
           `${destination.label} at ${width}px`,
         ).toBeVisible()
       }
@@ -277,7 +283,11 @@ test.describe('responsive layout', () => {
 
     // FR-018 — the token is 44px, which is the floor, not an aspiration.
     for (const destination of DESTINATIONS) {
-      const box = await page.getByRole('link', { name: destination.label }).boundingBox()
+      // `exact`, for the reason recorded on the navigation sweep above: a Home card's link name
+      // can contain a destination's label without being a navigation control.
+      const box = await page
+        .getByRole('link', { name: destination.label, exact: true })
+        .boundingBox()
       expect(box, destination.label).not.toBeNull()
       expect(box!.height, `${destination.label} height`).toBeGreaterThanOrEqual(44)
       expect(box!.width, `${destination.label} width`).toBeGreaterThanOrEqual(44)
@@ -346,5 +356,121 @@ test.describe('responsive layout', () => {
     } finally {
       await context.close()
     }
+  })
+
+  /**
+   * T140 (007) — **Messages with real content, at every supported width** (FR-580, FR-586,
+   * SC-516).
+   *
+   * ═══════════════════════════════════════════════════════════════════════════════════════
+   * The destination sweep above already walks `/messages`, and until 007 it walked a
+   * placeholder. Real content is what actually overflows: a conversation preview, an unbroken
+   * URL in a message, and a two-pane grid whose tracks default to `auto` — meaning their
+   * *min-content* width — so one long word widens the whole page rather than truncating.
+   *
+   * The component suite asserts the structure that prevents this (`minmax(0, …)`, `min-w-0`,
+   * `break-words`). Only a browser can say whether the document actually scrolls, which is what
+   * FR-586 is about.
+   * ═══════════════════════════════════════════════════════════════════════════════════════
+   */
+  test('Messages does not scroll sideways at any width, with a thread open', async ({ page }) => {
+    await page.goto('/')
+    await signIn(page, ADA)
+    await useConference(page, 'Product & Design Summit')
+
+    await page.goto('/messages')
+    await page.locator('a[href^="/messages/"]').first().click()
+    await expect(page.getByRole('textbox', { name: /message/i })).toBeVisible()
+
+    // A message no line-breaking algorithm can help with — the one piece of attendee content
+    // that genuinely can widen a column, and the one a conference message most often contains.
+    await page
+      .getByRole('textbox', { name: /message/i })
+      .fill(`https://example.com/${'a-very-long-unbroken-path-segment'.repeat(4)}`)
+    await page.getByRole('button', { name: /send message/i }).click()
+
+    for (const width of SCROLL_WIDTHS) {
+      await page.setViewportSize({ width, height: 900 })
+      await expect(page.getByRole('textbox', { name: /message/i })).toBeVisible()
+
+      const overflow = await page.evaluate(
+        () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      )
+      expect(
+        overflow,
+        `Messages overflowed by ${overflow}px at ${width}px with a long URL in the thread. ` +
+          'No content or primary action may require horizontal scrolling (FR-586).',
+      ).toBeLessThanOrEqual(0)
+    }
+  })
+
+  /**
+   * T140 (007) — **the conversation list is vertical, never a horizontally scrolling strip**
+   * (FR-580).
+   *
+   * The prototype puts a horizontal row of avatars above the thread, and Principle II makes
+   * correcting it a settled requirement rather than a judgement: choosing which conversation to
+   * read is the primary action of this destination, and a strip hides everything past the fourth
+   * behind a gesture with no keyboard equivalent.
+   *
+   * Measured on the list's own box rather than on the document, because a container that scrolls
+   * internally does not widen the page — which is exactly how this defect would survive the
+   * assertion above.
+   */
+  test('the conversation list itself never scrolls sideways', async ({ page }) => {
+    await page.goto('/')
+    await signIn(page, ADA)
+    await useConference(page, 'Product & Design Summit')
+    await page.goto('/messages')
+
+    const rows = page.locator('a[href^="/messages/"]')
+    await expect(rows.first()).toBeVisible()
+
+    for (const width of SCROLL_WIDTHS) {
+      await page.setViewportSize({ width, height: 900 })
+      await expect(rows.first()).toBeVisible()
+
+      const overflow = await rows.first().evaluate((row) => {
+        const list = row.closest('ul')
+        return list ? list.scrollWidth - list.clientWidth : 0
+      })
+
+      expect(
+        overflow,
+        `The conversation list scrolls sideways by ${overflow}px at ${width}px. FR-580 forbids ` +
+          "reproducing the prototype's horizontally-scrolling switcher.",
+      ).toBeLessThanOrEqual(0)
+    }
+  })
+
+  /**
+   * T140 (007) — **one pane at mobile, two from tablet up.**
+   *
+   * The structural half is asserted in the component suite; this is the measured half. At 320px
+   * the list must not be beside the thread, because a 140px-wide list column is not a usable
+   * control and squeezing two panes into a phone is what produces the overflow above.
+   */
+  test('Messages is one pane at mobile and two from tablet up', async ({ page }) => {
+    await page.goto('/')
+    await signIn(page, ADA)
+    await useConference(page, 'Product & Design Summit')
+    await page.goto('/messages')
+
+    const rows = page.locator('a[href^="/messages/"]')
+    await expect(rows.first()).toBeVisible()
+    await rows.first().click()
+    await expect(page.getByRole('textbox', { name: /message/i })).toBeVisible()
+
+    await page.setViewportSize({ width: 320, height: 900 })
+    await expect(
+      rows.first(),
+      'At 320px the thread replaces the list rather than sitting beside it, and an explicit back ' +
+        'affordance is how the reader returns (FR-580).',
+    ).toBeHidden()
+    await expect(page.getByRole('link', { name: /back to conversations/i })).toBeVisible()
+
+    await page.setViewportSize({ width: 1280, height: 900 })
+    await expect(rows.first(), 'from tablet up both panes are on screen').toBeVisible()
+    await expect(page.getByRole('textbox', { name: /message/i })).toBeVisible()
   })
 })

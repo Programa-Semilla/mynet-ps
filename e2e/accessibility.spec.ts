@@ -273,4 +273,102 @@ test.describe('accessibility', () => {
     const { violations } = await scan(page)
     expect(blocking(violations), describeViolations(blocking(violations))).toEqual([])
   })
+
+  /**
+   * T139 (007) — **Messages, its thread, its composer and both safety dialogs** (FR-582, FR-583,
+   * FR-584, SC-515).
+   *
+   * ═══════════════════════════════════════════════════════════════════════════════════════
+   * The destination sweep above visits `/messages` at all three widths, and until 007 it scanned
+   * a placeholder. It now scans a real two-pane workspace — but the sweep alone would still miss
+   * the three surfaces where a violation does the most harm, because none of them exists at rest:
+   *
+   *   - **The open thread**, whose message bubbles are the one place this feature adds
+   *     colour-carried meaning (a sent message on the accent, a received one on the surface).
+   *     Contrast on those is exactly what a static check cannot see.
+   *   - **The block and report dialogs**, which are modals — the surface where a missing
+   *     accessible name or an unreachable close control is worst, and the one the prototype got
+   *     wrong outright (Principle IV names it a defect, not an open question).
+   *
+   * The report dialog is scanned with its confirmation **disabled**, which is its ordinary state
+   * on opening (FR-546): a disabled control still has to be named and still has to be reachable.
+   * ═══════════════════════════════════════════════════════════════════════════════════════
+   */
+  test('Messages with a real conversation is clean', async ({ page }) => {
+    await page.goto('/')
+    await signIn(page, ADA)
+    await useConference(page, 'Product & Design Summit')
+    await page.goto('/messages')
+
+    // Awaited on a row rather than on the heading: the heading renders while the list is still
+    // loading, so scanning too early would scan a spinner and report it clean.
+    await expect(page.locator('a[href^="/messages/"]').first()).toBeVisible()
+
+    const { violations } = await scan(page)
+    expect(blocking(violations), describeViolations(blocking(violations))).toEqual([])
+  })
+
+  for (const width of WIDTHS) {
+    test(`the open thread and its composer are clean at ${width.px}px (${width.layout})`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: width.px, height: 900 })
+      await page.goto('/')
+      await signIn(page, ADA)
+      await useConference(page, 'Product & Design Summit')
+      await page.goto('/messages')
+
+      await page.locator('a[href^="/messages/"]').first().click()
+      await expect(page.getByRole('textbox', { name: /message/i })).toBeVisible()
+
+      const { violations } = await scan(page)
+      expect(
+        blocking(violations),
+        `open thread at ${width.px}px:\n${describeViolations(blocking(violations))}`,
+      ).toEqual([])
+    })
+  }
+
+  for (const dialog of [
+    { control: /^block /i, heading: /^block /i, label: 'block confirmation' },
+    { control: /^report /i, heading: /^report /i, label: 'report dialog' },
+  ]) {
+    test(`the ${dialog.label} is clean`, async ({ page }) => {
+      await page.goto('/')
+      await signIn(page, ADA)
+      await useConference(page, 'Product & Design Summit')
+      await page.goto('/messages')
+
+      await page.locator('a[href^="/messages/"]').first().click()
+      await expect(page.getByRole('textbox', { name: /message/i })).toBeVisible()
+
+      await page.getByRole('button', { name: dialog.control }).click()
+      await expect(page.getByRole('dialog')).toBeVisible()
+      await expect(page.getByRole('dialog').getByRole('heading')).toHaveText(dialog.heading)
+
+      const { violations } = await scan(page)
+      expect(
+        blocking(violations),
+        `${dialog.label}:\n${describeViolations(blocking(violations))}`,
+      ).toEqual([])
+    })
+  }
+
+  /**
+   * T139 (007) — **the block-management list on the account surface** (FR-541a).
+   *
+   * It lives beside "who can find me" rather than as a sixth destination, so the destination
+   * sweep never reaches it. Scanned in its **empty** state, which is the one almost every
+   * account is in and therefore the one nearly every reader sees.
+   */
+  test('the block list on the account surface is clean', async ({ page }) => {
+    await page.goto('/')
+    await signIn(page, ADA)
+    await page.goto('/account')
+
+    await expect(page.getByRole('heading', { name: /people you have blocked/i })).toBeVisible()
+
+    const { violations } = await scan(page)
+    expect(blocking(violations), describeViolations(blocking(violations))).toEqual([])
+  })
 })

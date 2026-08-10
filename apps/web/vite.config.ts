@@ -74,6 +74,20 @@ export default defineConfig({
       registerType: 'prompt',
       injectRegister: 'auto',
 
+      // ── T117 (007) — `generateSW` → `injectManifest` (research R2) ──────────────────────
+      //
+      // **A `push` handler is code, and generated-service-worker configuration cannot express
+      // one.** So `src/sw.ts` becomes the worker and the build only substitutes the precache
+      // manifest into it. Registering a *second* worker was rejected outright: one scope means
+      // one worker, and two would race for control of the same clients.
+      //
+      // Everything the `workbox` block below used to configure is carried across explicitly in
+      // `src/sw.ts`, with the reason each line existed — including the API denylist, which is the
+      // one that matters most: dropping it would answer API requests with the HTML shell.
+      strategies: 'injectManifest',
+      srcDir: 'src',
+      filename: 'sw.ts',
+
       manifest: {
         // FR-049, SC-013 — every name comes from the single branding constant. The product
         // cannot be called MyNet in the shell and something else on the home screen.
@@ -99,52 +113,45 @@ export default defineConfig({
         ],
       },
 
-      workbox: {
-        // Content-hashed filenames, so a new deployment's precache manifest differs and the old
-        // entries are evicted. This is FR-055 without hand-written cache-versioning logic.
+      /**
+       * ── What survives the move to `injectManifest`, and what does not ──────────────────
+       *
+       * `injectManifest` reads only the **manifest-generation** options from here; every
+       * behavioural option — `navigateFallback`, the denylist, `clientsClaim`, `skipWaiting`,
+       * `cleanupOutdatedCaches`, `runtimeCaching` — is now code in `src/sw.ts`, because that is
+       * the whole point of the strategy change.
+       *
+       * They are not lost. Each is reproduced there beside the reason it existed, so a reader
+       * comparing this diff can see that nothing was dropped in the move — which is the risk
+       * research R2 flagged as the highest in the feature.
+       */
+      injectManifest: {
+        // Content-hashed filenames, so a new deployment's manifest differs and the old entries
+        // are evicted. FR-055 without hand-written cache-versioning logic.
         globPatterns: ['**/*.{js,css,html,ico,png,svg,webmanifest}'],
-        // Sourcemaps are for the reviewer, not the attendee. Precaching them would multiply the
-        // install payload for no benefit.
+        // Sourcemaps are for the reviewer, not the attendee.
         globIgnores: ['**/*.map'],
-
-        // FR-051 — any in-scope address falls back to the shell, so a deep link to /network
-        // opens offline and lands on the not-found-free real destination rather than a browser
-        // error page.
-        navigateFallback: 'index.html',
-        // **The API is excluded from the fallback and from every cache.** Without this,
-        // navigation requests to the API origin would be answered with the HTML shell, and a
-        // failed request would look like a successful page load.
-        navigateFallbackDenylist: [/^\/api\//],
-
-        // No `runtimeCaching` entry exists, and none may be added for an API route. If a future
-        // slice needs offline data it needs a recorded decision about staleness first
-        // (constitution: optimistic updates and conflict resolution each require one).
-        runtimeCaching: [],
-
-        cleanupOutdatedCaches: true,
-
-        // ── Update semantics, chosen as a pair (FR-055) ──────────────────────────────────
-        //
-        // `clientsClaim` without `skipWaiting` is the combination this slice wants:
-        //
-        // - **claim**: the worker controls the page it was installed on, so the offline shell
-        //   works from the attendee's *first* visit. Without it, a first-time visitor who
-        //   loses their connection before ever reloading gets a browser error page — which is
-        //   precisely the case FR-051 exists for, at a conference venue with poor wifi.
-        // - **no skipWaiting**: a new deployment does not replace a running version underneath
-        //   somebody mid-session. It waits, and takes over at the next launch — which is
-        //   exactly the latitude FR-055 allows ("by the next launch at the latest").
-        //
-        // Turning on `skipWaiting` (or `registerType: 'autoUpdate'`) would swap assets under a
-        // live page and force a reload nothing warned the attendee about. There is no
-        // update-prompt UI in this slice to do it politely, so it is not done at all.
-        clientsClaim: true,
-        skipWaiting: false,
       },
 
-      // The service worker is disabled in `vite dev` but must be present in `vite preview`,
-      // which is what the end-to-end offline suite runs against.
-      devOptions: { enabled: false },
+      /**
+       * ═══════════════════════════════════════════════════════════════════════════════════════
+       * **THE WORKER RUNS IN `vite dev` TOO, AND 007 IS WHY THAT CHANGED.**
+       *
+       * This was `enabled: false`, decided in 001 on the reasoning that the worker only had to
+       * exist where the end-to-end offline suite runs — `vite preview`. That was true while the
+       * worker's whole job was caching the shell.
+       *
+       * **Web Push is impossible without a registered service worker.** With it off, `pnpm start`
+       * could not subscribe, could not receive, and could not run `quickstart.md` scenario 5 at
+       * all — the failure looked like a defect (a "Turn on notifications" button that goes quiet)
+       * rather than like a missing prerequisite, and the workaround was a two-terminal build-and-
+       * preview dance for what is otherwise a one-command project.
+       *
+       * `type: 'module'` because `src/sw.ts` is an ES module; without it the dev worker is served
+       * as a classic script and its imports fail.
+       * ═══════════════════════════════════════════════════════════════════════════════════════
+       */
+      devOptions: { enabled: true, type: 'module', navigateFallback: 'index.html' },
     }),
   ],
   // Vite reads `.env` from the project root by default, which here is `apps/web`. The single

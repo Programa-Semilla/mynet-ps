@@ -2285,6 +2285,850 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/conversations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Every conversation the attendee participates in, most recent first
+         * @description Not paginated: an attendee holds tens of these and FR-508's ordering is over the whole set. `counterpart` is **null** when the other participant has deleted their account (FR-573) — there is no name, no avatar and no identifier, because nothing was retained; the client renders the closed treatment from `state`, never from a missing field. `state` is derived from the participant count and the caller's own blocks and is stored nowhere. `blocked` means THIS attendee blocks the counterpart — the reverse is invisible here, deliberately (FR-537). `unread` is a boolean rather than a count (FR-531), derived from the reader's own read position and never from who spoke last (FR-527).
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            conversations: {
+                                /** Format: uuid */
+                                conversationId: string;
+                                counterpart: {
+                                    /** Format: uuid */
+                                    attendeeId: string;
+                                    displayName: string;
+                                    avatar: {
+                                        contentType: string;
+                                        base64: string;
+                                    } | null;
+                                } | null;
+                                lastMessage: {
+                                    body: string;
+                                    /** Format: date-time */
+                                    sentAt: string;
+                                    mine: boolean;
+                                } | null;
+                                unread: boolean;
+                                /** @enum {string} */
+                                state: "open" | "one_sided" | "blocked";
+                            }[];
+                        };
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        /**
+         * Open a conversation by sending its first message
+         * @description The ONLY route that creates a conversation, and it does so in one transaction with the first message — there is no route that creates an empty one, because FR-503a says none exists until something is said (opening a thread from a profile writes nothing). `attendeeId` names the RECIPIENT, never the caller. Answers 201 when it created the conversation and 200 when it appended to one that already existed (FR-510), with an identical body either way: a pair never has two conversations, and the caller has no reason to know which happened.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** @description The recipient. Not validated as a uuid at the schema, so a malformed identifier produces the same 404 as a real attendee with no conference in common (FR-504). */
+                        attendeeId: string;
+                        /** @description 1–2000 characters after trimming. Plain text only — attachments, images and rich formatting are out of scope (FR-513). */
+                        body: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description The conversation already existed; the message was appended to it. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** Format: uuid */
+                            conversationId: string;
+                            /** Format: uuid */
+                            messageId: string;
+                            /** Format: date-time */
+                            sentAt: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** Format: uuid */
+                            conversationId: string;
+                            /** Format: uuid */
+                            messageId: string;
+                            /** Format: date-time */
+                            sentAt: string;
+                        };
+                    };
+                };
+                /** @description The body was empty, whitespace-only, or over the limit once trimmed. The composer disables send below the lower bound (FR-512) and shows a counter approaching the upper one (FR-517), so this is a backstop rather than the designed path. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description No such attendee, no conference in common, a malformed identifier, or the caller themselves — all four with an IDENTICAL body. Distinguishing them would turn this route into an oracle for "is this identifier a real attendee", against a world-readable repository and public self sign-up (FR-504, FR-506). */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Throttled on the `conversation_create` counter. **This is the one throttle in the feature that genuinely refuses** (FR-504a): it is keyed on the caller's own authenticated identity, so a denial can only inconvenience the person doing it, and bounding how many distinct people one account opens conversations with is the whole point. */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                            retryAfterSeconds?: number;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/conversations/unread": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Whether anything at all is unread
+         * @description A boolean, not a count. FR-531 needs existence and nothing in the product needs more — and a count is a more precise disclosure of reading behaviour than any requirement asks for.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            hasUnread: boolean;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/conversations/{conversationId}/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * A page of history, newest first
+         * @description Behind the participation guard (FR-520, FR-523). **No author identifier is projected — only `mine`**: the counterpart is already established by the conversation, so an identifier per message would add nothing and widen the surface. Unlike 006's directory cursor this one guarantees no duplicates AND no omissions, because `sent_at` is immutable (FR-516) and the ordering total. The client reverses the page for display, since a thread opens at its most recent message.
+         */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description Opaque. Encodes the previous page's last (sentAt, id). It is a position, never a scope — the conversation comes from the path and its guard. */
+                    cursor?: string;
+                    /** @description Whether to include the counterpart, whose avatar bytes are the bulk of this response. The open thread polls every three seconds and the face never changes, so a poll asks for `false` and keeps the one it already has. */
+                    counterpart?: boolean;
+                    limit?: number;
+                };
+                header?: never;
+                path: {
+                    conversationId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @description Who the conversation is with, or **null** when they have deleted their account (FR-573) — no name, no avatar and no identifier, because nothing was retained. Carried on the page rather than fetched separately so that the header, the composer's availability and the safety dialogs are all satisfied by one request. */
+                            counterpart: {
+                                /** Format: uuid */
+                                attendeeId: string;
+                                displayName: string;
+                                avatar: {
+                                    contentType: string;
+                                    base64: string;
+                                } | null;
+                            } | null;
+                            messages: {
+                                /** Format: uuid */
+                                messageId: string;
+                                body: string;
+                                /** Format: date-time */
+                                sentAt: string;
+                                mine: boolean;
+                            }[];
+                            nextCursor: string | null;
+                            /** @enum {string} */
+                            state: "open" | "one_sided" | "blocked";
+                        };
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description No such conversation, **or** one the caller does not participate in — deliberately indistinguishable, with an identical status and an identical body (FR-524). A 403 would confirm that a conversation between two specific people exists, and a conversation identifier is guessable. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        /**
+         * Send a message into a conversation
+         * @description Behind the participation guard, so the caller demonstrably has a `conversation_participants` row (FR-521, FR-523). The author is the sign-in session's attendee and there is no parameter in which to name anybody else (FR-525). `sentAt` in the response is the SERVER's instant: a device with a wrong clock must not be able to place its own message out of order in a thread.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    conversationId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** @description 1–2000 characters after trimming. Plain text only — attachments, images and rich formatting are out of scope (FR-513). */
+                        body: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** Format: uuid */
+                            messageId: string;
+                            /** Format: date-time */
+                            sentAt: string;
+                        };
+                    };
+                };
+                /** @description The body was empty, whitespace-only, or over the limit once trimmed. The composer disables send below the lower bound (FR-512) and shows a counter approaching the upper one (FR-517), so this is a backstop rather than the designed path. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description No such conversation, **or** one the caller does not participate in — deliberately indistinguishable, with an identical status and an identical body (FR-524). A 403 would confirm that a conversation between two specific people exists, and a conversation identifier is guessable. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description `message_send` is configured **`mayDeny: false`** (FR-511a, research R5), so this always carries `retry-after` and always clears. A send is delayed, never denied — a networking product's value is a timely reply, and an attendee whose message is refused at a conference has been handed a failure they cannot act on. */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                            retryAfterSeconds?: number;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/conversations/{conversationId}/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Advance the caller's own read position
+         * @description Idempotent and **monotonic**: a request naming an older message than the current position is accepted and changes nothing. Without that, an out-of-order arrival could silently mark a conversation unread again. Writes only the caller's own participant row — there is no route, and no field on any response, by which one attendee learns another's read position (FR-530).
+         */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    conversationId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        throughMessageId: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description No such conversation, **or** one the caller does not participate in — deliberately indistinguishable, with an identical status and an identical body (FR-524). A 403 would confirm that a conversation between two specific people exists, and a conversation identifier is guessable. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/blocks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Everyone this attendee has blocked
+         * @description The management surface FR-541 requires, served to the block's owner only. **This is the one place the feature discloses a profile detail outside a conversation**, and the disclosure is bounded rather than incidental: the caller already knows exactly who these people are, having blocked them by hand, and a list of opaque identifiers would be unusable for the single action it exists to support. An empty array is not an error — it is the "you have not blocked anyone" state FR-541a declares. There is no route, and no field anywhere, by which a blocked attendee learns they were blocked (FR-537).
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            blocks: {
+                                /** Format: uuid */
+                                attendeeId: string;
+                                displayName: string;
+                                avatar: {
+                                    contentType: string;
+                                    base64: string;
+                                } | null;
+                                /** Format: date-time */
+                                blockedAt: string;
+                            }[];
+                        };
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        /**
+         * Block an attendee. Idempotent
+         * @description Takes effect immediately (SC-506): the next send by the blocked attendee is refused whether or not they have the thread open, because the block is read on the send path itself and cached nowhere. **Blocking deletes nothing** (FR-538) — the blocker keeps every message either of them wrote, and unblocking restores sending with nothing lost.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        attendeeId: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Blocked, or already blocked. The same either way. */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Attempting to block yourself. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description No such attendee. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+            };
+        };
+        /**
+         * Unblock an attendee. Idempotent
+         * @description **Directional** (FR-540): this releases only the caller's block. If the other attendee also blocks the caller, that row is untouched and the caller is not told it exists. Succeeds whether or not a block was in force, so a stale management list cannot produce an error. The target is in the body rather than the path because a write route naming an attendee in its URL is forbidden outright by the route audit (FR-385) — the same shape `POST /blocks` uses.
+         */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        attendeeId: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Report an attendee, which also blocks them
+         * @description Blocks the reported attendee, writes the report, and dispatches operator mail — in that order, because the attendee's protection lands first (FR-544). **The response says nothing about what happens next**: there is no case identifier to quote and no status to poll, because there is no route that would answer either, and inventing one would promise the review surface FR-548 forbids building. The operator mail carries identifiers and a timestamp only — never the message text and never the reason string (research R11).
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        attendeeId: string;
+                        /** @description In the reporter's own words. The dialog disables its confirmation while this is blank (FR-546), so a 400 here means the form was bypassed. It is stored and swept after 90 days, and it never leaves the database. */
+                        reason: string;
+                        /** @description The reported messages, if any. Stored as an array with no foreign key, so it degrades honestly into a list of things that no longer exist once M3 removes them. */
+                        messageIds?: string[];
+                    };
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Empty reason, or reporting yourself. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description No such attendee. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/push/subscriptions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Register this device for notification delivery
+         * @description 201 for a new endpoint, 200 when the same one re-registers. **Re-subscription is a replacement rather than an accumulation** — a browser silently renews its subscription, and every renewal that left its predecessor behind would be a row the server tries and fails to deliver to forever. The endpoint is bound to the calling session, so a device signed into a different account reassigns it (FR-555).
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        endpoint: string;
+                        keys: {
+                            p256dh: string;
+                            auth: string;
+                        };
+                    };
+                };
+            };
+            responses: {
+                /** @description This endpoint re-registered; it now belongs here. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description A new device. */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Malformed subscription. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+            };
+        };
+        /**
+         * Surrender this device’s registration. Idempotent
+         * @description Drops **this device only** (FR-556); every other device the attendee has registered keeps receiving. **Not called on sign-out** — a subscription is per device, not per session (FR-555), and somebody who signs out on their phone still wants to hear about a reply. What drops one is revoking permission, the browser replacing the subscription, a permanent delivery failure (FR-557), or deleting the account.\n\nThe endpoint is in the body rather than the path: it is a full URL, frequently longer than is comfortable to percent-encode into a path segment, and putting it there would write it into every access log the request passes through.
+         */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        endpoint: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {

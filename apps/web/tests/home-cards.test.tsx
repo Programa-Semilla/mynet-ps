@@ -168,6 +168,30 @@ const SCENARIOS = {
  */
 const PROP_DRIVEN = new Set(['greeting-day-context'])
 
+/**
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ * **CARDS THAT RENDER NOTHING WHEN THERE IS NOTHING TO SAY — A DECLARED EXCEPTION TO SC-109,
+ * AND THE ONLY ONE.**
+ *
+ * The strict matrix above requires four distinguishable, non-empty bodies. 007's unread
+ * indicator cannot satisfy it, and the reason is a requirement rather than an oversight:
+ * **FR-531 says it renders nothing at zero.** An indicator is a thing that appears when there is
+ * something to indicate, and a permanent "no unread messages" card is noise in the first
+ * viewport on the overwhelming majority of loads — a viewport Principle III makes a success
+ * criterion.
+ *
+ * Its loading state is silent for the same reason: a skeleton that resolves to nothing would be
+ * a flicker on every single load, which is worse than the wait it reports.
+ *
+ * **This is not an exemption from the composition contract**, and the block at the bottom of this
+ * file is what makes that true: these cards still get a matrix, a narrower one. They must render
+ * **nothing** when loading and when empty, **something** when populated, and — the half that
+ * actually matters — a real, retryable failure state (FR-533, SC-517), because a dot that
+ * silently stops appearing would let an attendee conclude nobody had messaged them.
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ */
+const ABSENT_WHEN_NOTHING_TO_SAY = new Set(['unread-messages'])
+
 describe('every Home card in all four states (SC-109)', () => {
   beforeEach(() => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
@@ -202,7 +226,9 @@ describe('every Home card in all four states (SC-109)', () => {
    * registry exactly.
    * ═════════════════════════════════════════════════════════════════════════════════════════
    */
-  const dataBacked = HOME_CARDS.filter((card) => !PROP_DRIVEN.has(card.id))
+  const dataBacked = HOME_CARDS.filter(
+    (card) => !PROP_DRIVEN.has(card.id) && !ABSENT_WHEN_NOTHING_TO_SAY.has(card.id),
+  )
 
   it('no card is exempted that no longer exists', () => {
     // The sum of two complementary filters over one array is a tautology and was asserted as
@@ -210,7 +236,9 @@ describe('every Home card in all four states (SC-109)', () => {
     // silently holds a dead id while the renamed card quietly enters the strict matrix — or,
     // worse, a future edit adds an id here that never existed and exempts nothing visibly.
     expect(
-      [...PROP_DRIVEN].filter((id) => !HOME_CARDS.some((card) => card.id === id)),
+      [...PROP_DRIVEN, ...ABSENT_WHEN_NOTHING_TO_SAY].filter(
+        (id) => !HOME_CARDS.some((card) => card.id === id),
+      ),
       'these ids are exempted from the strict matrix but are not registered cards',
     ).toEqual([])
     expect(dataBacked.length, 'the strict matrix must cover something').toBeGreaterThan(0)
@@ -448,3 +476,106 @@ describe('the lead slot (FR-157)', () => {
     expect(new Set(ids).size).toBe(ids.length)
   })
 })
+
+/**
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ * **THE NARROWER MATRIX, for cards that are absent when there is nothing to say** (FR-531,
+ * FR-533, SC-517).
+ *
+ * These are not exempt from the composition contract — they are held to a *different* contract,
+ * and it is spelled out here so that "renders nothing" cannot quietly become "renders nothing,
+ * ever, including when it broke".
+ *
+ * The failure assertion is the load-bearing one. An indicator that vanished on failure would let
+ * an attendee conclude nobody had messaged them, which is worse than the failure it is hiding.
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ */
+describe('cards that are absent when there is nothing to say', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    vi.setSystemTime(new Date('2026-09-14T07:00:00Z'))
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.restoreAllMocks()
+  })
+
+  const absent = HOME_CARDS.filter((card) => ABSENT_WHEN_NOTHING_TO_SAY.has(card.id))
+
+  it('covers the declared set, or the exemption above is asserting nothing', () => {
+    expect(absent.length).toBe(ABSENT_WHEN_NOTHING_TO_SAY.size)
+  })
+
+  const renderCard = (
+    overrides: Parameters<typeof testServices>[0],
+    card: (typeof absent)[number],
+  ) =>
+    render(
+      <WithServices services={testServices(overrides)}>
+        <MemoryRouter>
+          <HomeShell cards={[card]} activeEvent={{ status: 'ready', event: SUMMIT }} />
+        </MemoryRouter>
+      </WithServices>,
+    )
+
+  describe.each(absent.map((card) => [card.id, card] as const))('%s', (_id, card) => {
+    it('renders NOTHING at all when there is nothing to say (FR-531)', async () => {
+      renderCard({ conversations: { ...quietConversations, hasUnread: async () => false } }, card)
+      await vi.advanceTimersByTimeAsync(0)
+
+      expect(
+        screen.queryByRole('region', { name: card.title }),
+        'An indicator appears when there is something to indicate. A permanent "nothing here" ' +
+          'card is noise in a first viewport Principle III makes a success criterion.',
+      ).not.toBeInTheDocument()
+    })
+
+    it('renders nothing WHILE LOADING either, so it cannot flicker', async () => {
+      renderCard(
+        {
+          conversations: { ...quietConversations, hasUnread: () => new Promise<boolean>(() => {}) },
+        },
+        card,
+      )
+
+      expect(screen.queryByRole('region', { name: card.title })).not.toBeInTheDocument()
+    })
+
+    it('renders something when there IS something to say', async () => {
+      renderCard({ conversations: { ...quietConversations, hasUnread: async () => true } }, card)
+      await vi.advanceTimersByTimeAsync(0)
+
+      const region = await screen.findByRole('region', { name: card.title })
+      expect((region.textContent ?? '').trim().length).toBeGreaterThan(0)
+    })
+
+    it('RENDERS A RETRYABLE FAILURE rather than vanishing (FR-533, SC-517)', async () => {
+      renderCard(
+        {
+          conversations: {
+            ...quietConversations,
+            hasUnread: async () => {
+              throw new Error('server fault')
+            },
+          },
+        },
+        card,
+      )
+      await vi.advanceTimersByTimeAsync(0)
+
+      const region = await screen.findByRole('region', { name: card.title })
+      expect(within(region).getByRole('alert')).toBeInTheDocument()
+      expect(within(region).getByRole('button', { name: /try again/i })).toBeInTheDocument()
+    })
+  })
+})
+
+/** The rest of the conversation repository, so each scenario varies one method and no more. */
+const quietConversations = {
+  list: async () => [],
+  hasUnread: async () => false,
+  openWith: async () => ({ conversationId: '', messageId: '', sentAt: '' }),
+  markRead: async () => {},
+}

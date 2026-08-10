@@ -64,6 +64,25 @@ const NOT_EXPORTED: Record<string, string> = {
   speakers: 'Seeded conference content (002).',
   sessions: 'Seeded conference content. Exported by title inside `savedSessions`.',
   session_speakers: 'A join between two pieces of seeded conference content (002).',
+
+  /**
+   * T018 (007) — the three conversation tables. **None of them holds content, and that is the
+   * whole reason the model is shaped this way** (research R10, data-model.md).
+   */
+  conversations:
+    'Holds no attendee data at all — an id, a creation time and a denormalised ' +
+    '`last_message_at`. No participant identifier by design (FR-573). The conversation id ' +
+    'appears in the export as context on each authored message.',
+  conversation_pairs:
+    'A uniqueness constraint given a row so it can cascade (research R10), not a record. Its ' +
+    'two columns are the *other* attendee half the time, and reproducing them would export a ' +
+    'list of everyone this attendee has ever talked to — which is precisely the relationship ' +
+    'metadata `conversations` was emptied to avoid retaining.',
+  conversation_participants:
+    'Membership plus a private read position. Membership is implied by the authored messages ' +
+    'the export does contain; `last_read_message_id` is a read position that FR-530 keeps ' +
+    'private even from the other participant, and it describes UI state rather than anything ' +
+    'the attendee authored.',
 }
 
 /**
@@ -88,6 +107,40 @@ const NOT_EXPORTED_COLUMNS: Record<string, string> = {
   'active_event_selections.attendee_id': 'The requester.',
   'saved_sessions.attendee_id': 'The requester.',
   'session_notes.attendee_id': 'The requester.',
+
+  // T018 (007).
+  'messages.id': 'A surrogate key with no meaning outside this database.',
+  'messages.author_id':
+    'The requester. The export contains authored messages only (FR-578), so this column is the ' +
+    'same value on every row — and it is a WHERE clause rather than a projection, which is what ' +
+    'makes the exclusion structural.',
+  'attendee_blocks.blocker_id': 'The requester.',
+  'abuse_reports.id': 'A surrogate key with no meaning outside this database.',
+  'abuse_reports.reporter_id': 'The requester.',
+  'push_subscriptions.id': 'A surrogate key with no meaning outside this database.',
+  'push_subscriptions.attendee_id': 'The requester.',
+
+  /**
+   * ═════════════════════════════════════════════════════════════════════════════════════════
+   * **The two columns this feature adds that are CREDENTIALS RATHER THAN CONTENT**
+   * (research R14).
+   *
+   * They look like ordinary text and they are not. Together, `p256dh_key` and `auth_key` are
+   * what lets a server encrypt and deliver a notification to one specific device — so
+   * reproducing them puts a *capability* into a file the attendee downloads, emails to
+   * themselves and keeps, which is the same failure the password hash and live reset tokens are
+   * kept out for.
+   *
+   * The export does not omit the subscription. It lists the endpoint and both timestamps, and
+   * marks the omission with `keysRedacted: true` so the reader is told rather than left to
+   * notice — the difference between a redaction and a gap.
+   * ═════════════════════════════════════════════════════════════════════════════════════════
+   */
+  'push_subscriptions.p256dh_key':
+    'A credential, not content (research R14). With `auth_key` it grants delivery to this ' +
+    'device. Exported as a redacted presence — see `keysRedacted` in the document.',
+  'push_subscriptions.auth_key':
+    'A credential, not content (research R14). See `p256dh_key` above.',
 }
 
 interface Column {
@@ -216,8 +269,56 @@ describe('export coverage (T095, FR-377)', () => {
       sessionNotes: true,
       signInSessions: true,
       avatar: true,
+      // 007. `Record<keyof AccountExport, true>` means adding a section to the document without
+      // acknowledging it here fails to compile — which is how these five arrived.
+      messages: true,
+      blocks: true,
+      reports: true,
+      pushSubscriptions: true,
+      exclusions: true,
     }
 
     expect(Object.keys(shape)).toContain('avatar')
+  })
+
+  /**
+   * T137 (007) — **the export says what it leaves out** (FR-578).
+   *
+   * ─────────────────────────────────────────────────────────────────────────────────────────
+   * FR-578 excludes received messages from the export, which is a declared divergence from
+   * standing decision 12's "every field collected". The divergence is defensible — a received
+   * message is primarily its author's personal data — and it is *only* defensible if the person
+   * reading their own export is told.
+   *
+   * Without this, an attendee with an empty `messages` section cannot distinguish "I wrote
+   * nothing" from "half of my correspondence was withheld". That is the failure this asserts
+   * against, which is why it checks the note is present **unconditionally** rather than only
+   * when something was in fact withheld.
+   * ─────────────────────────────────────────────────────────────────────────────────────────
+   */
+  it('declares the received-message exclusion in the document itself (FR-578)', () => {
+    const shape: Record<keyof AccountExport, true> = {
+      exportedAt: true,
+      account: true,
+      profile: true,
+      interests: true,
+      registrations: true,
+      activeConference: true,
+      savedSessions: true,
+      sessionNotes: true,
+      signInSessions: true,
+      avatar: true,
+      messages: true,
+      blocks: true,
+      reports: true,
+      pushSubscriptions: true,
+      exclusions: true,
+    }
+
+    expect(
+      Object.keys(shape),
+      'The export must carry an `exclusions` section. FR-578 withholds received messages, and ' +
+        'an unexplained omission is indistinguishable from an attendee who wrote nothing.',
+    ).toContain('exclusions')
   })
 })

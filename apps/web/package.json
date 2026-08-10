@@ -6,9 +6,9 @@
   "description": "MyNet client — installable PWA (constitution Principle VI)",
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && vite build",
+    "build": "tsc --noEmit && tsc --noEmit -p tsconfig.sw.json && vite build",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.sw.json"
   },
   "dependencies": {
     "@mynet/data": "workspace:*",
@@ -32,6 +32,10 @@
     "tailwindcss": "^4.3.3",
     "typescript": "6.0.3",
     "vite": "^8.2.0",
-    "vite-plugin-pwa": "^1.3.0"
+    "vite-plugin-pwa": "^1.3.0",
+    "workbox-core": "^7.4.1",
+    "workbox-precaching": "^7.4.1",
+    "workbox-routing": "^7.4.1",
+    "workbox-window": "^7.4.1"
   }
 }

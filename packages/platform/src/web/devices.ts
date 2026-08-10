@@ -7,9 +7,12 @@ import type {
   SecureStorage,
 } from '../interfaces/index.js'
 import { WebConnectivityService } from './connectivity.js'
+import { WebNotificationService } from './notifications.js'
+import { WebVisibilityService } from './visibility.js'
 
 /**
- * T105 — web implementations of all six device capabilities (FR-046).
+ * T105 — web implementations of every device capability (FR-046). Six at 001; seven since 007
+ * added visibility, which `interfaces/index.ts` argues in place.
  *
  * ─────────────────────────────────────────────────────────────────────────────────────────
  * **Every one returns a defined result appropriate to its contract.** None throws "not
@@ -27,24 +30,24 @@ import { WebConnectivityService } from './connectivity.js'
  */
 
 /**
- * T107 — **not wired to real delivery, deliberately.**
+ * T116 (007) — **now wired to real delivery**, and the swap this file was shaped for.
  *
- * Notifications are out of product scope until a recorded decision brings them in (constitution,
- * Technology and Architecture Constraints). The interface exists so feature code has something
- * to call and so the eventual implementation is a swap rather than a refactor. Reporting
- * `isSupported() === false` and `'unsupported'` is truthful: MyNet does not deliver
- * notifications, whatever the browser is capable of.
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ * What stood here was a deliberate no-op reporting `isSupported() === false`, with a comment
+ * saying *"Do not 'finish' this by calling `Notification.requestPermission()`. Asking an attendee
+ * for a permission the product will not use is worse than not asking."*
  *
- * Do not "finish" this by calling `Notification.requestPermission()`. Asking an attendee for a
- * permission the product will not use is worse than not asking.
+ * That was right while register entry 10 stood. **Constitution 3.1.0 reversed it** — delivery is
+ * in scope for a received message and nothing else — so the product now uses the permission, and
+ * the instruction is satisfied rather than overridden. `WebNotificationService` also records why
+ * it is a class in its own file rather than four lines here.
+ *
+ * 001's claim that the eventual implementation would be "a swap rather than a refactor" is worth
+ * noting as having held: nothing calling this interface changed.
+ * ─────────────────────────────────────────────────────────────────────────────────────────
  */
-const notifications: NotificationService = {
-  isSupported: () => false,
-  requestPermission: async () => 'unsupported' as const,
-  show: async () => {
-    // Defined result: completes without effect. See above.
-  },
-}
+const notificationsWith = (vapidPublicKey?: string): NotificationService =>
+  new WebNotificationService(vapidPublicKey)
 
 /** T107 — also out of scope until a recorded decision. Same reasoning as notifications. */
 const calendar: CalendarService = {
@@ -94,9 +97,19 @@ const secureStorage: SecureStorage = {
   clear: async () => {},
 }
 
-export const webDevices = (): DeviceServices => ({
+/**
+ * 007 — `webDevices` now takes configuration, and it takes exactly one thing.
+ *
+ * The VAPID public key comes from the composition root, which is the one module permitted to read
+ * `import.meta.env`. Optional, because its absence is the expected state (register entry 20) and a
+ * client with no key must still start: the attendee gets the whole product minus delivery.
+ */
+export const webDevices = (options: { vapidPublicKey?: string } = {}): DeviceServices => ({
   connectivity: new WebConnectivityService(),
-  notifications,
+  // 007 — the seventh capability. `interfaces/index.ts` records why it exists rather than
+  // `useConversation.ts` reading `document.visibilityState` behind a lint exemption.
+  visibility: new WebVisibilityService(),
+  notifications: notificationsWith(options.vapidPublicKey),
   calendar,
   camera,
   contactShare,

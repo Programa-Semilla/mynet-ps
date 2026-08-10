@@ -164,7 +164,7 @@ describe('accessibility of the surfaces 004 introduces (SC-310)', () => {
 
   describe('the account surface', () => {
     it('names the discoverability control and describes its effect', async () => {
-      renderWith(<Account />)
+      const { container } = renderWith(<Account />)
 
       const control = await screen.findByLabelText(/let attendees at my conferences find me/i)
       expect(control).toBeInTheDocument()
@@ -173,7 +173,24 @@ describe('accessibility of the surfaces 004 introduces (SC-310)', () => {
       // switch position, which for an unverified attendee would be actively misleading.
       const described = control.getAttribute('aria-describedby')
       expect(described).toBeTruthy()
-      expect(screen.getByRole('status', { name: '' }).textContent?.length ?? 0).toBeGreaterThan(0)
+
+      // ───────────────────────────────────────────────────────────────────────────────────────
+      // **Looked up by the id the control actually points at**, rather than by asking the page
+      // for "the status region".
+      //
+      // The role query was unambiguous while this surface had exactly one live region. 007 adds
+      // the block-management list (FR-541a), whose loading state is legitimately a `status` too —
+      // so `getByRole('status')` now finds two and throws. That is the same collision 006
+      // recorded on Discover, and the fix is the same: one live region can only be *the* status
+      // of a control that names it.
+      // ───────────────────────────────────────────────────────────────────────────────────────
+      // Found through the rendered container rather than through `document`, because
+      // `mynet/no-direct-platform-access` counts a bare DOM global here as it does anywhere else
+      // in `apps/web` — and a test is not the place to start making exceptions to SC-008.
+      const description = container.querySelector(`#${CSS.escape(described as string)}`)
+      expect(description, 'the control points at an element that exists').not.toBeNull()
+      expect(description).toHaveAttribute('role', 'status')
+      expect(description?.textContent?.length ?? 0).toBeGreaterThan(0)
     })
 
     it('names the export and deletion controls unambiguously', async () => {

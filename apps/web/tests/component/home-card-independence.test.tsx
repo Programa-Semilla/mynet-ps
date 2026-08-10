@@ -113,6 +113,23 @@ describe('Home when one card fails', () => {
         save: async () => {},
         unsave: async () => {},
       },
+      // ───────────────────────────────────────────────────────────────────────────────────────
+      // 007 — **every read means every read.** The unread indicator renders nothing at zero
+      // (FR-531), so leaving its repository at the quiet default would have this assertion
+      // failing for the wrong reason: the card would be absent because it had nothing to say
+      // rather than because it vanished on failure.
+      //
+      // Failing it is what the test is actually about — a dot that silently stops appearing
+      // would let an attendee conclude nobody had messaged them (FR-533, SC-517).
+      // ───────────────────────────────────────────────────────────────────────────────────────
+      conversations: {
+        list: async () => [],
+        hasUnread: async () => {
+          throw new Error('server fault')
+        },
+        openWith: async () => ({ conversationId: '', messageId: '', sentAt: '' }),
+        markRead: async () => {},
+      },
     })
 
     // Every card keeps its place in the layout and says what is true, rather than disappearing

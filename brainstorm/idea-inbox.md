@@ -209,3 +209,30 @@ An entry is removed once a brainstorm document has been written from it.
 - **Summary**: The directory's read-path avatar repair decodes an image and writes to storage during a GET, for a case its own comment says does not exist.
 
 > The comment states there is no production avatar to backfill because the product has never been deployed, and that the repair exists only for a developer whose database predates the change — who is equally served by re-running the seed. It is now concurrency-bounded, but it remains a request path that mutates storage, which contradicts the upload-time decision recorded beside it.
+
+### session-write-per-request
+
+- **Source**: deep-review
+- **Date**: 2026-08-08
+- **Reference**: feat/007-messages-and-notification-delivery
+- **Summary**: `requireAttendee` issues an unconditional `UPDATE auth_sessions` on every authenticated request. 007's three-second thread poll turns that into roughly twenty row writes per minute per attendee with a thread open.
+
+> Pre-existing 001/004 infrastructure that this feature made hot rather than a defect it introduced, which is why it was not fixed in 007's review loop. On a burstable Standard_B2s with a loopback PostgreSQL sharing two vCPUs, each write is also a dead tuple on a narrow hot table plus a WAL record. The shape that preserves the semantics is a refresh threshold — write only when the session is materially stale, several minutes inside the idle window — which drops the rate by two orders of magnitude and changes nothing an attendee can observe. Changing session-expiry behaviour is an owner decision.
+
+### read-path-unthrottled
+
+- **Source**: deep-review
+- **Date**: 2026-08-08
+- **Reference**: feat/007-messages-and-notification-delivery
+- **Summary**: The poll interval is entirely client-controlled and the server bounds nothing. The throttle is wired to the two write routes only; the message-page read has no throttle, no cache header and no minimum interval.
+
+> Spec open question 6 left "what the poll costs on a phone at a venue" open. The client-side half was answered — it stops when the tab is hidden and when no thread is open — and the server-side half was not. In a product with public self sign-up, one modified client can consume the box's read capacity, and a future feature could shorten the interval without anyone seeing the server-side cost. Either add a `read`-class throttle action configured `mayDeny: false` and keyed on the attendee, or record explicitly that read frequency is deliberately unbounded so the next feature inherits it as a choice.
+
+### vapid-config-duplication
+
+- **Source**: deep-review
+- **Date**: 2026-08-08
+- **Reference**: feat/007-messages-and-notification-delivery
+- **Summary**: Two of the four server-side `push` config members exist only to police each other. `PUSH_VAPID_SUBJECT` is read by nothing, and the API's `PUSH_VAPID_PUBLIC_KEY` is a second copy of a value the client reads from its own `VITE_` variable.
+
+> Not a defect while the sink adapter is the only implementation — reserving the VAPID triple is a reasonable hedge for register entry 20. Worth settling when the real adapter lands: confirm it reads all three, and decide whether the API should *serve* the public key to the client rather than having it duplicated across two environment variables that nothing checks agree. Two sources for one key is the drift this codebase refuses elsewhere.

@@ -2,7 +2,9 @@ import 'fastify'
 import type { FastifyReply, FastifyRequest } from 'fastify'
 
 import type { MailService } from '../mail/service.js'
+import type { PushService } from '../notifications/service.js'
 import type { EventScope } from '../plugins/event-access.js'
+import type { ConversationScope } from '../plugins/participation.js'
 import type { StorageService } from '../storage/service.js'
 
 /**
@@ -35,6 +37,21 @@ declare module 'fastify' {
      * handler reads it through `eventScopeOf` rather than directly.
      */
     eventScope?: EventScope
+    /**
+     * 007 — proof that the attendee participates in the conversation named in the path
+     * (FR-523).
+     *
+     * Set only by `requireParticipation`, the only module that can construct one. A handler
+     * reads it through `conversationScopeOf` rather than directly.
+     *
+     * **A sibling of `eventScope`, not a replacement for it, and the two never both apply.**
+     * Conversations are cross-event (FR-507), so no conversation route carries an `:eventId`
+     * and no per-event route carries a `:conversationId`. That disjointness is what lets the
+     * two route audits stay separate — and it is also why the event audit walks past these
+     * routes without inspecting them, which is the whole reason the second guard exists
+     * (research R9).
+     */
+    conversationScope?: ConversationScope
   }
 
   interface FastifyInstance {
@@ -45,6 +62,13 @@ declare module 'fastify' {
      * `request.eventScope`, or refuses indistinguishably from a nonexistent event (FR-148).
      */
     requireEventAccess: (request: FastifyRequest, reply: FastifyReply) => Promise<void>
+    /**
+     * 007 — route-level participation guard. Verifies a `conversation_participants` row for
+     * `:conversationId` and populates `request.conversationScope`, or refuses with **404 rather
+     * than 403** (FR-524) — a 403 would confirm that a conversation between two specific people
+     * exists, which is the metadata this destination exists to keep private.
+     */
+    requireParticipation: (request: FastifyRequest, reply: FastifyReply) => Promise<void>
     /**
      * 004 — durable binary content, behind a project-owned port (FR-352, research D3).
      *
@@ -61,5 +85,13 @@ declare module 'fastify' {
      * `send`, which is what keeps the engagement-notification exclusion structural.
      */
     mail: MailService
+    /**
+     * 007 — notification delivery, behind a **vendor-free** port (FR-559, research R8).
+     *
+     * No push provider is chosen (register entry 20), so the sink adapter is what a clean clone,
+     * the test suite and CI all run. A route calls this and cannot tell which adapter it received
+     * — the same property `mail` above relies on.
+     */
+    push: PushService
   }
 }

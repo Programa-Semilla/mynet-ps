@@ -5,6 +5,8 @@ import { describe, expect, it } from 'vitest'
 
 import { PASSWORD_MIN_LENGTH as RESET_PASSWORD_MIN } from '../../src/app/auth/ResetPassword.js'
 import { PASSWORD_MIN_LENGTH as SIGN_UP_PASSWORD_MIN } from '../../src/app/auth/SignUp.js'
+import { MESSAGE_MAX_LENGTH } from '@mynet/data'
+
 import { LIMITS } from '../../src/app/profile/ProfileEdit.js'
 
 /**
@@ -120,4 +122,36 @@ describe("the client's copies of the server's validation bounds", () => {
    * `hasAvatar` and could carry it). Recorded in review-findings.md rather than resolved.
    */
   it.todo('holds the avatar prose to the server bound once that bound is knowable to the client')
+
+  /**
+   * 007's bound — the third hand-copied limit, and the one this file did not grow to cover.
+   *
+   * ═══════════════════════════════════════════════════════════════════════════════════════════
+   * `MESSAGE_MAX_LENGTH` is declared twice: `packages/data/src/interfaces/messages.ts` (which
+   * `Composer` uses to compute `sendable`, the remaining-characters counter and its threshold)
+   * and `apps/api/src/db/queries/messages.ts` (the schema bound and the trimmed-length check).
+   * Nothing checked they agreed — the exact failure this file exists for, added by a later
+   * feature that did not extend it.
+   *
+   * Both directions are defects an attendee sees. Raise the server's limit and the send button
+   * disables at the client's lower number, refusing a message the server would accept. Lower it
+   * and the button enables for one the server rejects with a 400 — the post-submit error FR-512
+   * and FR-517 both forbid.
+   * ═══════════════════════════════════════════════════════════════════════════════════════════
+   */
+  it("the message limit matches the route's published bound (FR-512, FR-517)", () => {
+    const body = bodyProperties('/conversations/{conversationId}/messages', 'post')['body']
+
+    expect(
+      body?.maxLength,
+      'The route publishes a bound and the composer enforces its own copy. If these disagree, ' +
+        'one of them is lying to an attendee about what they may send.',
+    ).toBeGreaterThanOrEqual(MESSAGE_MAX_LENGTH)
+
+    // The route deliberately publishes a *larger* wire bound than the trimmed limit, so a body
+    // that is only over because of whitespace is rejected by the trimmed check with a message
+    // rather than by the schema with a generic 400. Asserting the relationship rather than
+    // equality keeps that deliberate slack visible instead of looking like a mismatch.
+    expect(body?.maxLength).toBeLessThanOrEqual(MESSAGE_MAX_LENGTH * 2)
+  })
 })

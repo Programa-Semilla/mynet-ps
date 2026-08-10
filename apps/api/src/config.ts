@@ -30,6 +30,22 @@ const optional = (name: string, fallback: string): string => {
   return value === undefined || value.trim() === '' ? fallback : value
 }
 
+/**
+ * T002 (007) — a setting whose **absence is a legitimate, expected state**.
+ *
+ * Distinct from `optional` on purpose. `optional` substitutes a working default, so its callers
+ * can never tell configured from defaulted; these settings have no sensible default — there is no
+ * stand-in for a VAPID key or an operator's address — and the code that reads them must branch on
+ * whether one was supplied. Returning `undefined` rather than `''` makes that branch a type
+ * obligation instead of a truthiness check somebody can forget.
+ *
+ * Whitespace collapses to `undefined` so an empty value in a `.env` means the same as no line.
+ */
+const absent = (name: string): string | undefined => {
+  const value = process.env[name]
+  return value === undefined || value.trim() === '' ? undefined : value
+}
+
 const positiveInt = (name: string, fallback: number): number => {
   const raw = process.env[name]
   if (raw === undefined || raw.trim() === '') return fallback
@@ -169,6 +185,63 @@ export interface AppConfig {
      * would make a clean clone fail to boot over a setting nothing local consumes.
      */
     readonly from: string
+    /**
+     * T002 (007) — where abuse reports are mailed (FR-547).
+     *
+     * ───────────────────────────────────────────────────────────────────────────────────────
+     * **Optional, and its absence is the expected state.** Spec open question 3 leaves the
+     * operator address undecided, and it gates configuration only — never the code path. A
+     * report still blocks the reported attendee and still writes its row when this is unset;
+     * only the dispatch has nowhere to go, and FR-549 already requires that failure to be
+     * isolated from the two effects that matter.
+     *
+     * Required here would make a clean clone fail to boot over an address nothing local
+     * consumes, exactly as `from` above records for the same reason.
+     * ───────────────────────────────────────────────────────────────────────────────────────
+     */
+    readonly operatorAddress: string | undefined
+  }
+  /**
+   * T002 (007) — Web Push delivery (FR-550–FR-559, research R8).
+   *
+   * ═════════════════════════════════════════════════════════════════════════════════════════
+   * **EVERY MEMBER IS OPTIONAL, AND AN UNPROVISIONED PROVIDER IS THE EXPECTED STATE.**
+   *
+   * This mirrors `mail` deliberately. `apps/api/src/mail/service.ts` records the reasoning in
+   * full: no provider is chosen, so the unconfigured case is the normal one and the sink
+   * adapter is what a clean clone, the test suite and CI all run. Spec open question 2 blocks
+   * the *real* adapter and nothing else.
+   *
+   * Making these `required()` would invert that — a developer with no VAPID keys could not
+   * start the API at all, over a capability FR-552 says every attendee must be able to decline.
+   * ═════════════════════════════════════════════════════════════════════════════════════════
+   */
+  readonly push: {
+    /**
+     * The VAPID key pair identifying this server to the push service.
+     *
+     * Both halves or neither: a public key without its private key cannot sign, and a private
+     * key without its public half cannot be handed to a subscribing client. `loadConfig`
+     * refuses the half-configured case rather than starting and failing at first delivery.
+     *
+     * **The private key is a secret** and is read here, like every other secret (FR-041).
+     */
+    readonly vapidPublicKey: string | undefined
+    readonly vapidPrivateKey: string | undefined
+    /**
+     * The `mailto:` or `https:` contact the push service is given for this deployment, per the
+     * VAPID specification — it is how a push service reaches an operator whose sender is
+     * misbehaving. Defaulted, because it is contact information rather than a credential.
+     */
+    readonly vapidSubject: string
+    /**
+     * How long a single delivery attempt is given before it is abandoned (research R8).
+     *
+     * Delivery failure must never fail the send that triggered it, which FR-318a established
+     * for verification mail and R8 carries forward here. A timeout is what makes that true when
+     * the push service hangs rather than refuses.
+     */
+    readonly dispatchTimeoutMs: number
   }
 }
 
@@ -251,6 +324,30 @@ export const loadConfig = (): AppConfig => {
     },
     mail: {
       from: optional('MAIL_FROM', 'MyNet <no-reply@mynet.invalid>'),
+      // 007 — undecided by spec open question 3. Absent is normal; see the interface.
+      operatorAddress: absent('MAIL_OPERATOR_ADDRESS'),
+    },
+    push: {
+      // 007 — undecided by spec open question 2. Absent is normal; the sink adapter runs.
+      vapidPublicKey: absent('PUSH_VAPID_PUBLIC_KEY'),
+      vapidPrivateKey: absent('PUSH_VAPID_PRIVATE_KEY'),
+      vapidSubject: optional('PUSH_VAPID_SUBJECT', 'mailto:no-reply@mynet.invalid'),
+      // Ten seconds. Long enough for a slow push service, short enough that a hung one cannot
+      // hold a message send open — the send has already succeeded by the time this runs.
+      // ═══════════════════════════════════════════════════════════════════════════════════════
+      // **THREE SECONDS, NOT TEN, BECAUSE THIS IS AWAITED INSIDE THE SEND.**
+      //
+      // `notifyRecipient` is awaited on the message-send path — deliberately, so SC-503's latency
+      // is measurable and no error escapes as an unhandled rejection. The cost of that choice is
+      // that this timeout is added to the one request an attendee is actually waiting on: at ten
+      // seconds, a push service that *hangs* rather than refuses left the sender's composer
+      // disabled and their own message unrendered for ten seconds.
+      //
+      // A push service that has not accepted a 4 KB POST within three seconds will not improve
+      // the recipient's experience by being waited on for seven more, and the outcome is already
+      // the right one — `'failed'`, which is retried later rather than discarded (FR-557).
+      // ═══════════════════════════════════════════════════════════════════════════════════════
+      dispatchTimeoutMs: positiveInt('PUSH_DISPATCH_TIMEOUT_MS', 3_000),
     },
   }
 
@@ -262,6 +359,27 @@ export const loadConfig = (): AppConfig => {
       `AUTH_RESET_BRANCH_BUDGET_MS is ${budgetMs}ms, below the ${RESET_BRANCH_BUDGET_FLOOR_MS}ms ` +
         `floor. Below that, the reset-request branch becomes timeable and reports whether an ` +
         `address has an account (FR-327).`,
+    )
+  }
+
+  /**
+   * T002 (007) — **both VAPID halves, or neither.**
+   *
+   * Half-configured is the one push state that is never intentional, and it fails in the worst
+   * possible way: the API starts, the client is handed a public key, the device subscribes
+   * successfully, and every delivery then fails at signing time — long after the attendee was
+   * told notifications were on. Refusing at boot converts that into a deployment that does not
+   * start, which is the failure an operator can actually see.
+   *
+   * Neither key set remains entirely normal: that is the unprovisioned state, and the sink
+   * adapter serves it.
+   */
+  const { vapidPublicKey, vapidPrivateKey } = cached.push
+  if ((vapidPublicKey === undefined) !== (vapidPrivateKey === undefined)) {
+    throw new Error(
+      'PUSH_VAPID_PUBLIC_KEY and PUSH_VAPID_PRIVATE_KEY must be set together or not at all. ' +
+        'Exactly one is set, which starts the API, lets devices subscribe, and then fails every ' +
+        'delivery at signing time. Leave both unset to run the sink adapter.',
     )
   }
 

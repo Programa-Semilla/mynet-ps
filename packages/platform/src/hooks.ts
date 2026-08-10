@@ -7,6 +7,7 @@ import type {
   ContactShareService,
   NotificationService,
   SecureStorage,
+  VisibilityService,
 } from './interfaces/index.js'
 import { PlatformContext, type PlatformServices } from './registry.js'
 
@@ -93,6 +94,44 @@ export const useDirectoryRepository = (): PlatformServices['repositories']['dire
   usePlatform().repositories.directory
 
 /**
+ * 007 — private 1:1 conversations, and what was said in them.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ * **Two hooks rather than one, unlike the directory's, and the split follows the interfaces.**
+ * `ConversationRepository` answers *which conversations exist and is anything waiting*;
+ * `MessageRepository` answers *what was said and how to say something*. Home's unread card is
+ * the reason that matters in practice: it needs the first and must never acquire the second, so
+ * that a card rendering a dot cannot start reading correspondence.
+ *
+ * **Neither is cached** (FR-563). Nothing here is readable offline, and the composition root
+ * declares the refusal where the wiring happens.
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ */
+export const useConversationRepository = (): PlatformServices['repositories']['conversations'] =>
+  usePlatform().repositories.conversations
+
+export const useMessageRepository = (): PlatformServices['repositories']['messages'] =>
+  usePlatform().repositories.messages
+
+/**
+ * 007 — refusing contact, and reporting conduct.
+ *
+ * **Separate hooks, because they are separate acts.** A surface that lets somebody block does not
+ * thereby need to file reports, and `ReportRepository` is write-only (FR-548) — pairing it with
+ * blocks would put a write-only capability in the hands of every surface that lists them.
+ */
+export const useBlockRepository = (): PlatformServices['repositories']['blocks'] =>
+  usePlatform().repositories.blocks
+
+export const useReportRepository = (): PlatformServices['repositories']['reports'] =>
+  usePlatform().repositories.reports
+
+/** 007 — where this device is reachable for notification delivery (FR-553-FR-557). */
+export const usePushSubscriptionRepository =
+  (): PlatformServices['repositories']['pushSubscriptions'] =>
+    usePlatform().repositories.pushSubscriptions
+
+/**
  * 005 — when the content on screen was retrieved, or `null` when it is live (FR-216).
  *
  * A component calls this to render the staleness stamp. It learns nothing about caching from
@@ -110,6 +149,31 @@ export const useAuthGateway = (): PlatformServices['auth'] => usePlatform().auth
  * connectivity is the one capability whose *value* the UI reacts to, and making every caller
  * wire up its own subscription would guarantee that some caller forgets to unsubscribe.
  */
+/**
+ * T063 (007) — whether the attendee is actually looking at this tab (research R4).
+ *
+ * Returns the current value and re-renders on change, exactly as `useConnectivity` does and for
+ * the same reason: visibility is an ambient state the UI *reacts* to, and making every caller
+ * wire up its own subscription would guarantee that some caller forgets to unsubscribe.
+ *
+ * The one consumer today is the open thread's poll, which must not run in a background tab —
+ * see `VisibilityService` for why that condition needed a capability rather than a lint
+ * exemption.
+ */
+export const useDocumentVisible = (): boolean => {
+  const visibility: VisibilityService = usePlatform().devices.visibility
+  const [visible, setVisible] = useState(() => visibility.isVisible())
+
+  useEffect(() => {
+    // Re-read on mount: the value may have changed between the initial render and the
+    // subscription being attached.
+    setVisible(visibility.isVisible())
+    return visibility.subscribe(setVisible)
+  }, [visibility])
+
+  return visible
+}
+
 export const useConnectivity = (): boolean => {
   const connectivity: ConnectivityService = usePlatform().devices.connectivity
   const [online, setOnline] = useState(() => connectivity.isOnline())

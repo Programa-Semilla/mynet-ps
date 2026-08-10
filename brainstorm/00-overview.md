@@ -1,6 +1,6 @@
 # Brainstorm Overview
 
-Last updated: 2026-08-07 (006 implemented)
+Last updated: 2026-08-08 (#06 — Messages built through User Story 6; Web Push gated)
 
 The authoritative registers live elsewhere — open questions in `.specify/memory/constitution.md`,
 delivery sequence in `docs/superpowers/specs/2026-08-06-mynet-delivery-roadmap-design.md`. This file
@@ -17,6 +17,43 @@ win and this is stale.
 | 03 | 2026-08-07 | agenda-and-saved-sessions | shipped (PR #8) | `specs/005-agenda-and-saved-sessions/` |
 | 04 | 2026-08-07 | attendee-identity-and-profile | shipped (PR #12) | `specs/004-attendee-identity-and-profile/` |
 | 05 | 2026-08-07 | discover-and-the-deployment-platform | ratified in constitution **v3.0.0** | `specs/006-discover-and-deployment-platform/` |
+| 06 | 2026-08-07 | messages-and-notification-delivery | **implemented in full**, including Web Push; its amendment ratified in constitution **v3.1.0** | `specs/007-messages-and-notification-delivery/` |
+
+Session 05 has no document of its own: 006 was specified without one, and the row records the
+session rather than a file.
+
+## What 007 delivered, and what it deliberately did not
+
+**Delivered and green**: private 1:1 conversations, permanent and independent of the active event;
+the thread with its three-second visible-only poll; block and report, both server-enforced, with
+reports leaving the product as operator mail nothing inside it can read; per-participant unread
+state and Home's indicator; and deletion honesty in both directions.
+
+**Delivered after the amendment**: Web Push (User Story 5). It implements owner decision **M4**,
+which register entry 10 forbade until **constitution v3.1.0** resolved that entry in part —
+delivery in, for a received message and nothing else; **the bell and an in-app notification centre
+still out**. The same amendment ratified the two things needing it alongside: the
+`VisibilityService` capability — a seventh where Principle V named six — and the operator address
+abuse reports are dispatched to. That is why this session is numbered 06 while the phase it covers
+is 007.
+
+**What that half is**: a vendor-free `PushService` port with a recording sink adapter, per-device
+subscriptions keyed on the endpoint, a hand-written service worker carrying the offline shell's
+behaviour across from the generated one, and a permission surface that explains itself before it
+asks. **It ships unconfigured on purpose**: with no VAPID keys and no provider — register entry 20,
+still open — the sink records, the client never asks, and Messages is unaffected, because FR-552
+makes a denied permission a *complete* product rather than a degraded one.
+
+**Outstanding**: T148 — walking `quickstart.md` by hand with two browser profiles. Scenario 5 was
+walked and **found two defects nothing else could**: `pnpm start` could not register a service
+worker at all (so notifications were untestable from the one-command setup), and a private window
+cannot hold a push subscription while the product told the attendee to "try again". Scenarios 1–4
+and 6 are still unwalked, and it remains the only review the two-pane desktop layout has had.
+
+**The provider half of register entry 20 turned out not to exist.** Web Push signs with the
+project's own VAPID pair and posts to whatever endpoint the browser issued — no account, no SDK, no
+third party. What is genuinely open is key custody per environment and rotation. The constitution
+still words the entry as "the push provider" and should probably be amended.
 
 ## Delivery queue
 
@@ -31,7 +68,7 @@ the index, and it now differs from the roadmap in the ways #02 records.
 | 004 | Attendee Identity, Personal Data & Profile | **shipped** — 131/131 tasks, squash-merged to `develop` ([#12](https://github.com/Programa-Semilla/mynet-ps/pull/12)); scope well beyond the roadmap's | — |
 | 005 | Agenda | **shipped** — 94/94 tasks, squash-merged to `develop` ([#8](https://github.com/Programa-Semilla/mynet-ps/pull/8)) | 002 ✓ |
 | 006 | Discover, and the deployment platform | **implemented** — awaiting the two owner decisions that gate the first deploy (a domain, an Azure subscription). Migration `0005`: five indexes and one extension, **no new table and no new column** | 004 ✓ |
-| 007 | Messages | **next** | 004 ✓, 006 ✓ |
+| 007 | Messages **and the notification-delivery platform** | **shipped** — squash-merged to `develop`. Web Push delivers for real, verified end to end on a desktop. T148's by-hand walkthrough is partial (scenario 5 only) and carries forward. Migration `0006` | 004 ✓, 006 ✓ |
 | 008 | Network & Appointments | queued (∥ 009) | connection model; card-exchange semantics |
 | 009 | Session Q&A | queued (∥ 008) | question attribution |
 | 010 | Launch Readiness | queued | brand assets; client validation of desktop |
@@ -69,6 +106,23 @@ casts** removed before its own repository work (FR-497 required that order, and 
 fifteen in the idea inbox), and the two index findings 004's review deliberately left for whichever
 feature owned the next migration number.
 
+**007 departs from the roadmap in one large way, decided by the owner in #06.** The roadmap scopes
+it as conversations, thread, compose, unread and the Discover wiring. As brainstormed it also
+carries **the whole Web Push notification-delivery platform** — a service-worker push handler, a
+per-device subscription store, VAPID key custody, a provider integration, a permission surface and
+delivery-failure handling. That reverses the engagement-notification exclusion that has held since
+001 and wires `NotificationService` to real delivery for the first time, so it needs its own
+numbered standing decision and a constitution version bump before the specification is written.
+Delivering it as one feature and one PR was chosen over the recommended split; 004 shipped as a
+single 131-task PR and this is larger, so `speckit-spex-collab-phase-split` after planning is the
+mitigation rather than a scope change.
+
+007 also ships **block and report**, which the roadmap does not scope at all. They are not
+enhancements: open send plus indefinite reachability creates a contact path no attendee can close,
+in a product with public self sign-up and no moderator by construction. Reporting resolves to an
+**operator** mailbox rather than an in-product actor, which is what keeps it clear of the organizer
+exclusion — no admin interface, no privileged role, no reader inside the app.
+
 ## Open Threads
 
 ### Client decisions
@@ -77,7 +131,11 @@ Each names the phase it blocks — when to ask matters as much as what to ask.
 
 - **The connection model behind Network contacts** — the prototype derives contacts from
   conversations, with no connect or accept action, so there is no relationship to store.
-  *Blocks 008 entirely* (from #01 revisit)
+  *Blocks 008 entirely* (from #01 revisit). **#06 deliberately did not answer this**, choosing open
+  send precisely so the decision stays with the client — but it did make one half binding: under
+  open send a conversation is a *unilateral* act, so **008 must not derive contacts from
+  conversations**. Doing so would let a stranger insert themselves into another attendee's Network
+  (narrowed 2026-08-07 by #06)
 - **What a digital-card exchange records, and whether it is mutual.** *Blocks 008 entirely*
   (from #01 revisit)
 - **Audience-question attribution** — attributed to the author or anonymous. Decides whether Q&A is
@@ -103,14 +161,34 @@ Each names the phase it blocks — when to ask matters as much as what to ask.
 - **Authentication ownership** — self-implemented or a delegated provider (from #01 revisit)
 - **The transactional email provider.** #04 settled that verification and password-reset mail is
   sent and that it is distinct from the excluded notification delivery; by whom is undecided.
-  *Needed by 004* (added 2026-08-07 by #04)
+  *Needed by 004* (added 2026-08-07 by #04). **#06 enlarged what depends on it**: reports are
+  delivered to an operator by mail, so the safety path in 007 now rests on this too — and #04's
+  "distinct from the excluded notification delivery" no longer holds, because #06 brought that
+  delivery in
+- **The Web Push provider, and VAPID key custody.** The project's second external dependency and
+  secret. #06 brought engagement notification delivery into scope, which wires `NotificationService`
+  to real delivery for the first time since 001 declared it a deliberate no-op. Plausibly answered
+  together with the mail provider above. *Blocks 007* (added 2026-08-07 by #06)
+- **The operator address a report is emailed to, and the response expectation attached to it.**
+  #06 resolved reports to an operator rather than an in-product actor, which is what keeps them
+  clear of the organizer exclusion — but it creates an obligation the project owner personally
+  holds, and a report button promising review that never happens is worse than no button.
+  *Blocks 007* (added 2026-08-07 by #06)
+- **The constitution amendment bringing engagement notification delivery in.** #06's push decision
+  reverses an exclusion that has held since 001 and needs its own numbered standing decision and a
+  version bump. Decision 20 made the last retraction a major version; this is at minimum a minor
+  one. *Should land before 007's specification* (added 2026-08-07 by #06)
 - **The object storage provider** for avatar images. #04 put a `StorageService` interface in front of
   it with a local implementation for development, test and preview, so 004 is testable without it —
   but the production path stays unproven until this is answered. **Folds into API hosting above**
   rather than standing alone (added 2026-08-07 by #04)
 - **Nobody moderates uploaded avatar images.** Public sign-up plus image upload, with no admin actor
   and no moderation surface, and the organizer exclusion is what forecloses the usual answer.
-  Cheapest to settle before the first public preview (added 2026-08-07 by #04)
+  Cheapest to settle before the first public preview (added 2026-08-07 by #04). **#06 supplies a
+  precedent rather than an answer**: it resolved the same shape for messages by routing reports to
+  an *operator* mailbox out-of-band, on the reading that the constitution forecloses organizer
+  administration *inside the product* but not an operator. If that reading holds, avatars can follow
+  the same route (narrowed 2026-08-07 by #06)
 - **Preview environments must never point at production data**; preview access control undecided
   (from #01)
 - **Repository visibility.** The repository is **public** and owned by the `Programa-Semilla`
@@ -126,6 +204,37 @@ Each names the phase it blocks — when to ask matters as much as what to ask.
   is public, and `branches/develop/protection` returns **404 — no rule set**. Branch protection is
   free on public repositories, so this is a configuration task rather than an accepted risk
   (corrected 2026-08-06)
+
+### Design questions carried into 007's specification
+
+From #06. None blocks the specification; all are for `/speckit-specify` and its review gate. The
+three items that *do* block it are owner decisions and are listed above.
+
+- **The polling interval, and its backoff when the tab is hidden.** #06 chose two independent
+  freshness paths, so the non-push one needs a number the spec can justify — on a phone at a venue,
+  where it is battery and request load.
+- **A maximum message length.**
+- **Whether an attendee may suppress message content in notifications.** #06 chose content-carrying
+  push payloads over the recommended signal-only form, accepting that the most sensitive content in
+  the product appears on lock screens. A per-attendee preference is the usual mitigation and was not
+  decided either way.
+- **Copy for the departed-counterpart half-thread** — what the remaining attendee is actually told
+  about a conversation whose other side has erased themselves. The state is decided; the words are
+  not.
+- **Whether a report record survives either attendee deleting their account.** Cascade destroys the
+  evidence of the report; retention keeps one attendee's data past their erasure request. Neither is
+  obviously right, and `deletion-coverage` will not accept silence.
+- **Whether the offline cache key gains an event-less variant.** The decorator is keyed
+  `(attendeeId, eventId, resource)` and threads are not event-scoped. #06's refusal to cache makes
+  this moot for 007, but **008's cross-event contacts meet it again** with no such escape.
+- **Whether 007 splits into reviewable phases.** 004's expectation that it would need to was wrong;
+  this feature is larger and carries two subsystems. Worth deciding after planning rather than
+  before.
+- **The conversation switcher must not scroll horizontally.** The prototype's horizontally-scrolling
+  avatar strip (`App.tsx:971`) contradicts the binding constraint that no primary action require
+  horizontal scrolling, and switching conversations is a primary action. Recorded as a prototype
+  defect to correct, in the same category as its missing Escape handling and focus states — not an
+  open question.
 
 ### Design questions carried into 005's specification — settled
 
@@ -175,10 +284,13 @@ From #04. None blocks the specification; all are for `/speckit-specify` and its 
   the seed, generate it at deploy time, or accept it as non-secret.
 - **Whether deleting an account frees its email address for re-registration.** Hard deletion plus a
   globally unique email means it does, which is probably right and is currently unstated.
-- **Hard deletion gets harder in 007 and 009.** Notes and saves are private, so cascading them is
-  clean. A deleted attendee's messages sit in someone else's thread and their audience questions sit
-  on a session other people upvoted. An argument for settling the shape now, while the only affected
-  data is the attendee's own.
+- ~~**Hard deletion gets harder in 007 and 009.**~~ **Settled for 007 by #06; still open for 009.**
+  A departing attendee's messages and participant row cascade away; the other participant keeps
+  their own words in a surviving one-sided, read-only conversation. The two rejected alternatives
+  are recorded: deleting the whole thread destroys data belonging to someone who never asked, and
+  severing authorship retains free-form self-identifying text after an erasure request. **009's half
+  is untouched** — an audience question sits on a session other people upvoted, and the same three
+  options do not resolve the same way there.
 - **Whether `CameraService` is wired for direct capture**, or upload is file-picker only.
 - ~~**How 004 splits into reviewable phases.**~~ **Settled by delivery: it did not split.** 004
   shipped as one PR of 131 tasks ([#12](https://github.com/Programa-Semilla/mynet-ps/pull/12)),

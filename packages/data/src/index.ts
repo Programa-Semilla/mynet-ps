@@ -54,7 +54,31 @@ export type {
  */
 export type { Repositories } from './interfaces/index.js'
 
+// 007 — conversations, messages, safety and notification subscriptions. Appended likewise, for
+// the reason every block above states: the per-domain split is what lets features add interfaces
+// without contending over one list.
+export type {
+  AbuseReportDraft,
+  BlockedAttendee,
+  BlockRepository,
+  ConversationPreview,
+  ConversationRepository,
+  ConversationState,
+  ConversationSummary,
+  Counterpart,
+  DeviceRegistration,
+  Message,
+  MessagePage,
+  MessagePageQuery,
+  MessageRepository,
+  OpenedConversation,
+  PushSubscriptionRepository,
+  ReportRepository,
+  SentMessage,
+} from './interfaces/index.js'
+
 export {
+  MESSAGE_MAX_LENGTH,
   NotAuthenticatedError,
   OfflineError,
   RequestRefusedError,

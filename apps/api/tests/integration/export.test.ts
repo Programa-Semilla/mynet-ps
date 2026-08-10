@@ -1,9 +1,21 @@
+import { eq } from 'drizzle-orm'
 import type { FastifyInstance } from 'fastify'
 import sharp from 'sharp'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 
+import { getDb } from '../../src/db/client.js'
+import { attendeeBlocks } from '../../src/db/schema/blocks.js'
+import {
+  conversationPairs,
+  conversationParticipants,
+  conversations,
+} from '../../src/db/schema/conversations.js'
+import { messages } from '../../src/db/schema/messages.js'
+import { pushSubscriptions } from '../../src/db/schema/push-subscriptions.js'
+import { abuseReports } from '../../src/db/schema/reports.js'
 import {
   ADA,
+  attendees,
   clearThrottle,
   cookieHeader,
   GRACE,
@@ -95,7 +107,96 @@ describe('personal-data export', () => {
       headers: { cookie: cookieHeader(ada) },
       payload: { image: image.toString('base64') },
     })
+
+    await populate007Sections()
   })
+
+  /**
+   * 007 — the four sections this feature added to the export (research R14).
+   *
+   * ═════════════════════════════════════════════════════════════════════════════════════════
+   * **WRITTEN DIRECTLY TO THE DATABASE RATHER THAN THROUGH ROUTES, AND THAT IS DELIBERATE.**
+   *
+   * Every other section above is populated by driving the real API, which is the better fixture
+   * wherever it is available: it proves the write path and the read path agree. These four
+   * cannot be, yet — `POST /conversations`, `POST /blocks`, `POST /reports` and
+   * `POST /push/subscriptions` land in Phases 3, 5 and 7.
+   *
+   * Leaving them unpopulated is not the neutral choice it looks like. This test's whole
+   * guarantee is that a **declared** column is actually **produced**, and an empty section
+   * silences it for every column in that section — so `messages.body` could be declared,
+   * omitted from `assembleExport`, and pass. The emptiness guard above exists precisely to make
+   * that visible, and it is what went red when T018 declared these columns while the fixture
+   * had nothing to show.
+   *
+   * T138 adds the round-trip version once the routes exist. This keeps the coverage guarantee
+   * honest in the meantime, which is the whole reason T136/T137 were pulled forward at all.
+   * ═════════════════════════════════════════════════════════════════════════════════════════
+   */
+  const populate007Sections = async (): Promise<void> => {
+    const db = getDb()
+
+    const adaId = (
+      await db.select({ id: attendees.id }).from(attendees).where(eq(attendees.email, ADA)).limit(1)
+    )[0]?.id as string
+    const graceId = (
+      await db
+        .select({ id: attendees.id })
+        .from(attendees)
+        .where(eq(attendees.email, GRACE))
+        .limit(1)
+    )[0]?.id as string
+
+    const [conversation] = await db.insert(conversations).values({}).returning({
+      id: conversations.id,
+    })
+    const conversationId = conversation?.id as string
+
+    // The ordered pair, as `createConversationWithFirstMessage` will write it. The CHECK
+    // constraint refuses any other ordering, so the fixture cannot drift from the real shape.
+    const [lower, higher] = [adaId, graceId].sort()
+    await db.insert(conversationPairs).values({
+      conversationId,
+      lowerAttendeeId: lower as string,
+      higherAttendeeId: higher as string,
+    })
+    await db.insert(conversationParticipants).values([
+      { conversationId, attendeeId: adaId },
+      { conversationId, attendeeId: graceId },
+    ])
+
+    // Two messages, one from each side. **Only Ada's may appear in her export** (FR-578) — the
+    // absence of Grace's is asserted by `messages-export.test.ts` (T138); here the second
+    // message exists so that a fixture with nothing to exclude cannot make that assertion
+    // vacuous later.
+    await db.insert(messages).values([
+      { conversationId, authorId: adaId, body: 'A message Ada wrote, which her export contains.' },
+      {
+        conversationId,
+        authorId: graceId,
+        body: "A message Grace wrote, which Ada's export must not contain.",
+      },
+    ])
+
+    await db.insert(attendeeBlocks).values({ blockerId: adaId, blockedId: graceId })
+
+    await db.insert(abuseReports).values({
+      reporterId: adaId,
+      reportedId: graceId,
+      reason: 'A report Ada filed.',
+      messageIds: [],
+    })
+
+    // `lastDeliveredAt` is set rather than left null so the column is exercised as a value the
+    // export must reproduce, not merely as a key that happens to exist.
+    await db.insert(pushSubscriptions).values({
+      attendeeId: adaId,
+      endpoint: 'https://push.example.test/subscription/ada-device-1',
+      p256dhKey: 'a-public-key',
+      authKey: 'an-auth-secret',
+      lastDeliveredAt: new Date(),
+    })
+  }
 
   afterAll(async () => {
     await teardown(app)

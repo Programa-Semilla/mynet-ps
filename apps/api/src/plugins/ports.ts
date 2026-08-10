@@ -4,6 +4,9 @@ import fp from 'fastify-plugin'
 import { loadConfig } from '../config.js'
 import type { MailService } from '../mail/service.js'
 import { SinkMailService } from '../mail/sink-adapter.js'
+import type { PushService } from '../notifications/service.js'
+import { SinkPushService } from '../notifications/sink-adapter.js'
+import { WebPushService } from '../notifications/web-push-adapter.js'
 import { DbStorageService } from '../storage/db-adapter.js'
 import type { StorageService } from '../storage/service.js'
 
@@ -44,6 +47,8 @@ import type { StorageService } from '../storage/service.js'
 export interface PortOverrides {
   readonly storage?: StorageService
   readonly mail?: MailService
+  /** 007 — notification delivery. See below for why its unconfigured state differs from mail's. */
+  readonly push?: PushService
 }
 
 const portsPlugin = async (app: FastifyInstance, options: PortOverrides): Promise<void> => {
@@ -55,6 +60,46 @@ const portsPlugin = async (app: FastifyInstance, options: PortOverrides): Promis
   // absence of a provider is a startup failure with a message naming the register entry.
   app.decorate('mail', options.mail ?? new SinkMailService())
 
+  // ───────────────────────────────────────────────────────────────────────────────────────
+  // 007 — the third port, and **its unconfigured state is deliberately less severe than mail's**.
+  //
+  // `SinkMailService` refuses to construct under production because it holds verification and
+  // reset links, and a reset link *is* the account. `SinkPushService` holds a sender's name and a
+  // message the recipient was about to be shown anyway — nothing that is a credential — so a boot
+  // failure would be refusing to start over a capability FR-552 says every attendee may decline.
+  //
+  // What it is instead is a silent non-delivery, which the warning below makes visible.
+  // ───────────────────────────────────────────────────────────────────────────────────────
+  //
+  // ───────────────────────────────────────────────────────────────────────────────────────
+  // **THE REAL ADAPTER IS SELECTED BY CONFIGURATION, NOT BY ENVIRONMENT.**
+  //
+  // A VAPID pair being present *is* the provisioning signal — there is nothing else to configure,
+  // because Web Push has no vendor to sign up with (see `web-push-adapter.ts`). So the same rule
+  // holds everywhere: keys present, deliver for real; keys absent, record to the sink. That makes
+  // a local end-to-end test identical to production rather than a special mode, which is the only
+  // arrangement in which testing it locally proves anything.
+  //
+  // Both halves are already required together — `config.ts` refuses to start with exactly one —
+  // so checking the private key is checking the pair.
+  //
+  // The sink's logger is handed over **only in development**, so a recorded delivery is visible to
+  // somebody walking `quickstart.md` and invisible everywhere else: that line carries the message
+  // body, and a body is content rather than diagnostics.
+  // ───────────────────────────────────────────────────────────────────────────────────────
+  const push =
+    options.push ??
+    (config.push.vapidPrivateKey && config.push.vapidPublicKey
+      ? new WebPushService({
+          subject: config.push.vapidSubject,
+          publicKey: config.push.vapidPublicKey,
+          privateKey: config.push.vapidPrivateKey,
+          log: app.log,
+        })
+      : new SinkPushService(config.nodeEnv === 'development' ? app.log : undefined))
+
+  app.decorate('push', push)
+
   // Recorded at boot rather than only in this comment, because "mail is not provisioned" is the
   // sort of thing that is obvious for a week and invisible for a quarter.
   //
@@ -65,6 +110,17 @@ const portsPlugin = async (app: FastifyInstance, options: PortOverrides): Promis
     app.log.warn(
       'Transactional mail is not provisioned (register entry 18). Verification and reset links ' +
         'are written to the development sink, not sent.',
+    )
+  }
+
+  // 007 — the same signal for the second pending dependency. Logged outside development too when
+  // the keys are absent, because in a deployed environment "notifications are not arriving" is a
+  // question somebody asks of the logs, and a missing provider is the answer.
+  if (!options.push && !config.push.vapidPrivateKey) {
+    app.log.warn(
+      'Web Push is not provisioned (register entry 20 — no VAPID keys). ' +
+        'Notifications are recorded by the development sink, not delivered. Messages, unread ' +
+        'state and the open-thread poll are unaffected: delivery is deniable by design (FR-552).',
     )
   }
 }

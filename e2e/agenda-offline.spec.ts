@@ -45,6 +45,11 @@ test.describe('Agenda offline', () => {
 
     // Read once while connected — the cache is seeded by ordinary reads, never by pre-fetching,
     // which is what keeps it honest about what it can serve.
+    //
+    // The retrying assertion comes first for the reason `agenda-saved.spec.ts` records at length:
+    // `allTextContents()` does not auto-wait, and `goToAgenda` only waits for the `<h1>`. The
+    // `expect` below would then fail with an empty array rather than an offline defect.
+    await expect(page.getByRole('heading', { level: 3 }).first()).toBeVisible()
     const titles = await page.getByRole('heading', { level: 3 }).allTextContents()
     expect(titles.length).toBeGreaterThan(0)
 

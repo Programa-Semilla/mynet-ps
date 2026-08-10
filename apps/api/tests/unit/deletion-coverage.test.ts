@@ -53,6 +53,45 @@ const NOT_ATTENDEE_DATA: Record<string, string> = {
     '— 002 records that the same human at two conferences is two unrelated rows.',
   sessions: 'Seeded conference content (002).',
   session_speakers: 'A join between two pieces of seeded conference content (002).',
+
+  /**
+   * T017 (007) — **the only one of 007's seven tables that needs an entry here, and the
+   * emptiness that earns it is deliberate rather than incidental** (FR-575, FR-576,
+   * data-model.md).
+   *
+   * FR-576 requires every table this feature introduces to be classified. Six of the seven are
+   * classified by *cascading from `attendees`*, which this gate reads out of the schema — so
+   * they need no line here and gain one only by losing their cascade, which would fail the
+   * build. This is the seventh.
+   *
+   * ─────────────────────────────────────────────────────────────────────────────────────────
+   * `conversations` carries an id, a creation timestamp and a denormalised `last_message_at`.
+   * **No participant identifier, no title, no topic, no membership list.** After both
+   * participants delete their accounts, a row here would name nobody — which is what makes
+   * FR-573 true of this table by construction instead of by a deletion routine remembering to
+   * visit it.
+   *
+   * That emptiness is exactly why `conversation_pairs` exists as a separate table (research
+   * R10): the obvious way to enforce one-conversation-per-pair puts both identifiers in a
+   * column *here*, and would have retained a departed attendee's identifier forever in the very
+   * thing enforcing uniqueness.
+   *
+   * **It is still removed rather than retained** (FR-575) — an unreferenced conversation is
+   * litter, not a record — but that removal is `deleteAccount`'s empty-conversation sweep
+   * (T131), not a cascade, and it is proven by
+   * `tests/integration/conversation-empty-removal.test.ts` (T127). It is listed here rather
+   * than in EXPLICITLY_DELETED because the classification question this guard asks is "does it
+   * hold attendee data", and the answer is no.
+   *
+   * The other six tables need no entry: every one cascades from `attendees` through a real
+   * foreign key, which is the outcome M3 was chosen to produce.
+   * ─────────────────────────────────────────────────────────────────────────────────────────
+   */
+  conversations:
+    'Holds no attendee identifier at all — no participant column, by design (FR-573, research ' +
+    'R10). Participation lives in `conversation_participants`, which cascades; the pair ' +
+    'constraint lives in `conversation_pairs`, which cascades. An empty conversation is removed ' +
+    'by `deleteAccount` (FR-575), proven in tests/integration/conversation-empty-removal.test.ts.',
 }
 
 /**

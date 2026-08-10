@@ -1,5 +1,94 @@
 <!--
 SYNC IMPACT REPORT
+Version change: 3.0.0 → 3.1.0
+
+RATIFICATION STATUS: **RATIFIED 2026-08-08 by the project owner**, who directed the implementing
+session to proceed with phase 007's Web Push half on the strength of it. Drafted at his request; it
+records decisions he had already taken (M4, M5, M7, M8, recorded 2026-08-07 in
+brainstorm/06-messages.md) and one the implementation forced (the visibility capability).
+
+Two values it deliberately does NOT invent — the push provider with its key custody, and the
+operator address — are opened as register entries 20 and 21 rather than guessed. **Neither blocks
+implementation**: the port is vendor-free and the sink adapter needs no provider, exactly as
+`SinkMailService` needs none for entry 18. What entry 20 blocks is the real adapter, and therefore
+delivery in a deployed environment.
+
+Rationale: MINOR. A prohibition is lifted, Principle V's capability list gains a seventh device
+interface, and a new binding-constraints block is added. No principle is removed or redefined, and
+**no work performed under 3.0.0 is invalidated** — which is the distinction from 3.0.0 itself, where
+two DELIVERED requirements were withdrawn and a shipped guarantee retracted.
+
+The counter-argument was considered and rejected. Register entry 10 has bounded product scope since
+1.0.0, and lifting it could be read as a redefinition of what MyNet *is*. That reading is wrong on
+the versioning policy's own test: lifting a prohibition cannot make previously-compliant work
+non-compliant, nothing built under it is invalidated, and the entry's operative half — the bell —
+survives untouched. 2.3.0 is the closer precedent: it added `StorageService` as a seventh interface
+and widened a product boundary, and was MINOR.
+
+Owner decisions cited by this amendment (all 2026-08-07, recorded in brainstorm/06-messages.md):
+  M4. Web Push is brought in, reversing the engagement-notification exclusion. `NotificationService`
+      is wired to real delivery for the first time. (Resolves register entry 10, in part.)
+  M5. Unread is a private per-participant read position. No read receipts, delivery ticks, typing
+      indicators or presence.
+  M7. Push payloads carry message content. Push and open-thread polling are two independent
+      freshness paths, and the product is complete with only the second.
+  M8. Reporting auto-blocks, records, and emails a configured operator address.
+
+Modified principles:
+  - V. Abstraction Before Platform and Data APIs — EXPANDED by one device capability,
+    `VisibilityService`. Not a product decision: research R4 requires the open thread's poll to stop
+    while the tab is hidden, the only way to ask is `document.visibilityState`, and
+    `mynet/no-direct-platform-access` correctly refuses that in feature code. The alternatives were
+    a lint exemption — trading a structural boundary for a poll interval — or dropping the
+    condition, leaving a background tab polling forever. `packages/platform/tests/substitution.test
+    .ts` is what forced this to be declared rather than added quietly: it asserted the list was
+    exactly six and said a seventh "without an amendment is a decision nobody recorded".
+
+Added binding constraints:
+  - A new "Notification delivery" block. Entry 10's surviving half is written into binding text
+    rather than left in a register entry that is about to be struck through — a resolved entry is
+    not where anybody looks for a rule. It binds three things: no bell and no notification centre, a
+    received message as the ONLY trigger, and the lock-screen consequence of M7 recorded as accepted
+    rather than solved.
+
+Register changes:
+  - 10. RESOLVED IN PART, and the part that survives is PROMOTED to binding text. Engagement
+    notification delivery enters product scope for a received message only. The prohibition on the
+    notification bell is unchanged and now lives in "Notification delivery" above.
+  - 18. UNCHANGED in substance, WIDENED in consequence. The transactional email provider now also
+    carries operator abuse mail (M8), so an entry that blocked verification and recovery now also
+    blocks a safety obligation.
+  - 20. ADDED. The push provider and VAPID key custody — the project's second pending external
+    dependency and secret, created by this amendment.
+  - 21. ADDED. The operator address abuse reports are dispatched to, and the response expectation
+    attached to it. M8 creates an obligation the owner personally holds.
+  - 19. ESCALATED again. Open send plus permanent reachability means an unmoderated avatar is now
+    also visible to anyone who can open a conversation, not only to conference co-attendees.
+
+Templates and dependent artifacts:
+  ✅ .specify/templates/plan-template.md — Constitution Check resolves against this file at plan
+     time; no static edit required.
+  ✅ .specify/templates/spec-template.md — no edit required.
+  ✅ .specify/templates/tasks-template.md — no edit required.
+  ⚠️ CLAUDE.md — MUST be updated in the same change. Its standing-decision list ends at 20 and needs
+     the three this amendment ratifies; its "Out of product scope" line still excludes engagement
+     notification delivery outright; and its open-questions summary needs resynchronising.
+  ⚠️ packages/platform/src/interfaces/index.ts — `NotificationService`'s comment states the
+     implementation "MUST NOT be wired to real delivery", which restates the entry this amendment
+     reverses. It MUST be rewritten in the change that wires it, or the file contradicts itself.
+  ✅ specs/007-messages-and-notification-delivery/ — this amendment is what its plan.md Constitution
+     Check names as outstanding and what tasks.md Global Constraint 7 gates Phase 7 on.
+  ⚠️ GroundZero/requirements.md — NOT edited. Its notification bell is prototype reference, and the
+     bell remains forbidden regardless.
+
+Deferred TODOs:
+  - **Whether an attendee may suppress message content in notifications.** M7 puts message text on a
+    lock screen; a per-attendee preference is the usual mitigation and was NOT decided. Recorded in
+    "Notification delivery" as accepted rather than solved, and left open deliberately.
+  - The push provider and the transactional email provider may well be answered together. Entries 18
+    and 20 interact.
+
+--- PRIOR REPORT: 3.0.0 ---
 Version change: 2.3.0 → 3.0.0
 Rationale: MAJOR. Principle VII's mandatory pipeline element "a preview deployment" is redefined in
 a way that invalidates work performed under 2.x, and two DELIVERED requirements of phase 001 —
@@ -491,8 +580,17 @@ Application code MUST call project-owned interfaces, never external APIs directl
 two dimensions:
 
 **Device and browser capabilities** — `NotificationService`, `CalendarService`, `CameraService`,
-`ContactShareService`, `SecureStorage`, and `ConnectivityService`. Initial implementations MAY be
-web-based or no-op stubs.
+`ContactShareService`, `SecureStorage`, `ConnectivityService`, and `VisibilityService` (added 3.1.0;
+whether the attendee is actually looking at this tab). Initial implementations MAY be web-based or
+no-op stubs.
+
+`VisibilityService` is listed for a reason worth stating, because it is the first capability added
+by an implementation rather than by a product decision. A surface that polls MUST NOT poll a tab
+nobody is looking at — a backgrounded tab has its timers throttled unpredictably, so a poll that
+"runs" there fires in bursts when the tab wakes, on a phone, on cellular data. The only way to ask
+is `document.visibilityState`, and this principle forbids feature code from asking it directly. The
+choice was therefore an interface or an exemption, and an exemption would have traded a structural
+boundary for a poll interval.
 
 **Platform capabilities** — `StorageService`, for durable binary content that does not belong in the
 database (added 2.3.0 by D9, for avatar images). This is a *platform* capability rather than a device
@@ -851,6 +949,71 @@ every subsequent feature. These close the last three register entries that block
   networking product in which nobody can see anybody does not work, but "you registered, so you are
   discoverable, permanently" is not a defensible position next to a self-serve deletion commitment.
 
+### Notification delivery
+
+*Added 3.1.0 by M4, M5 and M7. This block is where register entry 10's surviving half now lives:
+the entry is struck through, and a struck-through entry is not where anybody looks for a rule.*
+
+**Engagement notification delivery is in product scope, for a received message and nothing else.**
+Until 3.1.0 it was excluded outright. What changed is one thing only, and the boundary is narrow by
+construction rather than by convention.
+
+- **A received message is the ONLY trigger.** No notification may be raised for anything else — not
+  a saved session starting, not an appointment, not an audience question, not an announcement.
+  A feature that wants a second trigger MUST amend this block. Enforced by test, not by convention:
+  a trigger set that can only be widened deliberately is the difference between a bounded capability
+  and a channel every later feature helps itself to.
+
+- **The notification bell MUST NOT be reproduced, and neither MUST an in-app notification centre.**
+  This is entry 10's original prohibition, carried forward **unchanged and unweakened**. Delivery
+  and an inbox are separable, and bringing the first in does not bring the second. The prototype
+  header's bell with its unread dot remains forbidden.
+
+- **Delivery MUST go through `NotificationService`** (Principle V), over a domain shape rather than
+  the browser's own `PushSubscription` type. A push provider is an external dependency and a secret;
+  neither may appear in feature code, and the server-side port MUST be vendor-free.
+
+- **Permission is deniable, so notification delivery MUST NOT be the only path to freshness.** Every
+  capability except delivery itself MUST work identically for an attendee who refuses permission,
+  and refusing MUST NOT degrade any other surface. An attendee who says no gets a complete product.
+
+- **Notification content is personal data on a lock screen, and that consequence is ACCEPTED rather
+  than solved.** M7 puts message text in the payload, on the reasoning that a notification saying
+  only "you have a message" makes the attendee open the application to learn whether it mattered —
+  which is most of the value gone. The cost is real: message content becomes visible on a locked
+  device to whoever is holding it. **Whether an attendee may suppress content in notifications was
+  not decided**, and it is recorded here as outstanding rather than closed. Principle VIII's
+  collect-only-what-a-requirement-names rule is unaffected: nothing new is stored.
+
+- **Subscriptions are per device, not per session.** Signing out MUST NOT revoke one; revoking
+  permission and a permanent delivery failure MUST. A subscription record holds credentials rather
+  than content, and MUST NOT be reproduced in the personal-data export — the presence of a device
+  and its timestamps are a record, the keys are a capability.
+
+*Rationale*: a networking product's value is a timely reply, and a message discovered an hour after
+a session ended is worth very little. That is the whole of what M4 buys, and it is why the reversal
+is narrow: the exclusion existed to keep MyNet from becoming a product that interrupts people, and
+one trigger tied to a message somebody actually sent does not make it one.
+
+### Reporting conduct out of the product
+
+*Added 3.1.0 by M8.*
+
+**A report MUST leave the product as mail to a configured operator, and MUST NOT be readable from
+inside it.** No route, no repository method, no screen, no privileged role. A report-reading surface
+needs a moderator, and a moderator is an organizer — the actor Principle III excludes by
+construction — so the report goes to a human who acts out-of-band.
+
+- **Reporting MUST also block**, in the same action. Somebody reporting conduct wants it to stop
+  now; a report that only files paperwork leaves them reachable by the person they just reported.
+- **Operator mail MUST carry identifiers and a timestamp only** — never message text and never the
+  reporter's reason. Both are two attendees' personal data, and an inbox is outside every retention
+  rule this project controls, for a recipient who can query the database directly.
+- **A failure to dispatch MUST NOT fail the report or the block.** Safety cannot depend on an
+  external service succeeding, and an unprovisioned provider is the expected state (entry 18).
+- **The operator address is undecided** — register entry 21. Until it exists, a report is still
+  blocked and still recorded, and the skipped dispatch MUST be logged rather than silently dropped.
+
 ## Branching and Change Flow
 
 `main` and `develop` are protected. **No commit and no push may be made directly to either
@@ -1018,6 +1181,40 @@ Owner decisions taken on 2026-08-07 in brainstorm #05
   a delivered, verified requirement, and it is the reason this amendment is MAJOR rather than MINOR.
   **001 FR-067 is not withdrawn** and binds UAT unchanged.
 
+**Resolved in 3.1.0**
+
+- ~~Engagement notification delivery is out of product scope.~~ — **RESOLVED IN PART 2026-08-08 by
+  owner decision M4**: delivery enters scope **for a received message and nothing else**. See
+  "Notification delivery" under Technology and Architecture Constraints, which is now the binding
+  statement; register entry 10 is struck through in place.
+
+  Three things survive the reversal unchanged, and they are what keep it narrow:
+  **the bell and the notification centre stay forbidden**; a received message is the *only* trigger,
+  so a later feature wanting a second one must amend the constitution; and permission is deniable,
+  so an attendee who refuses gets a complete product rather than a degraded one.
+
+  What it costs is recorded rather than glossed: M7 puts message content on a lock screen, and
+  whether an attendee may suppress it **was not decided**. It is deferred, not closed.
+
+  Consequence: the project acquires a second pending external dependency and secret — register
+  entry 20, the push provider and VAPID key custody.
+
+- ~~Feature code has no way to ask whether the attendee is looking at the page.~~ — **RESOLVED
+  2026-08-08**: `VisibilityService` joins Principle V's device capabilities as a seventh.
+
+  This is the first capability added by an *implementation* rather than by a product decision, and
+  it reached this register because a test refused to let it in quietly:
+  `packages/platform/tests/substitution.test.ts` asserted the list was exactly six and recorded that
+  a seventh "without an amendment is a decision nobody recorded". It was right, and the guard is
+  what turned a silent addition into this paragraph.
+
+- ~~Reports have no stated disposal path.~~ — **RESOLVED 2026-08-08 by owner decision M8**: a report
+  leaves the product as operator mail carrying identifiers and a timestamp only, blocks the reported
+  attendee in the same action, and is readable from nowhere inside the product. See "Reporting
+  conduct out of the product". **The address itself is NOT resolved** — register entry 21 — and the
+  rule is binding without it: a report still blocks and still records, and the skipped dispatch is
+  logged rather than silently dropped.
+
 **Open — require a client decision**
 
 *Numbering is stable.* Resolved entries are **struck through in place** rather than removed, and
@@ -1050,9 +1247,13 @@ so a gap in the source would silently render as the wrong number against a neigh
 9. **Audience-question attribution.** Whether a question asked in a session's Q&A is attributed to
    its author or anonymous. It determines whether Q&A is a personal-data surface under Principle
    VIII. Blocks the Q&A feature.
-10. **Notifications.** The prototype header shows a notification bell; notifications are out of
-    product scope until a recorded decision brings them in. The bell MUST NOT be reproduced before
-    then.
+10. ~~**Notifications.**~~ **RESOLVED IN PART 2026-08-08 in 3.1.0** by M4 — engagement
+    notification delivery enters product scope **for a received message and nothing else**, and is
+    now binding text under "Notification delivery" above rather than a register entry. **The bell
+    remains forbidden**, along with an in-app notification centre: that half of this entry is
+    carried forward unchanged and unweakened, which is why the entry is resolved *in part* rather
+    than closed. Retained in place so the numbering stays stable; see "Resolved in 3.1.0" above.
+    Creates entry 20.
 
 **Open — require an owner or planning decision**
 
@@ -1144,6 +1345,14 @@ so a gap in the source would silently render as the wrong number against a neigh
     password reset — and that it is distinct from the excluded engagement notifications. By whom it
     is sent is undecided, and it brings one external dependency and one secret. Needed by phase 004.
     *Added 2026-08-07.*
+
+    **WIDENED 2026-08-08 in 3.1.0.** M8 adds a third message to this dependency: operator abuse
+    mail. The entry is unchanged in substance and larger in consequence — an unprovisioned provider
+    now leaves a **safety** obligation undelivered as well as verification and recovery. It is not
+    a blocker for the reporting feature, which blocks and records regardless and logs the skipped
+    dispatch, but it means nobody is currently told a report was filed. Interacts with entry 21,
+    which is the address rather than the sender, and with entry 20 — the push provider and the mail
+    provider may well be answered together.
 19. **Nobody moderates uploaded avatar images.** D5 opens public self sign-up and D7 admits image
     upload, in a product with no administrative actor by construction — and the
     organizer-administration exclusion in Principle III is precisely what forecloses the usual
@@ -1158,8 +1367,33 @@ so a gap in the source would silently render as the wrong number against a neigh
     materially larger in consequence. Now interacts with entry 14 in its new form: a permanent,
     publicly reachable UAT carrying real-shaped profile images.
 
+    **ESCALATED AGAIN 2026-08-08 in 3.1.0.** Phase 007's open send means any attendee sharing a
+    conference may open a conversation with any other, with no request and no acceptance step, and
+    a conversation once open is permanent. An unmoderated avatar is therefore now visible in a
+    thread header to somebody the attendee never chose to be seen by — and the closest thing to a
+    moderation answer this project has is the block and report path 007 ships, which is
+    per-person, after the fact, and routes to an operator who does not yet exist (entries 18, 21).
+    Still unchanged in substance.
+
+20. **The push provider, and VAPID key custody.** *Added 2026-08-08 in 3.1.0, created by M4.* The
+    project's second pending external dependency and secret after entry 18, and the two may well be
+    answered together. Two halves, and the second is the one that needs a person rather than a
+    vendor comparison: **who holds the VAPID private key**, where it lives for each of the two
+    environments, and what happens when it is rotated — a rotated key invalidates every existing
+    subscription, so every attendee silently stops receiving until their browser re-registers.
+    Blocks only the real adapter: the port, the sink adapter and every test against it are buildable
+    without it, exactly as `SinkMailService` is for entry 18.
+21. **The operator address abuse reports are dispatched to, and the response expectation attached to
+    it.** *Added 2026-08-08 in 3.1.0, created by M8.* Not a vendor question — **an obligation the
+    owner personally holds.** Somebody has to read that inbox, and the product deliberately promises
+    the reporter nothing it cannot keep: no case identifier, no status, nothing to poll, because
+    FR-548 forbids the surface that would answer any of them. What the reporting dialog says today
+    is that a person will read it. **That sentence is only true once this entry is answered.**
+    Interacts with entry 18 (who sends it) and entry 19 (it is the nearest thing to a moderation
+    path this product has).
+
 **Runtime guidance**: `CLAUDE.md` provides durable project context for AI-assisted sessions. It MUST
 stay consistent with this constitution and MUST NOT contain implementation plans, session tasks,
 progress updates, or invented requirements.
 
-**Version**: 3.0.0 | **Ratified**: 2026-08-04 | **Last Amended**: 2026-08-07
+**Version**: 3.1.0 | **Ratified**: 2026-08-04 | **Last Amended**: 2026-08-08

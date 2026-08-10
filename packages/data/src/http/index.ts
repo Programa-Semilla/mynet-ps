@@ -18,6 +18,14 @@ export { HttpIdentityRepository } from './identity-repository.js'
 export { HttpProfileRepository } from './profile-repository.js'
 // 006 — the Discover directory. One new route plus 004's two profile reads, used unchanged.
 export { HttpDirectoryRepository } from './directory-repository.js'
+// 007 — Messages, the safety controls, and device registration. **Not one of these addresses
+// begins `/events/`**: conversations are cross-event (FR-507), so there is no conference for
+// `requireEventAccess` to guard and the server substitutes a branded `ConversationScope`
+// instead. None of the five is decorated with `cached()` at the composition root, and the
+// refusal is declared there (FR-563).
+export { HttpConversationRepository, HttpMessageRepository } from './messages-repository.js'
+export { HttpBlockRepository, HttpReportRepository } from './safety-repository.js'
+export { HttpPushSubscriptionRepository } from './push-repository.js'
 // 005 — the caching decorator. Applied at the composition root, so no component learns that a
 // cache exists (research D1, Principle V).
 export {

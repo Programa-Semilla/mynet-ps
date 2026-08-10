@@ -6,12 +6,17 @@ import {
   HttpActiveEventRepository,
   HttpAttendeeRepository,
   HttpAuthGateway,
+  HttpBlockRepository,
   HttpCatalogRepository,
   HttpClient,
+  HttpConversationRepository,
   HttpDirectoryRepository,
   HttpEventsRepository,
   HttpIdentityRepository,
+  HttpMessageRepository,
   HttpProfileRepository,
+  HttpPushSubscriptionRepository,
+  HttpReportRepository,
   HttpSavedSessionRepository,
   HttpSessionNotesRepository,
   type CacheScope,
@@ -31,7 +36,20 @@ import { webDevices, WebLocalCache } from '@mynet/platform/web'
  * in one line rather than eleven.
  */
 export const createServices = (): PlatformServices => {
-  const devices = webDevices()
+  const devices = webDevices({
+    // 007 (T117, FR-041) — the **public** half of the VAPID pair, and the only half that may ever
+    // reach a browser. The private key is read by the API and appears in no client module.
+    //
+    // Read here rather than in the capability, for the same reason the API base URL is: the
+    // composition root owns configuration. A capability reading its own environment would be a
+    // second place environment handling lives, and the one that drifted would silently decide
+    // whether notifications work at all.
+    //
+    // **Absent is a supported state** (register entry 20): with no key `isSupported()` is false,
+    // no permission is ever requested, and the product behaves exactly as it does for somebody
+    // who declined — which FR-552 already requires to be a complete product.
+    vapidPublicKey: import.meta.env['VITE_PUSH_VAPID_PUBLIC_KEY'],
+  })
 
   const http = new HttpClient({
     // Only VITE_-prefixed values reach the bundle. Nothing secret may ever carry that prefix
@@ -168,6 +186,32 @@ export const createServices = (): PlatformServices => {
       // it" look identical in a composition root.
       // ─────────────────────────────────────────────────────────────────────────────────────
       directory: new HttpDirectoryRepository(http),
+      // ─────────────────────────────────────────────────────────────────────────────────────
+      // 007 — **five repositories, NONE of them decorated with `cached`** (FR-563), and the
+      // refusal is declared here because "no cache" and "nobody got round to it" look identical
+      // in a composition root. 006 made the same declaration for the directory; this feature
+      // makes it for its whole surface.
+      //
+      // The reasoning is not one reason five times:
+      //
+      // - **Conversations and messages** are another person's words. 005's decorator revokes on
+      //   age alone, so a cached thread is a second copy of somebody else's personal data
+      //   ageing on this device — bought for no offline capability worth having, because every
+      //   write here is refused rather than queued (FR-565) and a thread that cannot be replied
+      //   to is not a product. FR-563 makes the whole destination's offline behaviour a stated
+      //   refusal rather than a degraded read.
+      // - **Blocks** must bind on the very next request (SC-506). Age is the wrong clock for a
+      //   refusal, which is precisely what 006 found it was for a discoverability setting.
+      // - **Reports** are write-only. There is nothing to cache and no method that could read
+      //   one back (FR-548).
+      // - **Push subscriptions** hold credentials. A stale copy would keep a revoked endpoint
+      //   alive locally after the browser had already replaced it.
+      // ─────────────────────────────────────────────────────────────────────────────────────
+      conversations: new HttpConversationRepository(http),
+      messages: new HttpMessageRepository(http),
+      blocks: new HttpBlockRepository(http),
+      reports: new HttpReportRepository(http),
+      pushSubscriptions: new HttpPushSubscriptionRepository(http),
     },
     freshness: {
       lastRetrieved: (eventId, content) =>

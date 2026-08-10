@@ -3227,6 +3227,1314 @@
           }
         }
       }
+    },
+    "/conversations": {
+      "get": {
+        "summary": "Every conversation the attendee participates in, most recent first",
+        "tags": [
+          "messages"
+        ],
+        "description": "Not paginated: an attendee holds tens of these and FR-508's ordering is over the whole set. `counterpart` is **null** when the other participant has deleted their account (FR-573) — there is no name, no avatar and no identifier, because nothing was retained; the client renders the closed treatment from `state`, never from a missing field. `state` is derived from the participant count and the caller's own blocks and is stored nowhere. `blocked` means THIS attendee blocks the counterpart — the reverse is invisible here, deliberately (FR-537). `unread` is a boolean rather than a count (FR-531), derived from the reader's own read position and never from who spoke last (FR-527).",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "conversations"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "conversations": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "conversationId",
+                          "counterpart",
+                          "lastMessage",
+                          "unread",
+                          "state"
+                        ],
+                        "additionalProperties": false,
+                        "properties": {
+                          "conversationId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "counterpart": {
+                            "type": "object",
+                            "nullable": true,
+                            "required": [
+                              "attendeeId",
+                              "displayName",
+                              "avatar"
+                            ],
+                            "additionalProperties": false,
+                            "properties": {
+                              "attendeeId": {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              "displayName": {
+                                "type": "string"
+                              },
+                              "avatar": {
+                                "type": "object",
+                                "nullable": true,
+                                "required": [
+                                  "contentType",
+                                  "base64"
+                                ],
+                                "additionalProperties": false,
+                                "properties": {
+                                  "contentType": {
+                                    "type": "string"
+                                  },
+                                  "base64": {
+                                    "type": "string"
+                                  }
+                                }
+                              }
+                            }
+                          },
+                          "lastMessage": {
+                            "type": "object",
+                            "nullable": true,
+                            "required": [
+                              "body",
+                              "sentAt",
+                              "mine"
+                            ],
+                            "additionalProperties": false,
+                            "properties": {
+                              "body": {
+                                "type": "string"
+                              },
+                              "sentAt": {
+                                "type": "string",
+                                "format": "date-time"
+                              },
+                              "mine": {
+                                "type": "boolean"
+                              }
+                            }
+                          },
+                          "unread": {
+                            "type": "boolean"
+                          },
+                          "state": {
+                            "type": "string",
+                            "enum": [
+                              "open",
+                              "one_sided",
+                              "blocked"
+                            ]
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Open a conversation by sending its first message",
+        "tags": [
+          "messages"
+        ],
+        "description": "The ONLY route that creates a conversation, and it does so in one transaction with the first message — there is no route that creates an empty one, because FR-503a says none exists until something is said (opening a thread from a profile writes nothing). `attendeeId` names the RECIPIENT, never the caller. Answers 201 when it created the conversation and 200 when it appended to one that already existed (FR-510), with an identical body either way: a pair never has two conversations, and the caller has no reason to know which happened.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "attendeeId",
+                  "body"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "attendeeId": {
+                    "type": "string",
+                    "maxLength": 64,
+                    "description": "The recipient. Not validated as a uuid at the schema, so a malformed identifier produces the same 404 as a real attendee with no conference in common (FR-504)."
+                  },
+                  "body": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 4000,
+                    "description": "1–2000 characters after trimming. Plain text only — attachments, images and rich formatting are out of scope (FR-513)."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The conversation already existed; the message was appended to it.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "The conversation already existed; the message was appended to it.",
+                  "type": "object",
+                  "required": [
+                    "conversationId",
+                    "messageId",
+                    "sentAt"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "conversationId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "messageId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "sentAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "conversationId",
+                    "messageId",
+                    "sentAt"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "conversationId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "messageId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "sentAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The body was empty, whitespace-only, or over the limit once trimmed. The composer disables send below the lower bound (FR-512) and shows a counter approaching the upper one (FR-517), so this is a backstop rather than the designed path.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "The body was empty, whitespace-only, or over the limit once trimmed. The composer disables send below the lower bound (FR-512) and shows a counter approaching the upper one (FR-517), so this is a backstop rather than the designed path.",
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such attendee, no conference in common, a malformed identifier, or the caller themselves — all four with an IDENTICAL body. Distinguishing them would turn this route into an oracle for \"is this identifier a real attendee\", against a world-readable repository and public self sign-up (FR-504, FR-506).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "No such attendee, no conference in common, a malformed identifier, or the caller themselves — all four with an IDENTICAL body. Distinguishing them would turn this route into an oracle for \"is this identifier a real attendee\", against a world-readable repository and public self sign-up (FR-504, FR-506).",
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Throttled on the `conversation_create` counter. **This is the one throttle in the feature that genuinely refuses** (FR-504a): it is keyed on the caller's own authenticated identity, so a denial can only inconvenience the person doing it, and bounding how many distinct people one account opens conversations with is the whole point.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Throttled on the `conversation_create` counter. **This is the one throttle in the feature that genuinely refuses** (FR-504a): it is keyed on the caller's own authenticated identity, so a denial can only inconvenience the person doing it, and bounding how many distinct people one account opens conversations with is the whole point.",
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "retryAfterSeconds": {
+                      "type": "number"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/conversations/unread": {
+      "get": {
+        "summary": "Whether anything at all is unread",
+        "tags": [
+          "messages"
+        ],
+        "description": "A boolean, not a count. FR-531 needs existence and nothing in the product needs more — and a count is a more precise disclosure of reading behaviour than any requirement asks for.",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "hasUnread"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "hasUnread": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/conversations/{conversationId}/messages": {
+      "get": {
+        "summary": "A page of history, newest first",
+        "tags": [
+          "messages"
+        ],
+        "description": "Behind the participation guard (FR-520, FR-523). **No author identifier is projected — only `mine`**: the counterpart is already established by the conversation, so an identifier per message would add nothing and widen the surface. Unlike 006's directory cursor this one guarantees no duplicates AND no omissions, because `sent_at` is immutable (FR-516) and the ordering total. The client reverses the page for display, since a thread opens at its most recent message.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "description": "Opaque. Encodes the previous page's last (sentAt, id). It is a position, never a scope — the conversation comes from the path and its guard."
+          },
+          {
+            "schema": {
+              "type": "boolean",
+              "default": true
+            },
+            "in": "query",
+            "name": "counterpart",
+            "required": false,
+            "description": "Whether to include the counterpart, whose avatar bytes are the bulk of this response. The open thread polls every three seconds and the face never changes, so a poll asks for `false` and keeps the one it already has."
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            },
+            "in": "query",
+            "name": "limit",
+            "required": false
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "conversationId",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "messages",
+                    "nextCursor",
+                    "state",
+                    "counterpart"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "counterpart": {
+                      "type": "object",
+                      "nullable": true,
+                      "description": "Who the conversation is with, or **null** when they have deleted their account (FR-573) — no name, no avatar and no identifier, because nothing was retained. Carried on the page rather than fetched separately so that the header, the composer's availability and the safety dialogs are all satisfied by one request.",
+                      "required": [
+                        "attendeeId",
+                        "displayName",
+                        "avatar"
+                      ],
+                      "additionalProperties": false,
+                      "properties": {
+                        "attendeeId": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "displayName": {
+                          "type": "string"
+                        },
+                        "avatar": {
+                          "type": "object",
+                          "nullable": true,
+                          "required": [
+                            "contentType",
+                            "base64"
+                          ],
+                          "additionalProperties": false,
+                          "properties": {
+                            "contentType": {
+                              "type": "string"
+                            },
+                            "base64": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "messages": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "messageId",
+                          "body",
+                          "sentAt",
+                          "mine"
+                        ],
+                        "additionalProperties": false,
+                        "properties": {
+                          "messageId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "body": {
+                            "type": "string"
+                          },
+                          "sentAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "mine": {
+                            "type": "boolean"
+                          }
+                        }
+                      }
+                    },
+                    "nextCursor": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "state": {
+                      "type": "string",
+                      "enum": [
+                        "open",
+                        "one_sided",
+                        "blocked"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such conversation, **or** one the caller does not participate in — deliberately indistinguishable, with an identical status and an identical body (FR-524). A 403 would confirm that a conversation between two specific people exists, and a conversation identifier is guessable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "No such conversation, **or** one the caller does not participate in — deliberately indistinguishable, with an identical status and an identical body (FR-524). A 403 would confirm that a conversation between two specific people exists, and a conversation identifier is guessable.",
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Send a message into a conversation",
+        "tags": [
+          "messages"
+        ],
+        "description": "Behind the participation guard, so the caller demonstrably has a `conversation_participants` row (FR-521, FR-523). The author is the sign-in session's attendee and there is no parameter in which to name anybody else (FR-525). `sentAt` in the response is the SERVER's instant: a device with a wrong clock must not be able to place its own message out of order in a thread.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "body"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "body": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 4000,
+                    "description": "1–2000 characters after trimming. Plain text only — attachments, images and rich formatting are out of scope (FR-513)."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "conversationId",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "messageId",
+                    "sentAt"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "messageId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "sentAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The body was empty, whitespace-only, or over the limit once trimmed. The composer disables send below the lower bound (FR-512) and shows a counter approaching the upper one (FR-517), so this is a backstop rather than the designed path.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "The body was empty, whitespace-only, or over the limit once trimmed. The composer disables send below the lower bound (FR-512) and shows a counter approaching the upper one (FR-517), so this is a backstop rather than the designed path.",
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such conversation, **or** one the caller does not participate in — deliberately indistinguishable, with an identical status and an identical body (FR-524). A 403 would confirm that a conversation between two specific people exists, and a conversation identifier is guessable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "No such conversation, **or** one the caller does not participate in — deliberately indistinguishable, with an identical status and an identical body (FR-524). A 403 would confirm that a conversation between two specific people exists, and a conversation identifier is guessable.",
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "`message_send` is configured **`mayDeny: false`** (FR-511a, research R5), so this always carries `retry-after` and always clears. A send is delayed, never denied — a networking product's value is a timely reply, and an attendee whose message is refused at a conference has been handed a failure they cannot act on.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "`message_send` is configured **`mayDeny: false`** (FR-511a, research R5), so this always carries `retry-after` and always clears. A send is delayed, never denied — a networking product's value is a timely reply, and an attendee whose message is refused at a conference has been handed a failure they cannot act on.",
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "retryAfterSeconds": {
+                      "type": "number"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/conversations/{conversationId}/read": {
+      "put": {
+        "summary": "Advance the caller's own read position",
+        "tags": [
+          "messages"
+        ],
+        "description": "Idempotent and **monotonic**: a request naming an older message than the current position is accepted and changes nothing. Without that, an out-of-order arrival could silently mark a conversation unread again. Writes only the caller's own participant row — there is no route, and no field on any response, by which one attendee learns another's read position (FR-530).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "throughMessageId"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "throughMessageId": {
+                    "type": "string",
+                    "maxLength": 64
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "conversationId",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Default Response"
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such conversation, **or** one the caller does not participate in — deliberately indistinguishable, with an identical status and an identical body (FR-524). A 403 would confirm that a conversation between two specific people exists, and a conversation identifier is guessable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "No such conversation, **or** one the caller does not participate in — deliberately indistinguishable, with an identical status and an identical body (FR-524). A 403 would confirm that a conversation between two specific people exists, and a conversation identifier is guessable.",
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/blocks": {
+      "get": {
+        "summary": "Everyone this attendee has blocked",
+        "tags": [
+          "safety"
+        ],
+        "description": "The management surface FR-541 requires, served to the block's owner only. **This is the one place the feature discloses a profile detail outside a conversation**, and the disclosure is bounded rather than incidental: the caller already knows exactly who these people are, having blocked them by hand, and a list of opaque identifiers would be unusable for the single action it exists to support. An empty array is not an error — it is the \"you have not blocked anyone\" state FR-541a declares. There is no route, and no field anywhere, by which a blocked attendee learns they were blocked (FR-537).",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "blocks"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "blocks": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "attendeeId",
+                          "displayName",
+                          "avatar",
+                          "blockedAt"
+                        ],
+                        "additionalProperties": false,
+                        "properties": {
+                          "attendeeId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "displayName": {
+                            "type": "string"
+                          },
+                          "avatar": {
+                            "type": "object",
+                            "nullable": true,
+                            "required": [
+                              "contentType",
+                              "base64"
+                            ],
+                            "additionalProperties": false,
+                            "properties": {
+                              "contentType": {
+                                "type": "string"
+                              },
+                              "base64": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          "blockedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Block an attendee. Idempotent",
+        "tags": [
+          "safety"
+        ],
+        "description": "Takes effect immediately (SC-506): the next send by the blocked attendee is refused whether or not they have the thread open, because the block is read on the send path itself and cached nowhere. **Blocking deletes nothing** (FR-538) — the blocker keeps every message either of them wrote, and unblocking restores sending with nothing lost.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "attendeeId"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "attendeeId": {
+                    "type": "string",
+                    "maxLength": 64
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Blocked, or already blocked. The same either way."
+          },
+          "400": {
+            "description": "Attempting to block yourself.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Attempting to block yourself.",
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such attendee.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "No such attendee.",
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Unblock an attendee. Idempotent",
+        "tags": [
+          "safety"
+        ],
+        "description": "**Directional** (FR-540): this releases only the caller's block. If the other attendee also blocks the caller, that row is untouched and the caller is not told it exists. Succeeds whether or not a block was in force, so a stale management list cannot produce an error. The target is in the body rather than the path because a write route naming an attendee in its URL is forbidden outright by the route audit (FR-385) — the same shape `POST /blocks` uses.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "attendeeId"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "attendeeId": {
+                    "type": "string",
+                    "maxLength": 64
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Default Response"
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/reports": {
+      "post": {
+        "summary": "Report an attendee, which also blocks them",
+        "tags": [
+          "safety"
+        ],
+        "description": "Blocks the reported attendee, writes the report, and dispatches operator mail — in that order, because the attendee's protection lands first (FR-544). **The response says nothing about what happens next**: there is no case identifier to quote and no status to poll, because there is no route that would answer either, and inventing one would promise the review surface FR-548 forbids building. The operator mail carries identifiers and a timestamp only — never the message text and never the reason string (research R11).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "attendeeId",
+                  "reason"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "attendeeId": {
+                    "type": "string",
+                    "maxLength": 64
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 2000,
+                    "description": "In the reporter's own words. The dialog disables its confirmation while this is blank (FR-546), so a 400 here means the form was bypassed. It is stored and swept after 90 days, and it never leaves the database."
+                  },
+                  "messageIds": {
+                    "type": "array",
+                    "maxItems": 100,
+                    "items": {
+                      "type": "string",
+                      "maxLength": 64
+                    },
+                    "description": "The reported messages, if any. Stored as an array with no foreign key, so it degrades honestly into a list of things that no longer exist once M3 removes them."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Default Response"
+          },
+          "400": {
+            "description": "Empty reason, or reporting yourself.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Empty reason, or reporting yourself.",
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such attendee.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "No such attendee.",
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/push/subscriptions": {
+      "post": {
+        "summary": "Register this device for notification delivery",
+        "tags": [
+          "notifications"
+        ],
+        "description": "201 for a new endpoint, 200 when the same one re-registers. **Re-subscription is a replacement rather than an accumulation** — a browser silently renews its subscription, and every renewal that left its predecessor behind would be a row the server tries and fails to deliver to forever. The endpoint is bound to the calling session, so a device signed into a different account reassigns it (FR-555).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "endpoint",
+                  "keys"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "endpoint": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 2048
+                  },
+                  "keys": {
+                    "type": "object",
+                    "required": [
+                      "p256dh",
+                      "auth"
+                    ],
+                    "additionalProperties": false,
+                    "properties": {
+                      "p256dh": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 512
+                      },
+                      "auth": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 512
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "This endpoint re-registered; it now belongs here."
+          },
+          "201": {
+            "description": "A new device."
+          },
+          "400": {
+            "description": "Malformed subscription.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Malformed subscription.",
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Surrender this device’s registration. Idempotent",
+        "tags": [
+          "notifications"
+        ],
+        "description": "Drops **this device only** (FR-556); every other device the attendee has registered keeps receiving. **Not called on sign-out** — a subscription is per device, not per session (FR-555), and somebody who signs out on their phone still wants to hear about a reply. What drops one is revoking permission, the browser replacing the subscription, a permanent delivery failure (FR-557), or deleting the account.\\n\\nThe endpoint is in the body rather than the path: it is a full URL, frequently longer than is comfortable to percent-encode into a path segment, and putting it there would write it into every access log the request passes through.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "endpoint"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "endpoint": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 2048
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Default Response"
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "tags": [

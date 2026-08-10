@@ -1,5 +1,27 @@
 import '@testing-library/jest-dom/vitest'
 
+import { configure } from '@testing-library/react'
+
+/**
+ * How long `findBy*` waits before declaring an element absent.
+ *
+ * ═════════════════════════════════════════════════════════════════════════════════════════════
+ * **THE 1000ms DEFAULT IS TOO TIGHT FOR A CODE-SPLIT DESTINATION, AND IT FAILED AS A FLAKE.**
+ *
+ * Agenda, Discover and Messages are all loaded through `lazy(() => import(…))`, so a `findBy*`
+ * that waits for their first heading is waiting on a **dynamic import** plus the first repository
+ * read — not on a re-render. Under the full component project's parallel load that regularly
+ * lands between one and one-and-a-half seconds, so tests passed alone and failed in the suite,
+ * reporting "unable to find role…" against a screen that renders the element moments later.
+ *
+ * Three separate tests hit this before it was recognised as one problem. Raising the default is
+ * the fix for the class: **no assertion changes**, and a genuinely missing element still fails —
+ * five seconds later instead of one. A test that needs to prove something is *absent* uses
+ * `queryBy*`, which does not wait at all and is unaffected by this.
+ * ═════════════════════════════════════════════════════════════════════════════════════════════
+ */
+configure({ asyncUtilTimeout: 5_000 })
+
 /**
  * 005 — a **deliberately minimal** `<dialog>` shim for jsdom.
  *

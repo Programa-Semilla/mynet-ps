@@ -1,6 +1,7 @@
 import { sql } from 'drizzle-orm'
 
 import { assertVerifiedScope, type EventScope } from '../../plugins/event-access.js'
+import { removeEmptyConversations } from './conversations.js'
 import { avatarObjectKey, cardKeyFor, type StorageService } from '../../storage/service.js'
 import { getDb } from '../client.js'
 
@@ -88,6 +89,71 @@ export type AccountExport = {
     readonly revokedAt: string | null
   }[]
   readonly avatar: { readonly contentType: string; readonly base64: string } | null
+
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════════════════
+   * T136, T137 (007) — **AUTHORED MESSAGES ONLY. RECEIVED MESSAGES ARE DELIBERATELY ABSENT**
+   * (FR-578), and this is the feature's one declared divergence from standing decision 12.
+   *
+   * Decision 12 requires an export "covering every field collected", and a received message is
+   * a field collected about this attendee. It is excluded anyway, on the reasoning that a
+   * received message is **primarily its author's personal data**: exporting it would hand one
+   * attendee a machine-readable copy of another attendee's words, obtained through a
+   * self-service route the author never sees and cannot object to.
+   *
+   * That reasoning is contestable and the specification says so rather than hiding it —
+   * comparable products do export received correspondence, and REVIEWERS.md lists this as a
+   * point a reviewer should decide they agree with. `exclusions` below carries the note into
+   * the document itself, so the attendee reading their own export learns what is missing and
+   * why rather than concluding their threads were empty.
+   * ═══════════════════════════════════════════════════════════════════════════════════════
+   */
+  readonly messages: readonly {
+    /** Context for grouping, not a record of the other participant — see `conversations`. */
+    readonly conversationId: string
+    readonly body: string
+    readonly sentAt: string
+  }[]
+
+  /** Blocks this attendee created. The reverse direction is somebody else's record. */
+  readonly blocks: readonly {
+    readonly blockedAttendeeId: string
+    readonly createdAt: string
+  }[]
+
+  /** Reports this attendee filed (FR-548 keeps them unreadable *inside* the product only). */
+  readonly reports: readonly {
+    readonly reportedAttendeeId: string
+    readonly reason: string
+    readonly messageIds: readonly string[]
+    readonly createdAt: string
+  }[]
+
+  /**
+   * Device notification registrations — **presence and timestamps, never the keys**
+   * (research R14).
+   *
+   * `p256dh_key` and `auth_key` are credentials rather than content: together they grant the
+   * ability to deliver to that device. Reproducing them would put a *capability* in a file the
+   * attendee downloads and keeps, which is the same reasoning that keeps the password hash and
+   * live reset tokens out. `keysRedacted` states the omission in the document rather than
+   * leaving the reader to notice it.
+   */
+  readonly pushSubscriptions: readonly {
+    readonly endpoint: string
+    readonly createdAt: string
+    readonly lastDeliveredAt: string | null
+    readonly keysRedacted: true
+  }[]
+
+  /**
+   * T137 (007) — what this document deliberately leaves out, in the document (FR-578).
+   *
+   * An export that silently omits something is indistinguishable from an export of an attendee
+   * who had nothing. Stating the exclusion is what keeps decision 12's divergence honest to the
+   * person the decision is about.
+   */
+  readonly exclusions: readonly string[]
 }
 
 /** ISO-8601 over the wire, as everywhere else in this product (FR-124). */
@@ -130,7 +196,19 @@ export const assembleExport = async (
   const account = accounts[0]
   if (!account) return null
 
-  const [profiles, interests, registrations, active, saved, notes, sessions] = await Promise.all([
+  const [
+    profiles,
+    interests,
+    registrations,
+    active,
+    saved,
+    notes,
+    sessions,
+    authored,
+    blocks,
+    reports,
+    subscriptions,
+  ] = await Promise.all([
     db.execute<{
       company: string | null
       role: string | null
@@ -180,6 +258,46 @@ export const assembleExport = async (
     }>(sql`
       SELECT created_at, last_used_at, expires_at, revoked_at
       FROM auth_sessions WHERE attendee_id = ${attendeeId}::uuid
+      ORDER BY created_at
+    `),
+    // ─────────────────────────────────────────────────────────────────────────────────────
+    // T136 (007) — **`author_id = the requester` is the whole of FR-578's exclusion**, and it
+    // is expressed as a WHERE clause rather than as a filter applied afterwards. There is no
+    // shape of this query that could return somebody else's message, so the exclusion cannot
+    // be undone by a later edit that forgets a `.filter()`.
+    //
+    // `conversation_id` is included as grouping context. It is not a record of the other
+    // participant: `conversations` holds no identifier at all, by design (research R10).
+    // ─────────────────────────────────────────────────────────────────────────────────────
+    db.execute<{ conversation_id: string; body: string; sent_at: Date }>(sql`
+      SELECT conversation_id, body, sent_at
+      FROM messages WHERE author_id = ${attendeeId}::uuid
+      ORDER BY sent_at, id
+    `),
+    db.execute<{ blocked_id: string; created_at: Date }>(sql`
+      SELECT blocked_id, created_at FROM attendee_blocks
+      WHERE blocker_id = ${attendeeId}::uuid
+      ORDER BY created_at
+    `),
+    db.execute<{
+      reported_id: string
+      reason: string
+      message_ids: string[]
+      created_at: Date
+    }>(sql`
+      SELECT reported_id, reason, message_ids, created_at
+      FROM abuse_reports WHERE reporter_id = ${attendeeId}::uuid
+      ORDER BY created_at
+    `),
+    // ─────────────────────────────────────────────────────────────────────────────────────
+    // **`p256dh_key` and `auth_key` are not selected, and their absence is the requirement**
+    // (research R14) — the same construction, and the same reasoning, as `token_hash` above.
+    // The endpoint and timestamps are personal data: they record that this attendee registered
+    // a device and when it last heard from us. The two keys are a delivery *capability*.
+    // ─────────────────────────────────────────────────────────────────────────────────────
+    db.execute<{ endpoint: string; created_at: Date; last_delivered_at: Date | null }>(sql`
+      SELECT endpoint, created_at, last_delivered_at
+      FROM push_subscriptions WHERE attendee_id = ${attendeeId}::uuid
       ORDER BY created_at
     `),
   ])
@@ -241,6 +359,51 @@ export const assembleExport = async (
     avatar: avatar
       ? { contentType: avatar.contentType, base64: avatar.bytes.toString('base64') }
       : null,
+    messages: authored.map((row) => ({
+      conversationId: row.conversation_id,
+      body: row.body,
+      sentAt: iso(row.sent_at) as string,
+    })),
+    blocks: blocks.map((row) => ({
+      blockedAttendeeId: row.blocked_id,
+      createdAt: iso(row.created_at) as string,
+    })),
+    reports: reports.map((row) => ({
+      reportedAttendeeId: row.reported_id,
+      reason: row.reason,
+      messageIds: row.message_ids,
+      createdAt: iso(row.created_at) as string,
+    })),
+    pushSubscriptions: subscriptions.map((row) => ({
+      endpoint: row.endpoint,
+      createdAt: iso(row.created_at) as string,
+      lastDeliveredAt: iso(row.last_delivered_at),
+      // A literal rather than a computed value: the point is that the reader is told, not that
+      // some code decided. If the keys were ever exported this line would have to be deleted,
+      // which is a visible act.
+      keysRedacted: true as const,
+    })),
+    /**
+     * T137 (007) — the stated omissions (FR-578).
+     *
+     * Present unconditionally, including when the sections above are empty. An attendee with no
+     * messages and an attendee whose received messages were withheld must be able to tell the
+     * difference, and a note that appears only when there is something to hide tells them
+     * nothing.
+     */
+    exclusions: [
+      'Messages you received are not included. This export covers messages you wrote. A ' +
+        "message someone sent you is primarily that person's personal data, and this export is " +
+        'a self-service route they cannot see or object to.',
+      'Notification device keys are not included. The endpoint and dates for each registered ' +
+        'device are listed, but the encryption keys are omitted: together they grant the ' +
+        'ability to send notifications to that device, so they are a capability rather than a ' +
+        'record of you.',
+      'Your password, sign-in tokens, and any active verification or password-reset links are ' +
+        'not included. Each of them would let somebody use your account.',
+      "Reports made about you by other people are not included. They are those people's " +
+        'records, and nothing in MyNet can read them.',
+    ],
   }
 }
 
@@ -301,9 +464,36 @@ export const deleteAccount = async (
   await storage.delete(avatarKey)
   await storage.delete(cardKeyFor(avatarKey))
 
+  // Collected **before** the delete: afterwards the participation rows naming this attendee are
+  // exactly what the cascade removed, so there would be nothing left to identify their
+  // conversations by. See `removeEmptyConversations` for why the sweep is scoped at all.
+  const theirConversations = await getDb().execute<{ conversation_id: string }>(sql`
+    SELECT conversation_id FROM conversation_participants WHERE attendee_id = ${attendeeId}::uuid
+  `)
+
   const rows = await getDb().execute<{ id: string }>(sql`
     DELETE FROM attendees WHERE id = ${attendeeId}::uuid RETURNING id
   `)
+
+  // ───────────────────────────────────────────────────────────────────────────────────────
+  // T131 (007) — **the one piece M3's cascades cannot do for themselves** (FR-575).
+  //
+  // Deleting the attendee has already taken their messages, their participation and their pair
+  // rows with it. `conversations` is not reachable by any of that, because it holds no attendee
+  // foreign key at all — deliberately, since a row naming a departed attendee would breach
+  // FR-573 (research R10).
+  //
+  // So a conversation whose *last* participant has now left survives as litter: unreachable by
+  // every product surface, and therefore something nothing would ever notice. This removes it.
+  // A conversation whose other participant is still here is untouched — theirs to keep,
+  // one-sided and read-only (FR-572).
+  //
+  // Ordered after the delete rather than before it, necessarily: the participation rows have to
+  // be gone before "no participants left" can be true.
+  // ───────────────────────────────────────────────────────────────────────────────────────
+  if (rows.length > 0) {
+    await removeEmptyConversations(theirConversations.map((row) => row.conversation_id))
+  }
 
   return rows.length > 0
 }

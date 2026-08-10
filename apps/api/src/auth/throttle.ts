@@ -102,7 +102,15 @@ interface ActionThreshold {
  * Every entry states what it is defending, because a number without a threat is a number
  * somebody will later "tune".
  */
-const THRESHOLDS: Record<ThrottleAction, ActionThreshold> = {
+/**
+ * **Exported for `tests/unit/throttle-actions.test.ts` (T030), and for nothing else.**
+ *
+ * `mayDeny: false` is a *guarantee* rather than a setting — FR-331 for `reset_request`, FR-511a
+ * for `message_send` — and a guarantee that only one integration test happens to exercise is a
+ * guarantee an edit can silently withdraw. The unit guard reads this table directly, so
+ * flipping a flag fails the build rather than a conference.
+ */
+export const THRESHOLDS: Record<ThrottleAction, ActionThreshold> = {
   /**
    * **Unchanged from 001, deliberately and as a requirement** (FR-307a). Password guessing,
    * bounded to roughly ten attempts an hour per address while a venue full of legitimate
@@ -208,6 +216,61 @@ const THRESHOLDS: Record<ThrottleAction, ActionThreshold> = {
     identifier: { freeAttempts: 1, ceilingMs: IDENTIFIER_MAX_DELAY_MS },
     source: { freeAttempts: 20, ceilingMs: SOURCE_MAX_DELAY_MS },
     mayDeny: false,
+  },
+
+  /**
+   * T029 (007) — sending a message (FR-511a).
+   *
+   * ═════════════════════════════════════════════════════════════════════════════════════════
+   * **`mayDeny: false`, and it is the second entry in this table to say so — for a completely
+   * different reason from `reset_request` above** (research R5).
+   *
+   * `reset_request` cannot deny because it is keyed on the **victim's** identifier: an attacker
+   * who triggers a denial denies somebody else their recovery path, so the denial *is* the
+   * attack. Nothing like that is true here. This action is authenticated and keyed on the
+   * sender's own identity, so a denial could only ever fall on the sender.
+   *
+   * It is delay-only anyway, because **a delayed message is a working product and a refused one
+   * is not.** A networking product's value is a timely reply; an attendee whose message is
+   * refused at a conference has been handed a failure they cannot act on, in the one moment the
+   * contact mattered. The volume one person can type is self-limiting, and the harm M1 names is
+   * not volume within a thread at all — it is *breadth of contact*, which is
+   * `conversation_create`'s job below.
+   * ═════════════════════════════════════════════════════════════════════════════════════════
+   *
+   * Generous on both dimensions: a lively exchange is several messages a minute, and a
+   * conference venue behind one address has hundreds of attendees doing that at once.
+   */
+  message_send: {
+    identifier: { freeAttempts: 30, ceilingMs: IDENTIFIER_MAX_DELAY_MS },
+    source: { freeAttempts: 300, ceilingMs: SOURCE_MAX_DELAY_MS },
+    mayDeny: false,
+  },
+
+  /**
+   * T029 (007) — opening a conversation with somebody new (FR-504a).
+   *
+   * ───────────────────────────────────────────────────────────────────────────────────────
+   * **`mayDeny: true`, and this is the one throttle in the feature that genuinely refuses.**
+   *
+   * It is legitimate here for the reason it is legitimate on `join_code`, `export` and
+   * `avatar_upload`: the identifier is the **acting attendee's own authenticated identity**, so
+   * a refusal can only inconvenience the person doing it. There is no third party for a denial
+   * to harm, which is precisely what separates this from `reset_request`.
+   *
+   * And a real cap is what FR-504a asks for. One account opening a thread with every attendee
+   * at a conference is the abuse this feature has to bound, and a bound that only *slows* mass
+   * contact does not bound it — it just spreads it over the afternoon.
+   * ───────────────────────────────────────────────────────────────────────────────────────
+   *
+   * Tighter than `message_send` by an order of magnitude, deliberately: reaching out to a
+   * genuinely new person is a considered act that happens a handful of times an hour, not
+   * thirty. Somebody working through a shortlist from Discover stays well inside it.
+   */
+  conversation_create: {
+    identifier: { freeAttempts: 5, ceilingMs: IDENTIFIER_MAX_DELAY_MS },
+    source: { freeAttempts: 60, ceilingMs: SOURCE_MAX_DELAY_MS },
+    mayDeny: true,
   },
 }
 

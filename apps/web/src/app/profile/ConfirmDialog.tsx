@@ -27,6 +27,7 @@ export const ConfirmDialog = ({
   confirmLabel,
   confirming,
   destructive = false,
+  confirmDisabled = false,
   children,
   onConfirm,
   onDismiss,
@@ -37,6 +38,21 @@ export const ConfirmDialog = ({
   confirming: boolean
   /** Styles the confirmation as irreversible. Colour is never the only signal — the wording is. */
   destructive?: boolean
+  /**
+   * 007 — disables the confirmation because the dialog's own input is not yet valid.
+   *
+   * ───────────────────────────────────────────────────────────────────────────────────────
+   * **Distinct from `confirming`, which means "in flight".** The report dialog needs a reason
+   * before it can be submitted (FR-546), and `requirements.md` specifies the treatment: a
+   * **disabled** confirmation, never an error shown after submission. Without this prop that
+   * dialog would have to reimplement the modal mechanics to add one attribute — and a second
+   * `<dialog>` is a second place for the focus-restoration ordering above to be got wrong,
+   * which is the failure this component exists to make impossible.
+   *
+   * Optional and defaulting to `false`, so every existing caller is unchanged.
+   * ───────────────────────────────────────────────────────────────────────────────────────
+   */
+  confirmDisabled?: boolean
   children: ReactNode
   onConfirm: () => void
   onDismiss: () => void
@@ -135,7 +151,7 @@ export const ConfirmDialog = ({
           <button
             type="button"
             onClick={onConfirm}
-            disabled={confirming}
+            disabled={confirming || confirmDisabled}
             className={`rounded-sm px-4 py-2 text-sm font-medium text-text-inverse disabled:cursor-not-allowed disabled:opacity-50 ${
               destructive ? 'bg-danger-500' : 'bg-accent-strong'
             }`}

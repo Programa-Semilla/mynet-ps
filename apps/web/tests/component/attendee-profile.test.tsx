@@ -1,5 +1,5 @@
 import { OfflineError, type VisibleProfile } from '@mynet/data'
-import { screen, waitFor } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 
@@ -202,21 +202,31 @@ describe('the profile view renders what 004 authored (FR-432)', () => {
 })
 
 /**
- * T084 — **no 007 or 008 action ships, in any form** (FR-434).
+ * T084 (006), amended by T045 (007) — **an action ships only once the phase that owns it has
+ * landed** (FR-434, FR-568).
  *
  * ═════════════════════════════════════════════════════════════════════════════════════════
- * Not present-but-disabled, not present-and-inert, not present-with-a-tooltip. A disabled
- * control is an affordance for a capability that does not exist: the reader presses it and
- * learns the product is broken rather than that the feature is not built yet.
+ * **THIS FILE'S ASSERTION CHANGED, AND THE CHANGE IS THE ARRANGEMENT WORKING RATHER THAN A
+ * WEAKENED TEST.**
  *
- * The assertion covers both the card and the profile view, because the prototype puts all three
- * actions on the card and it is the card a reviewer looks at first.
+ * 006 asserted that *no* messaging, card-sharing or scheduling control existed anywhere, because
+ * none of those capabilities did. The rule it was enforcing is FR-434's: not
+ * present-but-disabled, not present-and-inert, not present-with-a-tooltip — a disabled control is
+ * an affordance for a capability that does not exist, and the reader who presses it learns the
+ * product is broken rather than that the feature is not built.
+ *
+ * 007 builds messaging. So the *Message* action is now real, and asserting its absence would
+ * assert the opposite of FR-568. What has not changed is the rule: **card-sharing and scheduling
+ * are still 008's, and still must not appear in any form** — and the card must still carry
+ * exactly one action, because the messaging entry point belongs on the profile rather than on
+ * every row of a grid.
  * ═════════════════════════════════════════════════════════════════════════════════════════
  */
-describe('no messaging, card-sharing or scheduling control ships (FR-434)', () => {
-  const FORBIDDEN = /message|send a message|share card|business card|schedule|book a meeting/i
+describe('only the actions whose phase has landed ship (FR-434, FR-568)', () => {
+  /** 008's, and still forbidden. `message` is deliberately absent from this pattern now. */
+  const FORBIDDEN = /share card|business card|schedule|book a meeting|add contact/i
 
-  it('the profile view carries none of them, enabled or disabled', async () => {
+  it('the profile view carries no 008 action, enabled or disabled', async () => {
     renderDiscover({ at: `/discover/${ATTENDEE_ID}`, overrides: withProfile() })
 
     const dialog = await screen.findByRole('dialog')
@@ -229,20 +239,37 @@ describe('no messaging, card-sharing or scheduling control ships (FR-434)', () =
 
     expect(
       offending,
-      '007 builds messaging and 008 builds card-sharing and appointments. Shipping any of them ' +
-        'now — even disabled — is an affordance for a capability that does not exist (FR-434).',
+      '008 builds card-sharing and appointments. Shipping either now — even disabled — is an ' +
+        'affordance for a capability that does not exist (FR-434).',
     ).toEqual([])
   })
 
-  it('the card carries none of them either', async () => {
+  it('the profile view DOES carry the message action, and it addresses the new-thread route', async () => {
+    // ───────────────────────────────────────────────────────────────────────────────────────
+    // FR-568, and the other half of FR-434: the action appears now that its owning phase has
+    // landed. It is a link rather than a button because the thread is an addressable surface
+    // (FR-569), and it points at `new/<attendeeId>` — the address that deliberately creates
+    // nothing until a message is actually sent (FR-503a).
+    // ───────────────────────────────────────────────────────────────────────────────────────
+    renderDiscover({ at: `/discover/${ATTENDEE_ID}`, overrides: withProfile() })
+
+    const dialog = await screen.findByRole('dialog')
+    const action = await within(dialog).findByRole('link', { name: /message sofía muñoz/i })
+
+    expect(action).toHaveAttribute('href', `/messages/new/${ATTENDEE_ID}`)
+  })
+
+  it('the card carries no action of either kind — including messaging', async () => {
     renderDiscover({ overrides: withProfile() })
 
     const heading = await screen.findByRole('heading', { level: 3, name: 'Sofía Muñoz' })
     const card = heading.closest('li') as HTMLElement
 
+    // The messaging entry point belongs on the profile, not on every row of a grid: one action
+    // per card is what keeps a keyboard user at one stop per person (asserted below).
     const offending = [...card.querySelectorAll('button'), ...card.querySelectorAll('a')]
       .map((control) => control.textContent?.trim() ?? '')
-      .filter((label) => FORBIDDEN.test(label))
+      .filter((label) => FORBIDDEN.test(label) || /message/i.test(label))
 
     expect(offending).toEqual([])
   })

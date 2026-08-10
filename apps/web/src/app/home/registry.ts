@@ -2,6 +2,7 @@ import { greetingDayContextCard } from './cards/GreetingDayContext.js'
 import { nextSavedSessionCard } from './cards/NextSavedSession.js'
 import { peopleToMeetCard } from './cards/PeopleToMeet.js'
 import { restOfDayCard } from './cards/RestOfDay.js'
+import { unreadMessagesCard } from './cards/UnreadMessages.js'
 import { upNextCard } from './cards/UpNext.js'
 import { yourConferencesCard } from './cards/YourConferences.js'
 import type { HomeCard } from './contract.js'
@@ -51,6 +52,12 @@ export const HOME_CARDS: readonly HomeCard[] = [
   // 006 — who is worth meeting at this conference. Appended likewise: **one line**, and nothing
   // above it touched (FR-446).
   peopleToMeetCard,
+  // 007 — the unread-message indicator, completing six of the seven elements `requirements.md`
+  // names for the dashboard. **One line, and nothing above it touched** (FR-532). It is the first
+  // ATTENDEE-scoped card whose scope is load-bearing: conversations are cross-event (FR-507), and
+  // the discriminated union is what stops it quietly acquiring a dependency on the active
+  // conference.
+  unreadMessagesCard,
 ]
 
 /**

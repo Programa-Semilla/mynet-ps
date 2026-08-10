@@ -80,6 +80,35 @@ const AttendeeProfile = lazy(() =>
 )
 
 /**
+ * T031 (007) — **Messages is code-split, on the established rule rather than on a measurement.**
+ *
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ * The rule the block above narrowed — *the destinations needed to render the workspace stay
+ * eager* — decides this without needing to be reinterpreted. Messages is not the workspace. It
+ * is the third question the product answers, reached by a deliberate navigation, exactly as
+ * Discover is. It goes on to carry a conversation list, a thread, a composer, two confirmation
+ * dialogs, a block-management list and the push permission surface, none of which an attendee
+ * looking at Home has asked for.
+ *
+ * **The urgency research R7 attached to this is withdrawn, because the number behind it was
+ * wrong.** R7 and tasks.md T003 record the shell as sitting 0.6 KB under a 150 KB budget, which
+ * would have made splitting structural rather than a judgement. That baseline was measured with
+ * a repository-root `.env` present, and `envDir` below points Vite at it: `NODE_ENV=development`
+ * in that file makes a local `pnpm build` resolve React, React DOM and React Router to their
+ * **development** builds. CI has no `.env` — it is gitignored — so the number the gate actually
+ * sees is **91.7 KB, with 58 KB to spare**. Splitting here is correct and stays; it is simply
+ * not load-bearing, and a later reader should not plan around headroom that does not exist.
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ *
+ * **Both entries resolve to the same module, so the thread is NOT split separately** — the
+ * opposite of Discover's profile view, for a product reason recorded at the re-export in
+ * `messages/Messages.tsx`: the thread is this destination's primary content, rendered beside
+ * the list, not an overlay reached once.
+ */
+const Messages = lazy(() => import('./messages/Messages.js').then((m) => ({ default: m.Messages })))
+const Thread = lazy(() => import('./messages/Messages.js').then((m) => ({ default: m.Thread })))
+
+/**
  * The five destinations, declared once (FR-012, FR-013).
  *
  * ─────────────────────────────────────────────────────────────────────────────────────────
@@ -231,10 +260,45 @@ export const DESTINATIONS: readonly Destination[] = [
     children: [{ path: ':attendeeId', element: createElement(AttendeeProfile) }],
   },
   {
+    /*
+      T031 (007) — **Messages declares its element and its nested address here**, appended to
+      this entry and to nothing else. 006 extended the Discover entry the same way, and the
+      pattern is the point: a destination owns its addresses, `routes.tsx` names none of them,
+      and 008 and 009 extend their own entries without touching a neighbour's.
+
+      `purpose` needs no correction. It described what this destination would be and it turns
+      out to have been accurate — it is now a description rather than placeholder copy, because
+      the placeholder is gone.
+    */
     path: '/messages',
     label: 'Messages',
     purpose: 'Your conversations with other attendees.',
     icon: MessageSquare,
+    element: createElement(Messages),
+    // `/messages/<conversationId>` — one conversation, rendered inside the destination (FR-566).
+    // Nested rather than sibling, so the list stays mounted behind it on the two-pane layouts:
+    // opening a conversation is a navigation rather than a remount, and Back leaves the thread
+    // through the browser's own mechanism.
+    //
+    // ═══════════════════════════════════════════════════════════════════════════════════════
+    // **`new/<attendeeId>` IS THE ADDRESS OF A CONVERSATION THAT DOES NOT EXIST YET** (FR-503a),
+    // and it is what Discover's *message* action opens.
+    //
+    // FR-503a requires that choosing *Message* creates nothing — no conversation, no
+    // participation, no record of the attempt — so there is no identifier to address the thread
+    // by until the first message is actually sent. A second address is the honest way to say
+    // that: the reader is composing *to a person*, not reading *a conversation*.
+    //
+    // The alternative was `/messages/new?attendee=…`, which makes `new` a value of
+    // `:conversationId` that the thread has to recognise and exclude — a reserved word hiding in
+    // a parameter, which is exactly the sort of thing a later feature trips over. React Router
+    // ranks a static segment above a dynamic one, so `new/…` is matched here and never as a
+    // conversation identifier.
+    // ═══════════════════════════════════════════════════════════════════════════════════════
+    children: [
+      { path: ':conversationId', element: createElement(Thread) },
+      { path: 'new/:attendeeId', element: createElement(Thread) },
+    ],
   },
   {
     path: '/network',

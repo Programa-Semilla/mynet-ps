@@ -83,6 +83,19 @@ export const THROTTLE_ACTIONS = [
   // runs an entropy analysis to pick the crop, and re-encodes. `limitInputPixels` bounds one
   // upload; this bounds how many of them one account can ask for.
   'avatar_upload',
+
+  // ───────────────────────────────────────────────────────────────────────────────────────
+  // 007 — FR-511a and FR-504a. **Two actions rather than one, and they disagree about denial**
+  // (research R5). Both are authenticated and keyed on the acting attendee, so a denial can
+  // only ever fall on the actor; what differs is whether a denial is the right answer at all.
+  //
+  // Separate counters for the reason every entry above is separate: a send storm must not
+  // consume the allowance that bounds how many strangers one account can contact, and the
+  // reverse — the abuse FR-504a actually names — must not be paid for out of a busy
+  // conversation's send budget.
+  // ───────────────────────────────────────────────────────────────────────────────────────
+  'message_send',
+  'conversation_create',
 ] as const
 
 export type ThrottleAction = (typeof THROTTLE_ACTIONS)[number]
