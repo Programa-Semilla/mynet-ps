@@ -34,6 +34,11 @@ export { HttpPushSubscriptionRepository } from './push-repository.js'
 // inside the audit that already exists (research R1, R2).
 export { HttpCardRepository } from './cards-repository.js'
 export { HttpAppointmentRepository } from './appointments-repository.js'
+// 009 — audience questions. Names a conference in **every** path, like appointments above and
+// unlike cards — including on the three addresses whose question could be found without one. The
+// server names it because `event-scope-audit` examines a route only if it does and reports
+// success otherwise; this mirrors it so neither side reads as optional (research R12, FR-742).
+export { HttpQuestionsRepository } from './questions-repository.js'
 // 005 — the caching decorator. Applied at the composition root, so no component learns that a
 // cache exists (research D1, Principle V).
 export {

@@ -409,6 +409,51 @@ describe('attendee data isolation', () => {
         method: 'POST',
         ok: 404,
       },
+      // ═════════════════════════════════════════════════════════════════════════════════════
+      // 009 — audience questions. **These five entries exist because the coverage assertion
+      // above demanded them**, which is the guard working exactly as 006's and 008's entries
+      // record: the routes were added, this suite failed, and the boundary had to be exercised
+      // before it could pass.
+      //
+      // Three of them name a conference they do not need in order to find the question, and that
+      // is the point (FR-742, research R12). Registering them as `/questions/:questionId` would
+      // have named no conference, kept them out of this list, and left them outside every
+      // guarantee it enforces — while `event-scope-audit` reported success. 007 and 008 each had
+      // to build a whole second audit to close that hole; 009 pays one path segment instead.
+      // ═════════════════════════════════════════════════════════════════════════════════════
+      { template: '/events/:eventId/sessions/:sessionId/questions', method: 'GET', ok: 200 },
+      {
+        // ───────────────────────────────────────────────────────────────────────────────────
+        // **`ok: 400`, on 008's reasoning above and for the same reason it works here.**
+        //
+        // A whitespace-only body passes the route schema's `minLength: 1` and is refused by the
+        // handler's own trim (FR-703, FR-705). Reaching that check at all means
+        // `requireEventAccess` passed and the handler ran — so a 400 is strictly stronger
+        // evidence of "not over-refusing" than a 201 would be, and it leaves **no question
+        // behind**, so this entry needs no `undo` and cannot pollute the rest of the file.
+        // ───────────────────────────────────────────────────────────────────────────────────
+        template: '/events/:eventId/sessions/:sessionId/questions',
+        method: 'POST',
+        payload: { body: '   ' },
+        ok: 400,
+      },
+      // ─────────────────────────────────────────────────────────────────────────────────────
+      // **These three legitimately answer 404, and that is a REQUIREMENT rather than a weakness
+      // in the fixture** — the same position 008's three answer routes are in (FR-743).
+      //
+      // A legitimate request here names a question that does not exist, which FR-743 makes
+      // deliberately indistinguishable from one in another conference and from one the caller
+      // did not write. The non-over-refusal half is proven with real fixtures in
+      // `questions-vote.test.ts` and `questions-withdraw.test.ts`, where an actual question
+      // exists to act on — which is the only place it can honestly be proven.
+      //
+      // What this list still proves for them is the part that is about *events*: refusal parity
+      // between another attendee's conference and a nonexistent one, the same for a malformed
+      // identifier, and 401 without a session.
+      // ─────────────────────────────────────────────────────────────────────────────────────
+      { template: '/events/:eventId/questions/:questionId', method: 'DELETE', ok: 404 },
+      { template: '/events/:eventId/questions/:questionId/vote', method: 'POST', ok: 404 },
+      { template: '/events/:eventId/questions/:questionId/vote', method: 'DELETE', ok: 404 },
     ]
 
     const NONEXISTENT = '00000000-0000-0000-0000-000000000000'
@@ -438,6 +483,8 @@ describe('attendee data isolation', () => {
         // 008 — always a nonexistent appointment. See the three answer entries in EVENT_ROUTES
         // for why a real one could not make the legitimate case distinguishable anyway (FR-636).
         .replace(':appointmentId', NONEXISTENT)
+        // 009 — always a nonexistent question, for the same reason (FR-743).
+        .replace(':questionId', NONEXISTENT)
 
     beforeAll(async () => {
       const ada = await app.inject({

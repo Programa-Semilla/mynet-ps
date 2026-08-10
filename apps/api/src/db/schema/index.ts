@@ -95,3 +95,19 @@ export * from './cards.js'
 // The meeting and the seeded grid of times it can claim. `lapsed` is derived from the slot
 // instant and stored nowhere, which is what keeps this feature free of any background job.
 export * from './appointments.js'
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 009 — Session Q&A: audience questions and the upvotes that rank them. **Two tables, and both
+// are per-event** — the file says so in its header and again per table, because the constitution
+// makes neither rule a default.
+//
+// Unlike 007 and 008 this feature adds **no branded scope and no route audit**: a question always
+// belongs to a session and a session to exactly one event, so `EventScope` already reaches it —
+// *provided every address names its conference*, which is why `/events/:eventId/questions/:id`
+// carries an event it does not strictly need to find the row. Tidying that away would make the
+// **existing** audit walk past these routes reporting success (research R12).
+//
+// It also adds one column to a neighbour's table — `abuse_reports.question_ids` in `reports.ts` —
+// because a question must be reportable from the question itself (FR-781, FR-783).
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+export * from './questions.js'

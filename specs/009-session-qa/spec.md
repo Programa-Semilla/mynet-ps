@@ -733,6 +733,39 @@ require an organizer.
 
 ## Open Questions
 
+**0. RAISED AT THE DEEP-REVIEW GATE, 2026-08-10 — AN OWNER DECISION, BLOCKING NOTHING.**
+**Whether a question's payload should carry `authorId` at all.**
+
+The product behaves as specified today, and the profile route holds: a non-discoverable author is
+named on her question **and** `GET /events/:eventId/attendees/:id` still refuses for her, which is
+FR-736 and is now asserted in `questions-ask.test.ts` (both halves of SC-707, together).
+
+What the review found is a path FR-736 does not describe, verified in source rather than inferred.
+`authorId` is returned unconditionally, so this is the **first surface handing a co-attendee the
+attendee identifier of somebody who has turned discoverability off**. `POST /blocks` accepts any
+identifier whose owner shares a current conference; `GET /blocks` then joins `attendees` **live**,
+with no discoverability, verification or registration condition, and the route embeds the target's
+**card-rendition avatar bytes** beside their current display name — indefinitely, since the block
+row is never re-checked. `POST /conversations` uses the same predicate, so they can also be
+messaged. Before 009 a non-discoverable attendee's identifier could only be obtained through their
+own deliberate act: sharing a card, or sending a message.
+
+The visibility exception v3.3.0 records is about **the name**. The photograph is not the name.
+
+**Two answers, and each contradicts something already written down**, which is why it is recorded
+rather than resolved:
+
+- **Withdraw `authorId`.** Replace it with `isMine`, computed server-side beside `votedByMe`, and
+  have `POST /reports` resolve the reported attendee from the question inside the caller's event
+  scope. Closes it completely — and changes the payload shape `tasks.md` fixed for implementers,
+  and redesigns the report path.
+- **Narrow `listBlocks`.** Stop returning the avatar for a target the caller could not otherwise
+  see. Closes the worst of it — and alters a guarantee 007 owns, from inside 009.
+
+This is the same shape as 008's unresolved question about whether proposing a meeting should
+require the invitee to be discoverable: a finding whose fix contradicts a written decision, so the
+decision is the owner's rather than the implementer's.
+
 **1. The constitution amendment recording public Q&A visibility — A PRECONDITION ON IMPLEMENTATION,
 not on planning.** Decided at spec review on 2026-08-10: it is required. What is open is only its
 drafting. **CLOSED — v3.3.0 ratified 2026-08-10.** It records the **second** exception to Principle

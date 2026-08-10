@@ -135,6 +135,12 @@ precedent of naming these explicitly rather than letting a reviewer discover the
 Two phases (research R13). **Phase A must not merge claiming completeness** — US5 is unmet until B
 lands, and the Success Criteria say so.
 
+> **DELIVERED AS ONE PR, 2026-08-10.** Both phases are complete and green, so the constraint above
+> is satisfied rather than bypassed: nothing merged claiming completeness while US5 was unmet.
+> Splitting the merge would have shipped a Q&A surface with no way to report anything on it. The
+> boundary survives as a **reading order** for the reviewer — everything touching `routes/reports.ts`,
+> `queries/blocks.ts`'s filter, `ReportDialog` and `question_ids` is phase B's half.
+
 | Phase | Contents | Independently reviewable because |
 |---|---|---|
 | **A — Q&A** | Migration, both tables, repository + interface, five routes, panel section, ask/vote/withdraw/read, ordering, deletion cascade, export, offline refusal | Every acceptance scenario in US1–US4 passes at the end of it. Touches one neighbour's file. |

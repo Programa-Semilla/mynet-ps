@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { THRESHOLDS } from '../../src/auth/throttle.js'
+import { ATTEMPT_SCAN_LIMIT, THRESHOLDS } from '../../src/auth/throttle.js'
 import { THROTTLE_ACTIONS } from '../../src/db/schema/sign-in-attempts.js'
 
 /**
@@ -33,6 +33,38 @@ describe('throttle actions', () => {
     // costs nothing.
     for (const action of THROTTLE_ACTIONS) {
       expect(THRESHOLDS[action], `no threshold declared for '${action}'`).toBeDefined()
+    }
+  })
+
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════════════════
+   * **A THRESHOLD ABOVE THE SCAN BOUND IS DEAD CONFIGURATION THAT READS AS A WORKING BOUND.**
+   *
+   * `countFailures` reads at most `ATTEMPT_SCAN_LIMIT` rows and counts non-successes among
+   * them, so a `freeAttempts` above that number can never be reached: `delayFor` computes a
+   * negative excess and returns zero forever. The dimension does nothing, and nothing says so.
+   *
+   * Two entries were already in that state when this was written — 007's `message_send.source`
+   * at 300 and 009's `question_vote.source` at 600, against a bound of 200 — which is why this
+   * asserts the invariant rather than the two values. The source dimension is the one an
+   * attacker occupies, so it is the worst one to have silently disabled.
+   * ═══════════════════════════════════════════════════════════════════════════════════════
+   */
+  it('keeps every threshold reachable within the scan bound', () => {
+    for (const action of THROTTLE_ACTIONS) {
+      const thresholds = THRESHOLDS[action]
+
+      for (const [dimension, { freeAttempts }] of Object.entries(thresholds).filter(
+        ([, value]) => typeof value === 'object',
+      ) as [string, { freeAttempts: number }][]) {
+        expect(
+          freeAttempts,
+          `${action}.${dimension}.freeAttempts is ${freeAttempts}, at or above the ` +
+            `${ATTEMPT_SCAN_LIMIT}-row scan bound in countFailures — so the count can never ` +
+            'reach it and this dimension never engages. Either lower the threshold or raise ' +
+            'ATTEMPT_SCAN_LIMIT.',
+        ).toBeLessThan(ATTEMPT_SCAN_LIMIT)
+      }
     }
   })
 

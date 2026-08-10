@@ -81,8 +81,18 @@ body → { body: string }        1–500 characters after trimming
 ### `DELETE /events/:eventId/questions/:questionId` — withdraw
 
 ```
-204  → no content
+200  → { questions: [...] }
 ```
+
+> **Corrected 2026-08-10, by owner decision at the code-review gate.** This block said
+> `204 → no content`, contradicting the Writes preamble three lines above it — which states that
+> **all four** write routes return the full re-ordered list, citing research R5. The preamble,
+> `tasks.md`'s Interfaces block and R5 itself all agree; the `204` was the outlier.
+>
+> The behavioural cost of the outlier is what settles it: a `204` leaves the client with a list it
+> knows is stale and forces the second round trip R5 exists to remove — during which the counts can
+> change again, so the attendee watches the list flicker into place after removing their own
+> question. Implementation answers `200` with the list, like every other write here.
 
 - `403` **with a reason** when the question now has a vote (FR-714). This is one of only two refusals
   in this feature that explains itself, and it is safe because it describes the **reader's own

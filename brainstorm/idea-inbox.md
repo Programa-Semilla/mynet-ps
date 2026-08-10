@@ -290,3 +290,48 @@ An entry is removed once a brainstorm document has been written from it.
 - **Summary**: `GET /cards/held` has no limit, no cursor and no server-side cap, and embeds a base64 avatar per row. Response size is a pure function of how many people have shared a card with the reader.
 
 > The spec justifies it as "bounded by deliberate human acts", which bounds the *rate* — each row needs another attendee's act, and `card_share` is throttled — but places no ceiling on the *total*, which accumulates across every conference forever and can never be deleted (FR-618, cross-event by design). Fine at the 10–50 contacts a realistic attendee accumulates in a year; at 500 it is roughly 1.5–2.5 MB on the wire and 500 image buffers held per concurrent request on a two-vCPU VM. It degrades with no warning and no back-pressure, and the failure mode is the Network landing view timing out rather than paging. Worth deciding the ceiling deliberately — even a documented `LIMIT` makes the tail a product decision rather than an outage.
+
+### unpaginated-list-returned-per-write
+
+- **Source**: deep-review
+- **Date**: 2026-08-10
+- **Reference**: spec/009-session-qa
+- **Summary**: Every Q&A write returns the whole unpaginated question list, so the cost of the list is paid per *action* rather than per page view — at a 1,000-attendee keynote each upvote re-aggregates every vote on the session and ships every question body back.
+
+> FR-732 makes the *read* deliberately unpaginated, and research R5 makes every write answer with the list so the reader's own action lands without a second round trip. Both are right on their own; together they multiply. The indexes all serve the query correctly — this is a shape question, not an indexing one. Worth revisiting with a server-side cap after the ORDER BY, or `bool_or` in place of the correlated EXISTS, if a real conference ever produces a long list.
+
+### throttle-writes-dominate-sign-in-attempts
+
+- **Source**: deep-review
+- **Date**: 2026-08-10
+- **Reference**: spec/009-session-qa
+- **Summary**: Upvoting made `sign_in_attempts` — a table built for rare authentication events with a two-hour sweep — the product's highest-volume write path, since every vote writes an attempt row whatever the outcome.
+
+> Nothing breaks at the specified scale, and the table stays bounded. But the sweep interval equals the retention margin, so peak residency is three hours rather than two, and the sweep's DELETE cannot use either index (both lead with `action`). If it is ever worth reducing: an index on `occurred_at`, or moving idempotent per-actor counters off a table whose row-per-attempt shape exists to reconstruct failure *streaks*.
+
+### question-row-rerenders-whole-list
+
+- **Source**: deep-review
+- **Date**: 2026-08-10
+- **Reference**: spec/009-session-qa
+- **Summary**: `useSessionQuestions` returns a fresh object each render and it is passed whole into every row, so any vote re-renders every row and `React.memo` on a row could never hit.
+
+> Invisible at test sizes; shows up as upvote lag on a mid-range phone at a keynote, which is exactly the scenario the feature is for. Passing only the two stable callbacks each row uses would make memoisation possible without touching FR-780's key-stability reasoning.
+
+### throttle-read-then-write-is-not-atomic
+
+- **Source**: deep-review
+- **Date**: 2026-08-10
+- **Reference**: spec/009-session-qa
+- **Summary**: The throttle reads the counter, sleeps, then records — so a burst of concurrent requests all observe the same pre-burst count and all pass before any is recorded. It bounds a sustained rate, not a burst.
+
+> Pre-existing and shared by every throttled route since 001, not introduced by 009. It matters marginally more for `question_ask`, which publishes free text to a whole conference with an allowance of ten. Fixing it means changing the shared mechanism — record before counting, or fold both into one statement — so it belongs to whoever revisits `auth/throttle.ts` next.
+
+### withdrawal-confirmation-has-no-pending-state
+
+- **Source**: deep-review
+- **Date**: 2026-08-10
+- **Reference**: spec/009-session-qa
+- **Summary**: The withdrawal confirmation is the only one of seven `ConfirmDialog` call sites passing a literal `confirming={false}`; it closes before the request resolves, so the dialog's "Working…" state and double-activation guard are dead code on that path.
+
+> Withdrawal is the one action with a documented server-side race (FR-714), so it is the call site where a pending state would matter most: the dialog closes, the request may then be refused because a vote arrived, and the explanation surfaces away from the control that produced it.

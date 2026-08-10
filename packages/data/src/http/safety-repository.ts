@@ -118,6 +118,10 @@ export class HttpReportRepository implements ReportRepository {
         attendeeId: report.attendeeId,
         reason: report.reason,
         messageIds: report.messageIds,
+        // 009 (FR-783) — sent alongside the messages. Defaulted rather than omitted when absent,
+        // so the route's `additionalProperties: false` schema sees the same shape from both
+        // callers and neither has to know what the other sends.
+        questionIds: report.questionIds ?? [],
       }),
     })
   }

@@ -5,7 +5,7 @@ Guidance for Claude Code (claude.ai/code) working in this repository.
 This file is the **working brief**: what the product is, what has been decided, and how work is
 done here. It is deliberately short. Depth lives elsewhere, and these are authoritative over it:
 
-1. **`.specify/memory/constitution.md` (v3.2.0)** — governance and the authoritative decision
+1. **`.specify/memory/constitution.md` (v3.3.0)** — governance and the authoritative decision
    register. Supersedes tool defaults, habit, and any conflicting statement in this file.
 2. **`docs/superpowers/specs/2026-08-06-mynet-delivery-roadmap-design.md`** — the decomposition of
    the remaining product into features, with dependency order, reserved migration numbers, and gate
@@ -138,6 +138,65 @@ proposed, then accepted or declined, over a seeded 30-minute slot grid whose ava
 function of the reader's own commitments alone. Home gained its seventh and last card, which is the
 **only** way an attendee learns somebody has proposed a meeting: this feature dispatches no
 notification, and the bell stays forbidden.
+
+**009 (Session Q&A — audience questions and upvotes) is shipped**, and **with it the delivery
+roadmap is complete**: every feature 001–009 is delivered and every destination `requirements.md`
+names answers its question. What remains is 010, which adds no schema and no feature.
+
+A question is asked on a session, published to **every attendee registered for the conference
+under the author's real name with no opt-out**, and ranked by upvotes. That visibility is the
+**second recorded exception** to Principle VIII's "private content stays private" — constitution
+**v3.3.0, ratified 2026-08-10**, which gated the first line of code exactly as v3.2.0 gated 008's.
+009's own artifacts drafted it as a *third* exception, counting v3.2.0's N2; **N2 is an exception
+to the discoverability toggle, not to private content**, and the count was corrected at
+ratification.
+
+It arrived as a **fourth stacked section** on 005's panel, not the prototype's tab strip — 005
+built the panel for exactly this and `PanelNotes` says so in its own header. **It introduced no
+new architectural concept**: no branded scope, no fourth route audit, no cache classification, no
+notification trigger. Every mechanism it needed already existed, which is why its plan describes
+the approach as "almost entirely inheritance".
+
+**The one question v3.2.0 left open for this phase is answered and is now an invariant**: a
+departing attendee's questions go, and **everybody's votes on them go too** (owner decision 1).
+Nothing survives de-attributed — no placeholder, no tombstone. 007's answer for conversations
+does not transfer, because a conversation holds the survivor's own words and a question by
+somebody who has left holds nobody's.
+
+**Safety shipped with it, as PR-B.** A question is reportable **from the question**, without
+opening a conversation first (FR-781) — this is the product's first unmoderated many-to-many
+surface, and reporting is what makes it survivable in a product with no organizer. 007's
+`ReportDialog` moved to `apps/web/src/app/safety/`, and **`report_submit` throttling closes a gap
+007 left**: reporting is the only action that sends mail out of the product, so an unthrottled
+route was an unthrottled relay pointed at the single address a human is supposed to read.
+
+**Four defects were found during implementation, and three of them only by tests written for the
+purpose.** They are listed because each is the shape of mistake the next feature would repeat:
+
+1. **PostgreSQL's `trim()` strips spaces only.** `length(trim(body)) > 0` accepted `"\n\t \n"`
+   while the route — using JavaScript's Unicode-aware `String.prototype.trim` — refused it. The
+   two layers disagreed and the weaker one was the last line of defence. Found by the validation
+   test that drives the column **with the route bypassed**, which is why that file tests the two
+   layers separately instead of driving the route twice. The constraint is now
+   `btrim(body, E' \t\n\r')`.
+2. **Reading hook state inside a handler closes over a stale value.** The composer cleared its
+   field on `if (!questions.error)`, which is `null` at the moment the handler was created — so
+   **every** outcome looked like success and a refused post destroyed the attendee's typed
+   question. The hook's writes now resolve to whether the server accepted.
+3. **A success that lands late wipes what the attendee has typed since.** The clear ran
+   unconditionally on the response, so somebody starting their next question while the first was
+   in flight lost it. It now clears only if the field still holds what was posted.
+4. **React delivers a nested dialog's `cancel` to ancestor handlers, and research R2 predicted
+   the opposite.** R2 reasoned the platform sends `cancel` to the topmost dialog alone and said
+   the point was worth asserting rather than assuming — the assertion found the reasoning wrong.
+   One Escape on the withdrawal confirmation closed the confirmation **and** the panel, changing
+   the address. `SessionPanel` now compares `event.target` against its own dialog.
+
+**T097 — the by-hand `quickstart.md` walkthrough — was NOT completed for 009 either.** It joins
+007's and 008's outstanding walkthroughs rather than replacing them. Everything it covers is
+asserted by integration, component and end-to-end tests, and this feature's e2e does walk two
+browser profiles through asking, seeing and upvoting — but the eight scenarios have not been
+walked by a person, and neither have the desktop and tablet layout reviews.
 
 **T148 — the by-hand `quickstart.md` walkthrough — was NOT completed for 008 either**, and it
 shipped without it. Everything it covers is asserted by integration, component and end-to-end
@@ -382,6 +441,72 @@ refactor.
   the re-seed with an error naming neither table. The next feature with a non-cascading reference
   to seeded content will meet this.
 
+**Session Q&A (009)**
+
+- **No fourth branded scope and no fourth route audit, and that is an outcome rather than a
+  saving.** A question always belongs to a session and a session to exactly one event, so
+  `EventScope` reaches it — **provided every address says so**. Three of the five routes could
+  find their question from `:questionId` alone and name their conference anyway, because
+  `event-scope-audit` examines a route only if it declares an event parameter and **reports
+  success otherwise**. Tidying `/events/:eventId/questions/:id` to `/questions/:id` would remove
+  these routes from the only guard covering them while the whole suite stayed green. A dedicated
+  assertion now pins the naming rule, which is the cheapest of the three mechanisms 007 and 008
+  each had to build.
+- **The audit's conference-content predicate was narrowed, and the narrowing is a decision.** It
+  matched any path *containing* `/sessions`, which flagged `POST …/sessions/:id/questions` — a
+  write to **attendee state about conference content**, which is 005's distinction. It now asks
+  what a path *addresses*: the last non-parameter segment. 005 dodged this only by accident of
+  naming (`/agenda/saved/:sessionId`); Q&A is the first attendee-owned resource that genuinely
+  nests under a session. The predicate is checked against a table of paths that must still be
+  caught, because a guard exercised only by the routes that happen to exist stops guarding when
+  they change.
+- **The author join applies NONE of the directory's three conditions**, and each absence is the
+  feature: not discoverability (FR-734), not verification (FR-735), and no registration join.
+  `listDirectory` one file over has all three, so a reader arriving from it will see this query
+  as incomplete. Attribution has no opt-out — that is what v3.3.0 records — and consulting
+  verification would be a second use of a signal the constitution reserves for discoverability
+  alone.
+- **A vote count is `count(*)` at read time and must never become a column.** A denormalised
+  counter is a second source of truth for a number the rows already answer, and the one that
+  drifted would be the one displayed. 008 records the same reasoning for `lapsed`.
+- **The composite primary key on `question_votes` IS one-vote-per-attendee.** Enforced by the
+  schema rather than by handler logic, so a double-tap is the same request twice and no code path
+  exists that could produce a duplicate by forgetting to check.
+- **Withdrawal re-checks "no votes" inside the deleting transaction, with the question row
+  locked.** `SELECT … FOR UPDATE` conflicts with the `FOR KEY SHARE` a vote insert takes on its
+  parent, so a vote arriving between the reader seeing "you can withdraw this" and pressing the
+  control blocks until the transaction ends. Checking before the transaction is the race FR-714
+  exists to close, and it is the one property no layer but a real database can test.
+- **Every write returns the full re-ordered list.** The only shape satisfying immediate update,
+  server-side ordering and focus preservation at once — and the last of those is why rows are
+  keyed on the question id: focus is lost when a node is **unmounted**, not when it is moved.
+- **The repository is undecorated, which makes the offline rules structural rather than
+  classified.** `cached` treats every method not in `reads` as a write and a write purges the
+  whole conference prefix — 008's defect. Not decorating removes the mechanism instead of
+  configuring it: there is no `reads` map to omit from and no `args[0]` to misread. **Do not add
+  `cached` here to gain `passThrough`.**
+- **Two explained refusals, and both pass the same test — the follow-up question is about the
+  READER.** Withdrawal refused because a vote exists, and a vote refused because the caller is
+  the author. Everything else is the indistinguishable 404. The client classifies on
+  `error.code`, never on the class, and a test requires all five outcomes to be **different from
+  each other** — the property `instanceof` classification destroys, and the one that would have
+  caught 008's swallowed messages.
+- **Blocking filters the read and enters no aggregate.** Bidirectional, pair never ordered,
+  nothing written — so lifting a block restores the questions with no repair path, the deliberate
+  opposite of what a block does to an appointment. A block changes **no other reader's count**,
+  including a vote the blocker already cast.
+- **A nested dialog's `cancel` reaches ancestor React handlers.** The DOM event does not bubble;
+  React's synthetic system delivers it anyway. `SessionPanel` compares `event.target` against its
+  own dialog, and without that one Escape on an inner confirmation closes the panel and changes
+  the address. Invisible to every component test, because jsdom has no top layer.
+- **Eleven requirements are absences**, gathered in `apps/api/tests/unit/qa-absences.test.ts` and
+  `apps/web/tests/unit/qa-absences.test.ts`: no edit route, no downvote or reaction, no voter
+  disclosure, no answer/pin/moderation route, no Home card, no destination, no de-duplication,
+  nothing that polls, no contact derived from a question, no bell, no column on the attendee
+  record. **Both guards strip comments before matching**, because every pattern also appears in
+  the prose explaining the absence — matching raw text fails on a correct implementation, and the
+  natural repair is to weaken the pattern until it checks nothing.
+
 **Deployment**
 
 - **`deploy/vm/` is the whole platform**: Caddy with automatic Let's Encrypt TLS serving the built
@@ -497,6 +622,33 @@ a queued phase**:
     under Principle VIII, carrying identity scoping, deletion cascade and export coverage. *Closes
     register entry 9.* **Not solved**: what happens to a departing attendee's question that other
     people have upvoted — 007's answer for conversations does not transfer, and 009 must decide it.
+
+**2026-08-10** (ratified in constitution v3.3.0) — **the amendment that gated 009's first line of
+code**:
+
+27. **Public Q&A visibility is a recorded exception to "private content stays private", and it is
+    the SECOND one rather than the third.** A question is visible to every attendee registered
+    for the event, under a real name, **with no opt-out**, specifically including an attendee who
+    has turned discoverability off. Principle VIII requires an exception to be *recorded* rather
+    than derived, and the entailment argument — that attribution (N3) already implies public
+    visibility — was available and deliberately not taken. **The count was corrected at
+    ratification**: 009's artifacts called it the third, counting v3.2.0's N2, but N2 bypasses the
+    **discoverability toggle** under a standing consent and is not an exception to private
+    content at all. Three consequences travel with it: verification is never consulted, the name
+    is attribution rather than a route into the profile, and the attendee is told before they
+    publish.
+28. **A departing attendee's questions go, and everybody's votes on them go with them.** This is
+    the problem v3.2.0 left explicitly open for 009. Nothing survives de-attributed — no
+    placeholder, no "deleted attendee", no tombstone. The cost is stated rather than hidden:
+    other attendees lose a question they backed. It is accepted because the alternative is
+    retaining one person's words after they exercised erasure, on the strength of other people's
+    interest in them.
+29. **FR-756a is withdrawn.** A refused Q&A action does not purge the conference cache. Meeting it
+    would have given one feature a cross-feature responsibility **no other undecorated repository
+    has** — Messages, Discover, cards and profile all refuse without purging, and have since they
+    shipped. The underlying gap is real, product-wide and older than 009: **a cached conference
+    can outlive a withdrawn registration by up to 24 hours.** It is **register entry 22**, against
+    010, rather than 009's to fix alone.
 
 **Sharpened at the same time, without reversing anything**: standing decision 16 now says
 explicitly that there is **one visibility decision per attendee** and that no feature may give an
@@ -614,14 +766,29 @@ is a working summary. Each names what it blocks, because *when* to ask matters a
 
 ### Require a client decision
 
-**No open question blocks any remaining feature.** v3.2.0 closed the last three — the connection
-model, card-exchange semantics, and Q&A attribution — so 008 shipped and 009 is buildable.
-Everything below blocks **deployment** or **release**, not code.
+**No open question blocks any remaining feature, and there are no remaining features.** v3.2.0
+closed the connection model, card-exchange semantics and Q&A attribution; v3.3.0 closed public
+Q&A visibility and withdrew FR-756a. **009 shipped, and the delivery roadmap is complete** — 010
+adds no schema and no feature. Everything below blocks **deployment** or **release**, not code.
+
+- **Register entry 22 — a cached conference can outlive a withdrawn registration by up to 24
+  hours.** Conceded by 009 when FR-756a was withdrawn, and **product-wide rather than 009's**: no
+  undecorated repository — Messages, Discover, cards, profile or Q&A — purges on refusal. Filed
+  against 010, where a single answer can cover every one of them.
 
 - **Desktop and tablet layouts are unvalidated.** The approved prototype is mobile-only — a fixed
   390×844 frame. Every desktop layout built before this is answered is unreviewed design, so the
   cost compounds with each feature. **008 turned this from a risk into an observed defect**: the
   first dialog a human looked at was rendering in the top-left corner, having passed every gate.
+- **Whether a question's payload should carry `authorId`** — raised at 009's deep-review gate.
+  It makes Q&A the **first surface handing a co-attendee the identifier of somebody who has turned
+  discoverability off**, and `GET /blocks` then resolves that identifier to a live display name
+  **and avatar bytes** with no discoverability condition, indefinitely. The profile route still
+  refuses (FR-736 holds, and SC-707's two halves are now tested together); v3.3.0's exception is
+  about the *name*, and the photograph is not the name. Both fixes contradict something written
+  down — withdrawing `authorId` changes the interface `tasks.md` fixed, and narrowing `listBlocks`
+  alters a 007 guarantee — so it is the owner's call. **Blocks nothing**: the product behaves as
+  specified.
 - **Whether proposing a meeting should require the invitee to be discoverable**, as sharing a card
   does. 008's deep review raised it; the spec's Assumptions say no, on the ground that holding
   somebody's card is the stronger predicate — they handed it to you. Recorded rather than resolved

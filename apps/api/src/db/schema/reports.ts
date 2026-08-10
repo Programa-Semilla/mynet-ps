@@ -64,6 +64,27 @@ export const abuseReports = pgTable(
      */
     messageIds: uuid('message_ids').array().notNull(),
 
+    /**
+     * ───────────────────────────────────────────────────────────────────────────────────────
+     * **T011 (009) — the reported questions, mirroring `message_ids` EXACTLY, including its
+     * deliberate absence of a foreign key** (FR-783).
+     *
+     * The reasoning above transfers without modification and is if anything stronger here: a
+     * reported question will frequently be gone before anyone looks at the report, because its
+     * author can **withdraw it themselves** while it has no votes (FR-712) — a route no message
+     * has. `RESTRICT` would block a deletion the erasure right requires; `CASCADE` would
+     * silently empty the report while leaving the row, which reads as "they reported nothing".
+     *
+     * **No new retention rule.** `abuse_reports` is already swept at 90 days and cascades from
+     * both attendees, so this column inherits all of it rather than needing one of its own.
+     *
+     * It ships in migration `0008` with the rest of 009's schema even though **PR-B is what
+     * uses it** — schema ahead of code is the safe direction for a rollback, and the reverse
+     * would put a route in production writing to a column that does not exist.
+     * ───────────────────────────────────────────────────────────────────────────────────────
+     */
+    questionIds: uuid('question_ids').array().notNull(),
+
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [

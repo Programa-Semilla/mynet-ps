@@ -54,6 +54,17 @@ export interface AbuseReportDraft {
   readonly reason: string
   /** The messages being reported, if any. May be empty. */
   readonly messageIds: readonly string[]
+  /**
+   * 009 (FR-781, FR-783) — the audience questions being reported, if any. May be empty.
+   *
+   * ───────────────────────────────────────────────────────────────────────────────────────
+   * **Optional, so every existing caller is unchanged.** 007's thread reports carry messages and
+   * no questions; Q&A reports carry questions and no messages. Both are the same act against the
+   * same route, which is what makes reporting from a question possible **without opening a
+   * conversation first** — the whole point of FR-781.
+   * ───────────────────────────────────────────────────────────────────────────────────────
+   */
+  readonly questionIds?: readonly string[]
 }
 
 /**

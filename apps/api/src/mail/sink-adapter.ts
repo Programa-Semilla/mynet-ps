@@ -72,6 +72,8 @@ export class SinkMailService implements MailService {
       readonly reportId: string
       readonly reportedAt: string
       readonly messageIds: readonly string[]
+      // 009 (FR-783) — the reported questions, alongside the messages.
+      readonly questionIds: readonly string[]
     },
   ): Promise<void> {
     this.#sent.push({
@@ -79,13 +81,14 @@ export class SinkMailService implements MailService {
       to,
       link: report.reportId,
       at: new Date(),
-      messageIds: [...report.messageIds],
+      messageIds: [...report.messageIds, ...report.questionIds],
     })
 
     console.warn(
       `\n── development mail sink ─────────────────────────────────────────────\n` +
         `   abuse report ${report.reportId} for ${to}\n` +
-        `   reported at ${report.reportedAt}, ${report.messageIds.length} message(s) cited\n` +
+        `   reported at ${report.reportedAt}, ${report.messageIds.length} message(s) and ` +
+        `${report.questionIds.length} question(s) cited\n` +
         `   Nothing was sent. Register entry 18 — no mail provider is provisioned.\n` +
         `─────────────────────────────────────────────────────────────────────\n`,
     )

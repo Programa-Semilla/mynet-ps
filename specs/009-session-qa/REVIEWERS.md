@@ -42,7 +42,12 @@ reader's own action update without a second round trip.
 On the client, one new section on the existing session panel, one hook, and a repository that is
 **never wrapped in the cache decorator at all**.
 
-Delivered as **two PRs**: PR-A is everything except reporting; PR-B is the safety half.
+**Planned as two PRs — delivered as one.** The split (PR-A everything but reporting, PR-B the
+safety half) was designed so a reviewer could read the half added at spec review as a unit. Both
+halves are complete and every gate is green across them, so holding PR-A open would have shipped a
+Q&A surface with **no way to report anything on it** — which the Success Criteria explicitly forbid
+calling complete (US5 is unmet until B lands). The boundary survives as a reading order: everything
+touching `reports.ts`, `blocks`, `ReportDialog` and the block filter is PR-B's half.
 
 ## When It Applies
 
@@ -131,7 +136,7 @@ that to the owner before implementation.
 
 ## Open Questions
 
-**Two gate implementation and must be closed before the first line of code:**
+**Both gated implementation, and both are now CLOSED.**
 
 1. **The constitution amendment** recording public Q&A visibility as the **second recorded
    exception** to Principle VIII's "private content stays private". Principle VIII requires an
@@ -142,13 +147,32 @@ that to the owner before implementation.
    discoverability, not to private content, and the count was corrected at ratification.*
 
 2. **Whether FR-756a is withdrawn**, per the deviation above. Implementing against an unresolved
-   `MUST` is what T003 exists to prevent.
+   `MUST` is what T003 exists to prevent. **CLOSED — the owner withdrew it on 2026-08-10.** The
+   conceded gap (a cached conference outliving a withdrawn registration by up to 24 hours) is
+   product-wide and is **register entry 22** against 010, not 009's to fix alone. (T003, T003a)
+
+**One was raised AFTER implementation, at the deep-review gate, and is the owner's to answer. It
+blocks nothing — the product behaves as specified:**
+
+3. **Whether a question's payload should carry `authorId`.** It makes Q&A the first surface handing
+   a co-attendee the identifier of somebody who has turned discoverability off; `GET /blocks` then
+   resolves that identifier to a live display name **and avatar bytes**, indefinitely, with no
+   discoverability condition. The profile route still refuses — FR-736 holds, and SC-707's two
+   halves are now tested together. v3.3.0's exception is about the **name**, and the photograph is
+   not the name. Both fixes contradict something already written down: withdrawing `authorId`
+   changes the interface `tasks.md` fixed for implementers, and narrowing `listBlocks` alters a
+   guarantee 007 owns. Recorded rather than resolved, exactly as 008's equivalent was.
 
 **Four are planning-level and block nothing**: where the reused report dialog lives, whether the
 panel should become a registry, nested-dialog behaviour to be confirmed in a browser, and whether the
 two-PR split holds against the concrete task list.
 
 ## Review Checklist
+
+**Status: implemented, both review gates passed.** `pnpm verify` exit 0 — typecheck, lint, format,
+unit 418, component 562, contract, integration 903, build, asset budget 96.4/150 KB, e2e 141.
+Spec compliance 100% of in-force requirements (FR-756a withdrawn). Deep review: 5 agents, 31
+findings after dedup, 8 of 9 Important fixed, 1 referred to the owner (item 3 above).
 
 - [ ] Key decisions are justified
 - [ ] Breaking changes are documented with migration guidance
@@ -165,6 +189,10 @@ two-PR split holds against the concrete task list.
       all pass **unmodified**
 - [ ] No dialog re-patches centring locally; `theme/tokens.css` owns it
 - [ ] The four edits to other features' files are each minimal and intended
+- [ ] **`authorId` (Open Question 3)** — the one finding deliberately left unfixed
+- [ ] **T097 is NOT done**: the by-hand `quickstart.md` walkthrough, as for 007 and 008. The e2e
+      walks two browser profiles and measures both dialogs at three widths, but no person has
+      looked at it — which is how 008's top-left dialog was found after passing every gate
 
 ---
 

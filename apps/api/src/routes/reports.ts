@@ -1,9 +1,10 @@
-import type { FastifyInstance } from 'fastify'
+import type { FastifyInstance, FastifyRequest } from 'fastify'
 
+import { failureDelayMs, hashAttemptValue, recordRequest, serveDelay } from '../auth/throttle.js'
 import { loadConfig } from '../config.js'
 import { blockAttendee } from '../db/queries/blocks.js'
 import { writeReport } from '../db/queries/reports.js'
-import { notAuthenticated, notFound } from '../errors.js'
+import { notAuthenticated, notFound, tooManyAttempts } from '../errors.js'
 import { dispatchMail } from '../mail/dispatch.js'
 
 /**
@@ -33,8 +34,40 @@ import { dispatchMail } from '../mail/dispatch.js'
  *      provider is the expected state rather than an exceptional one.
  * ─────────────────────────────────────────────────────────────────────────────────────────
  */
+/**
+ * T071 (009) — **the throttle 007 did not have** (FR-746, research R8).
+ *
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ * Keyed on the reporter's own authenticated identity, so a refusal can only ever inconvenience
+ * the person reporting. What it bounds is the one thing this route does that no other does:
+ * **it sends mail out of the product**, to the single address a human is supposed to read. An
+ * unthrottled report route is an unthrottled mail relay pointed at the product's only safety
+ * channel.
+ *
+ * Every request counts, not only refused ones — a *successful* fiftieth report is precisely the
+ * thing being bounded, and a counter that reset on success would not bound it at all.
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ */
+const throttleReport = async (request: FastifyRequest): Promise<void> => {
+  const attendee = request.attendee
+  if (!attendee) throw notAuthenticated()
+
+  const key = {
+    identifierHash: hashAttemptValue(attendee.id),
+    sourceHash: hashAttemptValue(request.ip),
+    action: 'report_submit' as const,
+  }
+
+  const outstanding = await serveDelay(await failureDelayMs(key))
+  await recordRequest(key)
+
+  if (outstanding > 0) throw tooManyAttempts(outstanding, 'reports')
+}
+
 export const reportRoutes = async (app: FastifyInstance): Promise<void> => {
-  app.post<{ Body: { attendeeId: string; reason: string; messageIds?: string[] } }>(
+  app.post<{
+    Body: { attendeeId: string; reason: string; messageIds?: string[]; questionIds?: string[] }
+  }>(
     '/reports',
     {
       preHandler: [app.requireAttendee],
@@ -64,6 +97,13 @@ export const reportRoutes = async (app: FastifyInstance): Promise<void> => {
               description:
                 'The reported messages, if any. Stored as an array with no foreign key, so it degrades honestly into a list of things that no longer exist once M3 removes them.',
             },
+            questionIds: {
+              type: 'array',
+              maxItems: 100,
+              items: { type: 'string', maxLength: 64 },
+              description:
+                '009 (FR-783) — the reported audience questions, if any. Mirrors `messageIds` exactly, **including having no foreign key**: a reported question will frequently be gone before anyone looks, because its author can withdraw it themselves while it has no votes (FR-712) — a route no message has. Reporting from a question is what makes conduct on this feature reportable **without opening a conversation first** (FR-781).',
+            },
           },
         },
         response: {
@@ -82,6 +122,16 @@ export const reportRoutes = async (app: FastifyInstance): Promise<void> => {
             type: 'object',
             properties: { code: { type: 'string' }, message: { type: 'string' } },
           },
+          429: {
+            description:
+              "009 (FR-746) — throttled on `report_submit`, keyed on the reporter's own authenticated identity so a refusal can only inconvenience the person reporting. **This closes a gap 007 left**: reporting is the only action in this product that sends mail out of it, so an unthrottled route is an unthrottled relay pointed at the single address a human is supposed to read. Deliberately generous enough that somebody reporting two or three accounts in quick succession is never refused.",
+            type: 'object',
+            properties: {
+              code: { type: 'string' },
+              message: { type: 'string' },
+              retryAfterSeconds: { type: 'number' },
+            },
+          },
         },
       },
     },
@@ -89,7 +139,11 @@ export const reportRoutes = async (app: FastifyInstance): Promise<void> => {
       const attendee = request.attendee
       if (!attendee) throw notAuthenticated()
 
-      const { attendeeId, reason, messageIds = [] } = request.body
+      // Ordered before anything is read from the body, so a flood costs the attacker the delay
+      // rather than the server the work.
+      await throttleReport(request)
+
+      const { attendeeId, reason, messageIds = [], questionIds = [] } = request.body
 
       if (reason.trim().length === 0) {
         return reply
@@ -122,6 +176,8 @@ export const reportRoutes = async (app: FastifyInstance): Promise<void> => {
         reportedId: attendeeId,
         reason,
         messageIds,
+        // 009 (FR-783) — alongside the messages, in the same foreign-key-free shape.
+        questionIds,
       })
       if (!written) throw notFound()
 
@@ -150,9 +206,24 @@ export const reportRoutes = async (app: FastifyInstance): Promise<void> => {
             app.mail.sendAbuseReport(operator, {
               reportId: written.reportId,
               reportedAt: written.reportedAt,
-              // Identifiers only. The reason and the message bodies are deliberately not in
-              // this call's signature, so they cannot reach a provider by accident.
+              // ─────────────────────────────────────────────────────────────────────────
+              // **Identifiers only, and BOTH kinds of them** (FR-783, FR-784).
+              //
+              // The reason string, the message bodies and the question *text* are deliberately
+              // absent from this call's signature, so none of them can reach a provider by
+              // accident. A question is published to a whole conference, which makes it feel
+              // quotable — and quoting it here would move an attendee's words into an inbox
+              // nobody in this project controls.
+              //
+              // The question **identifiers** are a different thing and they must be here. This
+              // mail is the only artifact a human can act on: no route reads a report back
+              // (FR-548), and the row is swept after 90 days. Sending the identifiers of the
+              // messages but not of the questions left a Q&A report saying "somebody reported
+              // this person" on a surface where that person may have asked twenty questions —
+              // which is the exact uselessness FR-783 exists to prevent.
+              // ─────────────────────────────────────────────────────────────────────────
               messageIds,
+              questionIds,
             }),
           request.log,
           'abuse report mail failed to send',
