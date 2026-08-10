@@ -44,8 +44,8 @@ recovers one alpha matte, and every asset below is that matte resampled and pain
 | `../favicon-32.png`       | 32×32   | Tab, bookmark, pinned tab — the size hidpi displays ask for |
 | `../favicon-16.png`       | 16×16   | Tab at standard density                                     |
 | `../favicon.ico`          | 16 + 32 | Clients that guess `/favicon.ico` without reading the HTML  |
-| `../brand/mark-coral.png` | 91×96   | In-app mark for **inverse** surfaces — the desktop rail     |
-| `../brand/mark-navy.png`  | 91×96   | In-app mark for **light** surfaces — top bar, auth screens  |
+| `../brand/mark-coral.png` | 151×160 | In-app mark for **inverse** surfaces — the desktop rail     |
+| `../brand/mark-navy.png`  | 151×160 | In-app mark for **light** surfaces — top bar, auth screens  |
 | `../screenshots/*.png`    | 6 files | Install-prompt illustrations. **Not precached**             |
 
 ### The maskable safe zone is a circle, and the obvious reading is wrong
@@ -68,16 +68,30 @@ pixel inspection rather than by inspection on a device.
 
 ## Weight
 
-**Precached static assets grew from 8,281 to 91,927 bytes — an increase of 83,646 bytes (≈82 KiB)**
-in the install download. That is the honest cost of replacing three flat-colour placeholder PNGs
-with a real antialiased mark at seven sizes plus two in-app colourways.
+**The install download grew by 10,888 bytes (≈11 KiB), not by the whole asset set** — and the
+difference between those two numbers is the interesting part.
 
-The six install-prompt screenshots add a further **436,591 bytes (≈426 KiB)** to the repository and
-the deployed site, and **zero** to the install download: `injectManifest.globIgnores` carries
-`'screenshots/**'`, and `apps/web/tests/unit/icon-declarations.test.ts` reads the built worker to
-confirm it. The platform fetches them when it offers to install, which is an online act.
+|                                                 |       Bytes | In the install download?                       |
+| ----------------------------------------------- | ----------: | ---------------------------------------------- |
+| The two in-app marks                            |      19,169 | **Yes** — the shell renders them on every page |
+| The three placeholder icons they replaced       |       8,281 | (was)                                          |
+| **Net change to the precache**                  | **+10,888** |                                                |
+| Install icons + apple-touch + favicons + `.ico` |      80,748 | **No**                                         |
+| Six install-prompt screenshots                  |     436,591 | **No**                                         |
 
-**No gate measures any of this.** `scripts/asset-budget.mjs` walks the build manifest's entry chunk
+**Only the in-app marks are shell assets.** Manifest icons and favicons are fetched by the
+_browser process_, not from a document, so those requests never reach the service worker and can
+never be answered from its cache — precaching them would download ~79 KiB onto every device to
+satisfy requests that never arrive. `includeManifestIcons: false` in `apps/web/vite.config.ts` is
+what governs them; `globIgnores` alone does **not**, because the plugin appends manifest-declared
+icons to the precache list after the glob runs. The screenshots are excluded for the same reason
+the spec gives (FR-815d): the install prompt fetches them online, at install time.
+
+`scripts/brand-audit.mjs` asserts all of this against the **built** worker, and runs in
+`pnpm verify` right after `pnpm build`. It replaced a unit test that could never run — the unit
+layer does not build, so the check skipped on every CI run and reported green.
+
+**No gate measures the total.** `scripts/asset-budget.mjs` walks the build manifest's entry chunk
 and gzips only `.js`, so static assets are outside it entirely. The numbers above are recorded by
 hand for that reason; if this directory changes materially, re-measure and update them.
 

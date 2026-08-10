@@ -80,7 +80,12 @@ export const TopBar = () => {
         <div className="flex min-w-0 shrink items-center gap-2">
           {/*
             T039, T040 (010) — the mark, in the **navy** colourway for this raised surface, at
-            the mobile and tablet bands only (FR-822, FR-823, FR-824).
+            the mobile and tablet bands only (FR-820b, FR-823, FR-824).
+
+            Not FR-822: that one is the *desktop rail's* requirement, and this element is defined
+            against it by `desktop:hidden`. The citations in this codebase are a navigable index —
+            people grep them to find every site bound by a requirement — so naming the wrong one
+            sends the search to the wrong file.
 
             `desktop:hidden` is what stops two marks appearing at once: above 1280px the rail
             carries it, six centimetres to the left, and both showing is worse than neither.

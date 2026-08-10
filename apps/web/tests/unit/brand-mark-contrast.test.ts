@@ -39,12 +39,31 @@ const contrast = (a: string, b: string): number => {
   return ((light ?? 0) + 0.05) / ((dark ?? 0) + 0.05)
 }
 
-/** Reads a colour token from the one file that defines colours, rather than restating it here. */
+/**
+ * Reads a colour token from the one file that defines colours, resolving `var()` indirection.
+ *
+ * **The names read here are the SEMANTIC ones the components actually paint with** —
+ * `surface-inverse` on the rail, `surface-raised` on the top bar and the auth cards — not the
+ * palette entries behind them. They currently resolve to `navy-800` and `surface-card`, so a
+ * test that read the palette directly would agree today and silently stop tracking the surface
+ * the moment either alias was repointed. Following the same indirection the CSS follows is what
+ * keeps this measuring the mark's real background.
+ */
 const token = (name: string): string => {
   const tokens = readFileSync(join(import.meta.dirname, '../../src/theme/tokens.css'), 'utf8')
-  const match = new RegExp(`--color-${name}:\\s*(#[0-9a-f]{6})`, 'i').exec(tokens)
-  if (!match?.[1]) throw new Error(`Design token --color-${name} is not a hex value in tokens.css`)
-  return match[1]
+  const value = new RegExp(`--color-${name}:\\s*([^;]+);`).exec(tokens)?.[1]?.trim()
+
+  if (!value) throw new Error(`Design token --color-${name} is not defined in tokens.css`)
+
+  const indirect = /^var\(--color-([a-z0-9-]+)\)$/i.exec(value)
+  if (indirect?.[1]) return token(indirect[1])
+
+  if (!/^#[0-9a-f]{6}$/i.test(value)) {
+    throw new Error(
+      `Design token --color-${name} resolved to "${value}", which is not a hex colour`,
+    )
+  }
+  return value
 }
 
 /**
@@ -59,18 +78,18 @@ const NON_TEXT_MINIMUM = 3
 
 describe('the in-app mark is visible on every surface that carries it (FR-820c)', () => {
   it('coral on the inverse surface — the desktop rail', () => {
-    // The failure mode this pins: the *navy* mark here would score 1.2:1 and vanish.
-    expect(contrast(BRAND_CORAL, token('navy-800'))).toBeGreaterThanOrEqual(NON_TEXT_MINIMUM)
-    expect(contrast(BRAND_CORAL, token('navy-800'))).toBeCloseTo(5.29, 1)
+    // The failure mode this pins: the *navy* mark here would score 1.1:1 and vanish.
+    expect(contrast(BRAND_CORAL, token('surface-inverse'))).toBeGreaterThanOrEqual(NON_TEXT_MINIMUM)
+    expect(contrast(BRAND_CORAL, token('surface-inverse'))).toBeCloseTo(5.29, 1)
   })
 
   it('navy on the raised surface — the top bar and the five authentication cards', () => {
-    expect(contrast(BRAND_NAVY, token('surface-card'))).toBeGreaterThanOrEqual(NON_TEXT_MINIMUM)
-    expect(contrast(BRAND_NAVY, token('surface-card'))).toBeCloseTo(17.01, 1)
+    expect(contrast(BRAND_NAVY, token('surface-raised'))).toBeGreaterThanOrEqual(NON_TEXT_MINIMUM)
+    expect(contrast(BRAND_NAVY, token('surface-raised'))).toBeCloseTo(17.01, 1)
   })
 
   it('navy on the page background, for the card’s surroundings', () => {
-    expect(contrast(BRAND_NAVY, token('cream-100'))).toBeGreaterThanOrEqual(NON_TEXT_MINIMUM)
+    expect(contrast(BRAND_NAVY, token('surface'))).toBeGreaterThanOrEqual(NON_TEXT_MINIMUM)
   })
 
   it('coral on brand navy — the install icon’s own plate', () => {
@@ -79,13 +98,24 @@ describe('the in-app mark is visible on every surface that carries it (FR-820c)'
   })
 
   /**
-   * The swap is the mistake that actually happens, so both wrong answers are asserted to be
-   * wrong. If a future edit puts navy on the rail, this is the line that says why it is a defect
-   * rather than a preference.
+   * The swap is the mistake that actually happens, so the wrong answer is asserted to be wrong.
+   *
+   * **Only one of the two swaps is genuinely invisible, and saying so is the honest version.**
+   * Navy on the navy rail is 1.10:1 — gone. Coral on a white card is 2.92:1, which misses the
+   * WCAG graphical-object threshold by 2.7% but is plainly *visible* to a person; asserting
+   * "< 3" there and calling it invisibility would be a test passing for a reason other than its
+   * name, and one that flips red if the brand coral is darkened by a few units with nothing
+   * actually wrong. What is true and stable for that pair is that navy is the far better choice
+   * on a light surface, by a wide margin.
    */
-  it('REJECTS each colourway on the other’s surface — both are invisible there', () => {
-    expect(contrast(BRAND_NAVY, token('navy-800'))).toBeLessThan(NON_TEXT_MINIMUM)
-    expect(contrast(BRAND_CORAL, token('surface-card'))).toBeLessThan(NON_TEXT_MINIMUM)
+  it('REJECTS navy on the navy rail, where the mark would be invisible', () => {
+    expect(contrast(BRAND_NAVY, token('surface-inverse'))).toBeLessThan(1.5)
+  })
+
+  it('prefers navy to coral on a light surface, by a wide margin', () => {
+    expect(contrast(BRAND_NAVY, token('surface-raised'))).toBeGreaterThan(
+      contrast(BRAND_CORAL, token('surface-raised')) * 3,
+    )
   })
 
   it('checks the method itself against the two ends of the scale', () => {

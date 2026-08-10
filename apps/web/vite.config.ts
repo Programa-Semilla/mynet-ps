@@ -89,6 +89,28 @@ export default defineConfig({
       srcDir: 'src',
       filename: 'sw.ts',
 
+      /**
+       * T-deep-review (010) — **the install icons are not shell assets, so they are not
+       * precached** (the reasoning FR-815d gives for screenshots, applied where it also holds).
+       *
+       * ─────────────────────────────────────────────────────────────────────────────────────
+       * Manifest icons and favicons are fetched by the **browser process**, not from a document,
+       * so those requests never reach the service worker's `fetch` handler and can never be
+       * answered from the precache. Storing them there downloads ~79KB onto every device at
+       * install to satisfy requests that will not arrive.
+       *
+       * `globIgnores` alone does **not** achieve this, which is worth knowing before someone
+       * tries: this plugin appends every manifest-declared icon to the precache list *after* the
+       * glob runs, so the four icons come back regardless of the pattern. Measured — with
+       * `icons/**` ignored and this flag absent, all four were still in `dist/sw.js`. This option
+       * is the one that governs them.
+       *
+       * The two **in-app** marks stay precached, and that asymmetry is the point: they are
+       * rendered by the shell, on every page, and must be there offline.
+       * ─────────────────────────────────────────────────────────────────────────────────────
+       */
+      includeManifestIcons: false,
+
       manifest: {
         // FR-049, SC-013 — every name comes from the single branding constant. The product
         // cannot be called MyNet in the shell and something else on the home screen.
@@ -117,8 +139,14 @@ export default defineConfig({
          */
         // Copied rather than passed by reference: the declarations are `readonly` on purpose —
         // a manifest entry is a contract with a file on disk, not a list for a plugin to edit.
+        //
+        // **Both unconditional.** `screenshots` was briefly guarded by `SCREENSHOTS.length > 0`,
+        // left over from the phase where the files did not exist yet. That guard failed *open* in
+        // the mirror of this feature's whole thesis: emptying the array would silently drop the
+        // manifest key, and the existence gate — which derives its cases from the same array —
+        // would pass vacuously. Nothing would notice the screenshots had gone.
         icons: [...ICONS],
-        ...(SCREENSHOTS.length > 0 ? { screenshots: [...SCREENSHOTS] } : {}),
+        screenshots: [...SCREENSHOTS],
       },
 
       /**
@@ -143,7 +171,15 @@ export default defineConfig({
         // it offers to install and never again. They are the largest files in `public/`, so
         // precaching them would put roughly 430KB of prompt illustration into the install
         // download of every attendee who has already accepted the prompt (FR-815d).
-        globIgnores: ['**/*.map', 'screenshots/**'],
+        globIgnores: [
+          '**/*.map',
+          'screenshots/**',
+          // Browser-process fetches, never seen by the worker — see `includeManifestIcons`.
+          'icons/**',
+          'apple-touch-icon.png',
+          'favicon*.png',
+          'favicon.ico',
+        ],
       },
 
       /**

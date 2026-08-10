@@ -90,6 +90,28 @@ describe('the headings the mark sits above are unchanged (FR-821, SC-808)', () =
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(heading)
   })
 
+  /**
+   * FR-826 is an arrangement, not just a presence — "the **stacked** arrangement, mark centred
+   * **above** the existing heading". Nothing asserted the *above* part at any layer: a mark
+   * rendered below the heading, or outside the card entirely, satisfied the colourway test, the
+   * heading test and the end-to-end overflow test alike.
+   *
+   * Position in pixels is still a human judgement (quickstart scenario 8). Position in the
+   * document is not, and it is free to check.
+   */
+  it.each(HEADINGS)('$heading has the mark above it, in the same header', ({ Component }) => {
+    const { container } = renderSurface(Component)
+    const mark = container.querySelector('[data-brand-mark]')
+    const heading = screen.getByRole('heading', { level: 1 })
+
+    expect(mark).not.toBeNull()
+    expect(
+      mark!.compareDocumentPosition(heading) & Node.DOCUMENT_POSITION_FOLLOWING,
+      'the mark must precede the heading in document order',
+    ).toBeTruthy()
+    expect(mark!.closest('header')).toBe(heading.closest('header'))
+  })
+
   it('leaves the rail’s product name as live text rather than replacing it with the mark', () => {
     const { container } = renderSurface(DesktopRail)
 

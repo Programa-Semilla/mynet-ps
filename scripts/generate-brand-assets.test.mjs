@@ -23,9 +23,11 @@ import { describe, expect, it } from 'vitest'
 
 import {
   CROP,
+  IN_APP_MARK_HEIGHT,
   MARK,
   MARK_ASPECT,
   PLATE,
+  assertBoardDimensions,
   cornerDistance,
   maskableMarkHeight,
   safeRadius,
@@ -89,7 +91,156 @@ describe('alpha unmixing', () => {
   })
 })
 
+describe('the source guard (FR-807)', () => {
+  it('refuses a board of the wrong size, naming what it expected', () => {
+    expect(() => assertBoardDimensions({ width: 1000, height: 1000 })).toThrow(/1254×1254/)
+    expect(() => assertBoardDimensions({ width: 1000, height: 1000 })).toThrow(
+      /No asset was written/,
+    )
+  })
+
+  it('accepts the real board', () => {
+    expect(() => assertBoardDimensions({ width: 1254, height: 1254 })).not.toThrow()
+  })
+})
+
 describe('generated assets', () => {
+  /**
+   * **The geometry above is arithmetic; this is the artifact.**
+   *
+   * Every other assertion about the safe zone tests pure functions, and pure functions are not
+   * what ships. A regression in `main()` — sizing the maskable file with `STANDARD_FILL`, say —
+   * leaves every geometry case green, produces a 512×512 PNG that satisfies the declaration gate,
+   * passes the component and end-to-end suites, and is clipped on a real Android launcher.
+   */
+  it('keeps every mark pixel of the SHIPPED maskable icon inside the safe circle (SC-802)', async () => {
+    const { data, info } = await sharp(fromRoot('apps/web/public/icons/icon-maskable-512.png'))
+      .raw()
+      .toBuffer({ resolveWithObject: true })
+
+    let furthest = 0
+    for (let y = 0; y < info.height; y += 1) {
+      for (let x = 0; x < info.width; x += 1) {
+        const offset = (y * info.width + x) * info.channels
+        const isPlate =
+          Math.abs(data[offset] - PLATE.r) <= 12 &&
+          Math.abs(data[offset + 1] - PLATE.g) <= 12 &&
+          Math.abs(data[offset + 2] - PLATE.b) <= 12
+        if (!isPlate) {
+          furthest = Math.max(furthest, Math.hypot(x + 0.5 - 256, y + 0.5 - 256))
+        }
+      }
+    }
+
+    expect(furthest).toBeLessThanOrEqual(safeRadius(512))
+  })
+
+  /**
+   * FR-809 — the plate is the brand's navy, and nothing asserted it against a file. Painting it
+   * `navy-800` instead would be invisible to every other check and is exactly the token/brand
+   * confusion the constant's own comment exists to prevent.
+   */
+  it.each([
+    'icons/icon-192.png',
+    'icons/icon-512.png',
+    'icons/icon-maskable-512.png',
+    'apple-touch-icon.png',
+    'favicon-32.png',
+    'favicon-16.png',
+  ])('paints %s on the brand navy plate, not a design token', async (name) => {
+    const { data, info } = await sharp(fromRoot(`apps/web/public/${name}`))
+      .raw()
+      .toBuffer({ resolveWithObject: true })
+
+    // The corner of a centred mark is always plate.
+    expect([data[0], data[1], data[2]]).toEqual([PLATE.r, PLATE.g, PLATE.b])
+    expect(info.channels).toBeGreaterThanOrEqual(3)
+  })
+
+  /**
+   * FR-818 — "a resampling filter that preserves the round caps, **not** nearest-neighbour".
+   * The spec calls this half "mechanical and verifiable", and it was neither asserted nor
+   * verifiable until now. A nearest-neighbour downscale of a two-colour matte produces almost no
+   * intermediate values; a real filter produces a ramp along every curved edge.
+   */
+  it('downscales the favicons with a real resampling filter, not nearest-neighbour', async () => {
+    const { data, info } = await sharp(fromRoot('apps/web/public/favicon-16.png'))
+      .raw()
+      .toBuffer({ resolveWithObject: true })
+
+    let intermediate = 0
+    let total = 0
+    for (let offset = 0; offset < data.length; offset += info.channels) {
+      total += 1
+      if (data[offset] > PLATE.r + 20 && data[offset] < MARK.r - 20) intermediate += 1
+    }
+
+    expect(intermediate / total).toBeGreaterThan(0.05)
+  })
+
+  /** Nothing this feature ships may exceed the board's native mark height (FR-842's premise). */
+  it('never upscales the mark beyond the 300px master', async () => {
+    for (const name of [
+      'icons/icon-512.png',
+      'icons/icon-192.png',
+      'apple-touch-icon.png',
+      'icons/icon-maskable-512.png',
+    ]) {
+      const { data, info } = await sharp(fromRoot(`apps/web/public/${name}`))
+        .raw()
+        .toBuffer({ resolveWithObject: true })
+
+      let top = Infinity
+      let bottom = -1
+      for (let y = 0; y < info.height; y += 1) {
+        for (let x = 0; x < info.width; x += 1) {
+          if (data[(y * info.width + x) * info.channels] > (PLATE.r + MARK.r) / 2) {
+            top = Math.min(top, y)
+            bottom = Math.max(bottom, y)
+          }
+        }
+      }
+
+      expect(
+        bottom - top + 1,
+        `${name} upscales the mark above its native height`,
+      ).toBeLessThanOrEqual(CROP.height)
+    }
+  })
+
+  it('renders the in-app mark tall enough for a 3× display at its largest CSS size', () => {
+    // `h-10` — 40 CSS pixels on the five authentication screens — is 120 device pixels at 3×.
+    expect(IN_APP_MARK_HEIGHT).toBeGreaterThanOrEqual(40 * 3)
+    expect(IN_APP_MARK_HEIGHT).toBeLessThanOrEqual(CROP.height)
+  })
+
+  /**
+   * The colour that ships, against the colour the pipeline was told to paint.
+   *
+   * `apps/web/tests/unit/brand-mark-contrast.test.ts` computes every ratio from `#fe6551` and
+   * `#0d1942`, so if the shipped pixels drifted away from those the ratios would describe a mark
+   * nobody sees. They are not identical — resampling round-trips through premultiplied alpha and
+   * moves each channel by a unit or two — so the assertion is a tight bound rather than equality,
+   * and it lives here because this is the suite that already has a PNG decoder.
+   */
+  it.each([
+    ['mark-coral', MARK],
+    ['mark-navy', PLATE],
+  ])('paints %s within a rounding step of its brand constant', async (name, expected) => {
+    const { data, info } = await sharp(fromRoot(`apps/web/public/brand/${name}.png`))
+      .raw()
+      .toBuffer({ resolveWithObject: true })
+
+    // The first fully-opaque pixel is inside a stroke, so it carries the flat fill.
+    let offset = 0
+    while (offset < data.length && data[offset + 3] !== 255) offset += info.channels
+
+    expect(offset, `${name} has no fully opaque pixel`).toBeLessThan(data.length)
+    for (const [index, channel] of [expected.r, expected.g, expected.b].entries()) {
+      expect(Math.abs(data[offset + index] - channel)).toBeLessThanOrEqual(3)
+    }
+  })
+
   /**
    * SC-803 — iOS ignores `purpose: maskable` and paints transparency **black**. A transparent
    * apple-touch icon is therefore not a degraded icon, it is a black square with a mark on it,

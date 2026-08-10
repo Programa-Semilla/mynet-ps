@@ -131,10 +131,17 @@ control."* The mark must be `shrink-0` while the label keeps `shrink truncate`, 
 first. Reviewers should check this at 320px specifically, not just "on mobile". The owner chose to
 put the mark here after the brainstorm left it open — it is a deliberate cost, not an oversight.
 
-**The tablet band is an inference beyond the owner's answer.** The owner said the *mobile* top bar
-carries the mark. Extending it to tablet follows from the measured fact that the rail is desktop-only
-(`≥1280px`), so without it tablet would be the one band with no brand presence at all. Flagged in the
-spec's Assumptions as reviewable rather than buried.
+**The tablet band is an inference beyond the owner's answer, and its stated premise was wrong.**
+The owner said the *mobile* top bar carries the mark; extending it to tablet was an inference the
+spec flagged as reviewable. It was justified by "the rail is desktop-only (`≥1280px`)" — and that
+is **false**. `TabletRail` renders `tablet:flex desktop:hidden` on `bg-surface-inverse`, live from
+768px to 1279px. What is desktop-only is `DesktopRail`.
+
+The shipped arrangement still satisfies FR-823 and FR-824, and nothing about it is broken. But the
+alternative — the mark at the head of `TabletRail` in coral, mirroring `DesktopRail` exactly — was
+never weighed, because the spec recorded that surface as not existing. **This is an open layout
+question for the owner** and belongs with register entry 4. Found by the deep review, not by any
+gate.
 
 **Position and size are the class of defect no gate here can see.** This project's own history is the
 argument: the first human to open a dialog found it rendering in the **top-left corner** after it had

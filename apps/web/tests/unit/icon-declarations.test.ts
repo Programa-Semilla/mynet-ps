@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest'
 
 import { PRODUCT_NAME } from '../../src/app/branding.js'
 import { ICONS, SCREENSHOTS } from '../../src/app/icons.js'
+import { INTRINSIC, MARK_SOURCE } from '../../src/shell/BrandMark.js'
 
 /**
  * T030–T035 (010) — **a declared icon with no file fails the build** (FR-832–FR-835).
@@ -64,16 +65,30 @@ const pngSize = (path: string): { width: number; height: number; signature: bool
 /** A declared `src`/`href` is root-relative; the file that answers it lives in `public/`. */
 const publicPath = (src: string) => join(PUBLIC_DIR, src.replace(/^\//, ''))
 
+/**
+ * The document with HTML comments removed.
+ *
+ * `index.html` carries a long comment *about* icon links, immediately above the links themselves.
+ * Matching over the raw text cannot tell a live `<link>` from one inside that comment, so the day
+ * somebody comments a link out rather than deleting it — or writes an example into the note — the
+ * gate would demand a file that is deliberately not referenced.
+ */
+const HEAD = INDEX_HTML.replace(/<!--[\s\S]*?-->/g, '')
+
+/** Reads one attribute, tolerating either quote style. */
+const attribute = (name: string, attributes: string): string =>
+  new RegExp(`${name}=("([^"]*)"|'([^']*)')`)
+    .exec(attributes)
+    ?.slice(2)
+    .find((value) => value !== undefined) ?? ''
+
 /** Every `<link rel="…">` in the document head that names an icon. */
-const iconLinks = [...INDEX_HTML.matchAll(/<link\s+([^>]*?)\/?>/g)]
-  .map((match) => {
-    const attributes = match[1] ?? ''
-    return {
-      rel: /rel="([^"]+)"/.exec(attributes)?.[1] ?? '',
-      href: /href="([^"]+)"/.exec(attributes)?.[1] ?? '',
-      sizes: /sizes="([^"]+)"/.exec(attributes)?.[1] ?? '',
-    }
-  })
+const iconLinks = [...HEAD.matchAll(/<link\s+([^>]*?)\/?>/g)]
+  .map((match) => ({
+    rel: attribute('rel', match[1] ?? ''),
+    href: attribute('href', match[1] ?? ''),
+    sizes: attribute('sizes', match[1] ?? ''),
+  }))
   .filter((link) => link.rel === 'icon' || link.rel === 'apple-touch-icon')
 
 const declared = [
@@ -90,44 +105,102 @@ const declared = [
   })),
 ]
 
-describe('the gate can fail', () => {
-  it('has declarations to check — an empty list would pass every case below vacuously', () => {
-    expect(ICONS.length).toBeGreaterThanOrEqual(4)
-    expect(iconLinks.length).toBeGreaterThanOrEqual(3)
-    expect(declared.length).toBe(ICONS.length + SCREENSHOTS.length + iconLinks.length)
-  })
-})
+/**
+ * The check itself, as a function, so the failure path can be **demonstrated** rather than
+ * assumed (SC-810).
+ *
+ * A gate whose negative case has never executed is a gate nobody has seen work. Extracting the
+ * body lets the suite run it against a declaration that is known to be wrong and require it to
+ * throw — which is what the by-hand quickstart step was for, done automatically.
+ */
+const checkDeclaration = ({ src, sizes }: { src: string; sizes: string }): void => {
+  const path = publicPath(src)
 
-describe('every declared asset exists (C1.1, C2.1, FR-832)', () => {
-  it.each(declared)('$what resolves to a file', ({ src }) => {
-    const path = publicPath(src)
-
-    expect(
-      existsSync(path),
+  if (!existsSync(path)) {
+    throw new Error(
       `Declared as "${src}" but no file exists at ${path}.\n` +
         `Either the declaration is wrong, or the asset was never generated:\n` +
         `  node scripts/generate-brand-assets.mjs`,
-    ).toBe(true)
-    expect(statSync(path).size).toBeGreaterThan(0)
+    )
+  }
+  if (statSync(path).size === 0) throw new Error(`${src} exists but is empty.`)
+
+  const actual = pngSize(path)
+  if (!actual.signature) throw new Error(`${src} is declared image/png but is not a PNG.`)
+
+  if (sizes !== '') {
+    const [width, height] = sizes.split('x').map(Number)
+    if (actual.width !== width || actual.height !== height) {
+      throw new Error(
+        `Declared "${sizes}" but the file is ${actual.width}x${actual.height}. ` +
+          `A platform sizing an icon by its declaration renders it wrong.`,
+      )
+    }
+  }
+}
+
+describe('the gate can fail', () => {
+  /**
+   * Floors on **all three** declaration sources. `SCREENSHOTS` was originally left out, which
+   * meant the entire screenshot half of the feature could be deleted with every gate green: an
+   * empty array makes `declared` shorter, the manifest key vanish, and every case below pass
+   * vacuously — including the precache check, which asserts an *absence*.
+   */
+  it('has declarations to check — an empty list would pass every case below vacuously', () => {
+    expect(ICONS.length).toBeGreaterThanOrEqual(4)
+    expect(SCREENSHOTS.length).toBeGreaterThanOrEqual(2)
+    expect(iconLinks.length).toBeGreaterThanOrEqual(3)
+    expect(declared.length).toBe(ICONS.length + SCREENSHOTS.length + iconLinks.length)
+  })
+
+  it('offers both install-prompt form factors', () => {
+    expect(new Set(SCREENSHOTS.map((shot) => shot.form_factor))).toEqual(
+      new Set(['narrow', 'wide']),
+    )
+  })
+
+  /**
+   * A `<link>` the parser cannot read is silently dropped from `declared`, which turns "a new
+   * declaration fails by existing" into "a new declaration is ignored". So every link that looks
+   * like an icon must survive parsing.
+   */
+  it('parses every icon-ish <link> in the document rather than dropping ones it cannot read', () => {
+    const iconish = [...HEAD.matchAll(/<link\b[^>]*icon[^>]*>/g)]
+
+    expect(iconLinks.length, 'a <link> mentioning an icon was not parsed').toBe(iconish.length)
+  })
+
+  it('FAILS on a declaration whose file is absent', () => {
+    expect(() => checkDeclaration({ src: '/icons/does-not-exist.png', sizes: '192x192' })).toThrow(
+      /no file exists/,
+    )
+  })
+
+  it('FAILS when the file’s real size disagrees with the declaration', () => {
+    expect(() => checkDeclaration({ src: '/icons/icon-512.png', sizes: '192x192' })).toThrow(
+      /but the file is 512x512/,
+    )
   })
 })
 
-describe('every declared size is the file’s real size (C1.2, C2.2, FR-833)', () => {
-  it.each(declared.filter((entry) => entry.sizes !== ''))(
-    '$what is really $sizes',
-    ({ src, sizes }) => {
-      const path = publicPath(src)
-      const [width, height] = sizes.split('x').map(Number)
-      const actual = pngSize(path)
+describe('every declared asset exists at its declared size (C1.1, C1.2, C2.1, C2.2)', () => {
+  it.each(declared)('$what', ({ src, sizes }) => {
+    expect(() => checkDeclaration({ src, sizes })).not.toThrow()
+  })
+})
 
-      expect(actual.signature, `${src} is declared image/png but is not a PNG`).toBe(true)
-      expect(
-        { width: actual.width, height: actual.height },
-        `Declared "${sizes}" but the file is ${actual.width}x${actual.height}. ` +
-          `A platform sizing an icon by its declaration renders it wrong.`,
-      ).toEqual({ width, height })
-    },
-  )
+/**
+ * The two in-app marks are outside the manifest and outside `index.html`, so nothing above sees
+ * them — yet `BrandMark.tsx` hand-declares their pixel size on every `<img>` it renders, and that
+ * is what reserves the box before the image loads. A stale value reintroduces layout shift in the
+ * top bar at 320px, the one row FR-825 says nothing may move in.
+ */
+describe('the in-app mark matches the size BrandMark declares for it', () => {
+  it.each(Object.entries(MARK_SOURCE))('the %s mark is really %s', (_colourway, src) => {
+    const actual = pngSize(publicPath(src))
+
+    expect({ width: actual.width, height: actual.height }).toEqual(INTRINSIC)
+  })
 })
 
 describe('the declarations themselves', () => {
@@ -137,7 +210,14 @@ describe('the declarations themselves', () => {
    * recolour the mark arbitrarily, which is worse than not offering one.
    */
   it('declares no monochrome purpose (C1.5)', () => {
-    expect(ICONS.filter((icon) => icon.purpose === ('monochrome' as unknown))).toEqual([])
+    // Asserted over the runtime values, with no cast. The previous form filtered for
+    // `'monochrome' as unknown` — a predicate the declared type makes unsatisfiable, so the cast
+    // existed only to stop the compiler pointing that out, and the case could never fail. The
+    // real route by which `monochrome` arrives is somebody widening `IconDeclaration['purpose']`,
+    // and this form catches that because it checks what the array actually holds.
+    expect(ICONS.every((icon) => icon.purpose === undefined || icon.purpose === 'maskable')).toBe(
+      true,
+    )
     expect(INDEX_HTML).not.toContain('monochrome')
   })
 
@@ -184,35 +264,19 @@ describe('the declarations themselves', () => {
 })
 
 /**
- * T056 (010) — **the screenshots are declared and NOT precached** (FR-815d, SC-815).
+ * **The precache assertion is deliberately NOT here.** It lives in `scripts/brand-audit.mjs`,
+ * which `pnpm verify` runs immediately after `pnpm build`.
  *
- * Two facts that must hold together, and each is worthless alone: declaring them without
- * excluding them puts ~430KB of prompt illustration into every install download, and excluding
- * them without declaring them means the prompt shows a name and an icon.
+ * It was here, guarded by `it.skipIf(!existsSync('../../dist/sw.js'))`, and that guard made it a
+ * check that never ran: CI's `test-unit` job does not build, and `pnpm verify` runs `test:unit`
+ * *before* `build`. So it skipped on every CI run and, locally, read whatever `dist/sw.js` an
+ * earlier build had left lying around — asserting about a worker that was not the one the current
+ * source produces. Under this project's own rule a check that did not execute has not passed, and
+ * a skipped test in a green suite is exactly the false pass that rule names.
  *
- * This reads the built worker rather than the config, because `globIgnores` is a pattern and a
- * pattern is a claim about what it matches. The build is the only place that claim is settled —
- * `'screenshots/**'` matching nothing at all would look identical in the config and be a
- * silently empty exclusion.
- *
- * Skipped when `dist/` is absent, and **loudly**: this runs in the `unit` project, which does
- * not build. `pnpm verify` runs `build` before `test:e2e`, and a developer running only the unit
- * layer gets the note rather than a false pass.
+ * The lesson generalises: a unit test cannot assert anything about build output, because the unit
+ * layer is defined as the one that does not build. Reach for the post-build audit instead.
  */
-describe('the precache manifest', () => {
-  const worker = join(import.meta.dirname, '../../dist/sw.js')
-
-  it.skipIf(!existsSync(worker))('precaches every icon and NOT one screenshot (SC-815)', () => {
-    const built = readFileSync(worker, 'utf8')
-
-    expect(built).not.toMatch(/screenshots\//)
-    for (const icon of ICONS) {
-      expect(built, `${icon.src} must be precached with the shell`).toContain(
-        icon.src.replace(/^\//, ''),
-      )
-    }
-  })
-})
 
 describe('the document head (C2.3, C2.4, C2.5)', () => {
   it('links an apple-touch-icon — this document had none before feature 010 (FR-813)', () => {

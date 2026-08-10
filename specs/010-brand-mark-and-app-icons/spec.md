@@ -101,8 +101,8 @@ rather than a defect somebody rediscovers.
 | PWA manifest icons | Three provisional PNGs: 192, 512, maskable-512 |
 | `apps/web/index.html` | **No favicon link and no `apple-touch-icon` at all** — every tab shows the browser's default document glyph |
 | Desktop rail | The bare text `MyNet` from `PRODUCT_NAME`, desktop band only (`≥1280px`) |
-| Mobile top bar | The bare text `MyNet`; at tablet and above the same slot carries the **current destination** instead |
-| Tablet band | **No brand presence anywhere** — the rail is desktop-only and the bar has switched to the destination name |
+| Mobile top bar | The bare text `MyNet`, **already truncated to "M…" at every mobile width** before this feature (it needs 60px and has 43–58px); at tablet and above the same slot carries the **current destination** instead |
+| Tablet band | **No brand presence anywhere** — `DesktopRail` is `≥1280px` only and the bar has switched to the destination name. Note that a rail *is* present here (`TabletRail`, 768–1279px); it carries navigation and no brand |
 | `theme_color` / `background_color` | `navy-800` / `cream-100`, read from `tokens.css` at build time |
 
 **Correction.** Brainstorm #08 states that all five auth screens carry `<h1>MyNet</h1>` plus the
@@ -505,8 +505,10 @@ describes what is actually on disk.
   headings and landmarks are preserved, not replaced: the rail's `<span>` and every auth screen's
   `<h1>` keep their text, and nothing a screen reader reads today stops being read.
 - **FR-822**: The **desktop rail** MUST carry the mark beside the product name.
-- **FR-823**: The **top bar** MUST carry the mark at the width bands where no rail is present — the
-  mobile band beside the product name, and the tablet band beside the destination name.
+- **FR-823**: The **top bar** MUST carry the mark at the width bands where the **desktop** rail is
+  absent — the mobile band beside the product name, and the tablet band beside the destination name.
+  (Originally worded "where no rail is present", which was factually wrong: `TabletRail` exists at
+  768–1279px. The enumeration was always the operative half and is unchanged.)
   **OWNER DECISION**: the mobile top bar does carry the mark. The brainstorm had left this open on
   the ground that the bar is contextual and a mark might compete with the destination name.
 - **FR-824**: Exactly **one** mark MUST be visible at any width. At desktop width, where the rail is
@@ -671,7 +673,7 @@ reader checking whether it does needs the list.*
 |---|---|
 | **Offline behaviour** (Principle VI) | **Nothing is cached that was not already.** The brand assets are part of the application shell, precached with it, so the in-app mark renders offline exactly as the rest of the shell does. No repository, no network request and no caching decorator member is involved — there is no read to declare live or cached. Install-time icons are fetched by the platform during installation, which is by definition an online act. The precache set grows by the size of the derived assets, and **that growth is recorded as a number in the icons README** (FR-815) precisely because no gate measures it. **Screenshots are the one exception and are excluded from the precache set** (FR-815d): the install prompt reads them at install time, and an installed application never shows them. |
 | **Desktop layout** (Principle IV) | Persistent left rail carries the mark beside the product name, above the navigation — in the **light-on-dark colourway**, because the rail is the inverse surface (FR-820b). The top bar carries **no** mark at this band (FR-824). Authentication screens: mark centred above the heading in the existing centred card, in the **dark-on-light** colourway. |
-| **Tablet layout** (Principle IV) | No rail exists at this band today, so the top bar carries the mark beside the **destination** name, dark-on-light against the raised surface. This is the band with no brand presence at all before this feature. |
+| **Tablet layout** (Principle IV) | The top bar carries the mark beside the **destination** name, dark-on-light against the raised surface. **A rail does exist at this band** — `TabletRail`, 768–1279px, on the inverse surface — and it carries no brand; putting the mark there instead is the alternative this feature did not weigh, and is an open owner question (register entry 4). |
 | **Mobile layout** (Principle IV) | Compact header carries the mark beside the product name, dark-on-light. The mark is sized and constrained so that the conference switcher, profile control and sign-out control are untouched at 320px, and a label yields before a control does (FR-825). |
 | **Empty / loading / failure states** (Principle IV) | **None apply, and the absence is declared rather than omitted.** This feature adds no surface that reads data: no request, no repository call, no asynchronous state. A static asset that fails to load degrades to its alternative text, which is empty by design because the mark is decorative and the product name beside it is live text — so a failed image leaves the surface fully readable rather than nameless. |
 | **Accessibility** (Principle IV) | The mark is decorative and hidden from assistive technology; every existing accessible name, heading and landmark is preserved unchanged (FR-821, SC-807). No control is added, so no new label, focus state or keyboard path is introduced — and no existing one is displaced (FR-825). Width-band selection stays in CSS so exactly one navigation and one mark are in the accessibility tree at any width (FR-827). |
@@ -694,11 +696,22 @@ reader checking whether it does needs the list.*
   token `navy-800 #1b2340`; they meet on the splash screen. Accepted until Open Question 1 is
   settled, and recorded rather than hidden.
 - **The mark appears in the top bar at the tablet band as well as the mobile band.** The owner's
-  decision named the mobile top bar; extending it to tablet follows from the measured fact that the
-  rail is desktop-only (`≥1280px`), so without it the tablet band would be the one width with **no**
-  brand presence anywhere. This is the arrangement that gives every band exactly one mark and no
-  duplication (FR-823, FR-824). Stated here because it is an inference from the owner's answer rather
-  than the answer itself, and is therefore reviewable.
+  decision named the mobile top bar; extending it to tablet is an inference, stated here because it
+  is reviewable rather than settled.
+
+  **CORRECTED after implementation — the premise this inference rested on was false.** It read
+  "the rail is desktop-only (`≥1280px`), so the tablet band has no brand presence anywhere". A rail
+  *does* exist at the tablet band: `TabletRail` renders `tablet:flex desktop:hidden` on
+  `bg-surface-inverse`, live from 768px to 1279px. What is desktop-only is `DesktopRail`, not "the
+  rail", and FR-823's original predicate — "the bands where **no rail is present**" — therefore
+  contradicted its own enumeration.
+
+  The delivered arrangement (mark in the top bar at mobile and tablet, in the rail at desktop) is
+  unchanged and still satisfies FR-823's enumeration and FR-824. But the alternative it appeared to
+  rule out — the mark at the head of `TabletRail` in coral, mirroring `DesktopRail` exactly — was
+  never actually weighed, because the spec recorded that surface as not existing. **It is an open
+  layout question for the owner**, and belongs with register entry 4 rather than being treated as
+  decided here.
 - **The board's own scale tests are treated as validation** that the mark holds at 32/24/16px. They
   were drawn for that purpose.
 - **The asset budget does not cover this feature's assets, and that was confirmed rather than

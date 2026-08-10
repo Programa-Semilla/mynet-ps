@@ -96,10 +96,19 @@ const SAFE_CIRCLE_DIAMETER_FRACTION = 0.8
  * How much of a standard (non-maskable) icon the mark's height fills.
  *
  * No safe zone applies to these, so this is a design choice rather than a constraint: it reads
- * as a confident mark with breathing room rather than a glyph swimming in navy. At 512 it puts
- * the mark 317px tall — a 1.06× scale of the board's native 300px, visually indistinguishable.
+ * as a confident mark with breathing room rather than a glyph swimming in navy.
+ *
+ * **The ceiling is not a design choice, and it is why this is 0.58 rather than 0.62.** The larger
+ * value put the mark 317px tall in the 512 icon, drawn from a 300px master — a 1.06× upscale, and
+ * the only asset in this feature that was one. It was defensible on its own ("visually
+ * indistinguishable") and indefensible against the written record: the spec, the icons README and
+ * the constitution amendment all state that nothing here is upscaled, and one asset quietly
+ * contradicting that is how a booked follow-up later gets read as evidence something shipped soft.
+ *
+ * At 0.58 the 512 icon's mark is 296.9px — under the master, so the claim is now true everywhere
+ * rather than nearly everywhere. Keep any future value at or below `CROP.height / 512`.
  */
-const STANDARD_FILL = 0.62
+const STANDARD_FILL = 0.58
 
 /**
  * The same, for the favicons — deliberately tighter.
@@ -111,8 +120,20 @@ const STANDARD_FILL = 0.62
  */
 const FAVICON_FILL = 0.88
 
-/** In-app marks are rendered small by CSS; the asset is generous so it stays crisp on hidpi. */
-const IN_APP_MARK_HEIGHT = 96
+/**
+ * In-app marks are rendered small by CSS; the asset is generous so it stays crisp on hidpi.
+ *
+ * **160, not 96, and the arithmetic is the reason.** The largest in-app rendering is `h-10` — 40
+ * CSS pixels, on the five authentication screens. A 3× display draws that from 120 device pixels,
+ * and current flagship phones are 3×. At 96 the asset was *below* that, so the most prominent
+ * placement of the mark in the whole product was being upscaled 1.25× on the devices most
+ * attendees hold. 160 covers 4× at `h-10` and 6× at the top bar's `h-6`, and is still comfortably
+ * under the 300px master, so nothing here is upscaled either.
+ *
+ * The cost is a few kilobytes on two files. `BrandMark.tsx` carries the resulting intrinsic size,
+ * and `icon-declarations.test.ts` fails if the two ever disagree.
+ */
+const IN_APP_MARK_HEIGHT = 160
 
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 // Geometry
@@ -163,23 +184,26 @@ export const unmixAlpha = (red) => Math.min(1, Math.max(0, (red - PLATE.r) / UNM
  * difference between "the brand source was replaced and the pipeline said so" and "the icons
  * quietly became a rectangle of somebody's background".
  */
-const readBoard = async () => {
-  const path = fromRoot('assets/brand/logo.png')
-  const image = sharp(path)
-  const { width, height, channels } = await image.metadata()
-
+export const assertBoardDimensions = ({ width, height }, source = 'assets/brand/logo.png') => {
   if (width !== BOARD.width || height !== BOARD.height) {
     throw new Error(
       `Brand source has unexpected dimensions.\n` +
         `  expected: ${BOARD.width}×${BOARD.height}\n` +
         `  actual:   ${width}×${height}\n` +
-        `  source:   ${relative(repoRoot, path)}\n` +
+        `  source:   ${source}\n` +
         `The crop rectangle (${CROP.left},${CROP.top} ${CROP.width}×${CROP.height}) is measured ` +
         `against the expected size and means nothing against another. No asset was written.`,
     )
   }
+}
 
-  return { image, channels }
+const readBoard = async () => {
+  const path = fromRoot('assets/brand/logo.png')
+  const image = sharp(path)
+
+  assertBoardDimensions(await image.metadata(), relative(repoRoot, path))
+
+  return image
 }
 
 /**
@@ -189,12 +213,31 @@ const readBoard = async () => {
  * turns "two crops to keep in sync" into "one matte painted twice".
  */
 const alphaMatte = async () => {
-  const { image, channels } = await readBoard()
-  const { data } = await image.extract(CROP).raw().toBuffer({ resolveWithObject: true })
+  const image = await readBoard()
+  const { data, info } = await image.extract(CROP).raw().toBuffer({ resolveWithObject: true })
 
   const alpha = Buffer.alloc(CROP.width * CROP.height)
+
+  /**
+   * The stride comes from the **decoded buffer**, not from `metadata()`.
+   *
+   * They describe different things — `metadata()` describes the file on disk, `info` describes
+   * what `raw()` actually produced — and they agree only by luck for the current board. A
+   * replacement that decoded to a different channel count (a palette PNG, a greyscale export, one
+   * carrying `tRNS`) passes the dimension guard above and would then be read at the wrong stride,
+   * yielding a garbage matte with no error at all. That is precisely the "plausible-looking asset
+   * from an unexpected source" FR-807 exists to prevent, so the mismatch is checked rather than
+   * assumed.
+   */
+  if (data.length !== alpha.length * info.channels) {
+    throw new Error(
+      `Raw crop is ${data.length} bytes for ${alpha.length} pixels — unexpected channel count ` +
+        `${info.channels}. The brand source did not decode to the expected shape. No asset was written.`,
+    )
+  }
+
   for (let index = 0; index < alpha.length; index += 1) {
-    alpha[index] = Math.round(unmixAlpha(data[index * channels]) * 255)
+    alpha[index] = Math.round(unmixAlpha(data[index * info.channels]) * 255)
   }
   return alpha
 }
@@ -217,7 +260,15 @@ const paint = (alpha, colour) => {
   return sharp(rgba, { raw: { width: CROP.width, height: CROP.height, channels: 4 } })
 }
 
-/** Resamples the painted matte to a given height, preserving the round caps (Lanczos). */
+/**
+ * Resamples the painted matte to a given height.
+ *
+ * **Lanczos, and the filter choice is a requirement rather than a default** (FR-818). The mark is
+ * two round-capped strokes with two disc terminals; a nearest-neighbour downscale turns those
+ * caps into stair-steps at 16px, which is the size the board's own scale tests exist to validate.
+ * A resampling filter is what keeps the curve a curve. `generate-brand-assets.test.mjs` asserts
+ * the shipped favicon carries the intermediate values only a real filter produces.
+ */
 const resampled = (alpha, colour, height) =>
   paint(alpha, colour)
     .resize({ height: Math.round(height), kernel: 'lanczos3', fit: 'contain' })
@@ -244,9 +295,6 @@ const plate = async (alpha, size, markHeight) => {
     .png()
     .toBuffer()
 }
-
-/** The mark on nothing at all, for the in-app surfaces (FR-820a). */
-const bare = (alpha, height, colour) => resampled(alpha, colour, height)
 
 /**
  * Wraps PNG payloads in an ICO container (research R9).
@@ -291,7 +339,7 @@ const ico = (images) => {
  * The inventory is the point: a reader sees the complete set of files the repository is expected
  * to carry, at a glance, without following writes through the code that produces them.
  */
-const main = async () => {
+export const buildAssets = async () => {
   const alpha = await alphaMatte()
   const web = 'apps/web/public'
 
@@ -318,12 +366,26 @@ const main = async () => {
       ]),
     ],
 
-    // In-app marks — no plate, one matte painted twice (FR-820a, FR-820b).
-    [`${web}/brand/mark-coral.png`, await bare(alpha, IN_APP_MARK_HEIGHT, MARK)],
-    [`${web}/brand/mark-navy.png`, await bare(alpha, IN_APP_MARK_HEIGHT, MARK_NAVY)],
+    // In-app marks — **no plate**, so they take the surface behind them (FR-820a), and one matte
+    // painted twice so the two colourways cannot drift apart in shape (FR-820b).
+    [`${web}/brand/mark-coral.png`, await resampled(alpha, MARK, IN_APP_MARK_HEIGHT)],
+    [`${web}/brand/mark-navy.png`, await resampled(alpha, MARK_NAVY, IN_APP_MARK_HEIGHT)],
   ]
 
-  for (const [path, bytes] of assets) {
+  return assets
+}
+
+/**
+ * Builds every asset and writes it.
+ *
+ * **Building and writing are separate on purpose.** `scripts/brand-audit.mjs` calls `buildAssets`
+ * and compares the result against what is on disk, which is how FR-806 (regeneration is
+ * byte-identical) and FR-803 (no derived asset is hand-edited) become a gate rather than a
+ * quickstart step somebody is asked to remember. If this function did both, the audit could only
+ * check the pipeline against itself after overwriting the evidence.
+ */
+const main = async () => {
+  for (const [path, bytes] of await buildAssets()) {
     const absolute = fromRoot(path)
     await mkdir(dirname(absolute), { recursive: true })
     await writeFile(absolute, bytes)
@@ -331,9 +393,11 @@ const main = async () => {
   }
 }
 
-// Importable by the geometry test without generating anything; runnable as a command.
+// The self-run guard is what makes this importable by the geometry test without generating
+// anything, and runnable as a command. Nothing else is needed for that, so nothing else is
+// exported for it: the list below is exactly what `generate-brand-assets.test.mjs` imports.
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   await main()
 }
 
-export { BOARD, CROP, FAVICON_FILL, MARK, MARK_ASPECT, PLATE, STANDARD_FILL, main }
+export { CROP, IN_APP_MARK_HEIGHT, MARK, MARK_ASPECT, PLATE }

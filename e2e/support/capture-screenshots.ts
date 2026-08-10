@@ -8,7 +8,12 @@ import { ADA, signIn, useConference } from './attendees.js'
 /**
  * T051 (010) — captures the manifest's install-prompt screenshots (FR-815a–FR-815c).
  *
- *     DATABASE_URL=… pnpm exec playwright test e2e/support/capture-screenshots.ts
+ *     CAPTURE_SCREENSHOTS=1 DATABASE_URL=… pnpm exec playwright test
+ *
+ * The environment variable is not optional and naming the file is not enough: `playwright.config`
+ * switches `testMatch` on it, and a positional filter narrows *within* `testMatch` rather than
+ * overriding it — so the documented-looking `playwright test e2e/support/capture-screenshots.ts`
+ * exits with "No tests found".
  *
  * ═══════════════════════════════════════════════════════════════════════════════════════════
  * **These are regenerable by construction, and that is the whole reason this is a script.**

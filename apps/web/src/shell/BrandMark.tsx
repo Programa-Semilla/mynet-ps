@@ -34,13 +34,26 @@ export type BrandMarkColourway = 'coral' | 'navy'
  * Coral is for **inverse** surfaces — the navy rail. Navy is for **light** ones: the raised top
  * bar and the authentication cards.
  */
-const MARK_SOURCE: Record<BrandMarkColourway, string> = {
+export const MARK_SOURCE: Record<BrandMarkColourway, string> = {
   coral: '/brand/mark-coral.png',
   navy: '/brand/mark-navy.png',
 }
 
-/** The generated asset's intrinsic size, declared so the image reserves its box before it loads. */
-const INTRINSIC = { width: 91, height: 96 }
+/**
+ * The generated asset's intrinsic size, declared so the image reserves its box before it loads.
+ *
+ * **This is a derived quantity, and it is exported so that something can check it.** It falls out
+ * of `IN_APP_MARK_HEIGHT` and the crop's aspect ratio in `scripts/generate-brand-assets.mjs`, and
+ * a hand-copied duplicate of a generated number is exactly the "declaration that disagrees with
+ * its file" this feature exists to make impossible. These two assets sit outside the manifest, so
+ * the icon gate would not otherwise see them — `icon-declarations.test.ts` reads both PNGs' real
+ * IHDR dimensions and fails if they stop matching.
+ *
+ * Getting it wrong is not cosmetic: these attributes are what reserve the box before the image
+ * loads, so a stale value reintroduces layout shift in the top bar at 320px — the one row FR-825
+ * says nothing may move in.
+ */
+export const INTRINSIC = { width: 151, height: 160 }
 
 export const BrandMark = ({
   colourway,
