@@ -1,5 +1,75 @@
 <!--
 SYNC IMPACT REPORT
+Version change: 3.2.0 → 3.3.0
+
+RATIFICATION STATUS: **RATIFIED 2026-08-10 by the project owner**, who supplied the brand board on
+that date and ratified this amendment during the specification of feature 010. Drafted at his
+request. The supply of the mark IS the client decision register entry 2 has been waiting for since
+1.0.0 — no mark is invented here, and Principle I's prohibition on answering unasked questions is
+what kept one from being invented earlier.
+
+Rationale: MINOR. One register entry is resolved, one binding-constraint block is added, and one new
+entry is opened. No principle is removed or redefined, nothing delivered is retracted, and **no work
+performed under 3.2.0 is invalidated**.
+
+**FR-050 is satisfied differently, not withdrawn.** 001 required icons at the sizes installation
+needs and got them; the provisional set has always declared itself provisional, in a README titled
+"PROVISIONAL, NOT BRANDING" and in an amber diagonal band drawn specifically so the placeholder could
+not be mistaken for a decision. Replacing it is that plan completing, not a retraction — which is the
+distinction from 3.0.0, where a delivered and verified requirement was actually withdrawn.
+
+Owner decisions cited by this amendment (all 2026-08-10, recorded in
+brainstorm/08-brand-mark-and-app-icons.md and in the four scope answers given during
+specs/010-brand-mark-and-app-icons):
+  B1. The supplied brand board is the brand source of truth. The mark is carried into the product by
+      cropping from it; a vector redraw is a later change of input to the same pipeline.
+      (Resolves register entry 2.)
+  B2. Brand assets are DERIVED BY A READABLE SCRIPT, not committed as opaque binaries — preserving
+      the convention the provisional generator established, so that a reviewer verifies crop
+      geometry and plate colour by reading code.
+  B3. The icon plate carries the BRAND's navy, not the design token's. Measured, not preferred: the
+      board has no alpha channel, so the mark's antialiased edges are blends against its own navy
+      and any other plate colour leaves a halo.
+  B4. Whether the UI palette adopts the brand's navy and coral is DEFERRED, and the resulting seam
+      between the icon plate and the token-derived theme_color is knowingly accepted. (Opens
+      register entry 22.)
+  B5. Scope is core-only: install icons, apple-touch icon, favicons, the in-app mark and manifest
+      screenshots. The iOS splash matrix, the monochrome variant and the vector redraw are booked
+      follow-ups, not silent omissions.
+
+Added binding constraints:
+  - "Brand identity and application icons" — where entry 2 now lives, on the same principle 3.1.0
+    and 3.2.0 applied to entries 10, 7, 8 and 9: a struck-through entry is not where anybody looks
+    for a rule. It binds the single source, derivation by readable script, the brand constants as a
+    reasoned exception to the token rule, the prohibition on a raster lockup, and the requirement
+    that a declared icon with no file fails the build.
+
+Register changes:
+  - 2. RESOLVED by B1. Struck through in place; numbering stable.
+  - 4. NOT closed, and deliberately so. Feature 010 adds a visible element to the desktop and tablet
+    bands, which ESCALATES this entry rather than answering it. An amendment that quietly took it
+    would answer a question nobody asked (Principle I). The escalation is recorded on the entry.
+  - 22. ADDED — whether the design tokens adopt the brand's navy and coral. Created by B4. Adding is
+    permitted without a decision; this is an undecided matter that outlives feature 010, and leaving
+    it in a feature specification alone would make it invisible to this register.
+
+Templates and dependent artifacts:
+  - .specify/templates/spec-template.md — ✅ no change required.
+  - .specify/templates/plan-template.md, tasks-template.md — ✅ no change required.
+  - CLAUDE.md — ⚠ pending. Standing decisions list gains 27; open questions and current state
+    understate what is settled.
+  - brainstorm/00-overview.md — ⚠ pending, same reason.
+  - docs/superpowers/specs/2026-08-06-mynet-delivery-roadmap-design.md — ⚠ pending. Its 010 section
+    lists the brand mark as an unmet long-lead gate.
+  - apps/web/public/icons/README.md — ⚠ pending, and superseded by feature 010 rather than edited
+    here: its "Replacing them" checklist is what that feature executes.
+
+Deferred: none as governance. Three product follow-ups are booked by feature 010 rather than by this
+document — the iOS splash matrix, the monochrome variant, and the vector redraw — because each is a
+scope decision inside a feature, not a rule of conduct.
+
+PRIOR REPORT (3.1.0 → 3.2.0):
+
 Version change: 3.1.0 → 3.2.0
 
 RATIFICATION STATUS: **RATIFIED 2026-08-10 by the project owner**, who answered three register
@@ -1178,6 +1248,72 @@ construction — so the report goes to a human who acts out-of-band.
 - **The operator address is undecided** — register entry 21. Until it exists, a report is still
   blocked and still recorded, and the skipped dispatch MUST be logged rather than silently dropped.
 
+### Brand identity and application icons
+
+*Added 3.3.0 by B1–B5. This block is where register entry 2's answer now lives: the entry is struck
+through, and a struck-through entry is not where anybody looks for a rule.*
+
+**The project owner's brand board is the single source of every brand asset**, supplied 2026-08-10.
+Until then no mark existed here, and none was invented — Principle I forbids answering a question
+nobody asked, and a mark is exactly such a question.
+
+- **One source, and derived assets rather than delivered ones.** Every icon, favicon and in-app mark
+  MUST derive from the tracked brand source **by a readable script**, not be committed as an opaque
+  binary of unknown provenance. A reviewer MUST be able to verify the crop geometry, the plate colour
+  and the maskable safe-zone inset by **reading code**, and the script MUST fail loudly rather than
+  emit a plausible asset from an unexpected source. This is the convention the provisional generator
+  established and it is retained deliberately: it is what makes a later vector redraw a change of
+  *input* to one pipeline rather than a second, divergent mechanism.
+
+- **The brand constants are a reasoned exception to the single-colour-definition rule, and the only
+  one.** FR-008 puts every colour in the token file and the manifest gets no exemption — the
+  manifest's two values are *read from* the tokens at build time rather than written beside them.
+  The brand's navy and coral are different in kind: they are **identity, not palette**, they are
+  measured from the board rather than chosen, and they deliberately do **not** move when a token
+  moves. The reason is mechanical rather than aesthetic and MUST be recorded where they are defined:
+  the board carries no alpha channel, so the mark's antialiased edges are blends against its own
+  navy, and any other plate colour leaves a visible halo around every curve.
+
+- **Whether the design tokens adopt the brand's values is undecided** — register entry 22 — and
+  until it is settled the icon plate and the token-derived `theme_color` differ visibly on the
+  splash screen. That seam is **accepted knowingly**, not overlooked. No feature may resolve it by
+  quietly repainting a token: the primary surface and the accent are involved, so it repaints the
+  whole product and every contrast ratio must be re-verified.
+
+- **The mark ships as an image beside live text. A raster lockup is forbidden.** The product name
+  stays real text from the single branding constant (FR-049), so it remains selectable, searchable,
+  translatable and legible to assistive technology at any size.
+
+- **The mark is decorative and MUST NOT replace an accessible name.** Adding it to a surface MUST
+  leave every existing heading, label and landmark exactly as it is — a mark is recognition, never
+  the only way a surface identifies itself.
+
+- **Colourway is chosen per surface, and getting it wrong is an absence rather than a degradation.**
+  A dark-on-light mark placed on the inverse surface is invisible while remaining present in the
+  DOM, correctly sized, and passing every behavioural assertion available. The board supplies two
+  colourways precisely because this choice has to be made.
+
+- **A declared icon with no file MUST fail the build.** Expectations MUST derive from the
+  declarations themselves — the manifest and the document head — so that a **newly declared icon
+  fails by existing** rather than waiting for someone to remember to extend a check. This is the
+  technique Principle VIII's deletion and export coverage tests use, applied to the one class of
+  asset whose failure is invisible to every other gate: a manifest may name a missing file while
+  typecheck, lint, unit, component, contract, migration, integration, accessibility, end-to-end and
+  the production build all pass, and the failure appears only when a real device tries to install.
+
+- **Install weight has no gate, and MUST therefore be stated by hand.** The asset budget measures
+  the initial shell JavaScript — the entry chunk and what it statically imports — so static files
+  never enter it, while the service worker precaches every image it finds. Any feature adding
+  install assets MUST record their weight in a durable place and MUST exclude from the precache set
+  anything the *installed* application never shows.
+
+*Rationale*: the placeholder this replaces was struck through with an amber band on the reasoning
+that "a tasteful placeholder is the dangerous kind: it looks finished, so it ships and nobody
+notices for a year." The same instinct governs here. A brand mark is the one deliverable in this
+product whose defects are invisible to every automated gate this project has — wrong colourway,
+wrong size, wrong position, illegible at 16px — and the discipline that replaces those gates is a
+readable derivation and a human who looks.
+
 ## Branching and Change Flow
 
 `main` and `develop` are protected. **No commit and no push may be made directly to either
@@ -1415,6 +1551,40 @@ resolved, no register entry blocks any remaining feature. What remains open bloc
   rule is binding without it: a report still blocks and still records, and the skipped dispatch is
   logged rather than silently dropped.
 
+**Resolved in 3.3.0**
+
+Owner decision taken on 2026-08-10, recorded in brainstorm #08
+(`brainstorm/08-brand-mark-and-app-icons.md`) and in the four scope answers given while
+`specs/010-brand-mark-and-app-icons` was written.
+
+- ~~2. Real brand mark and application icons~~ — **RESOLVED: the owner supplied a brand board.**
+  Written into "Brand identity and application icons". This entry needed no analysis and never had a
+  candidate list — it needed an asset only the client could provide, which is why it outlived every
+  entry opened after it and why nothing here could close it sooner.
+
+  **What it cost to hold open honestly is worth recording.** The placeholder built under it is a
+  navy square with a coral disc struck through by an amber diagonal band, and its README says why:
+  *"a tasteful placeholder is the dangerous kind: it looks finished, so it ships and nobody notices
+  for a year."* That instinct is the reusable part. An unanswered question is safest when the
+  stand-in for it is impossible to mistake for an answer.
+
+**Opened in 3.3.0**
+
+- **22. Whether the design tokens adopt the brand's navy and coral.** Created by B4. See the entry
+  below. Deliberately not answered by the amendment that created it: the two values involved are the
+  primary surface and the accent, so adopting them repaints the product and re-opens every contrast
+  ratio the accessibility gate checks.
+
+**Escalated in 3.3.0, without being answered**
+
+- **4. Desktop and tablet layouts have never been validated by the client.** Feature 010 puts a
+  brand mark in the desktop rail and the tablet top bar, which is unreviewed design added to
+  unreviewed design. Position, size and colourway are precisely the class of defect no behavioural
+  gate can see — and 008 turned this entry from a risk into an observed one when the first human to
+  look at a dialog found it rendering in the top-left corner, having passed 135 end-to-end tests,
+  five review agents and CodeRabbit. **This amendment does not close it**, and feature 010 must not
+  be read as having validated anything.
+
 **Open — require a client decision**
 
 *Numbering is stable.* Resolved entries are **struck through in place** rather than removed, and
@@ -1423,9 +1593,12 @@ rather than left as gaps because Markdown renderers ignore explicit ordinals and
 so a gap in the source would silently render as the wrong number against a neighbouring entry.
 
 1. **What "PS" denotes** in the repository name `mynet-ps`.
-2. **Real brand mark and application icons.** No logo exists in the repository; the only images are
-   avatar photographs used as prototype sample data. Long lead time — it blocks release readiness,
-   not any single feature.
+2. ~~**Real brand mark and application icons.**~~ **RESOLVED 2026-08-10 in 3.3.0** — the project
+   owner supplied a brand board, and the supply is the client decision this entry was waiting for.
+   See "Brand identity and application icons" under Technology and Architecture Constraints, which
+   is now the binding statement. Carried forward from this entry's life: it was right that no mark
+   was drawn here in the meantime, and the deliberately ugly placeholder — a coral disc struck
+   through by an amber band — is why the gap stayed visible for the whole of it.
 3. **`GroundZero/requirements.md` is now knowingly out of step** with this constitution on product
    name, delivery mode, persistence, authentication, and routing. Whether it is amended or the
    divergence is recorded is undecided.
@@ -1599,9 +1772,19 @@ so a gap in the source would silently render as the wrong number against a neigh
     is that a person will read it. **That sentence is only true once this entry is answered.**
     Interacts with entry 18 (who sends it) and entry 19 (it is the nearest thing to a moderation
     path this product has).
+22. **Whether the design tokens adopt the brand's navy and coral.** *Added 2026-08-10 in 3.3.0,
+    created by B4.* Measured from the supplied board, the brand and the tokens disagree: brand navy
+    `#0d1942` against `navy-800 #1b2340`, brand coral `#fe6551` against `coral-500 #e8634d`. Cream
+    agrees and is not at issue. Adopting the brand values would make the board the single source of
+    truth for colour and remove the seam between the icon plate and the token-derived `theme_color`
+    on the splash screen. **The cost is that it repaints the entire product**: `navy-800` is the
+    primary surface and `coral-500` is both the accent and the focus ring, so every contrast ratio
+    the accessibility suite asserts must be re-verified on new values. **Blocks nothing** — the
+    product behaves as specified either way, and feature 010 is explicitly forbidden from resolving
+    it. What it costs to leave open is one visible seam on one surface.
 
 **Runtime guidance**: `CLAUDE.md` provides durable project context for AI-assisted sessions. It MUST
 stay consistent with this constitution and MUST NOT contain implementation plans, session tasks,
 progress updates, or invented requirements.
 
-**Version**: 3.2.0 | **Ratified**: 2026-08-04 | **Last Amended**: 2026-08-10
+**Version**: 3.3.0 | **Ratified**: 2026-08-04 | **Last Amended**: 2026-08-10

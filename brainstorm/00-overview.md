@@ -1,8 +1,8 @@
 # Brainstorm Overview
 
-Last updated: 2026-08-10 (#08 brainstormed the **brand mark and application icons** — the owner
-supplied a logo, which is the client decision that register entry has been waiting for, and 010
-stops being blocked on an asset that does not exist)
+Last updated: 2026-08-10 (#08 brainstormed the **brand mark and application icons**, and 010 is now
+**specified** with its amendment **ratified as constitution v3.3.0** — the owner supplied a logo,
+closing register entry 2, the oldest in the register)
 
 The authoritative registers live elsewhere — open questions in `.specify/memory/constitution.md`,
 delivery sequence in `docs/superpowers/specs/2026-08-06-mynet-delivery-roadmap-design.md`. This file
@@ -21,7 +21,7 @@ win and this is stale.
 | 05 | 2026-08-07 | discover-and-the-deployment-platform | ratified in constitution **v3.0.0** | `specs/006-discover-and-deployment-platform/` |
 | 06 | 2026-08-07 | messages-and-notification-delivery | **implemented in full**, including Web Push; its amendment ratified in constitution **v3.1.0** | `specs/007-messages-and-notification-delivery/` |
 | 07 | 2026-08-10 | network-and-appointments | **specified, then implemented**; entries 7, 8 and 9 ratified in constitution **v3.2.0** | `specs/008-network-and-appointments/` |
-| 08 | 2026-08-10 | brand-mark-and-app-icons | active — decided, awaiting `/speckit-specify` as **010** | `brainstorm/08-brand-mark-and-app-icons.md` |
+| 08 | 2026-08-10 | brand-mark-and-app-icons | **specified**; register entry 2 ratified in constitution **v3.3.0**. Not yet implemented | `specs/010-brand-mark-and-app-icons/` |
 
 Session 05 has no document of its own: 006 was specified without one, and the row records the
 session rather than a file.
@@ -75,7 +75,7 @@ the index, and it now differs from the roadmap in the ways #02 records.
 | 007 | Messages **and the notification-delivery platform** | **shipped** — squash-merged to `develop`. Web Push delivers for real, verified end to end on a desktop. T148's by-hand walkthrough is partial (scenario 5 only) and carries forward. Migration `0006` | 004 ✓, 006 ✓ |
 | 008 | Network & Appointments | **implemented** — 149 tasks, FR-601–FR-659. Migration `0007` adds three tables under **two different scoping rules**: `shared_cards` cross-event, `appointments` and `meeting_slots` per-event. A **third** branded scope and a **third** route audit (`CardScope`, `card-audit.test.ts`), because a card route names no conference and `event-scope-audit` walks past it. T148's by-hand walkthrough is outstanding | ~~connection model~~ ✓, ~~card-exchange semantics~~ ✓ |
 | 009 | Session Q&A | **unblocked** by v3.2.0 — questions are attributed, so Q&A is a personal-data surface. Migration `0008` | ~~question attribution~~ ✓ |
-| 010 | Launch Readiness — **brand mark and application icons** | **brainstormed** (#08), awaiting `/speckit-specify`. Replaces the three deliberately-ugly provisional icons, adds the favicon and `apple-touch-icon` that `index.html` has **never had**, and puts the mark on the rail, top bar and five auth screens. Carries a standing decision and a constitution amendment. **No migration** | ~~brand assets~~ ✓ (owner supplied 2026-08-10); client validation of desktop still open |
+| 010 | Launch Readiness — **brand mark and application icons** | **specified**, FR-800–FR-850, amendment ratified as **v3.3.0**. Replaces the three deliberately-ugly provisional icons, adds the favicon and `apple-touch-icon` that `index.html` has **never had**, puts the mark on the rail, top bar and five auth screens, and adds a gate that fails a **declared icon with no file** — which nothing catches today. Scope is core-only; splash matrix, monochrome and the vector redraw are booked follow-ups. **No migration**, so it does not contend with 009's `0008`. **Takes the brand gate only** — the rest of Launch Readiness stays outstanding | ~~brand assets~~ ✓ (owner supplied 2026-08-10); ~~register entry 2~~ ✓ (v3.3.0); palette adoption is new entry 22; client validation of desktop still open |
 
 **002 carries the most leverage and the most risk in the queue, and #02 enlarged it further.** It is
 not only the event switcher: it commits to the Home card composition contract and the per-event
@@ -193,10 +193,13 @@ deployment or release.
   a brand board at `seeds/logo.png`: the MyNet mark (a round-capped "N" with two node terminals) on
   navy and cream, horizontal and stacked lockups, scale tests to 16px, and a monochrome test. This
   is the client decision the entry was waiting for, so 010 is no longer blocked on an asset that
-  does not exist. **Ratification is pending** — #08 chose to close the register entry with a
-  standing decision and a constitution amendment carried by the feature, as 008 did with v3.2.0.
-  Two things it deliberately did **not** settle, both recorded as open questions below: whether the
-  UI palette adopts the brand's navy and coral, and the vector redraw the raster crop defers.
+  does not exist. **RATIFIED 2026-08-10 as constitution v3.3.0** — standing decision 27, and the
+  rule now lives in a binding block, "Brand identity and application icons", rather than in a
+  struck-through entry. The board moves to `assets/brand/` by owner decision: in this repository
+  "seed" means database seed data, and a brand board under `seeds/` reads as conference fixture
+  data. Two things it deliberately did **not** settle: whether the UI palette adopts the brand's
+  navy and coral — now **register entry 22** — and the vector redraw the raster crop defers, which
+  010 books rather than notes.
 - **`GroundZero/requirements.md` is knowingly out of step** with the constitution on product name,
   delivery mode, persistence, authentication, and routing. Amend it, or record the divergence?
   (from #01)
@@ -281,10 +284,14 @@ From #08. None blocks the specification. The brand decision itself is answered a
   passes every one of the ten correctness gates and fails only when a real device tries to install.
   010 should close this in the spirit of `deletion-coverage` and `export-coverage` — derive the
   expectation from the declaration, so a newly declared icon with no file **fails by existing**.
-- **The vector redraw is a follow-up that must be booked, not noted.** The mark measures 283×300px
-  in the board, so the two 512px assets are a 1.37× upscale while everything at or below 300px —
-  192, apple-touch 180, every favicon — is a pixel-exact downscale. Only the 512s are degraded, and
-  left unbooked they become permanent by default.
+- **The vector redraw is a follow-up that must be booked, not noted** — but **not for the reason #08
+  gave.** The session reasoned that the two 512px assets are a 1.37× upscale of the 283×300px mark
+  and are therefore degraded. **010's planning corrected this** (research R1): the maskable safe
+  zone is a *circle* of 80% diameter, not 80% of the side, so the largest mark that fits a 512px
+  maskable icon is **297.9px — 0.993× of native**, and nothing the feature ships is upscaled at all.
+  Worse, sizing the mark to 80% of the *side* as #08 assumed would put the node terminals **outside**
+  the safe zone, to be clipped by any circular mask. The redraw stays booked for resolution
+  independence at sizes not yet asked for; it is not rescuing a soft asset.
 
 ### Design questions carried into 008's specification
 

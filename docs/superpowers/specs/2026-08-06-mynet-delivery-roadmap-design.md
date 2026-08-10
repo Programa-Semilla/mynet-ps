@@ -386,10 +386,21 @@ parties' saved sessions, or a fixed grid. The prototype hardcodes `MEETING_SLOTS
 
 **Two gates with long lead times — raise them early, not here.**
 
-- **No real brand mark or application icons exist** anywhere in this repository.
+- ~~**No real brand mark or application icons exist** anywhere in this repository.~~ **ANSWERED
+  2026-08-10.** The owner supplied a brand board, closing constitution register entry 2 by
+  amendment **v3.3.0**. Raising it early worked exactly as this line intended.
+
+  **The brand half of 010 has been split out and specified on its own**, at
+  `specs/010-brand-mark-and-app-icons/` — a departure from this section that its spec declares. It
+  takes the brand gate and nothing else; **every other item in the list above remains outstanding
+  and still belongs to this phase.** It claims no migration, so it does not contend with 009's
+  reserved `0008`.
 - **The desktop and tablet experience has never been validated by the client.** The approved
   prototype is a mobile-only 390×844 frame. Every desktop layout built across 003–009 is unreviewed
-  design, and discovering a mismatch at 010 is the expensive outcome.
+  design, and discovering a mismatch at 010 is the expensive outcome. **Still open, and now
+  escalated**: 008 turned it from a risk into an observed defect when a dialog was found rendering
+  in the top-left corner having passed every gate, and the brand work adds a visible element to both
+  unreviewed bands.
 
 ---
 

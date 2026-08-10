@@ -5,7 +5,7 @@ Guidance for Claude Code (claude.ai/code) working in this repository.
 This file is the **working brief**: what the product is, what has been decided, and how work is
 done here. It is deliberately short. Depth lives elsewhere, and these are authoritative over it:
 
-1. **`.specify/memory/constitution.md` (v3.2.0)** — governance and the authoritative decision
+1. **`.specify/memory/constitution.md` (v3.3.0)** — governance and the authoritative decision
    register. Supersedes tool defaults, habit, and any conflicting statement in this file.
 2. **`docs/superpowers/specs/2026-08-06-mynet-delivery-roadmap-design.md`** — the decomposition of
    the remaining product into features, with dependency order, reserved migration numbers, and gate
@@ -129,7 +129,22 @@ as operator mail that nothing inside it can read.
 v3.2.0 and the implementation in one PR, because the amendment gated the code. The fifth and last
 empty destination now carries content, so **every destination `requirements.md` names answers its
 question**. Audience Q&A arrives in 009, as a third section on the panel 005 built, and it is the
-last feature on the roadmap.
+last feature that adds behaviour.
+
+**010 (Brand mark and application icons) is specified, and its constitution amendment — v3.3.0 — is
+ratified.** No code is written yet. The owner supplied a brand board on 2026-08-10, which closed
+**register entry 2, the oldest in the register**: MyNet has had no logo for the whole life of this
+project, and the placeholder built under that gap is a coral disc **struck through by an amber
+diagonal band** precisely so it could never be mistaken for a decision. The feature replaces the
+three provisional icons, adds the favicon and `apple-touch-icon` that `index.html` has **never
+had**, puts the mark on the rail, the top bar and the five auth screens, and adds a gate nothing
+covers today — **a declared icon with no file currently fails nothing**, because a manifest can name
+a missing path while all ten correctness gates pass and the failure appears only when a real device
+tries to install. Scope is core-only: the iOS splash matrix, the monochrome variant and a vector
+redraw of the mark are **booked follow-ups**. **Nothing it ships is upscaled**: planning corrected
+the brainstorm's 1.37× figure — the maskable safe zone is a *circle* of 80% diameter, so the largest
+mark fitting a 512px maskable icon is 297.9px against a 300px native master, and sizing it to 80% of
+the *side* instead would have put the node terminals outside the safe zone to be clipped.
 
 A contact is somebody whose digital business card you hold. Sharing is **one-directional** — it
 gives your card and takes nothing — and a held card resolves the sharer's **live** profile under a
@@ -503,6 +518,26 @@ explicitly that there is **one visibility decision per attendee** and that no fe
 individual field its own audience. 008 had specified a contact line carried only by a shared card;
 the owner rejected that reading and the field was withdrawn before any migration was written.
 
+**2026-08-10** (ratified in constitution v3.3.0) — **this closed the oldest entry in the register**:
+
+27. **MyNet has a brand mark, and the owner's board is its single source.** Supplied 2026-08-10: a
+    continuous round-capped "N" with two node terminals, in coral on navy and navy on cream, with
+    both lockups and 32/24/16px scale tests. *Closes register entry 2*, open since 1.0.0 — it
+    needed an asset only the client could provide, which is why nothing here could close it sooner
+    and why no mark was ever drawn in the meantime. Four things bind alongside it:
+    **assets are derived by a readable script**, never committed as opaque binaries, so a reviewer
+    verifies crop geometry and plate colour by reading code and the later vector redraw is a change
+    of *input* to one pipeline; **the icon plate carries the brand's navy `#0d1942`, not
+    `navy-800`** — measured, not preferred, because the board has no alpha channel so the mark's
+    antialiased edges are blends against its own navy and any other plate leaves a halo; **the mark
+    ships as an image beside live text**, never as a raster lockup, and never replacing an
+    accessible name; and **a declared icon with no file fails the build**, because a manifest can
+    name a missing file while all ten gates pass and the failure appears only on a real device.
+    **Deliberately not decided**: whether `navy-800` and `coral-500` adopt the brand values — that
+    is new register entry 22, and the resulting seam between the icon plate and the token-derived
+    `theme_color` is knowingly accepted. **Deliberately not closed**: register entry 4, the
+    unvalidated desktop and tablet layouts, which this work *escalates* by putting a mark in both.
+
 ## How work is done here
 
 ### Branching and change flow
@@ -615,8 +650,9 @@ is a working summary. Each names what it blocks, because *when* to ask matters a
 ### Require a client decision
 
 **No open question blocks any remaining feature.** v3.2.0 closed the last three — the connection
-model, card-exchange semantics, and Q&A attribution — so 008 shipped and 009 is buildable.
-Everything below blocks **deployment** or **release**, not code.
+model, card-exchange semantics, and Q&A attribution — so 008 shipped and 009 is buildable, and
+**v3.3.0 closed the oldest entry of all**, the brand mark. Everything below blocks **deployment** or
+**release**, not code.
 
 - **Desktop and tablet layouts are unvalidated.** The approved prototype is mobile-only — a fixed
   390×844 frame. Every desktop layout built before this is answered is unreviewed design, so the
@@ -627,8 +663,18 @@ Everything below blocks **deployment** or **release**, not code.
   somebody's card is the stronger predicate — they handed it to you. Recorded rather than resolved
   because changing it contradicts a written assumption, and that is the owner's call. **Blocks
   nothing**: the product behaves as specified today.
-- **Real brand mark and application icons.** None exist here. Long lead time; blocks release
-  readiness rather than any single feature.
+- ~~**Real brand mark and application icons.**~~ **ANSWERED 2026-08-10, ratified in v3.3.0** — the
+  owner supplied a brand board, closing the oldest entry in the register. **The mark is not in the
+  product yet**: 010 is specified, not implemented, so every icon on disk is still the provisional
+  placeholder with its amber band. What the answer buys is that nothing is blocked on the client any
+  more.
+- **Whether `navy-800` and `coral-500` adopt the brand's values** (`#0d1942`, `#fe6551`) — new
+  register entry 22, opened by the same amendment. Measured from the board, brand and tokens
+  disagree on both; cream agrees. Adopting them makes the board the single source of truth for
+  colour and removes the visible seam between the icon plate and the token-derived `theme_color` on
+  the splash screen — but `navy-800` is the primary surface and `coral-500` is both the accent and
+  the focus ring, so it repaints the whole product and every contrast ratio must be re-verified.
+  **Blocks nothing**; 010 is explicitly forbidden from resolving it.
 - **v3.1.0 is ratified and Phase 7 of 007 is delivered.** It resolved register entry 10 in part
   (delivery in, bell still out), added `VisibilityService` to Principle V, and made the reporting
   disposal path binding. **Two values it deliberately left open are below.** Neither blocks
