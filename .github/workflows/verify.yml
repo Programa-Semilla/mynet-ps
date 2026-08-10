@@ -363,6 +363,17 @@ jobs:
       - name: asset budget
         run: node scripts/asset-budget.mjs
       # ─────────────────────────────────────────────────────────────────────────────────────
+      # The brand audit lives here, and only here, because it asserts things about the **built**
+      # output: what the service worker precaches, and what the emitted manifest declares. It
+      # started life as a unit test guarded by `existsSync(dist/sw.js)` — which is never true in
+      # `test-unit`, since that job does not build. It skipped on every run and reported green.
+      #
+      # It also proves the committed brand assets are byte-identical to what the pipeline
+      # produces (FR-806, FR-803), which until now existed only as a by-hand quickstart step.
+      # ─────────────────────────────────────────────────────────────────────────────────────
+      - name: brand audit
+        run: node scripts/brand-audit.mjs
+      # ─────────────────────────────────────────────────────────────────────────────────────
       # **This artifact has no consumer today, and saying so is the honest thing.**
       #
       # A comment here previously claimed it was "the one `deploy.sh` ships". It is not:

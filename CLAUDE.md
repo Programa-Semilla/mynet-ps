@@ -129,7 +129,66 @@ as operator mail that nothing inside it can read.
 v3.2.0 and the implementation in one PR, because the amendment gated the code. The fifth and last
 empty destination now carries content, so **every destination `requirements.md` names answers its
 question**. Audience Q&A arrives in 009, as a third section on the panel 005 built, and it is the
-last feature on the roadmap.
+last feature that adds behaviour.
+
+**010 (Brand mark and application icons) is implemented**, on its constitution amendment v3.3.0.
+The owner supplied a brand board on 2026-08-10, which closed **register entry 2, the oldest in the
+register**: MyNet had no logo for the whole life of this project, and the placeholder built under
+that gap was a coral disc **struck through by an amber diagonal band** precisely so it could never
+be mistaken for a decision. **That placeholder is gone.** The three install icons are replaced at
+the same names and sizes, `index.html` gained the favicon and `apple-touch-icon` links it had
+**never had**, the mark is on the rail, the top bar and the five auth screens, and the manifest
+declares screenshots. Scope was core-only: the iOS splash matrix, the monochrome variant and a
+vector redraw are **booked**, per item, in
+`specs/010-brand-mark-and-app-icons/follow-ups.md`. **Nothing it ships is upscaled**: planning
+corrected the brainstorm's 1.37× figure — the maskable safe zone is a *circle* of 80% diameter, so
+the largest mark fitting a 512px maskable icon is 297.9px against a 300px native master, and sizing
+it to 80% of the *side* instead would have put the node terminals outside the safe zone to be
+clipped.
+
+**A deep review followed, and it is recorded in
+`specs/010-brand-mark-and-app-icons/review-findings.md`** — 31 findings, 22 fixed. Three of the
+five agents independently found the same defect, which is the single most useful thing it produced:
+**the only assertion for the precache exclusion could never run.** It was a unit test guarded by
+`it.skipIf(!existsSync('dist/sw.js'))`, and the unit layer is by definition the one that does not
+build — CI's `test-unit` job has no build step, and `pnpm verify` orders `test:unit` *before*
+`build`. It skipped on every CI run and, locally, asserted against a stale worker. In the feature
+whose thesis is that a check which did not execute has not passed.
+
+**Three things the review changed that are now invariants:**
+
+- **`scripts/brand-audit.mjs` is where build-output claims are asserted**, and it runs in
+  `pnpm verify` after `pnpm build` and as its own CI step. A missing worker is a **failure**, not a
+  skip. It also closed two guarantees that had no gate at all — regeneration is byte-identical
+  (FR-806/FR-803), and the built manifest matches its declarations with token-derived colours.
+- **Nothing is upscaled, and that is now enforced rather than asserted in prose.** One asset
+  contradicted it: `icon-512.png` rendered the mark 317px from a 300px master. Fixed by capping the
+  fill rather than weakening the claim. The in-app mark had the same fault from the other end — 96px
+  drawn at `h-10` is 1.25× on a 3× phone — and is now 160px.
+- **Install icons and favicons are NOT precached; the two in-app marks are.** Those requests are
+  issued by the browser process and never reach the service worker, so caching them was 79KB nobody
+  could use. `globIgnores` does **not** govern them — `vite-plugin-pwa` re-adds manifest icons after
+  the glob — `includeManifestIcons: false` does. Precache: 805KB → 715.85 KiB.
+
+**Its by-hand validation is outstanding, and it is the only thing outstanding.**
+Quickstart scenarios 5–9 — install on a device, the tab strip at 16px, the shell at three widths,
+the five auth screens, a screen-reader pass — have not been walked, because they need a phone and a
+person. Everything a machine can check is checked and green.
+
+**The first look at the shell did find something, and it is pre-existing rather than new.** At
+every mobile width the top bar's product-name label is truncated — it needs 60px to render "MyNet"
+and has 43–58px **without the mark at all**, so it was already rendering as "M…" before this
+feature. The mark takes a further ~9px at 390px. FR-825 is satisfied (the label yields, no control
+moves) and 010 did not cause it, so it was recorded rather than fixed: redesigning the mobile top
+bar is register entry 4's territory and the owner's call.
+
+**A second layout question is open for the same reason.** The spec justified putting the mark in
+the tablet top bar with "the rail is desktop-only", and that is **false** — `TabletRail` is live
+768–1279px on the inverse surface, carrying navigation and no brand. `DesktopRail` is the
+desktop-only one. The shipped arrangement satisfies FR-823 and FR-824 either way, but the
+alternative — the mark at the head of `TabletRail` in coral, mirroring `DesktopRail` — was never
+weighed, because the spec recorded that surface as not existing. Corrected in the spec; the
+arrangement is an owner decision under register entry 4.
 
 A contact is somebody whose digital business card you hold. Sharing is **one-directional** — it
 gives your card and takes nothing — and a held card resolves the sharer's **live** profile under a
@@ -662,6 +721,26 @@ explicitly that there is **one visibility decision per attendee** and that no fe
 individual field its own audience. 008 had specified a contact line carried only by a shared card;
 the owner rejected that reading and the field was withdrawn before any migration was written.
 
+**2026-08-10** (ratified in constitution v3.3.0) — **this closed the oldest entry in the register**:
+
+27. **MyNet has a brand mark, and the owner's board is its single source.** Supplied 2026-08-10: a
+    continuous round-capped "N" with two node terminals, in coral on navy and navy on cream, with
+    both lockups and 32/24/16px scale tests. *Closes register entry 2*, open since 1.0.0 — it
+    needed an asset only the client could provide, which is why nothing here could close it sooner
+    and why no mark was ever drawn in the meantime. Four things bind alongside it:
+    **assets are derived by a readable script**, never committed as opaque binaries, so a reviewer
+    verifies crop geometry and plate colour by reading code and the later vector redraw is a change
+    of *input* to one pipeline; **the icon plate carries the brand's navy `#0d1942`, not
+    `navy-800`** — measured, not preferred, because the board has no alpha channel so the mark's
+    antialiased edges are blends against its own navy and any other plate leaves a halo; **the mark
+    ships as an image beside live text**, never as a raster lockup, and never replacing an
+    accessible name; and **a declared icon with no file fails the build**, because a manifest can
+    name a missing file while all ten gates pass and the failure appears only on a real device.
+    **Deliberately not decided**: whether `navy-800` and `coral-500` adopt the brand values — that
+    is new register entry 22, and the resulting seam between the icon plate and the token-derived
+    `theme_color` is knowingly accepted. **Deliberately not closed**: register entry 4, the
+    unvalidated desktop and tablet layouts, which this work *escalates* by putting a mark in both.
+
 ## How work is done here
 
 ### Branching and change flow
@@ -774,14 +853,16 @@ is a working summary. Each names what it blocks, because *when* to ask matters a
 ### Require a client decision
 
 **No open question blocks any remaining feature, and there are no remaining features.** v3.2.0
-closed the connection model, card-exchange semantics and Q&A attribution; v3.3.0 closed public
-Q&A visibility and withdrew FR-756a. **009 shipped, and the delivery roadmap is complete** — 010
-adds no schema and no feature. Everything below blocks **deployment** or **release**, not code.
+closed the connection model, card-exchange semantics and Q&A attribution; **v3.3.0** closed public
+Q&A visibility and withdrew FR-756a; **v3.4.0** closed the oldest entry of all, the brand mark.
+**009 and 010 are both shipped, and the delivery roadmap is complete.** Everything below blocks
+**deployment** or **release**, not code.
 
 - **Register entry 22 — a cached conference can outlive a withdrawn registration by up to 24
   hours.** Conceded by 009 when FR-756a was withdrawn, and **product-wide rather than 009's**: no
-  undecorated repository — Messages, Discover, cards, profile or Q&A — purges on refusal. Filed
-  against 010, where a single answer can cover every one of them.
+  undecorated repository — Messages, Discover, cards, profile or Q&A — purges on refusal. It was
+  filed against 010, which did not answer it: 010 adds no repository and no cached read, so the
+  single answer that covers all of them is still owed.
 
 - **Desktop and tablet layouts are unvalidated.** The approved prototype is mobile-only — a fixed
   390×844 frame. Every desktop layout built before this is answered is unreviewed design, so the
@@ -801,8 +882,18 @@ adds no schema and no feature. Everything below blocks **deployment** or **relea
   somebody's card is the stronger predicate — they handed it to you. Recorded rather than resolved
   because changing it contradicts a written assumption, and that is the owner's call. **Blocks
   nothing**: the product behaves as specified today.
-- **Real brand mark and application icons.** None exist here. Long lead time; blocks release
-  readiness rather than any single feature.
+- ~~**Real brand mark and application icons.**~~ **ANSWERED 2026-08-10, ratified in v3.3.0, and
+  now BUILT** — the owner supplied a brand board, closing the oldest entry in the register, and 010
+  carried it into the product. Every icon on disk is derived from that board; the amber-banded
+  placeholder and the script that drew it are deleted. What remains is a person looking at it on a
+  phone (quickstart scenarios 5–9).
+- **Whether `navy-800` and `coral-500` adopt the brand's values** (`#0d1942`, `#fe6551`) — new
+  register entry 22, opened by the same amendment. Measured from the board, brand and tokens
+  disagree on both; cream agrees. Adopting them makes the board the single source of truth for
+  colour and removes the visible seam between the icon plate and the token-derived `theme_color` on
+  the splash screen — but `navy-800` is the primary surface and `coral-500` is both the accent and
+  the focus ring, so it repaints the whole product and every contrast ratio must be re-verified.
+  **Blocks nothing**; 010 is explicitly forbidden from resolving it.
 - **v3.1.0 is ratified and Phase 7 of 007 is delivered.** It resolved register entry 10 in part
   (delivery in, bell still out), added `VisibilityService` to Principle V, and made the reporting
   disposal path binding. **Two values it deliberately left open are below.** Neither blocks

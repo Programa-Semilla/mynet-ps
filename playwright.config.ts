@@ -18,8 +18,58 @@ import { WEB_ORIGIN } from './e2e/support/env.js'
  * The API is deliberately **not** a `webServer` entry. `e2e/support/api-process.ts` owns it,
  * because SC-003's redeployment clause requires restarting it from inside a test.
  */
+/**
+ * Whether this run is the screenshot capture tool rather than the test suite.
+ *
+ * Exact match, and never in CI: substituting the suite is a thing a person does deliberately at a
+ * terminal, not something an inherited environment should be able to do to a verification run.
+ */
+const capturingScreenshots = ((): boolean => {
+  const flag = process.env['CAPTURE_SCREENSHOTS']
+  if (flag === undefined) return false
+
+  if (flag !== '1') {
+    throw new Error(
+      `CAPTURE_SCREENSHOTS must be exactly "1" to run the capture tool; got "${flag}". ` +
+        `Any other value would silently replace the end-to-end suite.`,
+    )
+  }
+  if (process.env['CI']) {
+    throw new Error(
+      'CAPTURE_SCREENSHOTS is set in CI. The capture tool writes files into the working tree and ' +
+        'asserts nothing; it must never stand in for the end-to-end suite on a verification run.',
+    )
+  }
+  return true
+})()
+
 export default defineConfig({
   testDir: './e2e',
+
+  /**
+   * T051 (010) — **the screenshot capture tool is never part of the suite.**
+   *
+   * `e2e/support/capture-screenshots.ts` regenerates the manifest's install-prompt images. It is
+   * written as a Playwright test because that is what gives it a browser, a built client, a
+   * running API and a seeded database in one command — but it asserts nothing about the product
+   * and it *writes files into the repository*, so running it as a gate would rewrite committed
+   * assets on every verification.
+   *
+   * Switching `testMatch` rather than skipping it inside the file is deliberate. A permanently
+   * skipped test in the suite reads as a disabled gate, and under this project's rules a check
+   * that did not execute has not passed. This way the capture tool is simply **not a test** on
+   * any ordinary run, and the suite is not a test on a capture run.
+   *
+   *     CAPTURE_SCREENSHOTS=1 pnpm exec playwright test
+   *
+   * **The flag is compared to `'1'` exactly, and refused outright in CI.** Branching on
+   * truthiness would make `CAPTURE_SCREENSHOTS=0` and `=false` both replace the entire suite —
+   * and the suite that would vanish is the one carrying this project's cross-attendee isolation
+   * evidence. A stale exported variable or a copied CI matrix entry could turn `pnpm verify`
+   * green while executing none of it, which is the same "check that did not run reporting
+   * success" that `forbidOnly` below exists to prevent for the narrower `.only` case.
+   */
+  testMatch: capturingScreenshots ? '**/capture-screenshots.ts' : '**/*.spec.@(ts|js)',
 
   globalSetup: './e2e/support/global-setup.ts',
   globalTeardown: './e2e/support/global-teardown.ts',
