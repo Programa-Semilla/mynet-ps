@@ -1,7 +1,13 @@
 # Brainstorm: The administrative product, and the second actor
 
 **Date:** 2026-08-11
-**Status:** active
+**Status:** active — decided, and **ratified as constitution v4.0.0 on 2026-08-11**
+
+> **The amendment this session called for was drafted and ratified the same day.** v4.0.0 carries
+> the decisions below as standing decisions 31–36, reverses Principle III's administration exclusion
+> and D2's seed-data clause, and opens register entries **24, 25 and 26** — the three Open Questions
+> at the foot of this document that turned out to be governance rather than spec detail. Features
+> 011, 012 and 013 are licensed; **all three of those entries block 011.**
 
 ## Problem Framing
 

@@ -2,14 +2,20 @@
 SYNC IMPACT REPORT
 Version change: 3.4.0 → 4.0.0
 
-RATIFICATION STATUS: **DRAFTED 2026-08-11, NOT YET RATIFIED.** Written at the project owner's
-request during brainstorm #09 (brainstorm/09-administrative-product.md), which decided the shape of
-the administrative product. It is recorded here as a draft precisely because this project does not
-let an amendment ratify itself: 3.2.0 and 3.3.0 were each ratified by the owner at the gate of the
-feature they licensed, and 3.4.0 by the act of supplying the asset it recorded. **No line of code
-for features 011, 012 or 013 may be written until this is ratified.** Ratification requires the
-owner to accept, in particular, the four decisions labelled A1–A4 below, because each retracts
-something this document currently forbids.
+RATIFICATION STATUS: **RATIFIED 2026-08-11 by the project owner**, on reading the drafted amendment.
+Drafted the same day at his request during brainstorm #09
+(brainstorm/09-administrative-product.md), which decided the shape of the administrative product.
+
+It was drafted first and ratified second — a gap of one exchange rather than one release — because
+this project does not let an amendment ratify itself: 3.2.0 and 3.3.0 were each ratified by the
+owner at the gate of the feature they licensed, and 3.4.0 by the act of supplying the asset it
+recorded. **Features 011, 012 and 013 are licensed from this point.** The owner accepted, in
+particular, the four decisions labelled A1–A4 below, each of which retracts something this document
+previously forbade.
+
+*What ratification does NOT do*: entries 24, 25 and 26 remain open and each blocks feature 011.
+Ratifying the actor did not answer what the report queue discloses, what happens when a sole
+organizer deletes their account, or where the administrative site is served from.
 
 Rationale: **MAJOR.** Three independent triggers, any one of which would suffice under the
 versioning policy's "a principle is removed or redefined in a backward-incompatible way":
@@ -123,15 +129,16 @@ Templates and dependent artifacts:
   - .specify/templates/plan-template.md, tasks-template.md — ✅ no change required. Both are
     actor-agnostic; the plan template's Constitution Check reads "[Gates determined based on
     constitution file]" and so inherits this amendment without edit.
-  - CLAUDE.md — ✅ PARTIALLY updated, and the remainder is ⚠ pending. It was stale on three counts
-    and all three were corrected: it cited the constitution as v3.3.0 (actual 3.4.0), said
-    migrations run to 0007 (actual 0008), and stated the organizer exclusion this amendment
-    reverses. **Corrected to say the amendment is DRAFTED and that the old rule still binds until
-    ratification**, because CLAUDE.md is loaded into every session and a file that announced
-    administration as in-scope would license code this amendment has not yet authorised. Still
-    pending: its standing-decisions list does not carry A1–A6, and its open-questions summary does
-    not carry entries 24, 25 or 26 — deliberately deferred until ratification, since a decision
-    list is for decisions taken.
+  - CLAUDE.md — ✅ FULLY updated at ratification. It carries A1–A6 as standing decisions **31–36**,
+    entries 24, 25 and 26 as blockers on feature 011, and the five code-level guards. **Four
+    pre-existing errors were corrected while reconciling it**, and they are listed because three
+    were invisible until something depended on them: it cited the constitution as v3.3.0 (actual
+    3.4.0); it said migrations run to 0007 (actual 0008); it **numbered the brand-mark decision 27,
+    which the Q&A block already used** — the duplicate had stood since 3.4.0, and the brand mark is
+    now decision 30; and it attributed the brand mark to **v3.3.0**, which is the Q&A amendment,
+    where the constitution records **v3.4.0**. Its "no open question blocks any remaining feature,
+    and there are no remaining features" claim was true only while administration was prohibited
+    and is replaced rather than deleted.
   - brainstorm/00-overview.md — ✅ updated by brainstorm #09 on 2026-08-11.
   - docs/superpowers/specs/2026-08-06-mynet-delivery-roadmap-design.md — ✅ updated. Its Non-goals
     entry for organizer administration is struck through and annotated as reopened-pending-
@@ -908,9 +915,9 @@ end.
 exclusion is a WHAT, not a delivery-mode artifact.
 
 **Administration is IN scope as of 4.0.0** (A1), and the exclusion that stood here since 1.0.0 is
-reversed. *(4.0.0 is **DRAFTED and NOT YET RATIFIED** as of 2026-08-11, and lives on the feature
-branch rather than on `develop` — the pattern 3.2.0 established, so that a reviewer reads the rule
-and the code relying on it together. **Until it is ratified the previous exclusion still binds.**)* The two were named in one sentence and were never one decision; reversing one does not
+reversed. *(**RATIFIED 2026-08-11.** The amendment travels on the feature branch to `develop` — the
+pattern 3.2.0 established, so that a reviewer reads the rule and the code relying on it together,
+which also means a rebase dropping it un-licenses that code.)* The two were named in one sentence and were never one decision; reversing one does not
 weaken the other. Administration enters under four conditions, each binding and stated in full under
 "Administration, and the second actor": it lives in a **separate product**, it is exercised by a
 **second actor in two tiers**, **neither tier is reachable by self sign-up**, and **MyNet gains no
@@ -2388,5 +2395,4 @@ so a gap in the source would silently render as the wrong number against a neigh
 stay consistent with this constitution and MUST NOT contain implementation plans, session tasks,
 progress updates, or invented requirements.
 
-**Version**: 4.0.0 (DRAFT — not yet ratified) | **Ratified**: 2026-08-04 | **Last Amended**:
-2026-08-11
+**Version**: 4.0.0 | **Ratified**: 2026-08-04 | **Last Amended**: 2026-08-11
