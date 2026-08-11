@@ -82,6 +82,68 @@ describe('the UAT environment names what v3.4.0 decided (FR-820)', () => {
   })
 })
 
+/**
+ * T039 (010) — **nothing stands in front of UAT, and the absence is asserted** (FR-829).
+ *
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ * **"LOCK IT DOWN" WILL ALWAYS SOUND LIKE THE CAREFUL OPTION. IT IS THE ONE THIS REQUIREMENT
+ * FORBIDS.**
+ *
+ * Constitution v3.4.0 (decision 30) closed register entry 14 in the direction of leaving UAT
+ * open, and both alternatives were considered by name and **rejected as safer-looking but
+ * worse**: basic auth and an IP allowlist each disable the validation this environment exists
+ * for — service-worker registration, Web Push, a physical-device test on cellular — to buy
+ * secrecy over data that does not need it.
+ *
+ * **001's FR-067 is satisfied by the DATA rather than by the door.** UAT carries seeded content
+ * and accounts created against UAT, and nothing that must be kept from a stranger is ever
+ * present. That is what makes an open URL the correct answer rather than a tolerated one.
+ *
+ * Asserted here because adding a restriction is the most natural helpful change imaginable —
+ * "just while we're testing" — and it would breach a ratified decision silently.
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ */
+describe('UAT is openly reachable (FR-829)', () => {
+  const caddyfile = readFileSync(`${VM_DIR}/Caddyfile`, 'utf8')
+  const provision = readFileSync(`${VM_DIR}/provision-vm.sh`, 'utf8')
+
+  it('the files being inspected are the real ones', () => {
+    expect(caddyfile).toContain('APP_DOMAIN')
+    expect(provision).toContain('nsg rule create')
+  })
+
+  it('puts no credential in front of the product', () => {
+    // Caddy's directives for HTTP authentication, across the versions that spell it differently.
+    expect(
+      /\bbasic_?auth\b|\bforward_auth\b/i.test(caddyfile),
+      'An authentication directive has appeared in the Caddyfile. FR-829 forbids placing any ' +
+        'credential in front of UAT: it disables the service-worker and push validation the ' +
+        'environment exists for, to protect data that is seeded by definition.',
+    ).toBe(false)
+  })
+
+  it('leaves the web ports open to the world', () => {
+    // The rule that opens 80/443. A `--source-address-prefixes` on it is an allowlist.
+    const webRule = /allow-web[\s\S]{0,400}?destination-port-ranges 80 443/.exec(provision)?.[0]
+
+    expect(webRule, 'the allow-web NSG rule was not found to inspect').toBeDefined()
+    expect(
+      /--source-address-prefixes/.test(webRule ?? ''),
+      'The web rule now restricts source addresses. That is the IP allowlist v3.4.0 decision 30 ' +
+        'considered and rejected — it makes a physical-device test on cellular impossible, which ' +
+        'is one of the two things UAT was stood up to do.',
+    ).toBe(false)
+  })
+
+  /**
+   * The SSH rule is the deliberate opposite and must stay restricted. Asserted alongside, so that
+   * "no restrictions" is never read as a rule about the whole NSG.
+   */
+  it('still restricts SSH to a single address', () => {
+    expect(provision).toMatch(/allow-ssh[\s\S]{0,400}?--source-address-prefixes/)
+  })
+})
+
 describe('the production environment stays unfilled (FR-823)', () => {
   /**
    * The assertion this file was created for. See the header.

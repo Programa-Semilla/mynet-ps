@@ -172,3 +172,64 @@ because it writes reset links to the log, and a reset link is the account.
 **Recorded by**: the 010 implementation, phase 5.
 
 ---
+
+## 2026-08-11 — first deploy. **MyNet is serving at a public address.**
+
+**Act**: `deploy/vm/deploy.sh uat --migrate`, by hand, from a developer machine — deliberately
+before any automation exists, so there is a known-good path to compare against when phase 11's CI
+deploy misbehaves.
+
+**Result**: `https://mynet-dev.programasemilla.com` serves the product over a Let's Encrypt
+certificate obtained without anyone touching it. Migrations applied. Three containers healthy.
+
+### It took four attempts, and every failure was a path nothing had ever executed
+
+This is the point of doing the first deploy by hand. None of these three could have been found by
+review, by lint, or by any test in the repository — each lives in code that had never once been
+run, because nothing had ever been deployed.
+
+| # | Failure | Cause | Fix |
+| - | ------- | ----- | --- |
+| 1 | `scp: dest open ".../maintenance/index.html": No such file or directory` | `deploy.sh` enters maintenance at step 1b and rsyncs at step 3 — correct ordering, but on a **first** deploy the target directory does not exist yet | `mkdir -p` before the `scp` in `maintenance.sh` |
+| 2 | `ERROR: Unknown option: 'legacy'` building the API image | `apps/api/Dockerfile` ran `pnpm deploy --prod --legacy`; `--legacy` is a **pnpm 10** flag while `packageManager` pins **9.15.9** | dropped the flag; the Dockerfile's own header already warned it was "reviewed-but-untried" |
+| 3 | `TypeError: Invalid URL` in the migration runner | `POSTGRES_PASSWORD` was generated with `openssl rand -base64`, and `/` and `+` are not URL-safe. `docker-compose.yml` **substitutes** it into `DATABASE_URL`, and Compose cannot escape | regenerated with `tr '+/' '-_'`; the volume was destroyed and re-initialised, since `initdb` only runs on an empty data directory |
+
+**The third is worth more than its fix.** The driver's error message contained the entire
+connection string — password included — which is how a secret reaches a log at exactly the moment
+somebody is pasting logs to ask for help. `.env.example` now states that the value must be
+URL-safe, why Compose cannot escape it, and gives a generator that produces one.
+
+### Verified from OUTSIDE the host, not from it (T037, FR-824–FR-826)
+
+| Check | Observed |
+| ----- | -------- |
+| Certificate (FR-825) | `CN=mynet-dev.programasemilla.com`, issuer Let's Encrypt `YE1`, valid to 2026-11-09 |
+| HTTP → HTTPS | `308` to `https://mynet-dev.programasemilla.com/` |
+| Client served | `200`, `text/html`, 854 bytes |
+| API on the **same origin** (FR-824) | `GET /api/health` → `200`; `GET /api/ready` → `{"status":"ready"}` |
+| Database off-host (FR-826) | connection to `:5432` refused |
+| Security headers (SC-411) | every declared header present; `img-src` permits `data:` |
+
+### The readiness gate, demonstrated rather than asserted (T038, FR-827)
+
+The database container was **stopped**, and the two endpoints compared:
+
+```
+/api/health -> 200  {"status":"ok"}
+/api/ready  -> 503  {"status":"unavailable","dependency":"database"}
+```
+
+That is the whole of FR-827 in four lines. A deployment gating on `/health` would have declared
+success against a product that could not answer a single attendee request. `postgres` was
+restarted and `/ready` returned `200`.
+
+### What is NOT done
+
+Nothing is seeded — no conference, no join code, no attendee — so the address serves an empty
+product. Mail is configured and its credentials authenticate (`235 Authentication successful`
+against `smtp.mailgun.org:465`, TLS verified, no message sent), but no account journey has been
+walked. Backups are not installed on the host and the off-host container does not exist.
+
+**Recorded by**: the 010 implementation, phase 5.
+
+---

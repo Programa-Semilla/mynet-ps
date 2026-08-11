@@ -157,11 +157,11 @@ record.
 
 - [X] T033 [US2] Create the DNS A record for `mynet-dev.programasemilla.com` and confirm it resolves **before** provisioning — certificate issuance is what fails otherwise, and FR-825 forbids falling back to plain HTTP
 - [X] T034 [US2] Run `deploy/vm/provision-vm.sh` for `uat`, confirming the SKU preflight passes and every call is pinned to the subscription by identifier (FR-820, FR-821)
-- [ ] T035 [US2] Generate and install the VM `.env` from `deploy/vm/.env.example`, populating every required value from `contracts/configuration.md` including `ACME_EMAIL`, `POSTGRES_PASSWORD`, `AUTH_PASSWORD_PEPPER` and `AUTH_ATTEMPT_HASH_KEY`
-- [ ] T036 [US2] Run `deploy/vm/deploy.sh uat --migrate` **by hand** for the first deploy, deliberately before automation exists, so there is a known-good path to compare against when automation fails
-- [ ] T037 [US2] Verify TLS, the HTTP redirect, same-origin API requests, and that the database is unreachable from off-host (FR-824, FR-825, FR-826, SC-801)
-- [ ] T038 [US2] Verify the deployment gates on readiness by stopping the database container and confirming the gate refuses while `/health` alone would have passed (FR-827)
-- [ ] T039 [P] [US2] Assert in `apps/api/tests/unit/deployment-config.test.ts` that **no credential, allowlist or other access restriction sits in front of UAT** — no basic-auth directive in `deploy/vm/Caddyfile`, no source restriction on ports 80/443 (FR-829). Adding basic auth "temporarily" is exactly the helpful change that would breach this silently
+- [X] T035 [US2] Generate and install the VM `.env` from `deploy/vm/.env.example`, populating every required value from `contracts/configuration.md` including `ACME_EMAIL`, `POSTGRES_PASSWORD`, `AUTH_PASSWORD_PEPPER` and `AUTH_ATTEMPT_HASH_KEY`
+- [X] T036 [US2] Run `deploy/vm/deploy.sh uat --migrate` **by hand** for the first deploy, deliberately before automation exists, so there is a known-good path to compare against when automation fails
+- [X] T037 [US2] Verify TLS, the HTTP redirect, same-origin API requests, and that the database is unreachable from off-host (FR-824, FR-825, FR-826, SC-801)
+- [X] T038 [US2] Verify the deployment gates on readiness by stopping the database container and confirming the gate refuses while `/health` alone would have passed (FR-827)
+- [X] T039 [P] [US2] Assert in `apps/api/tests/unit/deployment-config.test.ts` that **no credential, allowlist or other access restriction sits in front of UAT** — no basic-auth directive in `deploy/vm/Caddyfile`, no source restriction on ports 80/443 (FR-829). Adding basic auth "temporarily" is exactly the helpful change that would breach this silently
 - [ ] T040 [P] [US2] Record the provisioning run in `deploy/vm/README.md` with every prerequisite an operator who did not build it would need (FR-830, SC-814)
 
 **Checkpoint**: the product is reachable at a real address.
