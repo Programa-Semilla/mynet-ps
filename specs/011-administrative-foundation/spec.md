@@ -96,6 +96,16 @@ than replaces.
 - No notification of any kind. The trigger set stays at a received message and nothing else.
 - No reporter-facing status, case identifier, or anything to poll.
 
+## Clarifications
+
+### Session 2026-08-11
+
+- Q: How is the first platform operator's credential established, given the repository is public and a committed password would be a published administrative credential? → A: Seed creates the operator identity with **no usable credential**; the initial credential comes from environment configuration per environment, absent means sign-in is impossible rather than defaulted, and it must be changed on first sign-in.
+- Q: Are administrative actions recorded in an audit trail, and if so which ones? → A: Every administrative **write**, plus every **read that discloses reported message content** — auditing exactly the privilege the third Principle VIII exception was written to grant, and not routine navigation.
+- Q: What happens to an organizer assignment when its conference is removed or re-seeded? → A: The reference is **non-cascading**, and the seed **explicitly clears assignments** as a declared step — 008's `shared_cards` precedent, so a re-seed fails loudly rather than silently stripping authority.
+- Q: What lifetime does an administrative session have, relative to an attendee session? → A: A **shorter idle window** than an attendee session, **plus an absolute cap** regardless of activity, so it cannot be held open indefinitely.
+- Q: An audit entry names an attendee who then deletes their account. What happens to the entry? → A: **Pseudonymise on deletion** — the attendee identifier is cleared, the operator, action and instant survive on a stated retention clock. The record's subject is the operator; the attendee is incidental to it.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - A platform operator signs in, and the second actor exists (Priority: P1)
@@ -268,6 +278,14 @@ assignment is gone and the conference reports as unassigned. Repeat with account
   recorded.
 - The last active platform operator is deactivated, leaving nobody who can promote or re-activate —
   recovery is by re-seed, and this must be stated rather than discovered.
+- An attendee deletes their account while an audit entry names them and a report about them is open —
+  the entry pseudonymises, the report cascades away, and neither leaves a placeholder.
+- A re-seed is attempted against a database where a promotion has happened — it must fail naming
+  organizer assignments, not with a foreign-key error naming neither table (FR-937, FR-938).
+- An administrative session reaches its absolute cap mid-action — the operator is returned to
+  sign-in without disclosing what they were looking at, and any attendee session survives.
+- An operator with an unreplaced initial credential attempts to reach a surface directly by address
+  — refused, since no administrative capability exists before replacement (FR-992).
 
 ## Requirements *(mandatory)*
 
@@ -335,6 +353,15 @@ assignment is gone and the conference reports as unassigned. Repeat with account
 - **FR-919**: An operator MUST be able to end their administrative session explicitly. Doing so MUST
   leave any attendee session held in the same browser untouched, and the reverse MUST also hold
   (FR-912).
+- **FR-919a**: An administrative session MUST expire on a **shorter idle window** than an attendee
+  session, and MUST additionally expire at an **absolute cap measured from establishment, regardless
+  of activity**. Both values MUST be stated explicitly rather than inherited. The cap is the
+  load-bearing half: an idle window alone can be held open indefinitely by a tab that keeps touching
+  the server, and this session grants access to other people's private message content under the
+  third Principle VIII exception. The attendee session policy was written for a person on their own
+  phone at a venue and MUST NOT be applied here by inheritance.
+- **FR-919b**: Expiry by either bound MUST return the operator to sign-in without disclosing what
+  they were looking at, and MUST NOT end any attendee session held in the same browser.
 
 #### The administrative site
 
@@ -371,6 +398,17 @@ assignment is gone and the conference reports as unassigned. Repeat with account
 - **FR-936**: A conference with no current organizer assignment MUST be reported as **unassigned**
   to platform operators. This state MUST be derived from the absence of an assignment and MUST NOT
   be stored.
+- **FR-937**: An assignment's reference to its conference MUST be **non-cascading**, so a surviving
+  assignment refuses the removal of a conference. This mirrors 008's `shared_cards.event_id` exactly,
+  and the constitution anticipated it: *"The next feature with a non-cascading reference to seeded
+  content will meet this."*
+- **FR-938**: The seed MUST **explicitly clear organizer assignments** as a declared step, and MUST
+  clear the whole administrative-assignment domain rather than only what it seeded — 008's rule,
+  learned when a surviving card broke the re-seed "with an error naming neither table".
+- **FR-939**: A re-seed MUST NOT be capable of silently removing an organizer's authority. **A
+  cascade is not an administrative write and FR-994 would not record it**, which is precisely why the
+  non-cascading reference is chosen over the semantically simpler one: the failure belongs at
+  development time, loudly, not in a deployed environment as a privilege change nobody performed.
 
 #### The report queue
 
@@ -437,6 +475,55 @@ the absence ends.
   `apps/api/src/db/seed/catalog.ts`, `catalog-read-only.test.ts`, `join-grants-nothing.test.ts`,
   `qa-absences.test.ts`, `no-report-read-surface.test.ts`.
 
+#### Administrative audit
+
+- **FR-994**: Every administrative **write** MUST be recorded in an append-only audit trail: the
+  acting operator, the action, the subject it acted on, and the instant. This covers promotion,
+  demotion, report resolution, question removal, and operator deactivation.
+- **FR-995**: Every **read that discloses reported message content** MUST also be recorded. This is
+  the one read privilege the **third Principle VIII exception** (4.1.0, A8) had to be written to
+  grant, and an unaudited grant of it is indefensible. Routine navigation — opening a list, viewing
+  a conference — MUST NOT be recorded, because the surfaces bound what they serve and recording them
+  produces volume without insight.
+- **FR-996**: The audit trail MUST be **append-only**. No administrative surface may edit or delete
+  an entry, and no tier may do so — including the platform tier, whose own actions it records.
+- **FR-997**: An audit entry MUST survive the deactivation of the operator it names (FR-909) and MUST
+  remain attributable to that operator. The record's **subject is the operator's act**; the attendee
+  it concerned is incidental to it.
+- **FR-997a**: When an attendee deletes their account, every audit entry naming them MUST be
+  **pseudonymised in the same transaction** — the attendee identifier cleared, the operator, action
+  and instant retained. **This is not a tombstone and MUST NOT become one**: nothing identifying the
+  attendee survives, no placeholder name, and the entry MUST NOT be reconstructible. What remains is
+  a record that an operator did something, which is the operator's data and not theirs.
+- **FR-997b**: Pseudonymisation MUST NOT be implemented as a soft-delete flag or a retained
+  foreign key set to a sentinel row. Principle VIII forbids a record marked deleted, and standing
+  decision 12 forbids a tombstone; a cleared column is neither.
+- **FR-998**: A pseudonymised audit entry is reached by no cascade, so a **retention window MUST be
+  stated** for it, per Principle VIII's third deletion rule — the same rule that governs
+  `sign_in_attempts`, and for the same reason: the records are pseudonymous rather than anonymous,
+  and a clock is the only thing that can clear them. It MUST NOT be shorter than the retention of the
+  records it explains.
+- **FR-999**: The audit trail MUST NOT be readable from MyNet, and MUST NOT disclose reported message
+  content itself — it records **that** a disclosure happened, never a second copy of what was
+  disclosed.
+
+#### Bootstrapping the first operator
+
+- **FR-990**: The seed MUST create a platform operator's **identity** and MUST NOT create a usable
+  credential for it. No password, hash, or secret of any kind may be committed. **The repository is
+  public** (register entry 16), so a committed operator credential is a published administrative
+  credential — a materially worse form of the join-code exposure already recorded against 004.
+- **FR-991**: A platform operator's initial credential MUST come from environment configuration,
+  supplied separately per environment. When it is **absent, administrative sign-in MUST be
+  impossible** for that operator — never a default, never a fallback, and never a generated value
+  written to a log.
+- **FR-992**: An operator signing in with an initial credential MUST be required to replace it before
+  reaching any administrative surface. Until they do, no administrative capability is available to
+  them.
+- **FR-993**: Seeding MUST NOT overwrite or reset the credential of an operator who has already
+  replaced theirs. A re-seed restores conference fixtures; it MUST NOT silently return an
+  administrative account to its bootstrap state.
+
 #### Personal data
 
 - **FR-980**: Administrative authority MUST be a server-enforced predicate, in the shape the existing
@@ -465,6 +552,11 @@ the absence ends.
   session, established under the administrative host only.
 - **Report resolution** — the outcome an operator recorded against a report, the internal note, the
   operator, and the instant. Survives the operator's removal.
+- **Audit entry** — an append-only record of one administrative write, or one read that disclosed
+  reported message content: the acting operator, the action, the subject, and the instant. Records
+  *that* a disclosure happened, never a copy of what was disclosed. **Pseudonymised** when the
+  attendee it names deletes their account, leaving the operator's act intact, and thereafter reached
+  by no cascade — so it carries a stated retention window, exactly as `sign_in_attempts` does.
 - **Unassigned conference** — not an entity. A derived state: a conference with no current organizer
   assignment. Deliberately not stored, following 008's `lapsed`.
 
@@ -496,6 +588,12 @@ the absence ends.
   horizontal scrolling of content or primary actions.
 - **SC-910**: No notification of any kind is dispatched by this feature, asserted by the existing
   source-level audit over the notification trigger set.
+- **SC-911**: Every administrative write and every disclosure of reported message content appears in
+  the audit trail, attributable to an operator — verified by performing one of each and finding all
+  of them, and by finding no entry for routine navigation.
+- **SC-912**: An operator with an environment-supplied initial credential cannot reach any
+  administrative surface before replacing it, and with no credential configured cannot sign in at
+  all — verified as two separate outcomes rather than one.
 
 ## Feature Declarations *(mandatory — Constitution Principle IX)*
 
@@ -510,7 +608,7 @@ the absence ends.
 | **Accessibility** (Principle IV) | Full Principle IV compliance (FR-922). Every modal — resolution, promotion, question removal — carries a clear close action and Escape dismissal, and **must use the base `<dialog>` centring rule in `theme/tokens.css`**, which is the invariant two features have already rediscovered by shipping dialogs in the top-left corner. |
 | **Validation checklist discharged** (Principle VII) | Discharges no item of the whole-product attendee checklist, because it adds no attendee surface — and says so rather than claiming partial credit. Adds its own gates: the administrative product must pass every existing correctness gate (typecheck, lint, unit, component, contract, migrations, integration against a real database, accessibility, e2e, production build). |
 | **Identity scoping & server-side authorization** (Principle VIII) | Authority is a **server-enforced predicate** (FR-980), never a client claim, in the shape `EventScope`, `ConversationScope` and `CardScope` establish. Tier is never derived from an attendee attribute, and **never from verification or discoverability** (FR-907). Refusals disclose nothing about what exists (FR-917). The report queue is the **third recorded Principle VIII exception** (4.1.0, A8), scoped to platform tier only, only what was reported, only in the queue, and nothing back to the reporter. |
-| **Deletion & export coverage** (Principle VIII) | Organizer assignments cascade from `attendees` and appear in the attendee export (FR-981, FR-982). **Operator records are the case Principle VIII has never had to consider** — personal data about somebody with no `attendees` row, whom no existing cascade reaches — so this feature must state a deletion or retention rule for every table it adds (FR-983) rather than allow-list its way past the coverage tests, which fail by existing. A report resolution deliberately survives its operator's removal (FR-944) and needs its own stated rule (FR-984). |
+| **Deletion & export coverage** (Principle VIII) | Organizer assignments cascade from `attendees` and appear in the attendee export (FR-981, FR-982). **Operator records are the case Principle VIII has never had to consider** — personal data about somebody with no `attendees` row, whom no existing cascade reaches — so this feature states a deletion or retention rule for every table it adds (FR-983) rather than allow-listing its way past the coverage tests, which fail by existing. Three records get distinct answers, and the differences are the point: a **report resolution** is reached by `abuse_reports`' existing cascade on both attendees, so it needs no clock; an **audit entry** is deliberately *not* cascaded but **pseudonymised** on attendee deletion (FR-997a) and then expires on a clock (FR-998), the same shape as `sign_in_attempts`; a **deactivated operator** stays resolvable while any record attributes an act to them (FR-909). Pseudonymisation is explicitly **not** a tombstone or a sentinel row (FR-997b). |
 | **Event scoping** (Standing decision D1/7) | **Both rules apply, and each table says which.** `organizer_assignments` is **per-event** — an assignment is authority over one conference. Operator records and administrative sessions are **neither**: they belong to the product, not to a conference, which is a third case decision 7 did not anticipate and which is declared here rather than defaulted. Report resolutions follow `abuse_reports`, which is **cross-event** by 007's decision that conduct is not a conference. |
 | **Register position** (Governance) | **Blocked by nothing.** Licensed by **v4.0.0** (standing decisions 31–36) and unblocked by **v4.1.0** (37–39), which closed entries 24, 25 and 26 — all three of which this feature would otherwise have had to settle by inference. **Addresses but does not close entries 19 and 21**: it creates the actor capable of moderating and of reading reports, but appoints nobody (21) and sets no standard for avatars (19), and FR-954 forbids closing 19 by building the action. **Escalates entry 4** — desktop and tablet layouts have never been validated, and this adds an entire product of them. **Opens no new entry.** |
 | **Reserved migration number** (Branching — parallel work) | **`0009`.** Migrations run to `0008_session_qa.sql`; 010 added no schema. The roadmap's reserved-number table covers the attendee programme only and is deliberately not extended, so `0009` is claimed here. Anyone regenerating the Drizzle snapshot must move `apps/api/migrations/meta/README.md` aside first, because `drizzle-kit generate` JSON-parses every file in `meta/`. |
@@ -541,29 +639,39 @@ the absence ends.
   — already exists. It is recorded as an edge case so it is not discovered.
 - **Seeded operator credentials must not be usable in a deployed environment as committed.** The seed
   is world-readable — the repository is public (entry 16) — so a committed operator password is a
-  published administrative credential. The specification treats first-run credential establishment as
-  a requirement of deployment rather than of this feature, and it is recorded in Open Questions.
+  published administrative credential. *Resolved by clarification into FR-990–FR-993: the seed
+  creates the identity only, and the credential is environment-supplied.* Note the interaction with
+  the `seed-production-guard` idea-inbox entry, which already observes that `pnpm db:seed` deletes
+  every attendee and re-inserts committed passwords with nothing enforcing that it never runs against
+  real data. FR-993 narrows the blast radius for operators specifically; it does not close that entry.
 
 ## Open Questions
 
 To be resolved at planning or escalated. **None may be silently resolved.**
 
-1. **How a seeded platform operator's first credential is established without committing it.** The
-   repository is public, so a password in the seed is a published administrative credential — a
-   materially worse version of the join-code concern already recorded against 004. Candidate shapes:
-   an environment-supplied secret consumed at first boot, a first-run establishment flow bound to a
-   one-time token, or provisioning outside the seed entirely. **This is the one question in this
-   feature with a security consequence that cannot be deferred to a later feature**, because the
-   operator account exists from the first deployment.
-2. **Whether a report resolution's internal note is personal data requiring its own retention rule.**
-   It is an operator's free text about two attendees, held indefinitely, on a row that survives the
-   operator (FR-944). 007 refused to put the reporter's reason in mail on closely related reasoning.
+1. ~~**How a seeded platform operator's first credential is established without committing it.**~~
+   **RESOLVED 2026-08-11 by clarification**: environment-supplied, absent means sign-in is
+   impossible, and it must be replaced on first use. Now FR-990–FR-993. Recorded rather than deleted
+   because the reasoning survives the answer — the repository is public, so a password in the seed is
+   a published administrative credential, and this was the one question in this feature with a
+   security consequence that could not be deferred, since the operator account exists from the first
+   deployment.
+2. **Whether a report resolution's internal note should exist in its present form.** *Narrowed
+   2026-08-11 by clarification.* The retention half of this question is **answered by the existing
+   schema rather than by a decision**: `abuse_reports` cascades on both `reporter_id` and
+   `reported_id`, so a resolution attached to it is already reached by an attendee's deletion and
+   needs no separate clock — unlike an audit entry, which deliberately is not (FR-997a). What remains
+   open is narrower and is a product question: the note is an operator's free text about two
+   attendees, and 007 refused to put the reporter's reason in operator mail on closely related
+   reasoning. Whether it should be structured rather than free text, or bounded in length, is
+   undecided.
 3. **Whether removing a question should be available from outside the report queue.** As specified,
    removal is reachable only from a report — which means an abusive question nobody reports cannot be
    removed. Widening it is a moderation-standard decision adjacent to entry 19.
-4. **What happens to an assignment when a conference is removed from the seed.** Conference content is
-   seeded and a re-seed clears it; 008 met the neighbouring problem when a non-cascading reference
-   broke the re-seed with an error naming neither table.
+4. ~~**What happens to an assignment when a conference is removed from the seed.**~~ **RESOLVED
+   2026-08-11 by clarification**: non-cascading reference, and the seed clears assignments as a
+   declared step. Now FR-937–FR-939. This is the feature the constitution predicted would meet 008's
+   trap, and it met it.
 5. **Whether the administrative product needs its own CI job or extends the existing ones.** Principle
    VII binds it equally; whether that is a widened matrix or a parallel set is a planning decision.
 6. **Whether operator sign-in attempts belong in `sign_in_attempts`.** That table is deliberately
