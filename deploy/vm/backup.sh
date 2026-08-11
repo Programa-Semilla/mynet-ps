@@ -85,6 +85,93 @@ record_outcome() {
 
 free_mb() { df -Pm "$1" 2>/dev/null | awk 'NR==2 {print $4}'; }
 
+# ═══════════════════════════════════════════════════════════════════════════════════════════════
+# 010 T051 (FR-870, FR-872, research R4) — **the off-host copy.**
+#
+# Uploads one artifact to an Azure Storage container and returns non-zero unless the service
+# confirms it. Every caller treats that non-zero as "do not prune".
+#
+# ───────────────────────────────────────────────────────────────────────────────────────────────
+# **PLAIN `curl` AGAINST THE BLOB REST API, NOT THE `az` CLI, AND NOT `azcopy`.**
+#
+# Neither is installed on this host and neither should be: this runs unattended under cron on a
+# two-vCPU box, and a tool that can be upgraded out from under a backup job is a tool that can
+# stop a backup job. `curl` is in the base image and the REST call is one request.
+#
+# The credential is a **SAS query string with create+write and nothing else** (R4). A compromised
+# VM can therefore add backups and can neither read the history nor destroy it — which is the
+# property that makes an off-host copy meaningfully off-host rather than merely elsewhere.
+# ───────────────────────────────────────────────────────────────────────────────────────────────
+#
+# ═══════════════════════════════════════════════════════════════════════════════════════════════
+# **HOW A WRITE-ONLY CREDENTIAL CONFIRMS ITS OWN UPLOAD, WHICH LOOKS IMPOSSIBLE AT FIRST.**
+#
+# FR-872 wants the copy *confirmed*, not merely attempted. The obvious confirmation — read the
+# blob back and compare — is exactly what a write-only credential cannot do, and widening it to
+# allow reads would give up the property above to check a box.
+#
+# So the confirmation is server-side instead. `Content-MD5` is sent with the request; Azure
+# **verifies the body against it** and refuses the write with `400 Md5Mismatch` if they differ.
+# A `201 Created` is therefore not "we sent some bytes" but "the service received exactly these
+# bytes and stored them". That is a stronger check than reading back a length, and it costs one
+# request rather than two.
+# ═══════════════════════════════════════════════════════════════════════════════════════════════
+copy_off_host() {
+  local name="$1"
+  local path="${BACKUP_DIR}/${name}"
+
+  # Unconfigured is a REFUSAL, not a skip (FR-871). Treating a missing target as "nothing to do"
+  # would let the prune proceed and leave the artifacts exactly where they already were — the
+  # single-disk arrangement this step exists to end, silently restored by an empty variable.
+  if [[ -z "${BACKUP_REMOTE_CONTAINER:-}" || -z "${BACKUP_REMOTE_CREDENTIAL:-}" ]]; then
+    log "No off-host target configured (BACKUP_REMOTE_CONTAINER / BACKUP_REMOTE_CREDENTIAL)."
+    log "  The artifact is kept and pruning will NOT proceed. Local backups will accumulate"
+    log "  until BACKUP_MIN_FREE_MB trips, which is deliberate: filling a disk is recoverable,"
+    log "  and deleting the only copy of a backup because the off-host copy silently failed is not."
+    return 1
+  fi
+
+  # Put Blob is a single request up to 256 MiB. Above that the API needs Put Block / Put Block
+  # List, which this does not implement — so it REFUSES rather than sending a request that would
+  # be rejected or, worse, appearing to succeed on a partial upload.
+  local bytes
+  bytes="$(stat -c %s -- "$path")"
+  if (( bytes > 256 * 1024 * 1024 )); then
+    log "REFUSING to upload ${name}: ${bytes} bytes exceeds the 256 MiB single-request limit."
+    log "  This needs block-based upload (Put Block / Put Block List), which is not implemented."
+    log "  The database has outgrown this script — that is a change to make deliberately."
+    return 1
+  fi
+
+  local md5 status
+  md5="$(openssl dgst -md5 -binary -- "$path" | base64)"
+
+  # `--data-binary @file` streams from disk. The SAS is appended to the URL, so it must not be
+  # logged: `curl` is given `-sS` and only the status code is captured.
+  status="$(curl -sS -o /dev/null -w '%{http_code}' -X PUT \
+    -H 'x-ms-blob-type: BlockBlob' \
+    -H "Content-MD5: ${md5}" \
+    -H 'Content-Type: application/octet-stream' \
+    --data-binary "@${path}" \
+    "${BACKUP_REMOTE_CONTAINER%/}/${name}?${BACKUP_REMOTE_CREDENTIAL#\?}" 2>/dev/null || echo 000)"
+
+  if [[ "$status" != "201" ]]; then
+    # The status is reported because the fix differs completely: 403 is an expired or wrong SAS,
+    # 404 is a container that does not exist, 400 is an MD5 mismatch — a corrupted upload, which
+    # is the one this check exists to catch — and 000 is no answer at all.
+    log "Off-host copy REFUSED by the service: HTTP ${status} for ${name}."
+    case "$status" in
+      400) log "  400 — the service's checksum did not match ours. The upload was corrupted." ;;
+      403) log "  403 — the SAS credential is expired, malformed, or lacks create+write." ;;
+      404) log "  404 — the container does not exist at BACKUP_REMOTE_CONTAINER." ;;
+      000) log "  000 — no response. Network, DNS, or the storage account is unreachable." ;;
+    esac
+    return 1
+  fi
+
+  log "Copied off-host: ${name} (${bytes} bytes, checksum verified by the service)."
+}
+
 usage() {
   cat <<EOF
 Usage: $(basename "$0") [run|install|status|--help]
@@ -94,6 +181,7 @@ Usage: $(basename "$0") [run|install|status|--help]
   status               Show the schedule, the retention period, and the artifacts on disk.
 
 Exit codes: 0 success  2 usage/config  3 skipped (another run holds the lock)
+            7 the off-host copy failed, so NOTHING was pruned (FR-871)
             4 refused (low disk)  5 dump failed  6 the dump is not readable
 EOF
 }
@@ -180,7 +268,26 @@ cmd_run() {
   fi
   log "Verified readable: pg_restore --list parses ${name}."
 
-  # 6. Prune, oldest first, keeping BACKUP_KEEP_LOCAL. Only reached on a verified artifact.
+  # ───────────────────────────────────────────────────────────────────────────────────────────
+  # 6. **COPY IT OFF THIS HOST, AND DO NOT PRUNE UNLESS THAT SUCCEEDED** (010 T051, T052,
+  #    FR-870, FR-871, FR-872).
+  #
+  # The failure this whole script defends against is the loss of the machine or its disk. Seven
+  # artifacts sitting on that disk defend against a bad migration and against nothing else — so
+  # until this step, "we have backups" meant "we have backups for as long as we have the VM".
+  #
+  # Ordered AFTER the verify for the reason the verify is ordered before the prune: there is no
+  # point copying an artifact that cannot be read, and every step here is arranged so that a
+  # persistent failure keeps data rather than losing it.
+  # ───────────────────────────────────────────────────────────────────────────────────────────
+  if ! copy_off_host "$name"; then
+    log "FAILED: ${name} was NOT copied off this host. It is kept and NOTHING was pruned."
+    record_outcome 7 "off-host copy failed"
+    exit 7
+  fi
+
+  # 7. Prune, oldest first, keeping BACKUP_KEEP_LOCAL. Only reached on a verified artifact
+  #    that is also known to exist somewhere other than this disk.
   local pruned=0
   while IFS= read -r old; do
     [[ -n "$old" ]] || continue

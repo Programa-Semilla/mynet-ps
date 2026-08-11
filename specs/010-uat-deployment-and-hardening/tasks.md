@@ -198,8 +198,8 @@ record.
 **Independent test**: destroy the database container, restore from off-host. Quickstart Scenario 8.
 
 - [ ] T050 [US4] Extend `deploy/vm/provision-storage.sh` (or add a sibling) to create the storage account and private container in `rg-mynet-backups`, with soft-delete enabled and a **write-only** credential for the backup job (research R4, FR-873)
-- [ ] T051 [US4] Add the off-host upload to `deploy/vm/backup.sh`, after the existing verification step and before pruning (FR-870)
-- [ ] T052 [US4] Make local pruning conditional on a **confirmed** off-host copy, and report a failed copy rather than absorbing it (FR-871, FR-872)
+- [X] T051 [US4] Add the off-host upload to `deploy/vm/backup.sh`, after the existing verification step and before pruning (FR-870)
+- [X] T052 [US4] Make local pruning conditional on a **confirmed** off-host copy, and report a failed copy rather than absorbing it (FR-871, FR-872)
 - [ ] T053 [P] [US4] Confirm the backup schedule and written retention period in `deploy/vm/provision-schedule.sh` and `deploy/vm/README.md` are **otherwise unchanged** by T051 and T052 (FR-877)
 - [ ] T054 [US4] Verify the failure path: make the target unreachable, run a backup, confirm pruning does **not** proceed (SC-806)
 - [ ] T055 [US4] **Destroy the database container on the deployed host and restore it** from an off-host artifact, confirming the seeded conference and its attendees return (FR-874, SC-807)
