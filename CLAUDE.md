@@ -5,7 +5,8 @@ Guidance for Claude Code (claude.ai/code) working in this repository.
 This file is the **working brief**: what the product is, what has been decided, and how work is
 done here. It is deliberately short. Depth lives elsewhere, and these are authoritative over it:
 
-1. **`.specify/memory/constitution.md` (v3.3.0)** — governance and the authoritative decision
+1. **`.specify/memory/constitution.md` (v3.4.0 ratified; **v4.0.0 DRAFTED 2026-08-11, not yet
+   ratified**)** — governance and the authoritative decision
    register. Supersedes tool defaults, habit, and any conflicting statement in this file.
 2. **`docs/superpowers/specs/2026-08-06-mynet-delivery-roadmap-design.md`** — the decomposition of
    the remaining product into features, with dependency order, reserved migration numbers, and gate
@@ -48,8 +49,16 @@ The core journey: inspect the next session → discover a relevant attendee → 
 them → schedule a networking appointment.
 
 The **attendee** is the only actor. Speakers and other attendees are data the attendee interacts
-with, not users of the system. **Organizer administration is out of scope**, and seed data must not
-become a route around that: no admin interface, no privileged role, no content import path.
+with, not users of the system.
+
+**Organizer administration was out of scope for the whole life of this project, and a DRAFTED
+amendment reverses that.** Until v4.0.0 is ratified the old rule still binds — no admin interface,
+no privileged role, no content import path, and seed data must not become a route around any of
+them. **Do not write administrative code against the draft.** What v4.0.0 proposes, per
+`brainstorm/09-administrative-product.md`: a second actor in two tiers (seeded platform operators;
+attendees promoted to conference organizer), living in a **separate website** so MyNet itself gains
+no admin surface, with conference authoring permitted to organizers and the seed retained as the
+dev/test fixture. Three features — 011, 012, 013 — are gated on ratification.
 
 ### The five destinations
 
@@ -297,7 +306,8 @@ at all*; unit, component and integration were all green on it and only e2e caugh
 owner reported the scheduling dialog rendering in the **top-left corner**, which no behavioural
 test could see. Both are written up as invariants above.
 
-**Migrations claimed so far run to `0007`.** The journal lists `0003` before `0004` while carrying a
+**Migrations claimed so far run to `0008`** (`0008_session_qa.sql`; 010 added no schema). **Feature
+011 reserves `0009`.** The journal lists `0003` before `0004` while carrying a
 later timestamp — `apps/api/migrations/meta/README.md` explains why both halves are load-bearing and
 what a regenerating feature must not "fix". Anyone regenerating must move that README aside first,
 because `drizzle-kit generate` JSON-parses every file in `meta/`.
@@ -770,8 +780,13 @@ open questions.
 - **Every feature declares its own completeness** (Principle IX): offline behaviour, all three
   layouts, empty/loading/failure states, accessibility, checklist items discharged, identity
   scoping, event scoping, register position, reserved migration number — declared in the spec, or
-  presumed unmet. **None may be deferred to a later polish pass.**
-- **Out of product scope**: organizer administration, payment processing. **Calendar integration**
+  presumed unmet. **None may be deferred to a later polish pass.** The section is called *Feature
+  Declarations*, and as of 2026-08-11 it is **finally in `.specify/templates/spec-template.md`** —
+  it had been mandatory since v2.1.0 and hand-copied into every spec from 002 to 010, because the
+  template never carried it despite the roadmap saying it did. Draft v4.0.0 adds a first row,
+  **Actor and tier**: every feature through 010 had one actor and never had to say so.
+- **Out of product scope**: payment processing, and — **until v4.0.0 is ratified** — organizer
+  administration. **Calendar integration**
   stays out until a recorded decision brings it in — its interface exists but must not be wired.
   **Engagement notification delivery came IN at v3.1.0** (standing decision 21), bounded to a
   received message and nothing else; **the notification bell and an in-app notification centre
