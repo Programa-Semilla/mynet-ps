@@ -5,7 +5,7 @@ Guidance for Claude Code (claude.ai/code) working in this repository.
 This file is the **working brief**: what the product is, what has been decided, and how work is
 done here. It is deliberately short. Depth lives elsewhere, and these are authoritative over it:
 
-1. **`.specify/memory/constitution.md` (v4.0.0)** — governance and the authoritative decision
+1. **`.specify/memory/constitution.md` (v4.1.0)** — governance and the authoritative decision
    register. Supersedes tool defaults, habit, and any conflicting statement in this file.
 2. **`docs/superpowers/specs/2026-08-06-mynet-delivery-roadmap-design.md`** — the decomposition of
    the remaining product into features, with dependency order, reserved migration numbers, and gate
@@ -824,6 +824,41 @@ asserts no write path and no import path at any privilege), `catalog-read-only.t
 `join-grants-nothing.test.ts` (FR-132, FR-134, FR-311), `qa-absences.test.ts` (no moderation route),
 and `no-report-read-surface.test.ts` (FR-548, which survives for MyNet).
 
+**2026-08-11** (ratified in constitution **v4.1.0**) — **closes all three entries v4.0.0 opened, in
+the same session. Feature 011 is unblocked:**
+
+37. **The administrative site is a subdomain, and its operator holds a separate session.**
+    `admin.<host>`, with `/api/*` reverse-proxied under it so its calls stay same-origin, and a
+    **host-only** session cookie — so one person signed into both products holds **two independent
+    sessions**, and signing out of one does not sign out of the other. *Closes register entry 26.*
+    **The reasoning turns on a distinction that must not be re-derived carelessly**: `SameSite` is
+    evaluated against the **registrable domain, not the origin**, so a subdomain is *same-site*
+    (decision 19's CSRF defence survives untouched, no synchroniser token needed) **and**
+    *different-origin* (its own service-worker scope, storage and CSP). No other topology gives
+    both. A path shares the origin and the attendee service worker is registered at **root scope**,
+    so it would intercept admin navigations. A separate registrable domain stops `SameSite=Lax`
+    being sent — the exact v3.0.0 failure where the cookie was never sent and nobody could sign in.
+38. **The report queue discloses the reported content and the reporter's stated reason**, to
+    platform operators only. *Closes register entry 24.* **This is the THIRD recorded Principle VIII
+    exception** — v4.0.0 predicted it would be one and refused to grant it by inference, which is
+    the point. Four conditions bind: platform tier only (a conference organizer may not read reports
+    at all); only what was reported, never the surrounding thread; only in the queue; and the
+    reporter is still told nothing. The **operator mail is unchanged** — identifiers and a timestamp
+    only — because it was written that way to stop the text living in an inbox outside every
+    retention rule this project controls, and a queue reading the row is not that.
+    **`content unavailable` is a first-class state, not an error**: reported message ids are stored
+    as a plain array rather than a foreign key precisely because the messages are usually gone
+    before anyone looks.
+39. **An organizer's assignments end with their access.** Deleting an account revokes that person's
+    organizer assignments **in the same transaction**, and withdrawing from a conference revokes the
+    assignment for it — 008's precedent, because **authority must not outlive the access it depends
+    on**. *Closes register entry 25.* **Deletion is never conditional**: decision 12 holds
+    absolutely and no administrative role may make an attendee's erasure right depend on another
+    person existing. A conference left with no organizer enters an explicit **`unassigned`** state
+    that platform operators can see; the conference and its content survive untouched, because
+    conference content is not attendee data. Reverting ownership silently to the platform tier was
+    rejected — it is a tidier invariant that hides the event nobody is prompted to act on.
+
 ## How work is done here
 
 ### Branching and change flow
@@ -943,54 +978,32 @@ is a working summary. Each names what it blocks, because *when* to ask matters a
 
 ### Require a client decision
 
-**Three open questions block feature 011, and they are new.** *Corrected 2026-08-11.* The delivery
-roadmap **is** complete — 001–010 are shipped and every destination `requirements.md` names answers
-its question — but v4.0.0 opened a **second programme** (011, 012, 013), and with it entries 24, 25
-and 26. The statement this replaced, that no open question blocks any remaining feature because there
-are no remaining features, was true only while administration was prohibited.
+**No open question blocks any feature, including 011.** *As of 2026-08-11.* v4.0.0 opened a second
+programme (011, 012, 013) and with it entries 24, 25 and 26; **v4.1.0 closed all three in the same
+session**, so the blockers existed for one exchange rather than one release. Everything below blocks
+**deployment** or **release**, not code.
 
-Still true: v3.2.0 closed the connection model, card-exchange semantics and Q&A attribution;
-**v3.3.0** closed public Q&A visibility and withdrew FR-756a; **v3.4.0** closed the oldest entry of
-all, the brand mark. Everything below other than 24, 25 and 26 blocks **deployment** or **release**,
-not code.
+The closing sequence is worth keeping, because it is the argument for opening entries you cannot yet
+answer: those three produced a **third privacy exception**, a **CSRF-adjacent topology decision**,
+and a **deletion rule touching decision 12**. None is a spec detail, and all three would have been
+settled by inference inside a feature specification had they not been opened deliberately.
 
-- **Register entry 24 — what the administrative report queue may disclose. BLOCKS 011.** Opened by
-  v4.0.0's decision 35. The floor needs no decision: the queue must not show more than the operator
-  mail does — identifiers and a timestamp, never message text, never the reporter's reason. What
-  needs one is whether it may show more. **A queue showing reported message text would be a third
-  recorded exception under Principle VIII**, and v3.3.0 established that an exception must be
-  *recorded* rather than derived, on an entailment argument that was available and deliberately not
-  taken. The available argument here — that a moderator cannot judge conduct they cannot see — must
-  not be taken silently either. Interacts with entry 19: an avatar is the same question in a
-  different medium.
-- **Register entry 25 — what happens when a promoted conference organizer deletes their own account.
-  BLOCKS 011.** Standing decision 12 makes deletion self-serve, hard and cascading with no
-  tombstone; a conference organizer is an attendee; so the sole organizer of a conference can orphan
-  it by exercising a guaranteed right, and the sessions they authored are conference content, so
-  they survive with nobody assigned. Every obvious repair breaks something recorded — refusing
-  breaks decision 12, requiring a successor first makes the right conditional on somebody else's
-  action, cascading the conference destroys content belonging to every attendee registered for it.
-  **Do not resolve by analogy to 008's or 009's deletion answers**: both concerned data the departing
-  person authored about themselves, and a conference is not that. The adjacent question travels with
-  it — whether withdrawing from a conference revokes an organizer assignment for it.
-- **Register entry 26 — the administrative site's origin and session topology. BLOCKS 011.** Standing
-  decision 19 binds client and API to one origin, and it is not a preference: it is what keeps
-  `SameSite=Lax` a genuine CSRF defence and why no synchroniser token is required. A second website
-  is a second origin unless deliberately arranged otherwise, and **it must not inherit that
-  reasoning unexamined** — this is the exact failure v3.0.0 was written to escape, where `fly.dev`
-  and `pages.dev` were separate registrable domains, the cookie was never sent, and the
-  configuration could not sign anyone in. Open in three parts: subdomain, path, or separate
-  registrable domain; whether an administrative session is distinct from the attendee session held
-  by the same person; and what replaces `SameSite=Lax` if the origins differ. Two long-parked
-  idea-inbox entries meet this directly — `session-topology-and-csrf` and
-  `security-response-headers`, both filed 2026-08-05 as cheapest to settle before the first
-  environment is opened.
-- **Register entries 19 and 21 are ADDRESSED but NOT closed by v4.0.0.** 011 creates the first actor
-  capable of moderating an avatar and of reading a report queue — but **a capability is not a
-  policy**. Who moderates, against what standard, on whose complaint, with what appeal, and whether
-  a removed avatar is replaced or blanked are all undecided (19); and somebody still has to *be*
-  that operator, which remains an obligation the owner personally holds (21). Neither may be read as
-  closed by 011 shipping.
+Also closed: v3.2.0 settled the connection model, card-exchange semantics and Q&A attribution;
+**v3.3.0** public Q&A visibility and the withdrawal of FR-756a; **v3.4.0** the oldest entry of all,
+the brand mark.
+
+- ~~**Register entries 24, 25 and 26**~~ — **RESOLVED 2026-08-11 in v4.1.0** as standing decisions
+  38, 39 and 37 respectively. See the decisions above; they are now binding text rather than
+  questions.
+
+- **Register entries 19 and 21 are ADDRESSED but NOT closed — by v4.0.0 or v4.1.0.** 011 creates the
+  first actor capable of moderating an avatar and of reading a report queue, and v4.1.0 decided what
+  that operator may *see* — but **a capability is not a policy**. Who moderates, against what
+  standard, on whose complaint, with what appeal, and whether a removed avatar is replaced or
+  blanked are all undecided (19); and somebody still has to *be* that operator, which remains an
+  obligation the owner personally holds (21). Neither may be read as closed by 011 shipping.
+  **These two are the oldest live entries in the register**, and they are the reason the
+  administration exclusion was reversed at all.
 
 - **Register entry 22 — a cached conference can outlive a withdrawn registration by up to 24
   hours.** Conceded by 009 when FR-756a was withdrawn, and **product-wide rather than 009's**: no

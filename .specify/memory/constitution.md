@@ -1,6 +1,82 @@
 <!--
 SYNC IMPACT REPORT
-Version change: 3.4.0 → 4.0.0
+Version change: 4.0.0 → 4.1.0
+
+RATIFICATION STATUS: **RATIFIED 2026-08-11 by the project owner**, in the same session that ratified
+4.0.0 and immediately after it. 4.0.0 opened entries 24, 25 and 26 and declared all three blockers on
+feature 011; this amendment closes all three. **Feature 011 is now unblocked.**
+
+Rationale: MINOR. Principle VIII's "private content stays private" clause gains a **third** recorded
+exception, two binding-constraint blocks are extended, and three register entries close. No principle
+is removed or redefined, nothing delivered is retracted, and no work performed under 4.0.0 is
+invalidated. **It is not PATCH** for the reason 3.3.0 gave when adding the second exception: an
+exception to a privacy rule is a change in what the product may do, not a clarification of what it
+already did.
+
+Owner decisions cited by this amendment (all 2026-08-11):
+  A7. The administrative site is served from a SUBDOMAIN of the same registrable domain, with
+      `/api/*` reverse-proxied under it so its calls stay same-origin, and its session cookie is
+      HOST-ONLY — so an operator signed into both products holds two independent sessions.
+      (Resolves register entry 26.)
+      The reasoning turns on a distinction the entry warned against assuming either way:
+      **`SameSite` is evaluated against the registrable domain, not the origin.** A subdomain is
+      same-SITE and different-ORIGIN, so D11's CSRF defence survives untouched *and* the
+      administrative app gets its own service-worker scope, its own storage and its own CSP. Neither
+      alternative offers both: a path shares the origin (and the attendee service worker, registered
+      at root scope, would intercept `/admin`), and a separate registrable domain is the exact shape
+      of the 3.0.0 failure where `SameSite=Lax` stopped being sent and nobody could sign in.
+  A8. The report queue DISCLOSES THE REPORTED CONTENT and the reporter's stated reason, to platform
+      operators only. (Resolves register entry 24. **This is the third Principle VIII exception**,
+      and 4.0.0 predicted it would be one.)
+      Ruled on the argument the entry recorded as available: a moderator cannot judge conduct they
+      cannot see, and the honest alternative is not "no access" but an operator querying the database
+      directly — unbounded, unscoped and unaudited. The reason field is included because the
+      rationale for keeping it out of the mail **does not transfer**: it was excluded to stop the
+      text living in "an inbox nobody in this project controls", and a queue reading the row is the
+      one-row case that rationale contrasts against.
+  A9. A conference organizer's ASSIGNMENTS ARE REVOKED IN THE SAME TRANSACTION as account deletion,
+      and as withdrawal from that conference. A conference left with no organizer enters an explicit
+      UNASSIGNED state that platform operators can see and act on. (Resolves register entry 25.)
+      Deletion is never made conditional, so D6 holds absolutely. The shape is 008's precedent —
+      withdrawing from a conference cancels the live meetings you had at it, in the same transaction,
+      because authority must not outlive the access it depends on.
+
+Added binding constraints:
+  - VIII. Attendee Data Is Personal Data — the **third** recorded exception, with its four scoping
+    conditions, and the 4.0.0 paragraph that predicted it superseded in place rather than deleted.
+  - "Deployment environments" — D11's one-origin rule extended to cover the administrative host.
+  - "Reporting conduct out of the product" — the disclosure question it deferred to entry 24 is
+    answered in place.
+  - "Administration, and the second actor" — gains the topology rule, the queue-disclosure rule, and
+    the organizer-lifecycle rule.
+
+Register changes:
+  - 24. RESOLVED by A8. Struck through in place; numbering stable.
+  - 25. RESOLVED by A9. Struck through in place; numbering stable.
+  - 26. RESOLVED by A7. Struck through in place; numbering stable.
+  - 19 and 21 remain ADDRESSED-not-closed, unchanged by this amendment. A8 gives an operator what
+    they need to *judge* a report; it does not decide who that operator is (21) or what standard
+    they moderate an avatar against (19).
+  - No entry is opened. **This is the first amendment since 3.1.0 to open none**, and it is worth
+    noting rather than passing over: 4.0.0 opened three and closed none, which is the expected shape
+    when an actor is introduced; this one is the settling-up.
+
+Templates and dependent artifacts:
+  - .specify/templates/spec-template.md, plan-template.md, tasks-template.md — ✅ no change required.
+  - CLAUDE.md — ✅ updated: standing decisions 37–39, and the three entries moved from blockers to
+    resolved.
+  - brainstorm/00-overview.md, brainstorm/09-administrative-product.md — ✅ updated.
+
+Deferred: none. Feature 011 has no blocking register entry.
+
+A NOTE ON WHAT THIS AMENDMENT COST, recorded because the sequence is the lesson: 4.0.0 was ratified
+with three known blockers and 011 could not have started under it. Answering them took one session
+and produced a **third privacy exception**, a **CSRF-adjacent topology decision**, and a **deletion
+rule that touches D6** — none of which is a spec detail, and all three of which would have been
+decided by inference inside a feature specification had the entries not been opened deliberately.
+That is the argument for opening entries you cannot yet answer.
+
+PRIOR REPORT (3.4.0 → 4.0.0):
 
 RATIFICATION STATUS: **RATIFIED 2026-08-11 by the project owner**, on reading the drafted amendment.
 Drafted the same day at his request during brainstorm #09
@@ -1109,7 +1185,7 @@ migration.
 - **Collect only what a requirement names.** Fields not traceable to an authoritative source MUST
   NOT be stored merely because they might be useful.
 - **Private content stays private.** Messages, notes, and appointments are visible only to their
-  participants. Any exception requires a recorded client decision. **Two such exceptions are
+  participants. Any exception requires a recorded client decision. **Three such exceptions are
   recorded.**
   - *First* (2.3.0, D10): an attendee's profile is visible to attendees registered for the same
     event, enforced server-side by the event-scoping predicate, and the attendee MUST be able to
@@ -1123,21 +1199,48 @@ migration.
     wants to say nothing publicly must not ask, rather than ask and then retreat. What bounds it is
     stated with it under "Audience questions" — the attendee is told before they publish, the name
     is not a route into the profile, and the question is reportable.
+  - *Third* (4.1.0, A8): **a reported message and the reporter's stated reason are visible to a
+    platform operator in the administrative report queue.** Four conditions scope it, and all four
+    bind:
+    - **Only the platform tier.** A conference organizer MUST NOT read reports at all. A report
+      names two attendees who may share no conference with that organizer.
+    - **Only what was reported.** The specific messages the reporter identified, never the
+      surrounding thread, never the pair's other conversations, and never a second report's subject.
+    - **Only in the queue.** This grants no general read of message content anywhere else in either
+      product.
+    - **The reporter is told nothing.** FR-548's absence of a reporter-facing surface is untouched;
+      a queue existing MUST NOT become a status anybody can poll.
 
-  An exception MUST be recorded here rather than **derived** from a rule elsewhere in this document.
-  This one could have been derived — attribution was already binding (3.2.0, N3) and a question on a
-  shared session is visibly public — and the owner ruled on 2026-08-10 that derivation is not
-  recording. A privacy exception nobody had to accept is one nobody has accepted.
+    **The reported content will frequently be absent, and that is a designed state rather than a
+    fault.** `abuse_reports` stores reported message identifiers as a plain array, deliberately not
+    a foreign key, because "the reported messages will frequently be gone before anyone looks at the
+    report" — by the reported attendee's deletion cascade or the reporter's own departure. A real
+    foreign key left only bad options: `RESTRICT` blocks a deletion the erasure right requires, and
+    `CASCADE` silently empties the report while leaving the row, which reads as "they reported
+    nothing". The queue MUST therefore render *content unavailable* as a first-class state and MUST
+    NOT present it as an error or as an empty report.
 
-  **4.0.0 grants NO third exception, and the restraint is deliberate** (A5). Administration reads
-  attendee data by definition, and it would be easy to read the arrival of a second actor as a
-  standing licence over everything. It is not one. **A platform operator reading the report queue is
-  not an exception to this clause** — 3.1.0 already binds operator mail to identifiers and a
-  timestamp, never message text and never the reporter's reason, and an in-product queue showing the
-  same fields discloses nothing this document has not already permitted. **A report surface that
-  showed the reported message text WOULD be a third exception**, and it is register entry 24 rather
-  than a consequence of A5. Whoever specifies feature 011 must return here for a decision rather than
-  reason from the operator's need to know.
+    *Why this one was granted where 4.0.0 withheld it*: the alternative to a scoped surface is not
+    an operator who sees nothing. It is an operator who queries the database directly — unbounded,
+    unscoped, and unaudited — which this document already concedes they can do. The exception buys a
+    narrower disclosure than the status quo it replaces.
+
+  An exception MUST be recorded here rather than **derived** from a rule elsewhere in this document,
+  and **both the second and the third were derivable and were not derived.** The second could have
+  been reasoned from attribution, already binding (3.2.0, N3), plus the plain fact that a question on
+  a shared session is visibly public; the owner ruled on 2026-08-10 that derivation is not recording.
+  The third could have been reasoned from an operator's evident need to judge what they are asked to
+  act on; it was ruled on 2026-08-11 instead. **A privacy exception nobody had to accept is one
+  nobody has accepted.**
+
+  **4.0.0 granted no third exception and predicted this one** (A5): *"A report surface that showed
+  the reported message text WOULD be a third exception, and it is register entry 24 rather than a
+  consequence of A5."* **4.1.0 answers that entry, and the prediction is the point** — the exception
+  was recorded by amendment rather than reasoned into existence inside a feature specification,
+  which is what Principle VIII requires and what 3.3.0 ruled when the same shortcut was available for
+  Q&A. What 4.0.0's restraint still binds: administration reads attendee data by definition, and the
+  arrival of a second actor is **not** a standing licence over everything. Three exceptions are
+  recorded; a fourth needs a fourth amendment.
 
   **Operator records are personal data about somebody who may not be an attendee**, which is a case
   this principle has never had to consider: "every stored record that belongs to an attendee MUST be
@@ -1275,6 +1378,27 @@ Principle VII no longer requires.
   preference: it is what keeps the session cookie's `SameSite` attribute a genuine CSRF defence
   rather than a nominal one, and it is why no synchroniser-token scheme is required. A topology that
   splits them MUST NOT ship without one.
+
+  **The administrative site is a SUBDOMAIN of the same registrable domain** (*added 4.1.0 by A7*),
+  with `/api/*` reverse-proxied under it so its own calls remain same-origin. The rule above is
+  therefore satisfied twice rather than bent once: each product is served from one origin, and
+  neither reaches the other's.
+
+  The distinction this rests on MUST NOT be re-derived carelessly, because getting it backwards in
+  either direction is expensive. **`SameSite` is evaluated against the registrable domain, not the
+  origin.** A subdomain is therefore **same-site** — so `SameSite=Lax` survives entirely intact and
+  no synchroniser token is needed — while being **different-origin**, which is what gives the
+  administrative app its own service-worker scope, its own storage, and its own Content-Security-
+  Policy. No other topology provides both. A path on the attendee origin shares the origin, and the
+  attendee service worker is registered at **root scope**, so it would intercept administrative
+  navigations. A separate registrable domain stops `SameSite=Lax` being sent at all, which is
+  precisely the 3.0.0 failure: `fly.dev` and `pages.dev` are separate registrable domains on the
+  Public Suffix List, the cookie was never sent, and **the configuration could not sign anyone in.**
+
+  **The administrative session cookie MUST be host-only** — no `Domain` attribute — so it is never
+  sent to the attendee host and the attendee session is never sent to the administrative one. One
+  person signed into both holds **two independent sessions**: an elevated session does not ride
+  along with casual attendee browsing, and signing out of one does not sign out of the other.
 - **Every deployed environment MUST serve over TLS** with a publicly trusted certificate obtained
   and renewed without manual intervention.
 - **The database MUST NOT be reachable from outside its own host.**
@@ -1609,10 +1733,17 @@ Three conditions bind that surface:
 - **Only the platform tier.** A conference organizer MUST NOT read reports. A report names two
   attendees who may share no conference with the organizer, and conduct reported at one event is not
   an assigned conference's business.
-- **What it may disclose is register entry 24 and is NOT decided here.** The operator-mail rule below
-  — identifiers and a timestamp, never message text, never the reporter's reason — is the floor, and
-  the queue MUST NOT show more than the mail does until that entry is answered. Showing reported
-  message text would require a third recorded exception under Principle VIII.
+- **It discloses the reported content and the reporter's stated reason** (*decided 4.1.0 by A8,
+  resolving register entry 24*), under the four conditions recorded with the **third** Principle VIII
+  exception: platform tier only, only what was reported, only in the queue, and nothing back to the
+  reporter. **The operator-mail rule below is unchanged** — mail still carries identifiers and a
+  timestamp and nothing else, because the reason it was written that way was that an inbox lives
+  outside every retention rule this project controls, and a queue reading the row does not.
+
+  **The queue MUST render *content unavailable* as a first-class state.** Reported message
+  identifiers are stored as a plain array rather than a foreign key precisely because the messages
+  are often gone before anyone looks, so an empty content pane is the expected case and MUST NOT be
+  presented as an error or as a report of nothing.
 - **The reporter is still promised nothing.** A queue existing MUST NOT become a status the reporter
   can see. FR-548's absence of a reporter-facing surface is not what this amendment narrows.
 
@@ -1757,11 +1888,38 @@ is not a second standard:
   fails by existing — which is the mechanism working, and the answer must be written down rather than
   allow-listed.
 
-**Three things are deliberately NOT decided here**, and each is an open register entry rather than a
-gap: what the report queue may disclose (24), what happens when a promoted organizer deletes their
-own account (25), and the administrative site's origin and session topology against D11 (26). A
-feature MUST NOT resolve any of them by inference — Principle I applies to this block exactly as it
-applies to everything else.
+**Three things 4.0.0 deliberately did NOT decide are now decided, by 4.1.0.** They were opened as
+register entries 24, 25 and 26 rather than left as gaps, and each turned out to be governance rather
+than a specification detail — which is the argument for opening entries you cannot yet answer.
+
+- **Where administration is served, and whose session it uses** (A7, entry 26). A **subdomain** of
+  the same registrable domain, `/api/*` reverse-proxied under it, and a **host-only** session cookie
+  so an operator holds two independent sessions. Stated in full under "Deployment environments",
+  because it is a topology rule and belongs where D11 lives.
+- **What the report queue discloses** (A8, entry 24). The **reported content and the reporter's
+  stated reason**, to platform operators only. This is the **third** recorded Principle VIII
+  exception; its four scoping conditions and the *content unavailable* requirement are stated with
+  the exception itself, under Principle VIII.
+- **An organizer's assignments end with their access** (A9, entry 25). **Deletion is never
+  conditional** — D6 holds absolutely, and no administrative role may make an attendee's erasure
+  right depend on another person existing. Instead:
+  - **Deleting an account revokes that person's organizer assignments in the same transaction.**
+  - **Withdrawing from a conference revokes the organizer assignment for that conference**, in the
+    same transaction, for the reason 008 established when withdrawal began cancelling live meetings:
+    **authority MUST NOT outlive the access it depends on.** A withdrawn organizer fails
+    `requireEventAccess` and can no longer see the conference as an attendee, so an assignment left
+    standing is authority nobody can observe being exercised.
+  - **A conference left with no organizer enters an explicit `unassigned` state**, and platform
+    operators MUST have a surface that shows it. The conference and its content survive untouched —
+    conference content is not attendee data and no cascade reaches it — so the failure mode being
+    prevented is not data loss but **silence**: an orphaned conference that nobody is prompted to
+    adopt. Reverting ownership implicitly to the platform tier was considered and rejected for
+    exactly that reason; it produces a tidier invariant and hides the event.
+
+**Register entries 19 and 21 remain ADDRESSED but NOT closed**, and 4.1.0 does not change that. A8
+gives an operator what they need to *judge* a report; it does not decide **who that operator is**
+(21) or **what standard an avatar is moderated against** (19). A feature MUST NOT read either as
+closed — Principle I applies to this block exactly as it applies to everything else.
 
 *Rationale*: this reversal was not sought for its own sake. The product accumulated three
 obligations it had no actor to discharge — an unmoderated avatar (entry 19), a reporting dialog
@@ -2086,6 +2244,26 @@ it does not answer either question, and neither may be read as closed by feature
 - **21. The operator address abuse reports are dispatched to.** The address question is half
   obsolete; the "somebody has to be that operator" question is not.
 
+**Resolved in 4.1.0**
+
+Owner decisions taken on 2026-08-11, in the session that ratified 4.0.0 and immediately after it.
+**All three entries 4.0.0 opened are closed, and feature 011 is unblocked.**
+
+- ~~24. What the administrative report queue may disclose~~ — **RESOLVED by A8**: the reported
+  content and the reporter's stated reason, to platform operators only. Written into Principle VIII
+  as its **third** recorded exception, with four scoping conditions. **4.0.0 predicted this would be
+  an exception and refused to grant it by inference**, which is the point — the alternative was an
+  operator's need-to-know reasoned into a privacy exception inside a feature specification.
+- ~~25. What happens when a promoted conference organizer deletes their own account~~ — **RESOLVED
+  by A9**: assignments revoked in the same transaction, deletion never conditional, conference
+  visibly `unassigned`. Also answers the adjacent question the entry carried, about withdrawal.
+- ~~26. The administrative site's origin and session topology~~ — **RESOLVED by A7**: a subdomain,
+  same-site and different-origin, with host-only session cookies.
+
+**Not closed by this amendment**, and this must not be read as tidying them away: entries **19** and
+**21** remain ADDRESSED-not-closed. 4.1.0 tells an operator what they may see; it does not appoint
+one or set the standard they judge by.
+
 **Escalated in 4.0.0, without being answered**
 
 - **4. Desktop and tablet layouts have never been validated by the client.** 3.4.0 escalated this
@@ -2334,7 +2512,14 @@ so a gap in the source would silently render as the wrong number against a neigh
     product behaves as specified either way, and feature 010 is explicitly forbidden from resolving
     it. What it costs to leave open is one visible seam on one surface.
 
-24. **What the administrative report queue may disclose.** *Added 2026-08-11 in 4.0.0, created by
+24. ~~**What the administrative report queue may disclose.**~~ **RESOLVED 2026-08-11 in 4.1.0 by
+    A8** — the reported content **and** the reporter's stated reason, to platform operators only,
+    under four scoping conditions now recorded as the **third** Principle VIII exception. Retained
+    in place so the numbering stays stable. The entry's own framing below was right that this needed
+    an amendment rather than a specification, and it is preserved because the reasoning is the
+    artifact. *Original entry, as written in 4.0.0:*
+
+    *Added 2026-08-11 in 4.0.0, created by
     A5. Blocks feature 011's report surface, and nothing else.* 3.1.0 bound operator mail to
     identifiers and a timestamp — never message text, never the reporter's reason — on the ground
     that both are two attendees' personal data and an inbox sits outside every retention rule this
@@ -2351,7 +2536,14 @@ so a gap in the source would silently render as the wrong number against a neigh
     Interacts with entry 21 (who the operator is) and entry 19 (an avatar is content a moderator must
     see to act on, which is the same question in a different medium).
 
-25. **What happens when a promoted conference organizer deletes their own account.** *Added
+25. ~~**What happens when a promoted conference organizer deletes their own account.**~~ **RESOLVED
+    2026-08-11 in 4.1.0 by A9** — assignments are revoked in the same transaction, deletion is never
+    made conditional, and the conference enters an explicit `unassigned` state that platform
+    operators can see. **The same rule applies to withdrawal**, which answers the adjacent question
+    this entry carried. Now binding text under "Administration, and the second actor". Retained in
+    place so the numbering stays stable. *Original entry:*
+
+    *Added
     2026-08-11 in 4.0.0. Blocks feature 011.* Two commitments collide, and neither yields cleanly.
     D6 and Principle VIII make deletion **self-serve, hard, and cascading, with no tombstone** — an
     attendee MUST be able to delete their own account without an intermediary. A conference organizer
@@ -2371,7 +2563,16 @@ so a gap in the source would silently render as the wrong number against a neigh
     assignment for it. 008 established that withdrawal cancels live meetings in the same transaction;
     whether the same reasoning reaches an assignment is undecided.
 
-26. **The administrative site's origin and session topology.** *Added 2026-08-11 in 4.0.0, created by
+26. ~~**The administrative site's origin and session topology.**~~ **RESOLVED 2026-08-11 in 4.1.0 by
+    A7** — a subdomain of the same registrable domain, `/api/*` reverse-proxied under it, and a
+    host-only session cookie giving two independent sessions. Now binding text under "Deployment
+    environments". Retained in place so the numbering stays stable. **What closed it was a
+    distinction, not a preference**: `SameSite` is evaluated against the registrable domain rather
+    than the origin, so a subdomain is same-site *and* different-origin — the only shape that keeps
+    D11's CSRF defence while giving the administrative app its own service-worker scope, storage and
+    CSP. *Original entry:*
+
+    *Added 2026-08-11 in 4.0.0, created by
     A3. Blocks feature 011.* D11 binds client and API to **one origin**, and the block above states
     why in terms that forbid casual reinterpretation: it "is what keeps the session cookie's
     `SameSite` attribute a genuine CSRF defence rather than a nominal one, and it is why no
@@ -2395,4 +2596,4 @@ so a gap in the source would silently render as the wrong number against a neigh
 stay consistent with this constitution and MUST NOT contain implementation plans, session tasks,
 progress updates, or invented requirements.
 
-**Version**: 4.0.0 | **Ratified**: 2026-08-04 | **Last Amended**: 2026-08-11
+**Version**: 4.1.0 | **Ratified**: 2026-08-04 | **Last Amended**: 2026-08-11

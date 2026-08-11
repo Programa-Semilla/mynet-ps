@@ -1,9 +1,11 @@
 # Brainstorm Overview
 
 Last updated: 2026-08-11 (#09 brainstormed **the administrative product** — the first work to
-require reversing a Principle III *prohibition* rather than an omission — and its amendment was
-**ratified the same day as constitution v4.0.0**, the project's first MAJOR bump since v3.0.0. The
-delivery roadmap is complete; this opens a **second programme** of three features)
+require reversing a Principle III *prohibition* rather than an omission. Its amendment was
+**ratified the same day as constitution v4.0.0**, the project's first MAJOR bump since v3.0.0, and
+**v4.1.0 followed in the same session** to close the three entries v4.0.0 opened. The delivery
+roadmap is complete; this opens a **second programme** of three features, and **nothing blocks
+011**)
 
 The authoritative registers live elsewhere — open questions in `.specify/memory/constitution.md`,
 delivery sequence in `docs/superpowers/specs/2026-08-06-mynet-delivery-roadmap-design.md`. This file
@@ -23,7 +25,7 @@ win and this is stale.
 | 06 | 2026-08-07 | messages-and-notification-delivery | **implemented in full**, including Web Push; its amendment ratified in constitution **v3.1.0** | `specs/007-messages-and-notification-delivery/` |
 | 07 | 2026-08-10 | network-and-appointments | **specified, then implemented**; entries 7, 8 and 9 ratified in constitution **v3.2.0** | `specs/008-network-and-appointments/` |
 | 08 | 2026-08-10 | brand-mark-and-app-icons | **specified, then implemented**; register entry 2 ratified in constitution **v3.4.0** | `specs/010-brand-mark-and-app-icons/` |
-| 09 | 2026-08-11 | administrative-product | **decided, and ratified as constitution v4.0.0** the same day — standing decisions 31–36; opens register entries 24, 25, 26 | `brainstorm/09-administrative-product.md` |
+| 09 | 2026-08-11 | administrative-product | **decided, and ratified as constitution v4.0.0** the same day — standing decisions 31–36. Opened entries 24, 25, 26; **all three closed by v4.1.0** as decisions 37–39 | `brainstorm/09-administrative-product.md` |
 
 Session 05 has no document of its own: 006 was specified without one, and the row records the
 session rather than a file.
@@ -88,7 +90,7 @@ requires reversing a Principle III **prohibition** rather than filling an omissi
 
 | # | Phase | Status | Blocked by |
 |---|-------|--------|------------|
-| 011 | Administrative foundation — second actor, admin site, **abuse-report queue** | **brainstormed** (#09); **licensed by v4.0.0** | register entries **24, 25 and 26** — all three block it |
+| 011 | Administrative foundation — second actor, admin site, **abuse-report queue** | **brainstormed** (#09); licensed by v4.0.0 | ~~24, 25, 26~~ — **all three closed by v4.1.0**; nothing blocks it |
 | 012 | Conference content authoring | **brainstormed** (#09); licensed by v4.0.0 | 011 |
 | 013 | Registration and attendee management | **brainstormed** (#09); licensed by v4.0.0 | 011 |
 
@@ -306,11 +308,13 @@ deployment or release.
 ### Design questions carried into 011's specification
 
 From #09. The decision itself is made and ratified as v4.0.0. **Three of these turned out to be
-governance rather than spec detail and are now register entries 24, 25 and 26 — all three block
-011.** They are marked below. The rest are for `/speckit-specify`. **None may be silently
-resolved.**
+governance rather than spec detail, became register entries 24, 25 and 26, and were closed the same
+day by v4.1.0** — the subdomain topology with host-only sessions, the report queue disclosing
+reported content and the reporter's reason as a **third** Principle VIII exception, and organizer
+assignments ending with access. They are marked below and are now binding text. The rest are for
+`/speckit-specify`. **None may be silently resolved.**
 
-- **[REGISTER ENTRY 25 — BLOCKS 011] A promoted organizer can delete their own account.** Standing
+- **[ENTRY 25 — CLOSED by v4.1.0] A promoted organizer can delete their own account.** Standing
   decision 12 makes deletion
   self-serve, complete and cascading with no tombstone. If the only organizer of a conference
   exercises that right, the conference is orphaned by a guaranteed action — and the sessions they
@@ -318,7 +322,7 @@ resolved.**
   the ownership model can simply win. **Owner decision.**
 - **Does withdrawing from a conference revoke an organizer assignment for it?** 008 established that
   withdrawal cancels live meetings in the same transaction; the analogous question is unanswered.
-- **[REGISTER ENTRY 26 — BLOCKS 011] The admin site needs its own session topology.** Standing
+- **[ENTRY 26 — CLOSED by v4.1.0] The admin site needs its own session topology.** Standing
   decision 19 — one origin for client
   and API — is what keeps `SameSite=Lax` a genuine CSRF defence and `connect-src 'self'` literally
   true. A second site is a second origin and cannot inherit that reasoning unexamined. **This is the
@@ -326,7 +330,7 @@ resolved.**
   in. It also meets two long-parked inbox entries head-on — `session-topology-and-csrf` and
   `security-response-headers` — which have been filed since 001 as "cheapest to settle before the
   first environment is opened".
-- **[REGISTER ENTRY 24 — BLOCKS 011] What does the report queue disclose?** The operator mail
+- **[ENTRY 24 — CLOSED by v4.1.0] What does the report queue disclose?** The operator mail
   deliberately carries identifiers and a
   timestamp, never message text and never the reason (decision 23). If reports become readable in a
   product surface, does that surface show the reported content? Message content is the most
