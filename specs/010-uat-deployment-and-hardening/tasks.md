@@ -182,7 +182,7 @@ record.
 
 **Independent test**: Quickstart Scenario 5, end to end, under five minutes.
 
-- [ ] T044 [US3] Seed the deployed environment so a conference with a join code, its sessions and its meeting slots exist — `deploy.sh --migrate` migrates and does not seed (FR-884)
+- [X] T044 [US3] Seed the deployed environment so a conference with a join code, its sessions and its meeting slots exist — `deploy.sh --migrate` migrates and does not seed (FR-884)
 - [ ] T045 [US3] Add the re-seed warning to `deploy/vm/README.md`, stating plainly that re-seeding UAT **destroys every account created against it**, including a reviewer's (FR-885, research R9)
 - [ ] T046 [US3] Walk sign-up → verification mail → verify → join by code → visible in Discover from a second profile, against the deployed address (FR-844, SC-802)
 - [ ] T047 [US3] Walk the password-reset journey against the deployed address (FR-844, SC-803)
