@@ -7,6 +7,7 @@ import { Link, useLocation } from 'react-router'
 import { PRODUCT_NAME } from '../app/branding.js'
 import { destinationFor } from '../app/navigation.js'
 import { useAuth } from '../auth/useAuth.js'
+import { EnvironmentMarker } from './EnvironmentMarker.js'
 import { EventSwitcher } from './EventSwitcher.js'
 
 /**
@@ -82,6 +83,14 @@ export const TopBar = () => {
         <span className="hidden shrink truncate font-display text-lg font-semibold text-text-primary tablet:inline">
           {current?.label ?? 'Not found'}
         </span>
+
+        {/*
+          010 T076 — FR-828. Sits beside the label rather than in a band of its own, because a
+          full-width band costs vertical space on every screen and mobile is where the first
+          viewport is a success criterion. It renders to nothing in a production build — the guard
+          is a build-time literal, so the element is not in the bundle at all.
+        */}
+        <EnvironmentMarker />
 
         {attendee && (
           <div className="flex min-w-0 shrink items-center gap-2 tablet:gap-3">

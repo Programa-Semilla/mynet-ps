@@ -195,16 +195,37 @@ record.
 
 ## Phase 8: User Story 4 — A backup that outlives its host, and a restore that has been performed (P1)
 
+> ### ⏸ US4 IS DESCOPED FOR UAT — owner decision, 2026-08-11
+>
+> **"I don't need backup work for UAT."** T050 and T053–T057 are not done and are not going to be
+> done in this feature. The reasoning is sound and is recorded rather than assumed: **UAT carries
+> seeded data only** (constitution v3.4.0 decision 30), and seeded data is recreated by
+> `db:seed` in seconds. Backing up a database whose entire contents are regenerable from the
+> repository buys close to nothing.
+>
+> **What this does NOT change.** Standing decision 17 makes backups a governance obligation with
+> three parts — daily and automated, a written retention period, and **a restore that has actually
+> been performed before production holds real attendee data**. That obligation binds *production*,
+> so nothing here breaches it. But the third part was going to be discharged here, against a real
+> host, for the first time; `OPERATIONS-LOG.md` still records only a restore exercised against a
+> throwaway container in 2026-08-07. **It carries forward to 011 and production, where it is not
+> optional.**
+>
+> **T051 and T052 are already done and stay done** — `backup.sh` copies off-host and refuses to
+> prune unless the copy is confirmed. That is code, it is reviewed, and it costs nothing to keep.
+> It is simply unexercised until an environment configures `BACKUP_REMOTE_*`.
+
+
 **Independent test**: destroy the database container, restore from off-host. Quickstart Scenario 8.
 
-- [ ] T050 [US4] Extend `deploy/vm/provision-storage.sh` (or add a sibling) to create the storage account and private container in `rg-mynet-backups`, with soft-delete enabled and a **write-only** credential for the backup job (research R4, FR-873)
+- [~] T050 [US4] Extend `deploy/vm/provision-storage.sh` (or add a sibling) to create the storage account and private container in `rg-mynet-backups`, with soft-delete enabled and a **write-only** credential for the backup job (research R4, FR-873)
 - [X] T051 [US4] Add the off-host upload to `deploy/vm/backup.sh`, after the existing verification step and before pruning (FR-870)
 - [X] T052 [US4] Make local pruning conditional on a **confirmed** off-host copy, and report a failed copy rather than absorbing it (FR-871, FR-872)
-- [ ] T053 [P] [US4] Confirm the backup schedule and written retention period in `deploy/vm/provision-schedule.sh` and `deploy/vm/README.md` are **otherwise unchanged** by T051 and T052 (FR-877)
-- [ ] T054 [US4] Verify the failure path: make the target unreachable, run a backup, confirm pruning does **not** proceed (SC-806)
-- [ ] T055 [US4] **Destroy the database container on the deployed host and restore it** from an off-host artifact, confirming the seeded conference and its attendees return (FR-874, SC-807)
-- [ ] T056 [US4] Record the performed restore in `deploy/vm/OPERATIONS-LOG.md`: what, from which artifact, when, by whom (FR-875)
-- [ ] T057 [US4] Verify the rollback path on the real host and confirm `deploy/vm/README.md` states what happens when the schema has moved ahead of the application (FR-838, FR-876, SC-819)
+- [~] T053 [P] [US4] Confirm the backup schedule and written retention period in `deploy/vm/provision-schedule.sh` and `deploy/vm/README.md` are **otherwise unchanged** by T051 and T052 (FR-877)
+- [~] T054 [US4] Verify the failure path: make the target unreachable, run a backup, confirm pruning does **not** proceed (SC-806)
+- [~] T055 [US4] **Destroy the database container on the deployed host and restore it** from an off-host artifact, confirming the seeded conference and its attendees return (FR-874, SC-807)
+- [~] T056 [US4] Record the performed restore in `deploy/vm/OPERATIONS-LOG.md`: what, from which artifact, when, by whom (FR-875)
+- [~] T057 [US4] Verify the rollback path on the real host and confirm `deploy/vm/README.md` states what happens when the schema has moved ahead of the application (FR-838, FR-876, SC-819)
 
 **Checkpoint**: the governance obligation is discharged early, against a real disk.
 
@@ -255,10 +276,10 @@ exposure that nothing else reports.
 
 ## Phase 12: Polish & Cross-Cutting Concerns
 
-- [ ] T075 Add the `VITE_UAT_MARKER` build-time flag to the client build configuration so the production bundle **does not contain** the marker rather than containing it behind a check (FR-828, research R6)
-- [ ] T076 Render the marker as static text inside the existing shell header in `apps/web/src/app/shell/` — not a new full-width band, because mobile is where vertical space is scarcest (FR-828)
-- [ ] T077 [P] Component test: the marker is not focusable, not dismissible, conveys its meaning in text rather than colour, and is exposed to assistive technology, in `apps/web/tests/unit/uat-marker.test.tsx`
-- [ ] T078 [P] Test: the marker is absent from a production build, not merely hidden (FR-828, SC-818)
+- [X] T075 Add the `VITE_UAT_MARKER` build-time flag to the client build configuration so the production bundle **does not contain** the marker rather than containing it behind a check (FR-828, research R6)
+- [X] T076 Render the marker as static text inside the existing shell header in `apps/web/src/app/shell/` — not a new full-width band, because mobile is where vertical space is scarcest (FR-828)
+- [X] T077 [P] Component test: the marker is not focusable, not dismissible, conveys its meaning in text rather than colour, and is exposed to assistive technology, in `apps/web/tests/unit/uat-marker.test.tsx`
+- [X] T078 [P] Test: the marker is absent from a production build, not merely hidden (FR-828, SC-818)
 - [ ] T079 [P] Verify at mobile width that the marker pushes no primary action below the fold and introduces no horizontal scrolling — if it cannot, adjust the header and **declare that as a layout change** rather than shipping a marker that costs the first viewport (spec Open Question 5)
 - [ ] T080 [P] Add the absence guards required by FR-895 in `apps/api/tests/unit/deployment-absences.test.ts`, covering FR-890 (no migration), FR-891 (no route, screen, destination or Home card), FR-892 (no second notification trigger), FR-893 (no administrative interface, privileged role or in-product report reader), FR-894 (no production value filled), plus FR-861 (report unreadable from inside the product) and FR-806a (no card backfill), following 007's and 009's pattern **including stripping comments before matching** — every phrase also appears in the prose explaining it
 - [ ] T081 [P] Confirm `apps/api/tests/unit/deletion-coverage.test.ts` and `export-coverage.test.ts` pass unchanged — if either fails, a schema change was introduced and FR-890 is broken (data-model.md)

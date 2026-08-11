@@ -160,6 +160,31 @@ export default defineConfig({
   // Only `VITE_`-prefixed values are exposed, so pointing at the shared file does not widen
   // what reaches the bundle (FR-041).
   envDir: resolve('../..'),
+  /**
+   * T075 (010) — **the UAT marker is a BUILD-TIME constant, and that is what makes FR-828's
+   * "MUST NOT appear in a production build" structural rather than conditional** (research R6).
+   *
+   * ═════════════════════════════════════════════════════════════════════════════════════════
+   * **A RUNTIME HOSTNAME CHECK WOULD HAVE BEEN THE OBVIOUS IMPLEMENTATION AND IS THE WRONG ONE.**
+   *
+   * `location.hostname !== 'mynetcr.com'` ships the marker's markup and its wording to production
+   * and relies on a comparison being right. The requirement is not "the marker is hidden in
+   * production" — it is that the production bundle **does not contain it**. Those differ the day
+   * somebody mistypes the comparison, and they differ for anybody reading the shipped bundle.
+   *
+   * `define` substitutes a literal `true` or `false` before minification, so the entire element —
+   * markup, strings and all — is dead code the bundler removes. `tests/unit/uat-marker-absent`
+   * asserts that against a real production build rather than trusting this comment.
+   *
+   * Deliberately NOT read as `import.meta.env.VITE_UAT_MARKER` at the usage site: Vite only
+   * statically replaces keys that are actually present in the environment, so an unset variable
+   * can survive as a runtime lookup against the env object — which is exactly the outcome this
+   * exists to prevent. A `define` is a literal either way.
+   * ═════════════════════════════════════════════════════════════════════════════════════════
+   */
+  define: {
+    __UAT_MARKER__: JSON.stringify(process.env['VITE_UAT_MARKER'] === 'true'),
+  },
   resolve: {
     alias: {
       '@mynet/platform/web': resolve('../../packages/platform/src/web/index.ts'),
