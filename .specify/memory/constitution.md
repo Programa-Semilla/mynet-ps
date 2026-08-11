@@ -102,13 +102,24 @@ Register changes:
     desktop design, and this entry has never been closed.
 
 Templates and dependent artifacts:
-  - .specify/templates/spec-template.md — ✅ UPDATED, and the update found a pre-existing drift
-    worth recording. Principle IX's "Feature Declarations" section has been mandatory since 2.1.0,
-    the delivery roadmap states that "the spec template carries the section", and **it did not**.
-    Every shipped spec from 002 to 010 added it by hand, which worked only because each session
-    read a neighbouring spec. The section is now in the template, carrying the twelve existing
-    obligations plus a new first row: **Actor and tier**. Every feature through 010 had exactly one
-    actor and never had to say so; from 011 silence about the actor is an undeclared obligation.
+  - .specify/templates/spec-template.md — ✅ UPDATED, and the update uncovered a pre-existing drift
+    with a cause worth recording. Principle IX's "Feature Declarations" section has been mandatory
+    since 2.1.0, the delivery roadmap states that "the spec template carries the section", and **it
+    did not**. Every shipped spec from 002 to 010 added it by hand, which worked only because each
+    session read a neighbouring spec rather than the template.
+
+    **The cause is that `.specify/templates/` is gitignored** — `.gitignore:29` ignores
+    `**/.specify/**`, and `constitution.md` is tracked only because it was force-added past that
+    rule. So the template was never shared, the roadmap's claim about it was never verifiable by
+    anybody, and a fix to it could not have reached a second machine. **The template is therefore
+    now force-added and tracked, exactly as `constitution.md` is**, because a mandatory section in
+    an unshared file is not a requirement — it is a convention that survives only as long as
+    somebody keeps copying it. *This changes what the repository tracks and is flagged for the
+    owner to reverse if unintended.*
+
+    The section now carries the twelve existing obligations plus a new first row: **Actor and
+    tier**. Every feature through 010 had exactly one actor and never had to say so; from 011
+    silence about the actor is an undeclared obligation.
   - .specify/templates/plan-template.md, tasks-template.md — ✅ no change required. Both are
     actor-agnostic; the plan template's Constitution Check reads "[Gates determined based on
     constitution file]" and so inherits this amendment without edit.
