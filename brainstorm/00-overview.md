@@ -1,7 +1,9 @@
 # Brainstorm Overview
 
-Last updated: 2026-08-10 (008 **implemented** — Network is the fifth destination to carry content,
-and the last empty one is gone; constitution v3.2.0 closed the register entries that gated it)
+Last updated: 2026-08-10 (**the delivery roadmap is complete** — 009 shipped and every destination
+carries content. Session #08 rescopes phase 010 to **UAT deployment and pre-public hardening** and
+adds **011** for the validation pass, and takes the five owner decisions that had gated the first
+deploy since 006)
 
 The authoritative registers live elsewhere — open questions in `.specify/memory/constitution.md`,
 delivery sequence in `docs/superpowers/specs/2026-08-06-mynet-delivery-roadmap-design.md`. This file
@@ -20,9 +22,12 @@ win and this is stale.
 | 05 | 2026-08-07 | discover-and-the-deployment-platform | ratified in constitution **v3.0.0** | `specs/006-discover-and-deployment-platform/` |
 | 06 | 2026-08-07 | messages-and-notification-delivery | **implemented in full**, including Web Push; its amendment ratified in constitution **v3.1.0** | `specs/007-messages-and-notification-delivery/` |
 | 07 | 2026-08-10 | network-and-appointments | **specified, then implemented**; entries 7, 8 and 9 ratified in constitution **v3.2.0** | `specs/008-network-and-appointments/` |
+| — | 2026-08-10 | session-qa | specified without a brainstorm; ratified in constitution **v3.3.0** | `specs/009-session-qa/` |
+| 08 | 2026-08-10 | uat-deployment-and-hardening | **active** — phase 010 rescoped, 011 added; five owner decisions taken, awaiting amendment | `brainstorm/08-uat-deployment-and-hardening.md` |
 
 Session 05 has no document of its own: 006 was specified without one, and the row records the
-session rather than a file.
+session rather than a file. 009 likewise — it went straight to specification, and its row is
+recorded here so the sessions table and the delivery queue can still be read against each other.
 
 ## What 007 delivered, and what it deliberately did not
 
@@ -72,8 +77,9 @@ the index, and it now differs from the roadmap in the ways #02 records.
 | 006 | Discover, and the deployment platform | **implemented** — awaiting the two owner decisions that gate the first deploy (a domain, an Azure subscription). Migration `0005`: five indexes and one extension, **no new table and no new column** | 004 ✓ |
 | 007 | Messages **and the notification-delivery platform** | **shipped** — squash-merged to `develop`. Web Push delivers for real, verified end to end on a desktop. T148's by-hand walkthrough is partial (scenario 5 only) and carries forward. Migration `0006` | 004 ✓, 006 ✓ |
 | 008 | Network & Appointments | **implemented** — 149 tasks, FR-601–FR-659. Migration `0007` adds three tables under **two different scoping rules**: `shared_cards` cross-event, `appointments` and `meeting_slots` per-event. A **third** branded scope and a **third** route audit (`CardScope`, `card-audit.test.ts`), because a card route names no conference and `event-scope-audit` walks past it. T148's by-hand walkthrough is outstanding | ~~connection model~~ ✓, ~~card-exchange semantics~~ ✓ |
-| 009 | Session Q&A | **unblocked** by v3.2.0 — questions are attributed, so Q&A is a personal-data surface. Migration `0008` | ~~question attribution~~ ✓ |
-| 010 | Launch Readiness | queued | brand assets; client validation of desktop |
+| 009 | Session Q&A | **shipped** — squash-merged to `develop` ([#17](https://github.com/Programa-Semilla/mynet-ps/pull/17)), with constitution v3.3.0 in the same PR. Migration `0008`. Four defects found during implementation, three of them only by tests written for the purpose. T097's by-hand walkthrough is outstanding and joins 007's and 008's | ~~question attribution~~ ✓ |
+| 010 | **UAT Deployment & Pre-Public Hardening** — *rescoped by #08* | queued, **fully unblocked**. No schema. Six security entries, then provision, DNS, TLS, a Mailgun adapter behind `MailService`, VAPID, seed, and an exercised restore on the real host | — |
+| 011 | **Launch Readiness & Production** — *added by #08* | queued | brand assets (entry 2); client validation of desktop and tablet (entry 4) |
 
 **002 carries the most leverage and the most risk in the queue, and #02 enlarged it further.** It is
 not only the event switcher: it commits to the Home card composition contract and the per-event
@@ -147,6 +153,24 @@ promises that a contact made at last year's conference does not vanish. Network 
 of a product whose discovery surface is transient by design, and #07 is what makes that promise
 true.
 
+**#08 splits the roadmap's 010 in two, and the reason is that its two halves have different
+blockers.** The roadmap scoped 010 as a validation pass. The owner's steer was UAT only, working
+like a charm — a different deliverable — and the two decisions that had gated every deploy since 006
+were taken in the same session, so the deployment half became fully unblocked while the validation
+half stayed dependent on register entries 2 and 4, neither of which is decidable now and both of
+which need people outside this repository. Keeping them as one phase would have held a working UAT
+hostage to a brand mark. **010 is therefore deployment and hardening, 011 is validation and
+production**, and 010's spec must say it departs from the roadmap.
+
+Two things about 010 are worth reading as departures rather than details. **It absorbs eight idea-inbox
+entries, not zero** — six security-and-abuse findings that all get worse the moment a URL is public,
+plus two the deployment work unavoidably touches (`backups-share-a-failure-domain`, because the
+restore drill would otherwise prove restore works from artifacts that die with the database, and
+`vapid-config-duplication`, because its own entry says to settle it when the real adapter lands).
+And **reading the inbox against shipped code found seven entries already closed** by work that never
+named them — a reminder that the inbox ages, and that an entry can be resolved by a feature that
+does not cite it, exactly as register entry 7 was.
+
 ## Open Threads
 
 ### Client decisions
@@ -183,9 +207,13 @@ deployment or release.
   design, so the cost compounds per phase. **Now more urgent than when it was written**: absorbing
   the catalog means 002 builds the Home dashboard *and* the catalog screens before any desktop review
   happens, and the roadmap's gate — scheduled for "after 002–003" — now fires after 002 alone.
-  *Worth pulling forward* (from #01, escalated by #02)
-- **Real brand mark and application icons** — no logo exists in the repository. *Blocks 010, long
-  lead time* (from #01)
+  *Worth pulling forward* (from #01, escalated by #02). **#08 both narrows and cheapens it**: it now
+  blocks **011** rather than 010, and once UAT exists the client reviews the running product at
+  their own screen width instead of a description — which is also the only way the register entry
+  has ever been answerable. *Register entry 4*
+- **Real brand mark and application icons** — no logo exists in the repository. *Blocks **011**, not
+  010, since #08 split the phase; long lead time, so it is the item most worth starting now.*
+  *Register entry 2* (from #01)
 - **`GroundZero/requirements.md` is knowingly out of step** with the constitution on product name,
   delivery mode, persistence, authentication, and routing. Amend it, or record the divergence?
   (from #01)
@@ -195,23 +223,30 @@ deployment or release.
 
 ### Owner and planning decisions
 
-- **API hosting and the managed PostgreSQL provider** (from #01 revisit)
-- **Authentication ownership** — self-implemented or a delegated provider (from #01 revisit)
-- **The transactional email provider.** #04 settled that verification and password-reset mail is
-  sent and that it is distinct from the excluded notification delivery; by whom is undecided.
-  *Needed by 004* (added 2026-08-07 by #04). **#06 enlarged what depends on it**: reports are
-  delivered to an operator by mail, so the safety path in 007 now rests on this too — and #04's
-  "distinct from the excluded notification delivery" no longer holds, because #06 brought that
-  delivery in
-- **The Web Push provider, and VAPID key custody.** The project's second external dependency and
-  secret. #06 brought engagement notification delivery into scope, which wires `NotificationService`
-  to real delivery for the first time since 001 declared it a deliberate no-op. Plausibly answered
-  together with the mail provider above. *Blocks 007* (added 2026-08-07 by #06)
-- **The operator address a report is emailed to, and the response expectation attached to it.**
-  #06 resolved reports to an operator rather than an in-product actor, which is what keeps them
-  clear of the organizer exclusion — but it creates an obligation the project owner personally
-  holds, and a report button promising review that never happens is worse than no button.
-  *Blocks 007* (added 2026-08-07 by #06)
+- ~~**API hosting and the managed PostgreSQL provider**~~ — **RESOLVED in v3.0.0** by D12 (two
+  Azure VMs), and **#08 supplies the subscription it lacked**:
+  `d428f98f-a3c4-49c3-ae24-06ec3de08477` (LinaSys-DevEnv), `centralus`, both environments. The same
+  subscription `bds-ps` uses, which also makes that project a working reference for this deployment
+  rather than merely a sibling
+- **Authentication ownership** — self-implemented or a delegated provider (from #01 revisit).
+  *Register entry 12.* Worth noting that it is self-implemented and shipped; what stays open is
+  whether that is the settled answer or an unratified default
+- ~~**The transactional email provider.**~~ — **ANSWERED 2026-08-10 by #08: Mailgun.** *Register
+  entry 18.* Its DNS verification lands on `programasemilla.com`, the same session as the UAT A
+  record. **Non-optional for UAT rather than merely desirable**: verification gates discoverability,
+  so with only the sink adapter every UAT attendee is invisible to every other one. `MailService`
+  is already a port with a `SinkMailService`, so the real adapter follows 007's `PushService` shape
+  exactly — including selection by configuration in every environment identically
+- ~~**The Web Push provider, and VAPID key custody.**~~ — **ANSWERED IN PART 2026-08-10 by #08.**
+  *Register entry 20.* The provider half was already found not to exist. **Custody is settled**: one
+  pair per environment, generated once, a GitHub Actions environment secret injected into the VM's
+  `.env` by `deploy.sh`, identical to every other secret — and **rotation only on compromise**,
+  because rotating silently stops delivery for every attendee until their browser re-registers. The
+  entry's "push provider" wording should be corrected in the same amendment
+- ~~**The operator address a report is emailed to.**~~ — **ANSWERED 2026-08-10 by #08:
+  `apps@programasemilla.com`.** *Register entry 21.* The response expectation travels with it and is
+  not discharged by naming an address: the dialog tells the attendee a person will read it, and that
+  sentence becomes true only when somebody does
 - **The constitution amendment bringing engagement notification delivery in.** #06's push decision
   reverses an exclusion that has held since 001 and needs its own numbered standing decision and a
   version bump. Decision 20 made the last retraction a major version; this is at minimum a minor
@@ -226,9 +261,23 @@ deployment or release.
   precedent rather than an answer**: it resolved the same shape for messages by routing reports to
   an *operator* mailbox out-of-band, on the reading that the constitution forecloses organizer
   administration *inside the product* but not an operator. If that reading holds, avatars can follow
-  the same route (narrowed 2026-08-07 by #06)
-- **Preview environments must never point at production data**; preview access control undecided
-  (from #01)
+  the same route (narrowed 2026-08-07 by #06). **#08 changed its urgency without resolving it**:
+  UAT is now openly reachable with public sign-up, so this stops being hypothetical — and the
+  operator mailbox the precedent needs now has an address. *Register entry 19, still open, and the
+  leading open question against 011*
+- ~~**Preview environments must never point at production data**; preview access control
+  undecided~~ — **the access half ANSWERED 2026-08-10 by #08**. *Register entry 14.* UAT is
+  **openly reachable and carries seeded data only**: FR-067 is satisfied by the data rather than by
+  the access control, and no real attendee data ever reaches it. Basic auth and an IP allowlist were
+  both rejected for the same reason — each breaks the two things 011 depends on, handing the client
+  a link for the entry-4 layout review and installing the PWA on a physical iPhone over cellular.
+  The data half was already binding and is unchanged
+- **Two domains, and only one of them is settled.** UAT is `mynet-dev.programasemilla.com`, on a
+  domain already under the owner's control. Production is **`mynetcr.com` provisionally** — not
+  registered, not final, documented rather than committed to `prod.env`. Worth recording as a free
+  win rather than a coincidence: they are separate registrable domains, so a UAT session cookie is
+  *structurally incapable* of reaching production, which is the strongest available form of the
+  isolation FR-067 demands (added 2026-08-10 by #08)
 - **Repository visibility.** The repository is **public** and owned by the `Programa-Semilla`
   organisation. Nothing in the constitution or `CLAUDE.md` records this, and both were written
   assuming private. Intended, or an artifact of creation on 2026-08-05? It changes the Principle VIII
