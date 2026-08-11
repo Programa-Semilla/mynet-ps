@@ -67,3 +67,28 @@ this feature, and it is flagged in the completion report rather than left to be 
 
 **Register position is declared and is unusually clean**: blocked by nothing, opens nothing, closes
 nothing, addresses entries 19 and 21 without closing them, and escalates entry 4.
+
+## Review gate — `/speckit-spex-gates-review-spec`, 2026-08-11
+
+**Result: PASSED after fixes.** Six findings — three Important, three Minor — all applied to the
+spec. None was a contradiction or a constitution violation; every one was a **gap where an
+implementer would have had to invent a rule**, which is what this gate exists to catch.
+
+| # | Severity | Finding | Fix |
+|---|---|---|---|
+| I1 | Important | Email uniqueness across the two credential sources was unspecified, so FR-914's two stores made authentication ambiguous and **FR-915's indistinguishable refusal unachievable** | **FR-918** — one address identifies at most one principal product-wide, extending decision 11 across both stores rather than creating a second uniqueness domain; collision refusal worded as an ordinary address-taken refusal so it is not an oracle |
+| I2 | Important | FR-936 required the unassigned state to be "reported to platform operators", but no requirement created a surface for it — a state nobody can observe | **FR-926** — a platform-operator conference surface showing organizers or unassigned, which 012 extends rather than replaces |
+| I3 | Important | Operator removal was referenced by FR-944, FR-983 and an edge case, but operators were seed-only with no defined lifecycle, so FR-983's Principle VIII obligation could not be discharged | **FR-908/FR-909** — deactivation as the terminal state, with identity resolvable for as long as any record attributes an action to it. Deactivation ends access; it does not erase the audit |
+| M1 | Minor | The conference-organizer tier ships with no capability, and the spec never said why | New scope-note section: the boundary is 012's foundation and must be independently testable before a large write surface depends on it |
+| M2 | Minor | SC-902 measured "reports filed since 007 shipped" — an empty corpus, since nothing is deployed | Rewritten to measure against reports created during the test |
+| M3 | Minor | No sign-out requirement, though FR-912 and US1 scenario 3 both depend on it | **FR-919** |
+
+Three supporting additions travelled with the fixes: the operator entity gained its active/deactivated
+state, four edge cases were added (sign-up colliding with an operator address, a deactivated
+operator signing in, the last operator being deactivated), and an assumption records that
+deactivating the last operator is recoverable only by re-seed and that this is accepted rather than
+guarded.
+
+**Not a finding**: Open Question 1 — how a seeded operator's first credential is established without
+committing it to a public repository. It is correctly recorded as an open question, and it carries
+the one security consequence in this feature that cannot be deferred past it.

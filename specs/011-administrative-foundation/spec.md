@@ -67,6 +67,24 @@ question**. The line is drawn there for a reason rather than for size:
 - **Avatar moderation** is register entry 19, whose *standard* is undecided. Building the action
   before the standard would decide the standard by inference.
 
+### Why the conference-organizer tier ships with no capability of its own
+
+A conference organizer promoted in 011 can sign in and see their assigned conferences, and that is
+all: authoring is 012, registration management is 013, and the report queue is platform-tier only.
+The tier is therefore delivered **empty on purpose**, and the reasoning is worth stating because it
+is the first thing a reviewer will question.
+
+The two-tier boundary is the load-bearing claim of v4.0.0, and 012 is built directly on top of it —
+every authoring action is scoped by "conferences this organizer is assigned". Building the boundary
+inside the feature that first *uses* it would mean the first test of the tier separation is also the
+first test of a large write surface, with no way to tell which one failed. Delivering it here makes
+the boundary independently testable (US4), and makes 012's scoping an inherited guarantee rather
+than a new one.
+
+It also is not truly empty from the platform tier's side: **promotion and demotion are real
+capabilities exercised in this feature**, and FR-926's conference surface is what 012 extends rather
+than replaces.
+
 ### What this feature does not do
 
 - No conference content authoring — no create, edit or delete of events, sessions, tracks, rooms or
@@ -242,6 +260,14 @@ assignment is gone and the conference reports as unassigned. Repeat with account
   empty states must render as deliberate states, not as failures.
 - Sign-in is attempted at the administrative address with credentials belonging to a **deleted**
   attendee who was previously an organizer.
+- Somebody attempts to sign up for MyNet with an address already held by a platform operator — the
+  refusal must be worded exactly as an ordinary address-taken refusal, or it becomes an oracle for
+  which addresses are administrative (FR-918).
+- A deactivated operator's credentials are presented at the administrative site — refused with the
+  same wording as any other failure, while their name still resolves on the resolutions they
+  recorded.
+- The last active platform operator is deactivated, leaving nobody who can promote or re-activate —
+  recovery is by re-seed, and this must be stated rather than discovered.
 
 ## Requirements *(mandatory)*
 
@@ -267,6 +293,15 @@ assignment is gone and the conference reports as unassigned. Repeat with account
 - **FR-907**: Administrative tier MUST NOT be derived from, or grant, any attendee attribute.
   Specifically it MUST NOT consult verification state — Principle VIII reserves verification for
   discoverability alone — and MUST NOT consult discoverability.
+- **FR-908**: A platform operator MUST be **deactivatable** by another platform operator, ending
+  their administrative access immediately and permanently unless re-seeded. Deactivation is the
+  operator lifecycle's terminal state; there is no self-serve operator deletion, because an operator
+  is not an attendee and Principle VIII's self-serve erasure right is an attendee's.
+- **FR-909**: A deactivated operator's identity MUST remain resolvable for as long as any record
+  attributes an action to them — a report resolution, a promotion, or a demotion. **Deactivation
+  ends access; it does not erase the audit of what was done.** The retention rule that eventually
+  clears a deactivated operator's record MUST be stated (FR-983), and it MUST NOT be shorter than
+  the retention of the records naming them.
 
 #### Authentication, session, and topology
 
@@ -289,6 +324,17 @@ assignment is gone and the conference reports as unassigned. Repeat with account
   mechanism, and the throttle MUST be configured so it may delay but can never deny.
 - **FR-917**: Every administrative address MUST refuse an unauthenticated request without disclosing
   whether the addressed resource exists.
+- **FR-918**: **An email address MUST identify at most one principal product-wide.** An operator
+  record MUST NOT be created with an address held by any attendee, and an attendee MUST NOT be able
+  to sign up with an address held by any operator. Without this the two credential sources of
+  FR-914 make authentication ambiguous, and **FR-915's indistinguishable refusal becomes
+  unachievable** — the system's behaviour would differ by which store matched. This extends
+  decision 11's product-wide uniqueness of attendee email across both stores rather than creating a
+  second uniqueness domain. The attendee-facing refusal on collision MUST be worded exactly as an
+  existing address-taken refusal is, disclosing nothing about operators.
+- **FR-919**: An operator MUST be able to end their administrative session explicitly. Doing so MUST
+  leave any attendee session held in the same browser untouched, and the reverse MUST also hold
+  (FR-912).
 
 #### The administrative site
 
@@ -305,6 +351,10 @@ assignment is gone and the conference reports as unassigned. Repeat with account
 - **FR-924**: It MUST show, on every surface, which tier the signed-in operator holds.
 - **FR-925**: A conference organizer MUST NOT be shown a control for a capability they do not hold.
   Refusal is server-enforced regardless, but a control that renders and then refuses is a defect.
+- **FR-926**: A platform operator MUST have a surface listing every conference, showing for each one
+  its current organizers or that it is **unassigned** (FR-936), from which they may promote. This is
+  what gives the derived unassigned state somewhere to be seen; a state nobody can observe is not a
+  state. A conference organizer's equivalent surface MUST list only their assigned conferences.
 
 #### Promotion and assignment
 
@@ -404,7 +454,10 @@ the absence ends.
 ### Key Entities
 
 - **Platform operator** — a seeded administrative identity with credentials, a display name, and
-  product-wide authority. Not an attendee. Holds no profile.
+  product-wide authority. Not an attendee. Holds no profile. Carries an **active/deactivated** state
+  (FR-908): deactivation ends access while keeping the identity resolvable for as long as any record
+  attributes an action to it (FR-909). Its address shares one uniqueness domain with attendee
+  addresses (FR-918).
 - **Organizer assignment** — a link between an attendee, a conference, and the platform operator who
   created it, with the instant it was created. Per-event by construction. Revoked by demotion, by the
   attendee's deletion, and by their withdrawal from that conference.
@@ -423,8 +476,10 @@ the absence ends.
   opening the administrative address.
 - **SC-901**: A person holding both an attendee and an administrative session can sign out of either
   without affecting the other — verified in a real browser, in both directions.
-- **SC-902**: 100% of reports filed by attendees since 007 shipped are readable by a platform
-  operator, including those whose reported content no longer exists.
+- **SC-902**: Every report an attendee can file is readable by a platform operator — a conversation
+  report (007) and a question report (009), including one whose reported content has since been
+  deleted — verified against reports created during the test rather than against any deployed
+  corpus, since nothing has been deployed.
 - **SC-903**: A reported question can be removed, and disappears for every attendee at that event,
   within one refresh of the surface showing it.
 - **SC-904**: A conference organizer is refused on 100% of platform-tier addresses, verified by
@@ -480,6 +535,10 @@ the absence ends.
   per Principle IV, which admits no exception; the mobile band is not optimised beyond compliance.
 - **Operator credentials follow the existing password rules and hashing.** No new credential
   mechanism is introduced, and no second pepper or key.
+- **Deactivating the last active platform operator is recoverable only by re-seed**, and this is
+  accepted rather than guarded. A "you cannot deactivate the last operator" rule would be a second
+  place for the tier's invariants to live, and the recovery path — operators are seed data (FR-901)
+  — already exists. It is recorded as an edge case so it is not discovered.
 - **Seeded operator credentials must not be usable in a deployed environment as committed.** The seed
   is world-readable — the repository is public (entry 16) — so a committed operator password is a
   published administrative credential. The specification treats first-run credential establishment as
