@@ -3,8 +3,8 @@
 #
 # Usage:  ./provision-vm.sh <uat|prod>
 #
-# Cost target (~fixed per month, per environment): Standard_B2als_v2 ~$30-38 + 64GB StandardSSD
-# ~$5 + static IP ~$4. Fixed cost with no per-request metering is why the owner chose this pattern
+# Cost target (~fixed per month, per environment): Standard_B2s ~$30-38 + 64GB StandardSSD ~$5
+# + static IP ~$4. Fixed cost with no per-request metering is why the owner chose this pattern
 # over a managed database (research D9) — the trade is recorded in plan.md's Complexity Tracking.
 #
 # The size is read from envs/<env>.env and preflighted below (FR-822) rather than assumed here.
@@ -88,6 +88,90 @@ EOF
   fi
 
   echo "   ${VM_SIZE} is available in ${LOCATION} with no restrictions."
+
+  # ═════════════════════════════════════════════════════════════════════════════════════════════
+  # **AND THE QUOTA, WHICH IS A COMPLETELY SEPARATE QUESTION FROM AVAILABILITY.**
+  #
+  # This half was added after the check above passed and `az vm create` would still have failed.
+  # `Standard_B2als_v2` reports `restrictions: []` in `centralus` — it is genuinely available —
+  # while the subscription's quota for its family, `standardBasv2Family`, is **0 of 0**. Azure
+  # models these as different things: *can this SKU be created here at all* and *is this
+  # subscription allowed any of it*. A preflight that asks only the first reports success and
+  # then watches the deployment fail on the second.
+  #
+  # That is exactly the failure FR-822 exists to prevent — an error naming neither the size, the
+  # region, nor a remedy, several steps in with a resource group already created. The first
+  # version of this preflight had the same blind spot as the thing it was written to replace.
+  #
+  # Two limits, because either can bind: the SKU's own family, and the region-wide `cores` total
+  # that every family draws from.
+  # ═════════════════════════════════════════════════════════════════════════════════════════════
+  local family vcpus
+  read -r family vcpus <<<"$(printf '%s' "$sku" | python3 -c '
+import json, sys
+sku = json.load(sys.stdin)
+caps = {c["name"]: c["value"] for c in sku.get("capabilities", [])}
+print(sku.get("family", ""), caps.get("vCPUs", "0"))
+')"
+
+  echo "== Preflight: does this subscription have quota for ${vcpus} ${family} vCPUs? =="
+
+  local usage shortfall
+  usage="$(az vm list-usage --subscription "${SUBSCRIPTION}" -l "${LOCATION}" -o json 2>/dev/null)"
+
+  # Reports EVERY insufficient limit rather than the first, for the reason
+  # `mynet::require_env_values` does: one round trip per problem is one round trip too many when
+  # the fix for each is a separate request that takes its own time to be granted.
+  shortfall="$(printf '%s' "$usage" | FAMILY="$family" VCPUS="$vcpus" python3 -c '
+import json, os, sys
+
+family, needed = os.environ["FAMILY"], int(os.environ["VCPUS"])
+wanted = {family: "the size'"'"'s own family", "cores": "the region-wide total"}
+problems = []
+
+for entry in json.load(sys.stdin):
+    key = entry["name"]["value"]
+    if key not in wanted:
+        continue
+    label = entry["localName"]
+    used, limit = int(entry["currentValue"]), int(entry["limit"])
+    free = limit - used
+    if free < needed:
+        problems.append(
+            "  " + label + ": " + str(used) + " used of " + str(limit)
+            + " - " + str(free) + " free, " + str(needed) + " needed"
+            + " (" + wanted[key] + ")"
+        )
+
+print("\n".join(problems))
+')"
+
+  if [[ -n "$shortfall" ]]; then
+    cat >&2 <<EOF
+
+ERROR: ${VM_SIZE} is available in ${LOCATION}, but this subscription has no quota for it.
+
+${shortfall}
+
+  size:         ${VM_SIZE}  (${vcpus} vCPUs, family ${family})
+  region:       ${LOCATION}
+  subscription: ${SUBSCRIPTION}
+
+Nothing has been created. Availability and quota are different questions and this size passes the
+first — so without this check the run would have failed inside \`az vm create\`, after the
+resource group existed, with an error naming neither the family nor the limit.
+
+Fixes:
+  1. Request a quota increase for that family in that region. In the portal:
+     Subscriptions -> ${SUBSCRIPTION} -> Usage + quotas -> filter by ${LOCATION}.
+     Small increases are often granted automatically within minutes.
+  2. Or choose a size whose family already has room:
+     az vm list-usage --subscription ${SUBSCRIPTION} -l ${LOCATION} -o table
+EOF
+    return 1
+  fi
+
+  echo "   quota is sufficient (${vcpus} vCPUs in ${family})."
 }
 
 mynet::require_vm_size
