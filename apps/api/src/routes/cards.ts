@@ -1,13 +1,16 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify'
 
 import {
+  beginAttempt,
   failureDelayMs,
   hashAttemptValue,
-  recordRequest,
   serveDelay,
   type ThrottleAction,
 } from '../auth/throttle.js'
 import { resolveActiveEvent } from '../db/queries/active-event.js'
+// 010 T023 — FR-806. The one permitted second use of verification state, and it applies to the
+// ACTOR at write time only; see the call site for why it must never reach card resolution.
+import { isEmailVerified } from '../db/queries/attendees.js'
 import {
   listHeldCards,
   listSharedCards,
@@ -165,8 +168,11 @@ const throttle = async (
     action,
   }
 
-  const outstanding = await serveDelay(await failureDelayMs(key))
-  await recordRequest(key)
+  // 010 T017 — recorded BEFORE it is judged, so concurrent shares count each other (FR-804).
+  // `failureDelayMs` excludes this row, which is what keeps the observable allowance identical
+  // to what it was when the order was the other way round (FR-805).
+  const attemptId = await beginAttempt(key)
+  const outstanding = await serveDelay(await failureDelayMs(key, attemptId))
 
   if (outstanding > 0) throw tooManyAttempts(outstanding, what)
 }
@@ -278,6 +284,40 @@ export const cardRoutes = async (app: FastifyInstance): Promise<void> => {
       if (!attendee) throw notAuthenticated()
 
       await throttle(request, 'card_share', 'card shares')
+
+      // ═════════════════════════════════════════════════════════════════════════════════════
+      // **T023 (010) — THE SHARER'S OWN ADDRESS MUST BE VERIFIED** (FR-806, FR-807, FR-808).
+      //
+      // The finding, in one sentence: an account created against an address its holder does not
+      // control can install a **live-resolving** profile, bearing a chosen name and face,
+      // **permanently** into a verified attendee's Network. Every clause is load-bearing — a
+      // held card resolves the sharer's *current* profile by design (v3.2.0 N2), a card cannot
+      // be recalled and the recipient cannot delete it (FR-618), and avatars are unmoderated
+      // (register entry 19, escalated by v3.4.0 and explicitly still open).
+      //
+      // Before this, sharing consulted verification for the **recipient** and not for the
+      // sharer. So the party being checked was the one *receiving* something, and the party
+      // writing into somebody else's Network was not checked at all.
+      //
+      // ─────────────────────────────────────────────────────────────────────────────────────
+      // **THIS GOVERNS THE ACTOR AT WRITE TIME AND MUST NEVER MIGRATE INTO CARD RESOLUTION**
+      // (FR-807). `queries/cards.ts` reads a held card with **no** discoverability condition,
+      // **no** verification condition and **no** registration join, and all three absences are
+      // the feature rather than an oversight — that is what a standing consent outliving the
+      // conference means. A reader who arrives here and then finds those absences will be
+      // tempted to "finish the job". Do not.
+      //
+      // **The refusal is `notFound()`** — the same factory the `unreachable` branch below
+      // throws, deliberately, so the two are byte-identical (FR-808). This route already answers
+      // one identical 404 for five different causes precisely so it cannot become an oracle for
+      // "is this identifier a real attendee", and a sixth cause with its own helpful message
+      // would undo that in one line.
+      //
+      // **No backfill** (FR-806a): a card already shared is not removed or repaired. None
+      // exists — no environment has ever been deployed — and a rule that removed one would
+      // contradict FR-618, which is a shipped guarantee.
+      // ═════════════════════════════════════════════════════════════════════════════════════
+      if (!(await isEmailVerified(attendee.id))) throw notFound()
 
       // ─────────────────────────────────────────────────────────────────────────────────────
       // **The conference is resolved from the caller, never accepted from them.**

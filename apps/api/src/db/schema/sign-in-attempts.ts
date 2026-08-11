@@ -142,6 +142,33 @@ export const THROTTLE_ACTIONS = [
   // Tightest of the three actions 009 adds, because each request leaves the product.
   // ───────────────────────────────────────────────────────────────────────────────────────
   'report_submit',
+
+  // ───────────────────────────────────────────────────────────────────────────────────────
+  // 010 — FR-801 and FR-803. **The first READS in this list, and the first two entries that may
+  // never deny for a reason neither `reset_request` nor `message_send` gives.**
+  //
+  // Every action above is a write or a credential submission. These are reads a client issues in
+  // volume: the attendee directory, which pages a whole conference, and the message-thread poll,
+  // which fires every three seconds while a thread is open. Left unbounded, the frequency of both
+  // is entirely client-controlled — and a join code is printed on badges, so "signed in" is not a
+  // meaningful barrier to anybody who wants the attendee list.
+  //
+  // **`mayDeny: false` on both**, because a refusal on either is indistinguishable from the
+  // product being broken: Discover never arrives, or a conversation appears to stop updating. The
+  // bound makes bulk collection expensive rather than impossible, which is the same trade
+  // `reset_request` makes and the only one available when the thing being bounded is also the
+  // product's central journey.
+  //
+  // Separate counters for the reason every entry above is separate: a reader with a thread open
+  // must not have their directory browsing slowed by their own poll, which would be a surprising
+  // coupling between two unrelated surfaces (research R7).
+  //
+  // **NO MIGRATION.** `action` is a `text` column carrying a TypeScript union, so adding a member
+  // changes types and nothing else — which is what makes FR-890's "no schema change" survivable
+  // for a feature that adds two throttled actions.
+  // ───────────────────────────────────────────────────────────────────────────────────────
+  'directory_read',
+  'thread_read',
 ] as const
 
 export type ThrottleAction = (typeof THROTTLE_ACTIONS)[number]

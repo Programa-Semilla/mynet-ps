@@ -3,7 +3,13 @@ import type { FastifyInstance } from 'fastify'
 import { verificationLink } from '../../auth/links.js'
 import { hashPassword } from '../../auth/password.js'
 import { startSession } from '../../auth/session.js'
-import { failureDelayMs, hashAttemptValue, recordAttempt, serveDelay } from '../../auth/throttle.js'
+import {
+  beginAttempt,
+  failureDelayMs,
+  hashAttemptValue,
+  serveDelay,
+  settleAttempt,
+} from '../../auth/throttle.js'
 import { issueVerification } from '../../auth/verification.js'
 import { normaliseEmail } from '../../db/queries/attendees.js'
 import { createAccount } from '../../db/queries/identity.js'
@@ -144,11 +150,14 @@ export const signUpRoutes = async (app: FastifyInstance): Promise<void> => {
       // aimed at an address would inflate the streak `sign-in` reads and lock its rightful
       // owner out of signing in, which is FR-031b's failure arriving by a new route.
       // ─────────────────────────────────────────────────────────────────────────────────────
+      // 010 T017 — recorded before it is judged (FR-804), excluded from its own count so the
+      // allowance is unchanged (FR-805). The row starts `succeeded: false`, so the two refusal
+      // branches below need no write of their own — they simply leave it as it is.
+      const attemptId = await beginAttempt({ identifierHash, sourceHash, action })
       const outstanding = await serveDelay(
-        await failureDelayMs({ identifierHash, sourceHash, action }),
+        await failureDelayMs({ identifierHash, sourceHash, action }, attemptId),
       )
       if (outstanding > 0) {
-        await recordAttempt({ identifierHash, sourceHash, action, succeeded: false })
         throw tooManyAttempts(outstanding, 'account creation attempts')
       }
 
@@ -161,12 +170,13 @@ export const signUpRoutes = async (app: FastifyInstance): Promise<void> => {
 
       if (!attendee) {
         // A refused sign-up counts as a failure, so repeated attempts against one address
-        // escalate — which is the only defence FR-303's disclosure leaves in place.
-        await recordAttempt({ identifierHash, sourceHash, action, succeeded: false })
+        // escalate — which is the only defence FR-303's disclosure leaves in place. The row
+        // already says so; leaving it alone is what records the failure.
         throw addressRegistered()
       }
 
-      await recordAttempt({ identifierHash, sourceHash, action, succeeded: true })
+      // A created account ends the streak, exactly as it did when this was `settleAttempt(true)`.
+      await settleAttempt(attemptId, true)
 
       // FR-306 — signed in without a second credential entry. 204 with no body, so the token
       // cannot leak into one.

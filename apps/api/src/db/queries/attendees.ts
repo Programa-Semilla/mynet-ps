@@ -41,6 +41,42 @@ export const findAttendeeForSignIn = async (
 }
 
 /**
+ * T023 (010) — **whether this attendee has confirmed the address they signed up with**
+ * (FR-806).
+ *
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ * **A NARROW FUNCTION FOR ONE CALLER, AND THE NARROWNESS IS THE DESIGN.**
+ *
+ * The standing invariant is that verification gates *exactly one thing: discoverability*, and
+ * that no feature may use it for anything else. FR-806 is a specified exception — the card-share
+ * route, checking **the actor at write time** — and it is the only one.
+ *
+ * The obvious alternative was to add `emailVerified` to `request.attendee`, where it would be
+ * free on every request because the session join already reads that row. That is exactly why it
+ * was rejected: an ambient flag on the request object is an invitation, and the next feature that
+ * wants to "just check" verification would find it already there with nothing to consult and
+ * nobody to ask. A function somebody has to import, named for the one requirement that permits
+ * it, keeps the second use visible and the third one a decision.
+ *
+ * **It must never be called from a read path** (FR-807). Card *resolution* consults neither
+ * discoverability nor verification, and those absences are what a standing consent means.
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ */
+export const isEmailVerified = async (id: string): Promise<boolean> => {
+  const rows = await getDb()
+    .select({ verifiedAt: attendees.emailVerifiedAt })
+    .from(attendees)
+    .where(eq(attendees.id, id))
+    .limit(1)
+
+  // `!== null && !== undefined` rather than `!= null`: the repository lints `eqeqeq`, and the
+  // two cases are genuinely different here — `undefined` means no such attendee, `null` means an
+  // attendee who has not verified. Both refuse, and neither is distinguishable to the caller.
+  const verifiedAt = rows[0]?.verifiedAt
+  return verifiedAt !== null && verifiedAt !== undefined
+}
+
+/**
  * Identity only. There is no overload of this that returns credential material, deliberately.
  */
 export const findAttendeeById = async (

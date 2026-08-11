@@ -1,5 +1,6 @@
-import type { FastifyInstance } from 'fastify'
+import type { FastifyInstance, FastifyRequest } from 'fastify'
 
+import { beginAttempt, failureDelayMs, hashAttemptValue, serveDelay } from '../../auth/throttle.js'
 import {
   DIRECTORY_MAX_PAGE_SIZE,
   DIRECTORY_PAGE_SIZE,
@@ -8,7 +9,7 @@ import {
   type DirectoryRow,
 } from '../../db/queries/directory.js'
 import { AVAILABILITIES, NETWORKING_INTENTS } from '../../db/schema/profiles.js'
-import { notFound } from '../../errors.js'
+import { notAuthenticated, notFound } from '../../errors.js'
 import { processAvatar } from '../../images/avatar.js'
 import { eventScopeOf, type EventParams } from '../../plugins/event-access.js'
 import { cardKeyFor } from '../../storage/service.js'
@@ -34,6 +35,50 @@ import { cardKeyFor } from '../../storage/service.js'
  * `tests/unit/directory-response-shape.test.ts` asserts both mechanisms over the schema itself.
  * ─────────────────────────────────────────────────────────────────────────────────────────
  */
+/**
+ * T020 (010) — **the read bound** (FR-801, FR-802, research R7).
+ *
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ * **A JOIN CODE IS PRINTED ON BADGES AND SHOWN ON SLIDES, SO "SIGNED IN" IS NOT A BARRIER.**
+ *
+ * Anybody can sign themselves up and enter one. Once inside, this route pages an entire
+ * conference at a hundred rows a request — name, company, role, headline, interests, availability
+ * and a face — and until now nothing counted the requests. That is the whole attendee list of a
+ * conference, downloadable by anybody who read a slide, and a public URL makes it worse in the
+ * only way that matters: it removes the need to be in the building.
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ *
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ * **IT MAY DELAY AND MAY NEVER DENY** (FR-802), and the clamp that guarantees it lives inside
+ * `failureDelayMs` rather than here — so this handler has no remainder it could turn into a
+ * refusal even if a later edit wanted one. That is deliberate: a 429 on this route refuses
+ * Discover to somebody standing in a venue trying to find the person they were told to meet.
+ *
+ * Keyed on the **reader's own identity**, never on anything else. Keyed on the conference, one
+ * attendee's browsing would slow every other attendee's; keyed on the source, a venue behind one
+ * address would throttle itself.
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ */
+const throttleRead = async (request: FastifyRequest): Promise<void> => {
+  const attendee = request.attendee
+  if (!attendee) throw notAuthenticated()
+
+  const key = {
+    identifierHash: hashAttemptValue(attendee.id),
+    sourceHash: hashAttemptValue(request.ip),
+    action: 'directory_read' as const,
+  }
+
+  // Recorded before it is judged, so concurrent listings count each other (FR-804); excluded
+  // from its own count, so the allowance is what it would have been the other way round (FR-805).
+  const attemptId = await beginAttempt(key)
+
+  // No `outstanding` to inspect: `directory_read` is delay-only, so `failureDelayMs` has already
+  // clamped its result to what `serveDelay` will actually sleep. There is nothing left to refuse
+  // on, which is how FR-802 is structural rather than remembered.
+  await serveDelay(await failureDelayMs(key, attemptId))
+}
+
 export const directoryRoutes = async (app: FastifyInstance): Promise<void> => {
   interface DirectoryQuerystring {
     readonly q?: string
@@ -174,6 +219,10 @@ export const directoryRoutes = async (app: FastifyInstance): Promise<void> => {
       },
     },
     async (request) => {
+      // T020 (010) — FR-801. Charged before the query runs, so the cost of a listing is paid by
+      // the request that asked for it rather than only by ones that turn out to be servable.
+      await throttleRead(request)
+
       let page
       try {
         page = await listDirectory(eventScopeOf(request), request.query)

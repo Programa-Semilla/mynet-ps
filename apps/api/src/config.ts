@@ -200,6 +200,35 @@ export interface AppConfig {
      * ───────────────────────────────────────────────────────────────────────────────────────
      */
     readonly operatorAddress: string | undefined
+    /**
+     * T002 (010) — the SMTP connection URL, and **the single signal that selects real delivery**
+     * (FR-841, research R3).
+     *
+     * ───────────────────────────────────────────────────────────────────────────────────────
+     * **This closes a discrepancy rather than adding a knob.** `deploy/vm/.env.example` has
+     * documented `MAIL_SMTP_URL` since 006 and nothing has ever read it — the example file
+     * promised an operator a setting the code ignored, which is the shape of configuration bug
+     * FR-836 exists to make loud. Research R3 resolved it in the example file's favour: a general
+     * SMTP client rather than a vendor SDK, so **no Mailgun package and no Mailgun type enters
+     * the dependency tree at all** and swapping providers is a change of URL.
+     *
+     * `absent` rather than `optional`, and rather than `required`, for the reason the two members
+     * above it record: the sink is what a clean clone, the test suite and CI all run, so the
+     * unconfigured case is the normal one. Presence is the provisioning signal — **identically in
+     * every environment, with no environment branch** — which is the arrangement 007 proved for
+     * the VAPID pair and the only one under which a local end-to-end test exercises the
+     * production path rather than a special mode.
+     *
+     * **It carries a credential in its userinfo, so it is a secret in full** (FR-832) and must
+     * never be logged. `SmtpMailService` is the only thing that reads it.
+     *
+     * The cost of absence is the harshest in this file: under production `SinkMailService`'s
+     * constructor throws, so **the API does not start** (research R2). That is deliberate — the
+     * sink holds reset links and a reset link is the account — and it is what sequenced this
+     * whole feature, putting the adapter before the first deploy rather than after it.
+     * ───────────────────────────────────────────────────────────────────────────────────────
+     */
+    readonly smtpUrl: string | undefined
   }
   /**
    * T002 (007) — Web Push delivery (FR-550–FR-559, research R8).
@@ -326,6 +355,9 @@ export const loadConfig = (): AppConfig => {
       from: optional('MAIL_FROM', 'MyNet <no-reply@mynet.invalid>'),
       // 007 — undecided by spec open question 3. Absent is normal; see the interface.
       operatorAddress: absent('MAIL_OPERATOR_ADDRESS'),
+      // 010 T002 — the provisioning signal for real delivery (FR-841, research R2/R3). Absent
+      // selects the sink, exactly as an absent VAPID pair does below; see the interface.
+      smtpUrl: absent('MAIL_SMTP_URL'),
     },
     push: {
       // 007 — undecided by spec open question 2. Absent is normal; the sink adapter runs.

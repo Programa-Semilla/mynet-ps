@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify'
 
-import { failureDelayMs, hashAttemptValue, recordRequest, serveDelay } from '../auth/throttle.js'
+import { beginAttempt, failureDelayMs, hashAttemptValue, serveDelay } from '../auth/throttle.js'
 import { loadConfig } from '../config.js'
 import {
   readOwnAvatarKey,
@@ -444,12 +444,13 @@ const avatarRoutes = async (app: FastifyInstance): Promise<void> => {
       const sourceHash = hashAttemptValue(request.ip)
       const action = 'avatar_upload' as const
 
+      // 010 T017 — recorded before it is judged (FR-804), excluded from its own count (FR-805),
+      // and never settled: the decode is the cost and it is paid before anything can be known
+      // about the bytes, so a successful upload must still count.
+      const attemptId = await beginAttempt({ identifierHash, sourceHash, action })
       const outstanding = await serveDelay(
-        await failureDelayMs({ identifierHash, sourceHash, action }),
+        await failureDelayMs({ identifierHash, sourceHash, action }, attemptId),
       )
-      // Counted whether or not the upload turns out to be decodable: the decode is the cost,
-      // and it is paid before anything can be known about the bytes.
-      await recordRequest({ identifierHash, sourceHash, action })
       if (outstanding > 0) throw tooManyAttempts(outstanding, 'avatar uploads')
 
       const raw = Buffer.from(image, 'base64')
