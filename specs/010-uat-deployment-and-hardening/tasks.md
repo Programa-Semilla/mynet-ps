@@ -155,8 +155,8 @@ Scenario 4.
 ⚠️ **T034 is the first irreversible step.** It creates billable infrastructure and a public DNS
 record.
 
-- [ ] T033 [US2] Create the DNS A record for `mynet-dev.programasemilla.com` and confirm it resolves **before** provisioning — certificate issuance is what fails otherwise, and FR-825 forbids falling back to plain HTTP
-- [ ] T034 [US2] Run `deploy/vm/provision-vm.sh` for `uat`, confirming the SKU preflight passes and every call is pinned to the subscription by identifier (FR-820, FR-821)
+- [X] T033 [US2] Create the DNS A record for `mynet-dev.programasemilla.com` and confirm it resolves **before** provisioning — certificate issuance is what fails otherwise, and FR-825 forbids falling back to plain HTTP
+- [X] T034 [US2] Run `deploy/vm/provision-vm.sh` for `uat`, confirming the SKU preflight passes and every call is pinned to the subscription by identifier (FR-820, FR-821)
 - [ ] T035 [US2] Generate and install the VM `.env` from `deploy/vm/.env.example`, populating every required value from `contracts/configuration.md` including `ACME_EMAIL`, `POSTGRES_PASSWORD`, `AUTH_PASSWORD_PEPPER` and `AUTH_ATTEMPT_HASH_KEY`
 - [ ] T036 [US2] Run `deploy/vm/deploy.sh uat --migrate` **by hand** for the first deploy, deliberately before automation exists, so there is a known-good path to compare against when automation fails
 - [ ] T037 [US2] Verify TLS, the HTTP redirect, same-origin API requests, and that the database is unreachable from off-host (FR-824, FR-825, FR-826, SC-801)
@@ -172,9 +172,9 @@ record.
 
 **Independent test**: Quickstart Scenario 9, steps 5–6.
 
-- [ ] T041 [US7] Point `deploy/vm/envs/uat.env`'s resolved database host at production's value, run each deployment script, confirm every one refuses naming the reason, then revert (FR-881, SC-811)
-- [ ] T042 [P] [US7] Verify the seed's production guard still refuses — it keys on the resolved target rather than `NODE_ENV`, which is stronger than the inbox entry that raised it proposed, and T044 is about to use the seeding path against a deployed host (FR-882)
-- [ ] T043 [P] [US7] Record both provoked refusals in `deploy/vm/OPERATIONS-LOG.md` — FR-881 asks for the observation, not the belief
+- [X] T041 [US7] Point `deploy/vm/envs/uat.env`'s resolved database host at production's value, run each deployment script, confirm every one refuses naming the reason, then revert (FR-881, SC-811)
+- [X] T042 [P] [US7] Verify the seed's production guard still refuses — it keys on the resolved target rather than `NODE_ENV`, which is stronger than the inbox entry that raised it proposed, and T044 is about to use the seeding path against a deployed host (FR-882)
+- [X] T043 [P] [US7] Record both provoked refusals in `deploy/vm/OPERATIONS-LOG.md` — FR-881 asks for the observation, not the belief
 
 ---
 

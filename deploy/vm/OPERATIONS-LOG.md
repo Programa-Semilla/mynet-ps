@@ -110,3 +110,65 @@ script in this repository can create it.
 **Recorded by**: the 010 implementation, phase 5.
 
 ---
+
+## 2026-08-11 — DNS cut over, and the FR-485 guards provoked rather than believed
+
+**Act**: an `A` record for `mynet-dev.programasemilla.com` was created at GoDaddy by the owner,
+then the data-separation guards were deliberately made to fire.
+
+### DNS
+
+Resolves to `20.9.29.146` from the authoritative nameserver (`ns25.domaincontrol.com`), from
+`8.8.8.8`, from `1.1.1.1` and from this machine's own resolver. No propagation delay observed.
+
+### The guard, provoked (FR-485, FR-881, SC-811)
+
+`envs/uat.env` was edited to name production's database — `DATABASE_NAME=mynet_prod` — and every
+script that takes an environment was run:
+
+| Script             | Outcome                                                      |
+| ------------------ | ------------------------------------------------------------ |
+| `provision-vm.sh`  | **REFUSED**, naming "UAT resolves to production's DATABASE NAME" and printing both values |
+| `deploy.sh`        | **REFUSED**, same message                                     |
+| `maintenance.sh`   | **REFUSED**, same message                                     |
+
+The file was then restored and verified byte-identical to the commit (`git diff` empty), and the
+same scripts were re-run and proceeded.
+
+**`backup.sh` is not in that table, and its absence is correct rather than a gap.** It was run and
+printed its usage instead of refusing, which looked like a hole for about a minute. It is not one:
+`backup.sh` runs **on the VM**, takes `run|install|status` rather than an environment, and reads
+only the `.env` beside it. It has no committed env file to be pointed at the wrong one *with* —
+the misconfiguration FR-485 defends against is not expressible there. The guard covers the three
+scripts that resolve an environment from `envs/`, which is all of the ones that can.
+
+**Observed, unprompted**: `az vm create` is idempotent. `provision-vm.sh uat` was re-run against
+the existing VM while testing the above, and the machine kept its IP, size, uptime and `.env`.
+
+### The seed's production guard (FR-882)
+
+`tests/unit/seed-target-guard.test.ts` — 12 assertions, all passing. It keys on the **resolved
+database name** (`mynet_uat` and `mynet_prod` are both in `DEPLOYED_DATABASES`) rather than on
+`NODE_ENV`, which is stronger than the idea-inbox entry that raised it proposed: an SSH tunnel
+makes a production database look local, and `NODE_ENV` is a statement about a process rather than
+about what it is pointed at. Seeding UAT will therefore require `SEED_TARGET_DATABASE=mynet_uat`
+as an explicit opt-in, which is phase 7's T044.
+
+### The VM `.env`
+
+Generated **on the host**, so no secret passed through an operator's terminal or shell history.
+`chmod 600`. `POSTGRES_PASSWORD`, `AUTH_PASSWORD_PEPPER` and `AUTH_ATTEMPT_HASH_KEY` are 48-byte
+random values; a VAPID pair was generated in a throwaway `node:22-alpine` container so nothing was
+installed on the host.
+
+**`AUTH_PASSWORD_PEPPER` must never be regenerated** — every stored password hash becomes
+unverifiable if it changes. The generator refuses to run when a `.env` already exists, for exactly
+that reason.
+
+**`MAIL_FROM` and `MAIL_SMTP_URL` are still blank, and the environment therefore cannot start
+yet.** That is research R2 working as designed: `SinkMailService` throws under `NODE_ENV=production`
+because it writes reset links to the log, and a reset link is the account.
+
+**Recorded by**: the 010 implementation, phase 5.
+
+---
