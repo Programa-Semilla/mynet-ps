@@ -478,6 +478,23 @@ jobs:
       VITE_API_BASE_URL: http://localhost:3000
       WEB_ORIGIN: http://localhost:5173
       # ───────────────────────────────────────────────────────────────────────────────────
+      # **013 — without this every administrative test times out, and the API looks healthy.**
+      #
+      # `app.ts` allows CORS on administrative routes from `config.adminOrigin ?? false`, so an
+      # unset value means the answer is `false` and the **browser** refuses every request the
+      # admin client makes. Nothing fails server-side; the specs simply wait for a response that
+      # never comes, which is what they did on this branch's first CI run.
+      #
+      # It passed locally only because `pnpm start` writes `ADMIN_ORIGIN` into `.env.local` —
+      # a **gitignored** file that CI does not have. That gap is the whole lesson: a value the
+      # local runner supplies is not a value the pipeline has.
+      #
+      # Deployed environments set nothing here, because Caddy serves `admin.<host>` and proxies
+      # `/api/*` beneath it, so administrative requests are same-origin. Local and CI are the
+      # only topologies where two ports stand in for two hosts.
+      # ───────────────────────────────────────────────────────────────────────────────────
+      ADMIN_ORIGIN: http://localhost:5174
+      # ───────────────────────────────────────────────────────────────────────────────────
       # **`loadConfig()` requires these, and the workflow has never supplied them.**
       #
       # A second latent fault, invisible until now because `db-branch` failed first: every job
@@ -555,6 +572,23 @@ jobs:
       DATABASE_URL: postgresql://mynet:mynet@localhost:5432/mynet_ci
       VITE_API_BASE_URL: http://localhost:3000
       WEB_ORIGIN: http://localhost:5173
+      # ───────────────────────────────────────────────────────────────────────────────────
+      # **013 — without this every administrative test times out, and the API looks healthy.**
+      #
+      # `app.ts` allows CORS on administrative routes from `config.adminOrigin ?? false`, so an
+      # unset value means the answer is `false` and the **browser** refuses every request the
+      # admin client makes. Nothing fails server-side; the specs simply wait for a response that
+      # never comes, which is what they did on this branch's first CI run.
+      #
+      # It passed locally only because `pnpm start` writes `ADMIN_ORIGIN` into `.env.local` —
+      # a **gitignored** file that CI does not have. That gap is the whole lesson: a value the
+      # local runner supplies is not a value the pipeline has.
+      #
+      # Deployed environments set nothing here, because Caddy serves `admin.<host>` and proxies
+      # `/api/*` beneath it, so administrative requests are same-origin. Local and CI are the
+      # only topologies where two ports stand in for two hosts.
+      # ───────────────────────────────────────────────────────────────────────────────────
+      ADMIN_ORIGIN: http://localhost:5174
       # ───────────────────────────────────────────────────────────────────────────────────
       # **`loadConfig()` requires these, and the workflow has never supplied them.**
       #

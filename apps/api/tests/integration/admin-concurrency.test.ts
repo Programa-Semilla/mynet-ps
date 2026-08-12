@@ -17,7 +17,7 @@ import { organizerAssignments } from '../../src/db/schema/organizer-assignments.
 import { questionVotes, sessionQuestions } from '../../src/db/schema/questions.js'
 import { reportResolutions } from '../../src/db/schema/report-resolutions.js'
 import { abuseReports } from '../../src/db/schema/reports.js'
-import { ADA, attendees, GRACE, setupTestApp, teardown } from './helpers.js'
+import { ADA, GRACE, resetDatabase, seededAttendeeId, setupTestApp, teardown } from './helpers.js'
 
 /**
  * T049, T101 (013) — **the two properties no layer but a real database can test.**
@@ -44,6 +44,23 @@ describe('administrative concurrency', () => {
 
   beforeAll(async () => {
     app = await setupTestApp()
+
+    // ═══════════════════════════════════════════════════════════════════════════════════════
+    // **ESTABLISHES ITS OWN SEEDED BASELINE RATHER THAN TRUSTING THE PREVIOUS FILE'S.**
+    //
+    // This file builds its fixtures from the *shared* seed — Ada, Grace and a session — and the
+    // integration suite seeds once for the whole run. `admin-reseed-guard.test.ts` sorts
+    // immediately before it and calls `seed()` repeatedly by design, including while asserting
+    // that a re-seed survives blocking rows; a torn or in-flight seed there leaves `attendees`
+    // momentarily empty, and every test in this file then dies in `beforeEach` on a fixture it
+    // never asserted anything about.
+    //
+    // **It failed exactly that way in CI and not once locally**, which is the signature
+    // `review-findings.md` records for this suite's isolation model: file order is stable but
+    // the timing is not. Calling `resetDatabase()` here does not fix that model — it removes
+    // this file's dependence on it, which is the part this feature owns.
+    // ═══════════════════════════════════════════════════════════════════════════════════════
+    await resetDatabase()
   })
 
   afterAll(async () => {
@@ -60,8 +77,11 @@ describe('administrative concurrency', () => {
     await db.delete(questionVotes)
     await db.delete(sessionQuestions)
 
-    adaId = (await db.select().from(attendees).where(eq(attendees.email, ADA)))[0]!.id
-    graceId = (await db.select().from(attendees).where(eq(attendees.email, GRACE)))[0]!.id
+    // `seededAttendeeId` rather than an index-and-assert: it fails with a sentence naming the
+    // prerequisite instead of `TypeError: Cannot read properties of undefined (reading 'id')`,
+    // which cost twenty minutes of misdirected investigation the first time it appeared.
+    adaId = await seededAttendeeId(ADA)
+    graceId = await seededAttendeeId(GRACE)
     sessionId = (await db.select().from(sessions).limit(1))[0]!.id
   })
 
