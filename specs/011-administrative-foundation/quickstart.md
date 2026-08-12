@@ -17,31 +17,55 @@ a browser, and are the ones that historically do not get walked.
 
 ```bash
 pnpm install
-pnpm db:migrate            # applies 0009
-pnpm db:seed               # conference fixtures + operator IDENTITIES (no credential)
+pnpm start
 ```
 
-Then establish the bootstrap credential — **a separate command by design** (research R10), because
-`pnpm db:seed` deletes every attendee and re-inserts committed passwords, and administrative
-credentials must not sit behind the least-guarded entry point in the project:
+That is the whole of it. `pnpm start` brings up the API, MyNet **and** the administrative site,
+migrating and seeding first when the database needs it, and **prints the administrative credential
+in the banner**:
 
-```bash
-ADMIN_BOOTSTRAP_EMAIL=ops@example.test \
-ADMIN_BOOTSTRAP_PASSWORD='<not committed, not defaulted>' \
-pnpm admin:bootstrap
+```
+  →  http://localhost:5173          MyNet
+  →  http://localhost:5174          Administration
+
+  Administration at the second origin — a separate product, a separate session.
+
+     operator@mynet.invalid
+     password: y23x-yp3y-npdm
 ```
 
-Run both apps:
+**The password is generated per run and stored nowhere** — not in `.env`, not in `.env.local`, not
+in the repository. That is the point: `db/seed/operators.ts` creates operator identities with **no
+credential** (FR-990) precisely because this repository is public, and a committed administrative
+password would be a published credential for the tier that reads the abuse-report queue. The
+generated one is handed to the existing `pnpm admin:bootstrap`, which carries FR-993's guard.
 
-```bash
-pnpm start                 # MyNet + API
-pnpm --filter @mynet/admin dev
-```
+Three consequences worth knowing before you start:
+
+- **You will be asked to choose a new password at first sign-in.** That is FR-992 working, not a
+  fault — the initial credential was set *for* the operator, so it is not theirs yet.
+- **A re-run will not print a password once you have chosen your own.** The bootstrap updates only
+  `WHERE credential_is_initial = true`, so it never resets a password an operator picked; the banner
+  says so instead of printing one that would not work. `pnpm start --reset-admin` issues a fresh one
+  without rebuilding the database — `--reset` would, and would take every attendee and note with it.
+- **The integration suite shares this database.** After `pnpm test:integration`, run `pnpm db:seed`
+  before poking at the administrative site, or the operators table holds test fixtures.
+
+The two commands this replaces still work and are what a deployed environment uses:
+`pnpm db:migrate`, `pnpm db:seed`, then `ADMIN_BOOTSTRAP_EMAIL` / `ADMIN_BOOTSTRAP_PASSWORD` with
+`pnpm admin:bootstrap`. Establishing the credential is **a separate command by design** (research
+R10), because `pnpm db:seed` deletes every attendee and re-inserts committed passwords, and
+administrative credentials must not sit behind the least-guarded entry point in the project.
 
 MyNet at `http://localhost:5173`, admin at `http://localhost:5174`. **Two ports locally stand in for
 two hosts in deployment** — same-site is not reproducible on `localhost`, so the *cookie
 independence* property (scenario 3) is only fully verified against a deployed pair of hosts. Say so
 rather than assume the local run proves it.
+
+`ADMIN_ORIGIN` is written into `.env.local` for the same reason the port exists. `app.ts` allows
+CORS on administrative routes from `config.adminOrigin ?? false`, so without it every request the
+admin client makes is refused **by the browser** while the server looks perfectly healthy. Deployed
+environments do not set it, because Caddy makes those requests same-origin.
 
 ---
 
@@ -54,6 +78,31 @@ rather than assume the local run proves it.
 **Also verify**: with `ADMIN_BOOTSTRAP_PASSWORD` unset and a fresh operator row, sign-in is
 **impossible** — not defaulted, not generated, not logged (FR-991). These are two distinct outcomes
 and SC-912 requires both.
+
+### SC-900 — sign-in to queue, measured *(T153)*
+
+SC-900 asks that a platform operator reach the report queue **in under 30 seconds** from opening
+the administrative address. That is a *human task* time, so it cannot be asserted by a test without
+becoming a different claim — but the part a machine can measure is worth having, because it is the
+part that could regress silently.
+
+**Method.** Five runs, each in a fresh browser context on an already-replaced credential (the
+steady-state path, not the first-ever sign-in). The clock starts at `goto(admin origin)` and stops
+when the first report row is visible, and it covers: document load, sign-in request, `/admin/me`,
+navigation to Reports, and the queue's own fetch. Driven exactly as `e2e/admin-accessibility.spec.ts`
+drives the same path, at 1440×900, against a local API and a local database.
+
+**Measured 2026-08-11**: samples 374, 381, 349, 365, 373 ms — **median 373 ms**, range 349–381 ms.
+
+**What it means.** The machine-observable path is roughly **1%** of SC-900's budget. The other ~29.6
+seconds are a person typing an address, an email and a password, and finding the queue — so SC-900
+is met with an enormous margin locally, and what the number is actually good for is the next
+reading: a median in the *seconds* would mean something had gone wrong (an unindexed query as the
+queue grows, a blocking request added to the shell), and there would now be a baseline saying so.
+
+**It is not a gate.** No test fails on this number. Deployed timings will be larger — TLS, a real
+network, a database on the same VM but not the same process — and that comparison is the point of
+recording the method rather than only the result.
 
 ## Scenario 2 — Refusals are indistinguishable *(FR-915, FR-918)*
 
@@ -173,11 +222,13 @@ only scenario that looks.
 ## Machine gates that must be green alongside this
 
 ```bash
-pnpm verify        # typecheck, lint, unit, component, contract, build
-pnpm test:integration
-pnpm test:e2e
-pnpm test:accessibility
+pnpm verify        # typecheck, lint, unit, component, contract, integration, build, e2e
+pnpm test:a11y     # NOT `test:accessibility` — that script does not exist
 ```
+
+`pnpm test:a11y` now runs **both** `accessibility.spec.ts` and `admin-accessibility.spec.ts`. It
+ran only the first until 011 added the second, which would have left the administrative scan
+outside the named accessibility gate while still passing under `test:e2e`.
 
 Specifically confirm these **fail loudly if the feature is wrong**, rather than passing by omission:
 

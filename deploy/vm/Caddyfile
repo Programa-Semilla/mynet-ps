@@ -92,6 +92,22 @@
 	# every API call would be answered with the client's index.html — a 200 carrying HTML, which
 	# the client's JSON parse reports as an unrecognisable failure rather than as a routing bug.
 	# ─────────────────────────────────────────────────────────────────────────────────────────
+	# ─────────────────────────────────────────────────────────────────────────────────────────
+	# 011 — **the administrative API does not exist on the attendee host.**
+	#
+	# Matched BEFORE the general `/api/*` handler, so it wins. Without it this block proxies
+	# `/api/admin/*` to the same API container, which means `POST https://<host>/api/admin/session`
+	# succeeds and plants `mynet_admin_session` — host-only — on the **attendee** origin. That is
+	# precisely the placement `apps/api/src/admin/cookie.ts` says the host-only cookie exists to
+	# prevent, reached by the one path nobody looks at.
+	#
+	# 404 rather than 403: an address that does not exist here answers as one. The administrative
+	# API lives on `admin.{$APP_DOMAIN}` and nowhere else.
+	# ─────────────────────────────────────────────────────────────────────────────────────────
+	handle /api/admin/* {
+		respond 404
+	}
+
 	handle /api/* {
 		uri strip_prefix /api
 		reverse_proxy api:3000
@@ -112,6 +128,115 @@
 		header @immutable Cache-Control "public, max-age=31536000, immutable"
 		# The document itself must never be cached, or a deploy leaves browsers loading an old
 		# index.html that references assets which no longer exist.
+		@document path / /index.html
+		header @document Cache-Control "no-cache"
+
+		try_files {path} /index.html
+		file_server
+	}
+}
+
+# ═══════════════════════════════════════════════════════════════════════════════════════════════
+# T042, T043 (011) — **the administrative site, on its own subdomain** (FR-910, decision 37,
+# research R2).
+#
+# `admin.{$APP_DOMAIN}` needs **its own A record**, pointing at this same VM. Caddy obtains a
+# second certificate for it exactly as it does for the apex, and cannot obtain either without
+# public DNS resolving first — see `README.md`, and note that no domain is registered yet, so
+# neither certificate has ever been issued.
+#
+# ───────────────────────────────────────────────────────────────────────────────────────────────
+# **A SUBDOMAIN, AND THE REASONING MUST NOT BE RE-DERIVED CARELESSLY.**
+#
+# `SameSite` is evaluated against the **registrable domain**, not the origin. So this host is:
+#
+#   - **same-site** as the apex — decision 19's CSRF defence survives untouched, and no
+#     synchroniser token is needed; and
+#   - **different-origin** — so it gets its own service-worker scope, its own storage, its own CSP.
+#
+# No other topology gives both, and the two rejected alternatives each fail in a way this project
+# has already paid for once:
+#
+#   - **A path** (`{$APP_DOMAIN}/admin`) shares the origin, and the attendee service worker is
+#     registered at **root scope** — so it would intercept administrative navigations and answer
+#     them from a precache built for a different application.
+#   - **A separate registrable domain** stops `SameSite=Lax` being sent at all. That is precisely
+#     the v3.0.0 failure recorded at the top of this file, where `pages.dev` and `fly.dev` meant
+#     the session cookie was never sent and nobody could sign in.
+#
+# **`/api/*` is proxied here too, to the same API container.** That is what keeps administrative
+# calls same-origin, which is what keeps `connect-src 'self'` literally true on this host and the
+# host-only session cookie sendable. One API, two origins, two independent sessions.
+# ───────────────────────────────────────────────────────────────────────────────────────────────
+admin.{$APP_DOMAIN} {
+	encode zstd gzip
+
+	# ─────────────────────────────────────────────────────────────────────────────────────────
+	# T043 — security headers for the administrative document.
+	#
+	# **Deliberately NOT copied to MyNet's block in this feature.** The apex block above has its
+	# own set, and there is an open inbox entry about strengthening them; adding to it here would
+	# make that entry read as closed when nobody has reviewed it. This block stands alone.
+	#
+	# Two differences from the apex set, and both are because this product does less:
+	#
+	#   - **No `data:` in `img-src`.** The apex needs it because the directory delivers 24 avatar
+	#     faces as data URLs in one response (FR-456). Nothing here renders an avatar — no
+	#     administrative tier may read a profile at all (FR-973) — so the allowance would be
+	#     permission for something that must not happen.
+	#   - **`X-Robots-Tag`**, matching the `noindex` in `index.html`. Not a security control:
+	#     authorisation is server-side (FR-980) and this would be worth nothing if it were
+	#     load-bearing. It keeps an administrative sign-in out of search results.
+	#
+	# `frame-ancestors 'none'` and `X-Frame-Options: DENY` matter more here than on the apex: a
+	# framed administrative surface is a clickjacking target with the report queue behind it.
+	# ─────────────────────────────────────────────────────────────────────────────────────────
+	header {
+		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self'; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer"
+		X-Frame-Options "DENY"
+		X-Robots-Tag "noindex, nofollow"
+		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()"
+		Strict-Transport-Security "max-age=63072000; includeSubDomains"
+		-Server
+	}
+
+	# The maintenance switch covers this host too, and reads the **same file**. A window that
+	# took MyNet down while leaving administration up would be a window in which an operator
+	# could act on a database the attendee product cannot reach — and the file is what makes
+	# leaving maintenance a pure `rm` with no restart.
+	@maintenance file {
+		root /srv/maintenance
+		try_files /ON
+	}
+	handle @maintenance {
+		root * /srv/maintenance
+		rewrite * /index.html
+		header Retry-After "600"
+		header Cache-Control "no-store, must-revalidate"
+		file_server {
+			status 503
+		}
+	}
+
+	# The same API container. Matched before the file server, for the reason the apex block
+	# records: otherwise `handle` falls through to the SPA fallback and every API call is
+	# answered with an HTML document carrying a 200.
+	handle /api/* {
+		uri strip_prefix /api
+		reverse_proxy api:3000
+	}
+
+	# The built administrative client. **`/srv/admin`, a different directory from `/srv/web`** —
+	# two builds, two artifacts, and `deploy.sh` places each. Serving one from the other would
+	# put the attendee client's service worker on this origin, which is the whole thing the
+	# subdomain exists to prevent.
+	handle {
+		root * /srv/admin
+
+		@immutable path /assets/*
+		header @immutable Cache-Control "public, max-age=31536000, immutable"
 		@document path / /index.html
 		header @document Cache-Control "no-cache"
 

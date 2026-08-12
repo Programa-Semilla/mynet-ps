@@ -1,6 +1,6 @@
 import { defineConfig, devices } from '@playwright/test'
 
-import { WEB_ORIGIN } from './e2e/support/env.js'
+import { ADMIN_ORIGIN, WEB_ORIGIN } from './e2e/support/env.js'
 
 /**
  * End-to-end and accessibility configuration (FR-068, SC-005).
@@ -102,18 +102,42 @@ export default defineConfig({
     },
   ],
 
-  webServer: {
-    command: 'pnpm --filter @mynet/web build && pnpm --filter @mynet/web preview --strictPort',
-    url: WEB_ORIGIN,
-    // Generous because the command includes a production build.
-    timeout: 240_000,
-    // **Never reuse.** The command above builds and then serves, so reusing a server that is
-    // already listening silently skips the build and tests the previous run's bundle. That is
-    // not a slow feedback loop, it is a wrong answer: a change can appear to fail after it was
-    // fixed, or — far worse — appear to pass after it was broken. The few seconds a rebuild
-    // costs are the price of the suite meaning what it says (SC-010).
-    reuseExistingServer: false,
-    stdout: 'pipe',
-    stderr: 'pipe',
-  },
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════════════════════
+   * 011 — **TWO SERVERS, BECAUSE THERE ARE TWO PRODUCTS ON TWO ORIGINS.**
+   *
+   * Both build before they serve, and neither reuses an existing server, for the reason the web
+   * entry has always given: reusing one that is already listening silently skips the build and
+   * tests the previous run's bundle — not a slow feedback loop but a wrong answer.
+   *
+   * The administrative entry is a **second origin** rather than a path on the first, which is the
+   * local stand-in for `admin.<host>` (decision 37). `e2e/support/env.ts` records what the port
+   * reproduces and what it does not.
+   * ═══════════════════════════════════════════════════════════════════════════════════════════
+   */
+  webServer: [
+    {
+      command: 'pnpm --filter @mynet/web build && pnpm --filter @mynet/web preview --strictPort',
+      url: WEB_ORIGIN,
+      // Generous because the command includes a production build.
+      timeout: 240_000,
+      // **Never reuse.** The command above builds and then serves, so reusing a server that is
+      // already listening silently skips the build and tests the previous run's bundle. That is
+      // not a slow feedback loop, it is a wrong answer: a change can appear to fail after it was
+      // fixed, or — far worse — appear to pass after it was broken. The few seconds a rebuild
+      // costs are the price of the suite meaning what it says (SC-010).
+      reuseExistingServer: false,
+      stdout: 'pipe',
+      stderr: 'pipe',
+    },
+    {
+      command:
+        'pnpm --filter @mynet/admin build && pnpm --filter @mynet/admin preview --strictPort',
+      url: ADMIN_ORIGIN,
+      timeout: 240_000,
+      reuseExistingServer: false,
+      stdout: 'pipe',
+      stderr: 'pipe',
+    },
+  ],
 })

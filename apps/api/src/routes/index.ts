@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify'
 
 import { accountRoutes } from './account.js'
+import { adminRoutes } from './admin/index.js'
 import { meRoutes } from './auth/me.js'
 import { signInRoutes } from './auth/sign-in.js'
 import { signOutRoutes } from './auth/sign-out.js'
@@ -165,4 +166,25 @@ export const ROUTES: readonly RoutePlugin[] = [
   // both 007 and 008 had to build. Do not "tidy" the nesting away (research R12, FR-742).
   // ─────────────────────────────────────────────────────────────────────────────────────────
   questionRoutes,
+  // ─────────────────────────────────────────────────────────────────────────────────────────
+  // 011 — the administrative product. **Appended, never inserted**, for the reason every entry
+  // above states: the generated contract lists paths in observation order.
+  //
+  // **Registered at the root, deliberately not under `/events/:eventId`** — the opposite of
+  // `appointmentRoutes` and `questionRoutes`, and for a reason neither of them has.
+  // Administrative authority is product-wide (platform tier) or assignment-wide (organizer
+  // tier); it is never derived from a registration. Nesting these under the attendee event
+  // prefix would assert something false about the caller, and would make `event-scope-audit`
+  // demand a `requireEventAccess` that a platform operator would fail entirely correctly.
+  //
+  // What guards them is `requireOperator` / `requirePlatformOperator` and a **fourth** route
+  // audit, because the event audit walks straight past a route naming no conference and reports
+  // success — the finding 007 recorded for conversations and 008 for cards, met a third time
+  // (research R5, FR-905).
+  //
+  // One route inside this group does name an event — `/admin/conferences/:eventId/organizers` —
+  // and is the single path where two audits disagree. It carries an allow-list entry in the
+  // event audit with the reason written down.
+  // ─────────────────────────────────────────────────────────────────────────────────────────
+  adminRoutes,
 ]

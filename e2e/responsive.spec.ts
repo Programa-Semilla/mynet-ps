@@ -1,7 +1,9 @@
 import { expect, test, type Page } from '@playwright/test'
 
-import { ADA, GRACE, signIn, useConference } from './support/attendees.js'
-import { DESTINATIONS, SCROLL_WIDTHS, WIDTHS } from './support/destinations.js'
+import { ADA, ALAN, GRACE, SEED_PASSWORD, signIn, useConference } from './support/attendees.js'
+import { ADMIN_DESTINATIONS, DESTINATIONS, SCROLL_WIDTHS, WIDTHS } from './support/destinations.js'
+import { ADMIN_ORIGIN } from './support/env.js'
+import { seedQuestionReport, signInAsOperator } from './support/operators.js'
 
 /**
  * T080, T081 — the responsive obligations, asserted rather than reviewed
@@ -39,6 +41,38 @@ const horizontalOverflow = (page: Page) =>
         .slice(0, 3),
     }
   })
+
+/**
+ * Centred means the gaps on either side match. Compared with a tolerance rather than for
+ * equality because sub-pixel layout and a scrollbar both shift it slightly — and because the
+ * failure this catches is not a few pixels off, it is the dialog against the edge.
+ *
+ * **Module scope so both dialog tests share one definition.** 011 adds four more dialogs on a
+ * second origin, and a second copy of this would be a second place for the tolerance and the
+ * explanation to drift apart.
+ */
+const expectCentred = async (on: Page, what: string): Promise<void> => {
+  const box = await on.getByRole('dialog').boundingBox()
+  expect(box, `${what}: the dialog must be laid out`).not.toBeNull()
+
+  const viewport = on.viewportSize()
+  expect(viewport).not.toBeNull()
+
+  const left = box!.x
+  const right = viewport!.width - (box!.x + box!.width)
+
+  expect(
+    Math.abs(left - right),
+    `${what}: the dialog is not centred — ${Math.round(left)}px to its left and ` +
+      `${Math.round(right)}px to its right. A modal <dialog> centres itself with the ` +
+      "user-agent's `margin: auto`, and Tailwind's Preflight zeroes it. See the `dialog` " +
+      'rule in theme/tokens.css.',
+  ).toBeLessThanOrEqual(2)
+
+  // Vertically too. A dialog shorter than the viewport is centred; a tall one is clamped by
+  // its own max-height and sits flush, so this only asserts it is not jammed at the top.
+  expect(box!.y, `${what}: the dialog is flush against the top edge`).toBeGreaterThan(0)
+}
 
 test.describe('responsive layout', () => {
   test('no destination requires horizontal scrolling at any width from 320px', async ({ page }) => {
@@ -214,34 +248,6 @@ test.describe('responsive layout', () => {
     page,
     browser,
   }) => {
-    /**
-     * Centred means the gaps on either side match. Compared with a tolerance rather than for
-     * equality because sub-pixel layout and a scrollbar both shift it slightly — and because
-     * the failure this catches is not a few pixels off, it is the dialog against the edge.
-     */
-    const expectCentred = async (on: Page, what: string) => {
-      const box = await on.getByRole('dialog').boundingBox()
-      expect(box, `${what}: the dialog must be laid out`).not.toBeNull()
-
-      const viewport = on.viewportSize()
-      expect(viewport).not.toBeNull()
-
-      const left = box!.x
-      const right = viewport!.width - (box!.x + box!.width)
-
-      expect(
-        Math.abs(left - right),
-        `${what}: the dialog is not centred — ${Math.round(left)}px to its left and ` +
-          `${Math.round(right)}px to its right. A modal <dialog> centres itself with the ` +
-          "user-agent's `margin: auto`, and Tailwind's Preflight zeroes it. See the `dialog` " +
-          'rule in theme/tokens.css.',
-      ).toBeLessThanOrEqual(2)
-
-      // Vertically too. A dialog shorter than the viewport is centred; a tall one is clamped by
-      // its own max-height and sits flush, so this only asserts it is not jammed at the top.
-      expect(box!.y, `${what}: the dialog is flush against the top edge`).toBeGreaterThan(0)
-    }
-
     // Desktop, where a mispositioned dialog is most obvious and the gutters are widest.
     await page.setViewportSize({ width: 1440, height: 900 })
     await signedIn(page)
@@ -290,6 +296,139 @@ test.describe('responsive layout', () => {
     await expectCentred(gracePage, 'the scheduling dialog')
 
     await graceContext.close()
+  })
+
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════════════════
+   * T146 (011) — **the administrative product's four dialogs, on the other origin.**
+   *
+   * A separate test rather than more steps in the one above, because it needs a different
+   * origin and a different principal — and because the defect this catches is per-dialog. 008
+   * shipped two mispositioned dialogs while the two written before them were fine; the class of
+   * mistake is *forgetting the rule on the next one*, so what matters is that every new dialog
+   * is enumerated here.
+   *
+   * The administrative client imports the same `theme/tokens.css`, so the base `dialog` rule
+   * should carry across — **should** being exactly the assumption 008 made about `m-auto` and
+   * the reason this measures rather than asserts a class name. It is also the first time the
+   * rule is exercised on a second application, which is the point at which "it is in the shared
+   * stylesheet" stops being an argument and starts being a claim.
+   *
+   * **Nothing here confirms.** Every dialog is opened, measured, and dismissed with Escape —
+   * which doubles as a check that Escape reaches each one. Resolving a report or removing a
+   * question would change state other specs read.
+   * ═══════════════════════════════════════════════════════════════════════════════════════
+   */
+  test('every administrative dialog is centred too, and Escape dismisses each', async ({
+    browser,
+  }) => {
+    test.slow()
+
+    // Its own report, so this does not depend on `admin-moderation.spec.ts` having run — and
+    // so the question is still there to be removable, which the one that spec acts on is not.
+    // Grace asks and Alan reports, matching that spec's pairing for the reason it records: the
+    // block reporting creates must not land on Ada and Grace, whose card and meeting the test
+    // above depends on.
+    await seedQuestionReport(
+      { email: GRACE.email, password: SEED_PASSWORD },
+      { email: ALAN.email, password: SEED_PASSWORD },
+      'Product & Design Summit',
+    )
+
+    const context = await browser.newContext({ viewport: { width: 1440, height: 900 } })
+    const operator = await context.newPage()
+
+    try {
+      await signInAsOperator(operator)
+
+      // ── The report queue's two dialogs.
+      await operator.goto(`${ADMIN_ORIGIN}/reports`)
+      await operator
+        .getByRole('link', { name: new RegExp(`reported ${GRACE.displayName}`, 'i') })
+        .first()
+        .click()
+
+      await operator.getByRole('button', { name: /remove this question/i }).click()
+      await expect(operator.getByRole('dialog')).toBeVisible()
+      await expectCentred(operator, 'the question-removal confirmation')
+      await operator.keyboard.press('Escape')
+      await expect(operator.getByRole('dialog')).toBeHidden()
+
+      await operator.getByRole('button', { name: /record a resolution/i }).click()
+      await expect(operator.getByRole('dialog')).toBeVisible()
+      await expectCentred(operator, 'the resolution dialog')
+      await operator.keyboard.press('Escape')
+      await expect(operator.getByRole('dialog')).toBeHidden()
+
+      // ── Promotion.
+      await operator.goto(`${ADMIN_ORIGIN}/conferences`)
+      await operator
+        .getByRole('button', { name: /add an organizer/i })
+        .first()
+        .click()
+      await expect(operator.getByRole('dialog')).toBeVisible()
+      await expectCentred(operator, 'the promotion dialog')
+      await operator.keyboard.press('Escape')
+      await expect(operator.getByRole('dialog')).toBeHidden()
+
+      // ── Operator deactivation. The identifier is typed rather than chosen, so the dialog can
+      // be opened without naming a real operator — and this deliberately never confirms.
+      await operator.goto(`${ADMIN_ORIGIN}/operators`)
+      await operator.getByLabel(/operator identifier/i).fill('00000000-0000-4000-8000-000000000000')
+      await operator.getByRole('button', { name: /end their access/i }).click()
+      await expect(operator.getByRole('dialog')).toBeVisible()
+      await expectCentred(operator, 'the operator-deactivation confirmation')
+      await operator.keyboard.press('Escape')
+      await expect(operator.getByRole('dialog')).toBeHidden()
+    } finally {
+      await context.close()
+    }
+  })
+
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════════════════════
+   * **FR-020 COVERS THE ADMINISTRATIVE SITE TOO, AND NOTHING WAS CHECKING IT.**
+   *
+   * `horizontalOverflow` is pointed at every attendee surface in this file and, until this test,
+   * at no administrative one. The gap was easy to miss because `admin-accessibility.spec.ts`
+   * walks these same four addresses at three widths and reports them clean — **axe says nothing
+   * about a page that scrolls sideways**, so a suite that looks thorough covered a different
+   * obligation entirely.
+   *
+   * The administrative pages are the ones most likely to fail it: they are tables of
+   * identifiers, addresses and timestamps, which is the content that does not reflow. 320px is
+   * the stated floor and is where a table given a fixed column width shows immediately.
+   * ═══════════════════════════════════════════════════════════════════════════════════════════
+   */
+  test('no administrative destination scrolls sideways at any width (FR-020)', async ({
+    browser,
+  }) => {
+    const context = await browser.newContext({ viewport: { width: 1440, height: 900 } })
+    const operator = await context.newPage()
+
+    try {
+      await signInAsOperator(operator)
+
+      for (const width of SCROLL_WIDTHS) {
+        await operator.setViewportSize({ width, height: 900 })
+
+        for (const destination of ADMIN_DESTINATIONS) {
+          await operator.goto(`${ADMIN_ORIGIN}${destination.path}`)
+          await expect(
+            operator.getByRole('heading', { name: destination.heading, level: 1 }),
+          ).toBeVisible()
+
+          const { overflow, widest } = await horizontalOverflow(operator)
+          expect(
+            overflow,
+            `${destination.label} overflows by ${overflow}px at ${width}px. ` +
+              `Widest: ${JSON.stringify(widest)}`,
+          ).toBeLessThanOrEqual(0)
+        }
+      }
+    } finally {
+      await context.close()
+    }
   })
 
   test('the Agenda filter and save controls are touch-sized at mobile', async ({ page }) => {

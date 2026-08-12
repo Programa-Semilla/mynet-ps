@@ -14,21 +14,30 @@ and with it, backups became this project's obligation rather than a vendor's.
 Two isolated Azure VMs, `uat` and `prod`. Each runs one Docker Compose stack:
 
 ```
-                    :80 :443
-                       │
-                   ┌───▼────┐   auto-TLS (Let's Encrypt)
-                   │ caddy  │   serves /srv/web, proxies /api/*
-                   └─┬────┬─┘
-        /api/*  ─────┘    └───── everything else
-             │                        │
-        ┌────▼────┐            (the built client,
-        │   api   │             rsynced from CI)
-        └────┬────┘
-             │
-     ┌───────▼────────┐
-     │   postgres     │  127.0.0.1:5432 — LOOPBACK ONLY (FR-486)
-     └────────────────┘
+        <domain>                     admin.<domain>
+            :80 :443                      :80 :443
+                   \                     /
+                    \   ┌───────────┐   /     auto-TLS, TWO certificates
+                     ───│   caddy   │───       serves /srv/web + /srv/admin,
+                        └─┬───────┬─┘          proxies /api/* under BOTH hosts
+             /api/*  ─────┘       └───── everything else
+                  │                          │
+             ┌────▼────┐              /srv/web    → apps/web/dist
+             │   api   │              /srv/admin  → apps/admin/dist
+             └────┬────┘              (both rsynced by deploy.sh)
+                  │
+          ┌───────▼────────┐
+          │   postgres     │  127.0.0.1:5432 — LOOPBACK ONLY (FR-486)
+          └────────────────┘
 ```
+
+**Two origins, one API, one database** (011, standing decision 37). `admin.<domain>` is the
+administrative product. It is a _subdomain_ rather than a path or a separate domain because
+`SameSite` is evaluated against the **registrable domain, not the origin** — so the admin host is
+_same-site_ (decision 19's CSRF defence survives untouched) **and** _different-origin_ (its own
+service-worker scope, storage and CSP). A path would put it under the attendee service worker's
+root scope; a separate registrable domain would stop the session cookie being sent at all, which
+is the v3.0.0 failure described below. The Caddyfile records the full argument.
 
 **Client and API share one origin, and that is not a preference.** It is what keeps the session
 cookie's `SameSite=Lax` a genuine CSRF defence and makes `connect-src 'self'` literally true. The
@@ -57,10 +66,21 @@ Once both exist:
 ```bash
 az login
 ./provision-vm.sh uat          # prints the VM's public IP
-# point the A record at it, then:
+# point BOTH A records at it, then:
 ssh azureuser@<ip>
 cd ~/app/deploy/vm && cp .env.example .env && nano .env
 ```
+
+**Two A records, both to the same VM** (011):
+
+| Record           | Serves                      |
+| ---------------- | --------------------------- |
+| `<domain>`       | MyNet, the attendee product |
+| `admin.<domain>` | the administrative product  |
+
+Caddy obtains a **separate certificate for each host** and cannot obtain either until public DNS
+resolves it. A missing `admin` record is the quiet failure here: MyNet comes up perfectly, every
+check in section 4 passes, and only the administrative host is dead — so check it explicitly.
 
 Then from your machine:
 
@@ -68,9 +88,71 @@ Then from your machine:
 ./deploy.sh uat --migrate
 ```
 
+`deploy.sh` builds **both** clients and rsyncs them to two separate directories, `web/` and
+`admin/`, which `docker-compose.yml` mounts at `/srv/web` and `/srv/admin`. They are two trees
+rather than one with a subdirectory because the attendee service worker is registered at root
+scope, and anything served beneath it would be intercepted by a precache built for a different
+application.
+
 **Every value in `.env` differs between environments**, including `AUTH_PASSWORD_PEPPER`. The
 pepper is mixed into every stored password hash — sharing it would make a UAT disclosure a
 production one.
+
+### Giving a platform operator their first credential (011)
+
+**The seed creates operator identities with a null `password_hash`, so sign-in is impossible
+rather than defaulted** (FR-990, FR-991). This repository is public and the seed is committed,
+reviewed data — it cannot carry an administrative password. Bootstrapping is therefore a separate,
+deliberate act:
+
+```bash
+# On the VM, with ADMIN_BOOTSTRAP_EMAIL and ADMIN_BOOTSTRAP_PASSWORD set in .env:
+cd ~/app/deploy/vm
+docker compose run --rm api node dist/admin/bootstrap.js
+```
+
+`node dist/…`, not `pnpm admin:bootstrap` — the runtime image carries the compiled output and
+production dependencies only, with no source and no `tsx`. This is the same shape as the migration
+step in `deploy.sh` (`docker compose run --rm api node dist/db/migrate.js`), and `run --rm` rather
+than `exec` so it works whether or not the API container is currently up.
+
+Three things about it are load-bearing and are asserted by `admin-bootstrap.test.ts`:
+
+- **It is separate from `pnpm db:seed` on purpose.** Seeding deletes every attendee and re-inserts
+  the committed fixtures; getting a credential must not require doing that.
+- **The credential it sets is _initial_.** It reaches exactly one route — the forced replacement —
+  and no administrative surface until it has been replaced (FR-992).
+- **It never resets a credential the operator chose** (FR-993). Idempotent upsert is the natural
+  wrong implementation, so leaving the two values in `.env` after the first bootstrap is safe; a
+  later run is a no-op against an operator who has replaced theirs.
+
+Unset both values once you are done. A blank pair makes the command do nothing at all, which is
+the correct resting state.
+
+### The last operator, and why nothing guards it
+
+**If every platform operator is deactivated, or the last one loses their credential, there is no
+way back in through the product.** Deactivation is performed by platform operators, so the tier
+can empty itself, and no route refuses the last deactivation.
+
+That is deliberate rather than an oversight. A guard would have to answer "who is allowed to be
+last", which is a governance question nobody has decided, and the alternative — a permanently
+undeletable operator — is a worse property for a product whose whole administrative tier is
+supposed to be revocable.
+
+**Recovery is by re-seed of the identities plus a fresh bootstrap:**
+
+```bash
+docker compose run --rm api node dist/db/seed/index.js   # ⚠️ deletes every attendee — see below
+docker compose run --rm api node dist/admin/bootstrap.js
+```
+
+**In production this is not an acceptable recovery**, because `db:seed` deletes attendee data. On
+a production host the repair is to insert an operator row by hand against the database and then
+bootstrap it — which requires shell access to the VM, and that is the actual control protecting
+this path. Record any such intervention in `OPERATIONS-LOG.md`; an operator created outside the
+seed is an administrative act with no audit entry, because `admin_audit_entries` records acts
+performed _through_ the product (FR-939 records the same reasoning for the re-seed).
 
 ---
 
@@ -116,7 +198,17 @@ curl -sI https://<domain>/                       # 200, and the security headers
 curl -s  https://<domain>/api/health             # {"status":"ok"} — liveness
 curl -s  https://<domain>/api/ready              # {"status":"ready"} — readiness
 ssh azureuser@<ip> 'cd ~/app/deploy/vm && docker compose ps'
+
+# 011 — the administrative host is a SEPARATE certificate and a separate artifact, so it
+# fails independently and none of the checks above would notice.
+curl -sI https://admin.<domain>/                 # 200, its own (stricter) headers
+curl -s  https://admin.<domain>/api/health       # the SAME API, reached from the other origin
+curl -sI https://admin.<domain>/ | grep -i x-robots-tag   # noindex — proves it is the admin block
 ```
+
+**`img-src` differs between the two hosts and that is the quickest way to tell them apart.** MyNet
+permits `data:` because the directory delivers avatar faces as data URLs; the admin host does not,
+because no administrative tier may read a profile at all (FR-973).
 
 **Then sign in, and navigate.** This is the check the whole platform half exists for (**SC-410**),
 and it is the one that **fails today**: in the configuration this replaces, the client was on
@@ -194,6 +286,30 @@ and then three things that are easy to lose and silent when lost:
 - **the `unaccent` extension** — directory search depends on it, so losing it leaves a search that
   finds nobody at a Spanish-language conference;
 - **that `unaccent` still works**, not merely that its row is present.
+
+**011 added three more to the same script** (T156), because the administrative schema has two
+shapes that a row count cannot see and that fail exactly the way the cascade does — the rows come
+back, the database looks correct, and a guarantee is gone. They are inverses of each other:
+
+- **`ON DELETE NO ACTION` survived.** `organizer_assignments.event_id` is the one reference in
+  this schema deliberately _not_ cascading (FR-937). Restored as a cascade, deleting a conference
+  would strip its organizers' authority with no audit entry to explain it.
+- **The partial unique index survived, predicate included.** One live assignment per attendee and
+  conference, with revoked rows unconstrained so they accumulate as history. Restored without the
+  `WHERE`, it becomes _stricter_ than intended and rejects the history; restored not at all, one
+  attendee can hold two live assignments and nothing at read time notices.
+- **And that the index still constrains** — a second live assignment is refused — which is the
+  same standard the `unaccent` check applies: a definition that is present but not enforcing is
+  still a definition.
+
+Two things the script cannot check, for a human doing a real restore:
+
+- **`operators.password_hash` may legitimately be null**, so "nobody can sign in" is not evidence
+  the restore failed — it is the seeded state (FR-990). Re-running the bootstrap is safe but is
+  not a repair; read the last-operator section above first.
+- **Verify the administrative host itself**, with the `curl` checks in section 4. The attendee
+  product coming back is not evidence that the admin one did: separate certificate, separate
+  artifact, separate origin, and the database you just replaced is the only shared component.
 
 To restore for real, into an environment:
 

@@ -1,0 +1,27 @@
+/**
+ * T006 (011) — the administrative client's stylesheet entry point (FR-921).
+ *
+ * ═══════════════════════════════════════════════════════════════════════════════════════════
+ * THIS FILE DEFINES NO COLOUR, NO SPACING AND NO RADIUS. IT IMPORTS THEM.
+ *
+ * `apps/web/src/theme/tokens.css` is the single file in the repository where a colour may be
+ * written literally (FR-008, SC-009), and `mynet/no-colour-literals` names it as the one entry
+ * in its allow list. A second product does not get a second palette: FR-921 says the
+ * administrative site is recognisably MyNet, drawing from the same tokens and the same brand
+ * assets, and the cheapest way to break that would have been to copy the values here.
+ *
+ * **The cross-application relative path is deliberate and is the honest cost.** The alternative
+ * — lifting the token file into a shared package — would rewrite every import in the attendee
+ * client to make this one import prettier, and would move a file that four features refer to by
+ * path in their own comments. A path that reads as unusual is the correct signal here: it says
+ * out loud that these two applications share one source of truth for their appearance.
+ *
+ * That import also carries the **base `<dialog>` rule**, which is the reason it must be the
+ * whole token file rather than a `@theme` fragment. Tailwind's Preflight sets `margin: 0` on
+ * every element, taking away the `margin: auto` the user agent uses to centre a `showModal()`
+ * dialog — and every dialog that did not re-add it shipped pinned to the top-left corner. 004
+ * and 008 each shipped one that way, and no behavioural test could see it. This feature has
+ * three dialogs; they inherit the fix rather than each rediscovering it.
+ * ═══════════════════════════════════════════════════════════════════════════════════════════
+ */
+@import '../../../web/src/theme/tokens.css';

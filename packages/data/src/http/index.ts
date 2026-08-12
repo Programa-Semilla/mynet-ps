@@ -53,3 +53,23 @@ export type { CachedReads, CacheOptions, CacheScope, Clock, FreshnessRegistry } 
 export type { CachedEntry, LocalCache } from './cache-store.js'
 export { HttpAuthGateway } from './auth.js'
 export type { AuthGateway } from './auth.js'
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 011 — the administrative product's three repositories.
+//
+// Exported from this barrel like every other HTTP implementation, and **deliberately absent from
+// the `Repositories` aggregate in `interfaces/index.ts`**: that aggregate is what
+// `packages/platform`'s injected registry exposes to `apps/web`, and adding an administrative
+// repository to it would put administrative code inside MyNet's bundle — which decision 33
+// forbids and `apps/web/tests/unit/admin-absences.test.ts` catches. They are composed in
+// `apps/admin/src/app/services.ts`, that product's own root. See `deviations.md` D2.
+//
+// **None is decorated with `cached`**, and the absence is the whole offline story for the
+// administrative product: an operator acting on stale state resolves a report twice or removes a
+// question that is already gone. 009's reasoning, applied to a second product.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+export {
+  HttpAdminConferenceRepository,
+  HttpAdminReportRepository,
+  HttpAdminSessionRepository,
+} from './administration-repository.js'

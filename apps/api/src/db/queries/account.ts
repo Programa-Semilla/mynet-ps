@@ -1,6 +1,8 @@
 import { sql } from 'drizzle-orm'
 
 import { assertVerifiedScope, type EventScope } from '../../plugins/event-access.js'
+import { revokeAllAssignments, revokeAssignmentForEvent } from './admin-assignments.js'
+import { pseudonymiseAuditEntriesFor } from './admin-audit.js'
 import { removeEmptyConversations } from './conversations.js'
 import { avatarObjectKey, cardKeyFor, type StorageService } from '../../storage/service.js'
 import { getDb } from '../client.js'
@@ -254,6 +256,39 @@ export type AccountExport = {
   }[]
 
   /**
+   * ═══════════════════════════════════════════════════════════════════════════════════════
+   * T026 (011) — **conferences this attendee has been given authority over** (FR-981).
+   *
+   * The only thing 011 adds to this document, out of five new tables. An assignment is a fact
+   * about the attendee who holds it — that somebody granted them authority over a named
+   * conference on a date, and possibly ended it — and that belongs here exactly as their
+   * registrations do.
+   *
+   * **Revoked assignments are included, and that is deliberate.** A revoked row is history:
+   * omitting it would make the document say the attendee never held the authority, which is
+   * false, and would make an export taken after a demotion differ from one taken before it in a
+   * way that hides something about them rather than about anybody else.
+   *
+   * `assignedBy` is the granting operator's **display name**, never their identifier. The
+   * attendee is entitled to know who granted their authority; an operator UUID is an identifier
+   * for a principal they have no other way to resolve, and would be the only place in this
+   * document where a non-attendee principal's key appears.
+   *
+   * The other four tables 011 adds are declared not-attendee-data in
+   * `tests/unit/export-coverage.test.ts`, each with its reasoning — including
+   * `admin_audit_entries`, which names an attendee and is still an *operator's* record.
+   * ═══════════════════════════════════════════════════════════════════════════════════════
+   */
+  readonly organizerAssignments: readonly {
+    readonly assignmentId: string
+    readonly eventId: string
+    readonly eventName: string
+    readonly assignedBy: string
+    readonly assignedAt: string
+    readonly revokedAt: string | null
+  }[]
+
+  /**
    * T137 (007) — what this document deliberately leaves out, in the document (FR-578).
    *
    * An export that silently omits something is indistinguishable from an export of an attendee
@@ -320,6 +355,7 @@ export const assembleExport = async (
     meetings,
     questionsAsked,
     questionVotes,
+    organizerAssignments,
   ] = await Promise.all([
     db.execute<{
       company: string | null
@@ -515,6 +551,34 @@ export const assembleExport = async (
       WHERE v.attendee_id = ${attendeeId}::uuid
       ORDER BY v.voted_at, v.question_id
     `),
+    // ─────────────────────────────────────────────────────────────────────────────────────
+    // T026 (011) — conferences this attendee has been given authority over (FR-981).
+    //
+    // **Revoked rows are included** — a revoked assignment is history, and omitting it would
+    // make the document say the attendee never held the authority. `ORDER BY assigned_at`
+    // rather than by liveness, so the section reads as a chronology.
+    //
+    // `o.display_name` rather than `a.assigned_by`: the attendee is entitled to know who
+    // granted their authority, and an operator UUID is an identifier for a principal they have
+    // no other way to resolve. It is the only place a non-attendee principal appears in this
+    // document, and it appears as a name.
+    // ─────────────────────────────────────────────────────────────────────────────────────
+    db.execute<{
+      id: string
+      event_id: string
+      event_name: string
+      assigned_by: string
+      assigned_at: Date
+      revoked_at: Date | null
+    }>(sql`
+      SELECT a.id, a.event_id, e.name AS event_name, o.display_name AS assigned_by,
+             a.assigned_at, a.revoked_at
+      FROM organizer_assignments a
+      JOIN events e ON e.id = a.event_id
+      JOIN operators o ON o.id = a.assigned_by
+      WHERE a.attendee_id = ${attendeeId}::uuid
+      ORDER BY a.assigned_at, a.id
+    `),
   ])
 
   const profile = profiles[0]
@@ -642,6 +706,15 @@ export const assembleExport = async (
       sessionTitle: row.title,
       votedAt: iso(row.voted_at) as string,
     })),
+    // T026 (011) — FR-981. Includes revoked assignments; see the interface for why.
+    organizerAssignments: organizerAssignments.map((row) => ({
+      assignmentId: row.id,
+      eventId: row.event_id,
+      eventName: row.event_name,
+      assignedBy: row.assigned_by,
+      assignedAt: iso(row.assigned_at) as string,
+      revokedAt: iso(row.revoked_at),
+    })),
     /**
      * T137 (007) — the stated omissions (FR-578).
      *
@@ -662,6 +735,13 @@ export const assembleExport = async (
         'not included. Each of them would let somebody use your account.',
       "Reports made about you by other people are not included. They are those people's " +
         'records, and nothing in MyNet can read them.',
+      // T026 (011) — FR-982. Stated for the same reason every line above is: an attendee who
+      // has never been an organizer and an attendee whose administrative record was withheld
+      // must be able to tell the difference.
+      'Administrative records about you are not included. If you have been given authority ' +
+        'over a conference, that is listed above; what an administrator did, decided, or ' +
+        'recorded is their record of their own actions rather than data about you, and it is ' +
+        'readable from nowhere in MyNet.',
     ],
   }
 }
@@ -730,9 +810,71 @@ export const deleteAccount = async (
     SELECT conversation_id FROM conversation_participants WHERE attendee_id = ${attendeeId}::uuid
   `)
 
-  const rows = await getDb().execute<{ id: string }>(sql`
-    DELETE FROM attendees WHERE id = ${attendeeId}::uuid RETURNING id
-  `)
+  // ═════════════════════════════════════════════════════════════════════════════════════════
+  // **T137, T138 (011) — THE DELETE IS NOW A TRANSACTION, BECAUSE TWO ADMINISTRATIVE
+  // OBLIGATIONS MUST NOT BE ABLE TO COMMIT APART FROM IT.**
+  //
+  // This was three independent statements, which was correct while every one of them was either
+  // idempotent or reached by a cascade. FR-997a is neither: pseudonymising the audit trail is a
+  // one-way write against rows **no cascade can reach**, and either ordering fails differently if
+  // it can commit alone.
+  //
+  //   * Pseudonymise, then the delete fails → an attendee who still exists has had the
+  //     administrative record about them stripped. Accountability lost, for nobody's benefit.
+  //   * Delete, then the pseudonymisation fails → an attendee is erased while
+  //     `admin_audit_entries` still names them. **That is a retained identifier for somebody who
+  //     exercised erasure**, which is the Principle VIII breach FR-997a exists to prevent, and
+  //     nothing would ever report it.
+  //
+  // One transaction removes the choice. Decision 39 is explicit that **deletion is never
+  // conditional** — no administrative role may make an attendee's erasure right depend on
+  // another person existing — so nothing here can refuse, warn, or block. It can only make sure
+  // that what accompanies the erasure happens with it.
+  // ═════════════════════════════════════════════════════════════════════════════════════════
+  const rows = await getDb().transaction(async (tx) => {
+    // ───────────────────────────────────────────────────────────────────────────────────────
+    // **T137 — revoking the assignments is belt and braces, and it is here anyway** (FR-960).
+    //
+    // `organizer_assignments.attendee_id` is `ON DELETE CASCADE`, so the rows go regardless. It
+    // runs first for the reason `revokeAllSessions` gives on this same path: a revocation that
+    // turns out to be redundant costs nothing, while a missing one would leave authority behind.
+    //
+    // More importantly it makes the *intent* visible in the deletion transaction. Decision 39
+    // says authority must not outlive the access it depends on; a reader of `deleteAccount`
+    // should be able to see that being done rather than infer it from a foreign key three files
+    // away — which is exactly how the withdrawal path's equivalent went unnoticed until 008.
+    //
+    // **Called rather than inlined, and `tx` is what makes that safe.** The helper exists to take
+    // the caller's transaction; writing the same UPDATE here instead put a second copy of the rule
+    // in a file that does not own it, and the two could later disagree about what "live" means.
+    // ───────────────────────────────────────────────────────────────────────────────────────
+    await revokeAllAssignments(attendeeId, tx)
+
+    // ───────────────────────────────────────────────────────────────────────────────────────
+    // **T138 — pseudonymisation, and it is NOT a deletion** (FR-997a, FR-997b).
+    //
+    // The operator's act survives — who did it, what they did, when. What goes is *whom it was
+    // done to*. There is **no row meaning "deleted attendee"**, no flag, no sentinel, and
+    // nothing reconstructible: a cleared nullable column is neither a soft delete nor a
+    // tombstone, which is precisely what FR-997b requires.
+    //
+    // **Hashing was rejected** and the reason generalises: a hash of a UUID drawn from a known
+    // set is reversible by enumeration in one pass, which makes it a tombstone in disguise.
+    //
+    // **`pseudonymiseAuditEntriesFor` is called, not reimplemented here.** It takes the caller's
+    // transaction precisely so this can commit with the deletion or not at all, so inlining the
+    // UPDATE bought nothing and cost a second copy of the rule. It also matters that the audit
+    // module keeps owning its own retention operation: `audit-append-only.test.ts` permits
+    // exactly two mutations there **by exact name**, and a pseudonymisation living only as
+    // anonymous SQL in this file would be invisible to that guard. The rule itself is documented
+    // in `schema/admin-audit.ts`, which owns it.
+    // ───────────────────────────────────────────────────────────────────────────────────────
+    await pseudonymiseAuditEntriesFor(attendeeId, tx)
+
+    return tx.execute<{ id: string }>(sql`
+      DELETE FROM attendees WHERE id = ${attendeeId}::uuid RETURNING id
+    `)
+  })
 
   // ───────────────────────────────────────────────────────────────────────────────────────
   // T131 (007) — **the one piece M3's cascades cannot do for themselves** (FR-575).
@@ -835,6 +977,34 @@ export const withdrawFromConference = async (unverified: EventScope): Promise<vo
         AND sn.attendee_id = ${scope.attendeeId}::uuid
         AND s.event_id = ${scope.eventId}::uuid
     `)
+
+    // ═════════════════════════════════════════════════════════════════════════════════════════
+    // **T139 (011) — LEAVING A CONFERENCE TAKES THE AUTHORITY OVER IT** (FR-961, decision 39).
+    //
+    // The same trap 008 recorded immediately above, arriving through a third door — and the
+    // reasoning is close enough that it is worth being explicit about the difference.
+    //
+    // 008's problem was a **commitment** the departing attendee could no longer see or cancel
+    // while the other party could still act on it. This is an **authority** the departing
+    // attendee could still exercise: nothing about an `organizer_assignments` row depends on a
+    // registration, so an organizer who withdrew from a conference would keep administrative
+    // control over it indefinitely — able to promote, demote and act on content at an event they
+    // have left.
+    //
+    // Decision 39 states it in one sentence: **authority must not outlive the access it depends
+    // on.** 008's cancellation is cited there as the precedent, which is why this sits beside it.
+    //
+    // **Scoped to this conference only.** Somebody withdrawing from one event keeps their
+    // authority over the others — FR-932's independent revocability seen from the lifecycle side.
+    // Contrast `deleteAccount` below, which revokes every assignment.
+    //
+    // **`revokeAssignmentForEvent` is called and handed `tx`.** This must commit **with** the
+    // withdrawal or not at all — an authority revoked by a rolled-back withdrawal is an organizer
+    // who lost their conference for no reason — and passing the transaction is exactly how the
+    // helper delivers that. Inlining the UPDATE here did not make it more atomic; it only made
+    // `organizer_assignments` a table two files write with two copies of the same predicate.
+    // ═════════════════════════════════════════════════════════════════════════════════════════
+    await revokeAssignmentForEvent(scope.attendeeId, scope.eventId, tx)
 
     // Last, and the cascade to `active_event_selections` rides on it.
     await tx.execute(sql`

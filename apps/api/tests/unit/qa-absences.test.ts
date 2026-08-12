@@ -178,13 +178,33 @@ describe('009 — the absences that are requirements', () => {
   })
 
   /**
-   * T088 — **no answer, no `answered` flag, no pin, no moderation route** (FR-768).
+   * T088 — **no answer, no `answered` flag, no pin** (FR-768).
    *
    * Each of these is an **organizer** act. Answering from the stage is a thing that happens in
-   * the room, not in the product; pinning and moderating need somebody with authority over other
-   * people's questions, and Principle III excludes that actor by construction. A report is not
-   * moderation — it removes and protects for *one reader* and sends the matter out of the
-   * product to a human.
+   * the room, not in the product; pinning needs somebody with authority over other people's
+   * questions. A report is not moderation — it removes and protects for *one reader* and sends
+   * the matter out of the product to a human.
+   *
+   * ═══════════════════════════════════════════════════════════════════════════════════════════
+   * **T103 (011) — THE MODERATION HALF MOVED TO ITS OWN ASSERTION BELOW, AND FINDING OUT WHY
+   * REQUIRED FIXING A HOLE FIRST.**
+   *
+   * 011 adds exactly one moderation route — `DELETE /admin/questions/:questionId` — and the
+   * expectation was that this guard would catch it and demand a deliberate amendment. **It did
+   * not.** The predicate matched on *words in the URL* (`answer|pin|moderat|…`), and that route
+   * contains none of them, so an administrative question-removal route passed this assertion
+   * while it reported success.
+   *
+   * That is the exact failure this codebase warns about in three other places: *a gate keyed on
+   * a name is defeated by choosing another name.* `participation-audit.test.ts` learned it when
+   * `/conversations/:id/messages` slipped past a matcher keyed on `:conversationId`; 008
+   * inherited the lesson rather than re-learning it.
+   *
+   * So the moderation half is now matched by **shape** — a write to a question by anybody who is
+   * not its author — and narrowed **by path** to permit the one administrative route. Widening
+   * a pattern until it passes was the alternative, and 009's own header names that as the
+   * natural wrong repair.
+   * ═══════════════════════════════════════════════════════════════════════════════════════════
    */
   it('exposes no organizer act on a question (FR-768)', () => {
     const organizer = routes
@@ -193,12 +213,110 @@ describe('009 — the absences that are requirements', () => {
 
     expect(
       organizer,
-      'A route that answers, pins, approves or moderates a question exists. Each is an ' +
-        'organizer act, and Principle III excludes that actor from this product by construction.',
+      'A route that answers, pins, approves or moderates a question exists. Answering and ' +
+        'pinning remain out of scope entirely — they are acts on the room, and this product ' +
+        'has no surface for them (FR-768).',
     ).toEqual([])
 
     const schema = codeOnly(join(apiSrc, 'db/schema/questions.ts'))
     expect(schema).not.toMatch(/answered|answer_text|pinned|approved|hidden|moderat/i)
+  })
+
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════════════════════
+   * **T103 (011) — EXACTLY ONE MODERATION ROUTE, NARROWED BY PATH** (FR-950, FR-953, FR-976).
+   *
+   * Matched by **shape rather than by name**: any route that writes to a question. That catches
+   * `DELETE /admin/questions/:id`, and it would equally catch `DELETE /questions/:id/remove`,
+   * `POST /events/:eventId/questions/:id/takedown`, or anything else somebody reaches for —
+   * which the word-matching predicate above could not.
+   *
+   * **The permitted set is one exact label, not a pattern.** FR-976 says the five named guards
+   * are amended deliberately and narrowly and never weakened to the point of checking nothing;
+   * a literal is the narrowest amendment available. A second moderation route fails here naming
+   * itself, and whoever adds it has to decide whether it belongs.
+   *
+   * **The attendee withdrawal route stays permitted and is NOT moderation.** An author
+   * withdrawing their own unvoted question (FR-712) is the opposite act: it is somebody
+   * retracting their own words, refused the moment anybody has backed them.
+   * ═══════════════════════════════════════════════════════════════════════════════════════════
+   */
+  it('exposes exactly ONE moderation route, and it is the administrative one (FR-953)', () => {
+    /** The one route 011 is licensed to add. An exact label, deliberately not a pattern. */
+    const PERMITTED_MODERATION = ['DELETE /admin/questions/:questionId']
+
+    /** The author's own retraction — not moderation. See the header. */
+    const AUTHOR_WITHDRAWAL = /^\/events\/[:{][^/]+\/questions\/[:{][^/]+$/
+
+    /**
+     * **What the path ADDRESSES, not what it contains** — 009's own narrowing, reused.
+     *
+     * `DELETE /events/:eventId/questions/:questionId/vote` writes to a **vote**, which is the
+     * caller's own and is neither moderation nor an act on somebody else's words. Matching any
+     * path *containing* `/questions/:` would catch it, exactly as 009's original predicate
+     * caught `POST …/sessions/:id/questions` by containing `/sessions`.
+     *
+     * The rule is the same one 009 arrived at: ask what the last non-parameter segment is.
+     */
+    const addressesAQuestion = (url: string): boolean => {
+      const segments = url.split('/').filter((segment) => segment.length > 0)
+      const last = [...segments].reverse().find((segment) => !segment.startsWith(':'))
+      return last === 'questions'
+    }
+
+    const writesToAQuestion = routes
+      .filter((route) => addressesAQuestion(route.url))
+      .filter((route) =>
+        methodsOf(route).some((method) => ['DELETE', 'PUT', 'PATCH'].includes(method)),
+      )
+      .filter((route) => !AUTHOR_WITHDRAWAL.test(route.url))
+      .flatMap((route) => methodsOf(route).map((method) => `${method} ${route.url}`))
+      .filter((label) => !label.startsWith('HEAD '))
+
+    expect(
+      writesToAQuestion,
+      "A route writes to somebody else's question and is not the one moderation route this " +
+        'feature is licensed to add. Constitution v4.0.0 admitted ONE enforcement action — ' +
+        'removing a reported question, reachable only from a report (FR-950, FR-953). Anything ' +
+        'else is a second administrative power that needs its own decision.',
+    ).toEqual(PERMITTED_MODERATION)
+
+    // The permitted route must actually exist. An allow-list that outlives its route is a hole
+    // waiting for a name collision — the discipline every list in this codebase applies.
+    const labels = new Set(
+      routes.flatMap((route) => methodsOf(route).map((method) => `${method} ${route.url}`)),
+    )
+    for (const permitted of PERMITTED_MODERATION) {
+      expect(labels.has(permitted), `${permitted} is permitted but no longer exists`).toBe(true)
+    }
+  })
+
+  /**
+   * **The moderation route is reachable only from a report** (FR-953), asserted at the schema.
+   *
+   * Without this, `PERMITTED_MODERATION` above would licence a route an operator could call for
+   * any question they cared to name — which is general moderation wearing the one permitted
+   * route's label. The `reportId` requirement is what bounds the power, and it is checked
+   * server-side because "the interface only offers it from a report" is not a control.
+   */
+  it('lets the moderation route be reached only from a report (FR-953)', () => {
+    const removal = routes.find(
+      (route) =>
+        route.url === '/admin/questions/:questionId' && methodsOf(route).includes('DELETE'),
+    )
+
+    expect(removal, 'the moderation route is missing from the route table').toBeDefined()
+
+    const querystring = (removal?.schema as Record<string, unknown> | undefined)?.[
+      'querystring'
+    ] as { required?: string[] } | undefined
+
+    expect(
+      querystring?.required,
+      'The moderation route does not require a `reportId`. Without it an operator could remove ' +
+        'any question they can name, which is general moderation rather than the bounded action ' +
+        'constitution v4.0.0 admitted (FR-953).',
+    ).toContain('reportId')
   })
 
   /**

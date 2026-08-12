@@ -243,3 +243,17 @@ export const dropSchema = async (name) => {
     'DROP SCHEMA IF EXISTS public CASCADE; DROP SCHEMA IF EXISTS drizzle CASCADE; CREATE SCHEMA public;',
   ])
 }
+
+/**
+ * Runs one statement against an instance database and returns `psql`'s output.
+ *
+ * Everything here already speaks to PostgreSQL through `docker exec psql` rather than a driver,
+ * and this keeps that true: the alternative was importing `postgres` into a script that runs
+ * before `pnpm install` is guaranteed to have produced anything, in a file whose whole purpose
+ * is to work on a fresh clone.
+ *
+ * **Not for anything taking user input.** The caller composes the statement, so this is a
+ * developer tool for fixed SQL, not a query interface.
+ */
+export const runSql = async (name, statement) =>
+  docker(['exec', CONTAINER, 'psql', '-U', USER, '-d', name, '-t', '-A', '-c', statement])

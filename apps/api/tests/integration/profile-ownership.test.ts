@@ -116,6 +116,25 @@ describe('a profile is editable by its owner and by nobody else (FR-335)', () =>
     const offending = routes
       .filter((route) => /:attendeeId|\{attendeeId\}|:userId|:personId/.test(route.url))
       .filter((route) => methodsOf(route).some((method) => method !== 'GET' && method !== 'HEAD'))
+      // ─────────────────────────────────────────────────────────────────────────────────────
+      // T028 (011) — **the administrative demotion route names an attendee in a write, and that
+      // is exactly the power constitution v4.0.0 admitted.**
+      //
+      // FR-335's purpose is that **no attendee may edit another attendee**, and it is entirely
+      // intact: every attendee-facing route is still checked here, and the profile assertions
+      // above still find no way for one person to change another's.
+      //
+      // `DELETE /admin/conferences/:eventId/organizers/:attendeeId` edits **no profile and no
+      // account** (FR-934, FR-973). It revokes an assignment — administrative authority the
+      // named attendee holds — performed by a principal who is not an attendee, through a guard
+      // the attendee product cannot reach, on a separate origin. Applying FR-335 to it would be
+      // a claim that the second actor does not exist.
+      //
+      // The absence that matters is asserted separately and positively:
+      // `admin-forbidden-surfaces.test.ts` fails the build if any administrative route reaches
+      // a profile at all — *conference content is authorable, a person is not* (decision 33).
+      // ─────────────────────────────────────────────────────────────────────────────────────
+      .filter((route) => !/^\/admin(\/|$)/.test(route.url))
       .map((route) => `${methodsOf(route).join('/')} ${route.url}`)
 
     expect(

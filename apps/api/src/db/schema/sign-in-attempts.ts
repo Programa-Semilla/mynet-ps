@@ -142,6 +142,28 @@ export const THROTTLE_ACTIONS = [
   // Tightest of the three actions 009 adds, because each request leaves the product.
   // ───────────────────────────────────────────────────────────────────────────────────────
   'report_submit',
+
+  // ───────────────────────────────────────────────────────────────────────────────────────
+  // 011 — FR-916. **The second entry in this list configured `mayDeny: false`, and it is the
+  // first to arrive at that setting by the SAME reasoning as `reset_request` rather than a
+  // different one.**
+  //
+  // Administrative sign-in is unauthenticated and keyed on a **submitted address**, which is
+  // the property that separates `reset_request` from every `mayDeny: true` action here: the
+  // person a denial falls on is not the person making the requests. An attacker who can lock
+  // out an address they do not own has locked out the platform operator — and the operator is
+  // the only principal who can read the abuse-report queue or promote anybody.
+  //
+  // The attendee `sign_in` action IS `mayDeny: true`, and the difference is the population. A
+  // denied attendee is one of thousands and recovers by waiting; a denied operator may be the
+  // only person who can act on the product at all, and there is nobody to appeal to. So this
+  // action **may delay but can never deny**, exactly as FR-331 requires of `reset_request`.
+  //
+  // Separate from `sign_in` for the reason every entry here is separate: administrative
+  // sign-in attempts must not slow any attendee's sign-in, and attendee traffic must not
+  // consume the operator's allowance.
+  // ───────────────────────────────────────────────────────────────────────────────────────
+  'admin_sign_in',
 ] as const
 
 export type ThrottleAction = (typeof THROTTLE_ACTIONS)[number]

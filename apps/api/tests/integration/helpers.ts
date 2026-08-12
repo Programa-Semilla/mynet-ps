@@ -1,4 +1,4 @@
-import { sql } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
 import type { FastifyInstance } from 'fastify'
 
 import { buildApp, type BuildAppOptions } from '../../src/app.js'
@@ -173,6 +173,42 @@ export const resetDatabase = async (): Promise<void> => {
 export { SEED_EVENTS } from '../../src/db/seed/events.js'
 
 /** Clears only the throttle table, so an earlier test's failures do not delay a later one. */
+/**
+ * A seeded attendee's id, **or a failure that names the actual cause**.
+ *
+ * ═════════════════════════════════════════════════════════════════════════════════════════════
+ * **THE SHARED SEED IS A PREREQUISITE, AND WHEN IT IS MISSING THE SYMPTOM IS UNREADABLE.**
+ *
+ * Most suites resolve their fixtures with `(await db.select()…)[0]!.id`, which is fine while the
+ * seed is present and produces `TypeError: Cannot read properties of undefined (reading 'id')`
+ * when it is not — a message that names neither the table, the attendee, nor the seed.
+ *
+ * It is not hypothetical: the 114 integration files share one database, are seeded **once** for
+ * the whole run, run in file-size order, and several call `resetDatabase()` mid-run. A file that
+ * assumes the seed is intact can find it gone for reasons that have nothing to do with what it
+ * is testing, and the resulting `TypeError` sends the next reader after the wrong thing. This
+ * turns that into one sentence.
+ *
+ * It does **not** fix the underlying isolation model — see `review-findings.md`. It makes the
+ * next occurrence diagnosable instead of misleading.
+ * ═════════════════════════════════════════════════════════════════════════════════════════════
+ */
+export const seededAttendeeId = async (email: string): Promise<string> => {
+  const rows = await getDb().select().from(attendees).where(eq(attendees.email, email))
+  const found = rows[0]
+  if (!found) {
+    throw new Error(
+      `The seeded attendee ${email} is absent, so this suite's fixture cannot be built. That is ` +
+        'a prerequisite failure rather than a defect in the behaviour under test: the ' +
+        'integration files share one database and are seeded once for the whole run, so a ' +
+        'neighbouring file’s `resetDatabase()` (or a partially-applied seed) can remove it. ' +
+        'Re-run with `pnpm db:seed` first; if it recurs, the suite ordering is the thing to ' +
+        'investigate, not this file.',
+    )
+  }
+  return found.id
+}
+
 export const clearThrottle = async (): Promise<void> => {
   await getDb().delete(signInAttempts)
 }

@@ -42,3 +42,24 @@ export const API_ORIGIN = process.env['VITE_API_BASE_URL'] ?? `http://localhost:
 
 /** Where the harness reaches the client. */
 export const WEB_ORIGIN = process.env['WEB_ORIGIN'] ?? 'http://localhost:5173'
+
+/**
+ * 011 — where the harness reaches the **administrative** client.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════════════════════
+ * **A SECOND ORIGIN, NOT A PATH, AND THE PORT IS STANDING IN FOR A SUBDOMAIN.**
+ *
+ * In a deployed environment the administrative site is `admin.<host>` (decision 37), served by
+ * its own Caddy block. Locally there is no DNS to give it a name, so it is a second port — which
+ * is a **different origin** in exactly the way that matters for these tests: separate storage,
+ * separate service-worker scope, and a cookie the browser will not send to the other one.
+ *
+ * What the port does NOT reproduce is `SameSite` evaluation, which is done against the
+ * registrable domain — `localhost:5174` and `localhost:5173` are same-site in a way
+ * `admin.example.com` and `example.com` also are, so the local topology happens to behave the
+ * same for the property these tests care about. That is a coincidence worth naming rather than
+ * relying on: the deployed guarantee is asserted by the Caddyfile and by
+ * `tests/unit/admin-cookie.test.ts`, not here.
+ * ═══════════════════════════════════════════════════════════════════════════════════════════
+ */
+export const ADMIN_ORIGIN = process.env['ADMIN_ORIGIN'] ?? 'http://localhost:5174'

@@ -152,7 +152,37 @@ describe('throttle actions', () => {
     ).toBe(true)
   })
 
-  it('keeps the delay-only set to exactly the two actions that earned it', () => {
+  it('lets administrative sign-in delay but never deny (FR-916)', () => {
+    // ─────────────────────────────────────────────────────────────────────────────────────
+    // T040 (011). `reset_request`'s argument, arriving a second time: the action is
+    // **unauthenticated and keyed on a submitted address**, so anybody can drive the counter
+    // for an address they do not own — and the address they would choose is the platform
+    // operator's, who is the only principal that can read the report queue or promote anybody.
+    //
+    // The attendee `sign_in` action is `mayDeny: true` and that stays correct: a locked-out
+    // attendee is one of thousands and recovers by waiting. A locked-out operator may be the
+    // only person able to act on the product, with nobody to appeal to.
+    // ─────────────────────────────────────────────────────────────────────────────────────
+    expect(
+      THRESHOLDS.admin_sign_in.mayDeny,
+      'FR-916 — administrative sign-in is unauthenticated and keyed on a submitted address, so ' +
+        'an identifier-keyed denial only ever harms the operator being attacked. It may delay ' +
+        'and must never deny.',
+    ).toBe(false)
+  })
+
+  it('keeps administrative sign-in separate from attendee sign-in', () => {
+    // Separate counters, for the reason every action in this table is separate: administrative
+    // attempts must not slow any attendee's sign-in, and attendee traffic must not consume the
+    // operator's allowance. Asserted because "reuse `sign_in`" is the obvious simplification
+    // and it would silently couple the two populations — including their `mayDeny` settings,
+    // which deliberately differ.
+    expect(THROTTLE_ACTIONS).toContain('admin_sign_in')
+    expect(THRESHOLDS.admin_sign_in).not.toBe(THRESHOLDS.sign_in)
+    expect(THRESHOLDS.sign_in.mayDeny).toBe(true)
+  })
+
+  it('keeps the delay-only set to exactly the three actions that earned it', () => {
     // ─────────────────────────────────────────────────────────────────────────────────────
     // The inverse of the assertions above, and the one that fails when a **future** feature
     // adds an action and copies the wrong neighbour's flag. Delay-only is the exceptional
@@ -168,10 +198,12 @@ describe('throttle actions', () => {
     expect(
       delayOnly,
       'The set of delay-only throttle actions has changed. `reset_request` (FR-331, keyed on a ' +
-        "victim's address) and `message_send` (FR-511a, a refused message at a conference is a " +
-        'failure nobody can act on) are the two that have earned it. Anything else here is ' +
+        "victim's address), `message_send` (FR-511a, a refused message at a conference is a " +
+        'failure nobody can act on) and `admin_sign_in` (FR-916, unauthenticated and keyed on a ' +
+        'submitted address, so a denial locks out the operator rather than the attacker) are ' +
+        'the three that have earned it. Anything else here is ' +
         'either a new requirement that needs recording, or a flag copied from the wrong ' +
         'neighbour.',
-    ).toEqual(['message_send', 'reset_request'])
+    ).toEqual(['admin_sign_in', 'message_send', 'reset_request'])
   })
 })

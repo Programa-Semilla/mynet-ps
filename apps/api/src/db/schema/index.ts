@@ -111,3 +111,47 @@ export * from './appointments.js'
 // because a question must be reportable from the question itself (FR-781, FR-783).
 // ═══════════════════════════════════════════════════════════════════════════════════════════
 export * from './questions.js'
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 011 — the administrative foundation: the second actor, the admin site, and the report queue.
+// **Five tables, and they do not share one scoping rule — three of them share NEITHER of the
+// two rules standing decision 7 offers**, which is the first time that has been true.
+//
+// `operators`, `operator_sessions` and `admin_audit_entries` are neither per-event nor
+// cross-event: their subjects are a principal and an act, not a conference or a relationship
+// between conferences. Each file records that as a statement rather than leaving it as a gap,
+// because the decision demands a declaration and "neither" is an answer.
+// `organizer_assignments` is **per-event** — it IS authority over one conference.
+// `report_resolutions` follows `abuse_reports` and is **cross-event**: conduct is not a
+// conference (007's rule).
+//
+// They also carry **three distinct deletion rules where a single one would have been wrong**:
+// cascade (resolutions, reached through their report), pseudonymise-plus-clock (audit), and
+// deactivate-plus-clock (operators). `deletion-coverage.test.ts` fails by existing the moment
+// these appear, and its allow-list entries state each rule rather than asserting an exemption.
+//
+// Like 007 and 008 and unlike 009, this feature adds a **fourth branded scope and a fourth
+// route audit**: administrative routes name no conference, so `event-scope-audit` walks past
+// them reporting success. `src/admin/scope.ts` and `tests/unit/operator-audit.test.ts`.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+
+// The second actor's identity. Not an attendee, holds no profile, has no `attendees` row —
+// which is what makes a promoted attendee's MyNet experience unchanged (FR-904).
+export * from './operators.js'
+
+// Deliberately NOT `auth_sessions`. A separate table is the storage half of "two independent
+// sessions"; the host-only cookie is the transport half (research R3, decision 37).
+export * from './operator-sessions.js'
+
+// The second tier, stored as authority rather than as a person. `event_id` is `NO ACTION` on
+// purpose: a cascade is not an administrative write, so a re-seed would strip authority with
+// no audit trace (FR-939). The seed must clear this domain (FR-938).
+export * from './organizer-assignments.js'
+
+// What an operator did about a report. `report_id` is unique, and that constraint IS the
+// concurrency guarantee (FR-945) — 009's composite primary key reasoning, applied again.
+export * from './report-resolutions.js'
+
+// The accountability record. `subject_attendee_id` carries no foreign key, deliberately, so
+// erasure can clear it by written rule rather than by constraint (FR-997a, research R6).
+export * from './admin-audit.js'

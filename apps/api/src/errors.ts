@@ -76,6 +76,19 @@ export type ErrorCode =
    * question (FR-713's shape applied to voting), so reaching this means the control was bypassed.
    */
   | 'own_question'
+  /**
+   * FR-992 (011) — the administrative credential set by the bootstrap has not been replaced.
+   *
+   * One of only two 011 refusals that explain themselves. See `credentialNotReplaced` below.
+   */
+  | 'credential_not_replaced'
+  /**
+   * FR-945 (011) — another operator has already resolved this report.
+   *
+   * Produced from a **unique-constraint violation**, not from a read-then-write check. See
+   * `reportAlreadyResolved` below and `schema/report-resolutions.ts`.
+   */
+  | 'report_already_resolved'
 
 export class AppError extends Error {
   readonly statusCode: number
@@ -290,6 +303,44 @@ export const questionHasVotes = (): AppError =>
  * this bypassed the form — the same relationship the note limit and the report reason each have
  * with their own 400.
  */
+/**
+ * FR-992 (011) — the operator has not yet replaced the credential that was set for them.
+ *
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ * **ONE OF ONLY TWO REFUSALS IN 011 THAT EXPLAIN THEMSELVES**, and it passes the test every
+ * explained refusal in this product has to pass: **the follow-up question is about the reader.**
+ *
+ * It describes the reader's own credential to the reader, and it is actionable in one step —
+ * the credential-replacement route is the single address this state may reach. Everything else
+ * administrative refuses with the indistinguishable 401 or 404, because everything else would
+ * be disclosing something about the product to somebody who has not proved they belong in it.
+ *
+ * 403 rather than 404: the caller holds a valid administrative session and the surface exists.
+ * FR-917's indistinguishability is about callers who have proved nothing, and this one has.
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ */
+export const credentialNotReplaced = (): AppError =>
+  new AppError(
+    'credential_not_replaced',
+    403,
+    'Replace your initial password before continuing. It was set for you, so it is not yours yet.',
+  )
+
+/**
+ * FR-945 (011) — a report another operator has already resolved.
+ *
+ * Explained, for the same reason as `credentialNotReplaced`: it is a fact about the reader's own
+ * work — somebody has already dealt with this — and it discloses nothing about any attendee. The
+ * 409 comes from a **unique constraint violation** rather than a read-then-write check, which is
+ * what makes it a guarantee rather than a narrowed race (see `schema/report-resolutions.ts`).
+ */
+export const reportAlreadyResolved = (): AppError =>
+  new AppError(
+    'report_already_resolved',
+    409,
+    'Another operator has already resolved this report. Reload the queue to see what they decided.',
+  )
+
 export const ownQuestion = (): AppError =>
   new AppError(
     'own_question',

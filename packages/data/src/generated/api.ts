@@ -4610,6 +4610,808 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/session": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Exchange administrative credentials for a session cookie
+         * @description Sets a host-only, HttpOnly, SameSite=Lax cookie scoped to the administrative host, independent of any MyNet session (FR-912). Every failure — unknown address, wrong password, an attendee who is not an organizer, a deactivated operator — returns one identical refusal (FR-915).
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** Format: email */
+                        email: string;
+                        password: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Signed in. The session is in the cookie. */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description One identical refusal for all four causes (FR-915). */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Throttled. May delay but never denies (FR-916) — an identifier-keyed denial here would lock out the operator rather than the attacker. */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                            retryAfterSeconds?: number;
+                        };
+                    };
+                };
+            };
+        };
+        /**
+         * Sign out of the administrative site
+         * @description Revokes this administrative session server-side and clears its cookie. Does NOT affect any MyNet session the same person holds (FR-912, decision 37).
+         */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/session/credential": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Replace the initial administrative credential
+         * @description The ONE route reachable while `credential_is_initial` is true (FR-992). Every other administrative address refuses with 403 until this succeeds.
+         */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        currentPassword: string;
+                        newPassword: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description A conference organizer has no administrative credential to replace — they sign in with their MyNet password (FR-914). */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The signed-in administrative principal and their tier */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            displayName: string;
+                            /** @enum {string} */
+                            tier: "platform" | "organizer";
+                            credentialIsInitial?: boolean;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/reports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The abuse-report queue
+         * @description Open and resolved reports, newest first. **Carries no reported content** — which is why reading this list writes no audit entry (FR-995). Both report origins appear here: `abuse_reports` is one cross-event table, because conduct is not a conference.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            id: string;
+                            reporterName: string;
+                            reportedName: string;
+                            reportedAt: string;
+                            /** @enum {string} */
+                            kind: "messages" | "questions";
+                            resolution?: {
+                                /** @enum {string} */
+                                outcome?: "actioned" | "dismissed";
+                                note?: string;
+                                resolvedAt?: string;
+                                resolvedBy?: string;
+                            } | null;
+                        }[];
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description A conference organizer, refused indistinguishably from a route that does not exist (FR-906). */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/reports/{reportId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * One report, with the reported content and the reporter’s stated reason
+         * @description The **third recorded exception to Principle VIII** (constitution v4.1.0, decision 38) and the only route in the product that carries one. Returns exactly what was reported and nothing adjacent — never the surrounding thread, the pair’s other conversations, or any third party (FR-942). `contentAvailable: false` is a first-class state, not an error: the reported rows are usually gone before anybody looks (FR-941). **Reading this writes an audit entry** (FR-995).
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    reportId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            id: string;
+                            reporterName?: string;
+                            reportedName?: string;
+                            reportedAt?: string;
+                            /** @enum {string} */
+                            kind?: "messages" | "questions";
+                            reason: string;
+                            contentAvailable: boolean;
+                            content: {
+                                id?: string;
+                                body?: string;
+                            }[];
+                            resolution?: {
+                                /** @enum {string} */
+                                outcome?: "actioned" | "dismissed";
+                                note?: string;
+                                resolvedAt?: string;
+                                resolvedBy?: string;
+                            } | null;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/reports/{reportId}/resolution": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Record what was done about a report
+         * @description Two outcomes and deliberately no third — there is no `pending` or `escalated`, because a status meaning "somebody is still thinking about it" would be a workflow visible to the reporter through timing. A second resolution is refused with **409 and an explanation** (FR-945), produced by a unique constraint rather than a read-then-write check. **Discloses nothing to the reporter, the reported attendee, or any MyNet surface** (FR-946).
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    reportId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** @enum {string} */
+                        outcome: "actioned" | "dismissed";
+                        note: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Already resolved by another operator (FR-945). */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/questions/{questionId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove a reported audience question
+         * @description The only enforcement action in this feature. The question and **all** its votes go (FR-950, FR-951); no other question’s count moves. The author is not told who removed it or why (FR-952), and nothing is dispatched. Reachable only for a question named by the report given in `reportId` — an operator cannot browse and remove. A message report offers no removal at all (FR-953).
+         */
+        delete: {
+            parameters: {
+                query: {
+                    reportId: string;
+                };
+                header?: never;
+                path: {
+                    questionId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description The question is gone, the report does not name it, or the caller is a conference organizer — one indistinguishable answer for all three. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/conferences": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Conferences this principal may act on
+         * @description Every conference for a platform operator; only assigned ones for a conference organizer (FR-926). `unassigned` is **derived** from the absence of a live assignment and stored nowhere (FR-936) — a stored flag would need four write paths to keep it true, three of which belong to other features, and the one that drifted would be the one displayed.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            id: string;
+                            name: string;
+                            organizers: {
+                                attendeeId?: string;
+                                displayName?: string;
+                            }[];
+                            unassigned: boolean;
+                        }[];
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/conferences/{eventId}/organizers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Promote a registered attendee to organizer of this conference
+         * @description The only way a conference organizer comes into being — **neither tier is reachable by self sign-up** (decision 32, FR-902). Requires the attendee to be registered for the conference (FR-930). Records the acting operator and the instant (FR-933). **Dispatches nothing** (FR-935): the trigger set stays at a received message. Note this route deliberately does NOT carry `requireEventAccess` despite naming an event — see the file header.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    eventId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        attendeeId: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description The conference does not exist, the attendee is not registered for it, or the caller is a conference organizer — one indistinguishable answer, so this route is not an enumeration oracle for another attendee’s presence (008’s defect, not repeated). */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description That attendee already holds a live assignment for this conference. */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/conferences/{eventId}/organizers/{attendeeId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * End an organizer’s authority over this conference
+         * @description Ends administrative access and **leaves the account untouched** (FR-934) — no profile field, no registration, nothing an attendee can observe in MyNet (FR-904). The row is revoked rather than deleted, because a revoked assignment is history and an audit entry explaining the promotion has to stay coherent against it. If this was the last organizer, the conference enters the derived `unassigned` state, which platform operators can see (decision 39).
+         */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    eventId: string;
+                    attendeeId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/operators/{operatorId}/deactivation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * End a platform operator’s access permanently
+         * @description Immediate: `requireOperator` re-reads the operator row on every request, so live sessions stop working at once rather than at next sign-in. The row survives, because the identity must keep resolving on records that name it (FR-909). There is deliberately no deletion route — an operator is not an attendee and has no erasure right here (FR-901).
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    operatorId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description No such operator, or already deactivated — one answer for both, so the route reports nothing about who exists. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {

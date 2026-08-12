@@ -431,6 +431,44 @@ export const THRESHOLDS: Record<ThrottleAction, ActionThreshold> = {
     source: { freeAttempts: 50, ceilingMs: SOURCE_MAX_DELAY_MS },
     mayDeny: true,
   },
+
+  /**
+   * T040 (011) — administrative sign-in (FR-916, research R4).
+   *
+   * ═════════════════════════════════════════════════════════════════════════════════════════
+   * **`mayDeny: false` — THE SECOND ENTRY IN THIS TABLE TO SAY SO, AND THE FIRST TO REACH IT BY
+   * `reset_request`'S OWN ARGUMENT RATHER THAN A DIFFERENT ONE.**
+   *
+   * The rule this table runs on is *who a denial falls on*. Every `mayDeny: true` action above
+   * is authenticated and keyed on the acting attendee's own identity, so a refusal can only
+   * inconvenience the person doing the thing. `reset_request` is `mayDeny: false` because it is
+   * keyed on a **victim's** address: an identifier-keyed denial there only ever harms the person
+   * being attacked.
+   *
+   * This is that case again. Administrative sign-in is unauthenticated and keyed on a submitted
+   * address, so anyone can drive the counter for an address they do not own — and the address
+   * they would choose is the platform operator's, who is the only principal that can read the
+   * report queue or promote anybody.
+   *
+   * **Note that the attendee `sign_in` action IS `mayDeny: true`, and the difference is
+   * population rather than principle.** A locked-out attendee is one of thousands and recovers
+   * by waiting; a locked-out operator may be the only person able to act on the product, with
+   * nobody to appeal to. The blast radius of the same mechanism is different enough to change
+   * the setting, and that reasoning is written here rather than left to be inferred from the
+   * neighbouring entry.
+   * ═════════════════════════════════════════════════════════════════════════════════════════
+   *
+   * Tight free allowances despite never denying, because delay is the whole control here: an
+   * operator signing in types one password, and six attempts is far beyond a typo while the
+   * escalating delay makes credential-guessing pointless. The source allowance stays an order of
+   * magnitude higher for the reason every entry gives — one office behind one address must not
+   * trip it.
+   */
+  admin_sign_in: {
+    identifier: { freeAttempts: 6, ceilingMs: IDENTIFIER_MAX_DELAY_MS },
+    source: { freeAttempts: 60, ceilingMs: SOURCE_MAX_DELAY_MS },
+    mayDeny: false,
+  },
 }
 
 export interface AttemptKey {

@@ -25,6 +25,9 @@ question and settle it with the client.
 GroundZero/       # Initialization brief, requirements.md, approved prototype (reference only)
 apps/api/         # Fastify + Drizzle over PostgreSQL; versioned migrations
 apps/web/         # React + TypeScript PWA; shell, sign-in, five destinations
+apps/admin/       # 011 — the SEPARATE administrative website (admin.<host>). No PWA, no
+                  #   service worker, no @mynet/platform: it needs none of the seven device
+                  #   capabilities, and its absences are structural rather than configured.
 packages/data/    # Repository interfaces + HTTP implementations + generated contract types
 packages/platform/# Device-capability + storage interfaces, web implementations, repository registry
 packages/config/  # Shared TypeScript and Vitest bases

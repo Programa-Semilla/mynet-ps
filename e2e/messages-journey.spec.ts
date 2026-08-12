@@ -127,7 +127,28 @@ test.describe('Messages: reaching someone you just found', () => {
     // Each row of the conversation list is a link to its own address (FR-569), so counting them
     // counts conversations without depending on any counterpart's name.
     const graceConversations = gracePage.locator('a[href^="/messages/"]')
-    await expect(gracePage.getByRole('heading', { name: 'Messages' })).toBeVisible()
+
+    /**
+     * ═══════════════════════════════════════════════════════════════════════════════════════
+     * **THE HEADING IS NOT THE LIST, AND COUNTING BEFORE THE LIST HAS LOADED IS A RACE.**
+     *
+     * `Messages` renders its title immediately and its conversations after the request settles,
+     * so `count()` taken on the heading alone reads whatever happened to be mounted — usually
+     * the right answer, occasionally zero. It failed exactly that way: the screenshot showed
+     * Grace's conversation with Ada present on screen while the count had already returned 0.
+     *
+     * Two changes, and both matter. Waiting for the loading state to clear makes the *first*
+     * read honest; `toHaveCount` rather than a one-shot `count()` makes the second read retry,
+     * so a slow list is a slow pass instead of a false failure. A wrongly-created conversation
+     * still fails it — the count settles on `before + 1` and never reaches `before`.
+     * ═══════════════════════════════════════════════════════════════════════════════════════
+     */
+    const listSettled = async (page: typeof gracePage): Promise<void> => {
+      await expect(page.getByRole('heading', { name: 'Messages' })).toBeVisible()
+      await expect(page.getByText(/loading your conversations/i)).toHaveCount(0)
+    }
+
+    await listSettled(gracePage)
     const before = await graceConversations.count()
 
     const adaContext = await browser.newContext()
@@ -154,13 +175,13 @@ test.describe('Messages: reaching someone you just found', () => {
     await adaPage.goto('/')
 
     await gracePage.reload()
-    await expect(gracePage.getByRole('heading', { name: 'Messages' })).toBeVisible()
+    await listSettled(gracePage)
 
-    expect(
-      await graceConversations.count(),
+    await expect(
+      graceConversations,
       'Grace must not be able to tell that Ada opened a thread with her. FR-503a makes that ' +
         'structural — nothing was written — rather than a matter of what the list happens to show.',
-    ).toBe(before)
+    ).toHaveCount(before)
 
     await adaContext.close()
     await graceContext.close()

@@ -95,6 +95,52 @@ const NOT_EXPORTED: Record<string, string> = {
     'Seeded conference content (FR-623): an event, a start and an end, with no attendee ' +
     'identifier. The grid is not data about anybody. The slot an attendee actually claimed IS ' +
     'exported, as `slotId` with its instants inside each element of `appointments`.',
+
+  /**
+   * ═════════════════════════════════════════════════════════════════════════════════════════
+   * **T026 (011) — FOUR OF THIS FEATURE'S FIVE TABLES, AND TWO OF THEM NAME ATTENDEES.**
+   *
+   * The fifth, `organizer_assignments`, IS exported (FR-981) and is mapped in
+   * `EXPORTED_COLUMNS` — an assignment is a fact about the attendee who holds it.
+   *
+   * The two that name attendees and are still excluded need the harder argument, because
+   * "contains an attendee identifier" is normally the end of the discussion:
+   *
+   *   - `operator_sessions` may carry an `attendee_id` (the organizer tier signs in with
+   *     attendee credentials). It is excluded for the same reason `auth_sessions.token_hash` is:
+   *     a session row is authentication material, not content. Note the asymmetry that is
+   *     deliberate — `auth_sessions`' *timestamps* are exported, because when somebody was using
+   *     MyNet is data about them. When somebody was using the ADMINISTRATIVE site is data about
+   *     an operator's working pattern, which is not the requester's to receive even when the
+   *     requester is that person: the export is a MyNet document.
+   *
+   *   - `admin_audit_entries` carries `subject_attendee_id`, and is excluded because it records
+   *     an **operator's act**, not the attendee's data. Exporting it would hand somebody a list
+   *     of administrative decisions made about them, attributed to named operators — a
+   *     different document with different governance, which Principle VIII's portability right
+   *     does not ask for and which FR-999 forbids re-disclosing through any surface.
+   * ═════════════════════════════════════════════════════════════════════════════════════════
+   */
+  operators:
+    'The second actor is not an attendee (FR-901). No row here is the requester or is about ' +
+    'them; an operator has no `attendees` row at all, and nothing in MyNet may learn that ' +
+    'operators exist (FR-903).',
+  operator_sessions:
+    "Authentication material, not content — `auth_sessions.token_hash`'s reasoning, applied to " +
+    'the whole table. The timestamps are excluded too, deliberately unlike `auth_sessions`: ' +
+    "when somebody was using the ADMINISTRATIVE site describes an operator's working pattern, " +
+    'and this export is a MyNet document about a MyNet attendee.',
+  admin_audit_entries:
+    "A record of an OPERATOR'S ACT, not the attendee's data (FR-982, FR-999). It names an " +
+    'attendee and is still not about them in the sense portability means: exporting it would ' +
+    'produce a list of administrative decisions made about somebody, attributed to named ' +
+    'operators, which is a different document with different governance. The attendee half is ' +
+    'cleared on erasure (FR-997a) rather than handed over.',
+  report_resolutions:
+    "An operator's decision about a report, not the reporter's or the reported attendee's data. " +
+    'The report itself IS exported to the reporter (007, the `reports` section), which is the ' +
+    'part that is theirs — what they said, when, about whom. What an operator then concluded is ' +
+    'not, and FR-946 keeps the reporter told nothing at all about it.',
 }
 
 /**
@@ -166,6 +212,13 @@ const NOT_EXPORTED_COLUMNS: Record<string, string> = {
     "The requester. `attendee_id = the requester` is the export query's WHERE clause, which is " +
     'what makes the scoping structural rather than a filter applied afterwards.',
   'question_votes.attendee_id': 'The requester, on every row of the votes section.',
+
+  // T026 (011). The requester, exactly as `registrations.attendee_id` above — the export is
+  // keyed on one attendee, so this column is the same value on every row and is a WHERE clause
+  // rather than a projection.
+  'organizer_assignments.attendee_id':
+    'The requester. An assignment is exported because it is a fact about them; the column ' +
+    "naming them is the query's WHERE clause, which is what makes the scoping structural.",
 }
 
 interface Column {
@@ -310,6 +363,10 @@ describe('export coverage (T095, FR-377)', () => {
       // document without acknowledging it here fails to compile, which is how these arrived.
       questionsAsked: true,
       questionVotes: true,
+      // 011 — the only section this feature adds. An assignment is a fact about the
+      // attendee who holds it (FR-981); the other four tables are declared
+      // not-attendee-data above, each with its reasoning.
+      organizerAssignments: true,
       exclusions: true,
     }
 
@@ -357,6 +414,10 @@ describe('export coverage (T095, FR-377)', () => {
       // document without acknowledging it here fails to compile, which is how these arrived.
       questionsAsked: true,
       questionVotes: true,
+      // 011 — the only section this feature adds. An assignment is a fact about the
+      // attendee who holds it (FR-981); the other four tables are declared
+      // not-attendee-data above, each with its reasoning.
+      organizerAssignments: true,
       exclusions: true,
     }
 

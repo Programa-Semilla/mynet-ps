@@ -72,6 +72,31 @@ env:
   AUTH_ATTEMPT_HASH_KEY: preview-only-attempt-key-not-a-secret
 
 jobs:
+  # ═════════════════════════════════════════════════════════════════════════════════════════
+  # T008 (011) — **`apps/admin` is covered by the five gates below WITHOUT a job of its own,
+  # and that is the deliberate arrangement rather than an omission.**
+  #
+  # The second website (constitution v4.0.0, standing decision 33) enters every existing gate
+  # through the root scripts, because each of them already addresses the whole workspace:
+  #
+  #   typecheck       `pnpm -r typecheck`      — recursive; `@mynet/admin` declares the script
+  #   lint            `eslint .`               — `mynet/admin-client` block in packages/config
+  #   test-unit       vitest `unit` project    — `apps/admin/tests/unit/**` in vitest.base.ts
+  #   test-component  vitest `component`       — `apps/admin/tests/**/*.test.tsx`, same file
+  #   build           `pnpm build`             — the root script builds api, web, then admin
+  #
+  # Five duplicate jobs re-running the same commands against a filtered subset would report the
+  # same failures twice and, worse, would create a second place for the two applications' gate
+  # coverage to drift apart. Principle VII asks that every gate run on Linux CI, not that every
+  # application have its own copy of them.
+  #
+  # **What this arrangement costs is worth stating**: a failure in `test-unit` no longer tells
+  # you which product it came from without reading the output. That is the trade, and the check
+  # names in the required-checks assertion at the bottom of this file are unchanged because of
+  # it — adding admin-specific names there would have needed branch-protection changes that
+  # nobody has configured yet (see the open questions in CLAUDE.md).
+  # ═════════════════════════════════════════════════════════════════════════════════════════
+
   # ── Gate 1: type checking (FR-001) ──────────────────────────────────────────────────────
   typecheck:
     name: typecheck
@@ -385,6 +410,20 @@ jobs:
         with:
           name: web-dist
           path: apps/web/dist
+          retention-days: 7
+      # ─────────────────────────────────────────────────────────────────────────────────────
+      # T008 (011) — the second website's build output, uploaded separately.
+      #
+      # Two artifacts rather than one, because the two products are deployed to two hosts by
+      # Caddy (`admin.<host>` and `<host>`, decision 37) and an operator inspecting a run needs
+      # to know which bundle is which. Combining them would also hide the property FR-923 is
+      # about: this directory contains **no `manifest.webmanifest` and no `sw.js`**, and that is
+      # visible at a glance only while it is its own artifact.
+      # ─────────────────────────────────────────────────────────────────────────────────────
+      - uses: actions/upload-artifact@v4
+        with:
+          name: admin-dist
+          path: apps/admin/dist
           retention-days: 7
 
   # ── Gates 8 and 9: accessibility and end-to-end (FR-068, SC-005) ────────────────────────

@@ -342,6 +342,9 @@ const ico = (images) => {
 export const buildAssets = async () => {
   const alpha = await alphaMatte()
   const web = 'apps/web/public'
+  // 011 — the second website. It takes the favicons and the two in-app marks and **nothing
+  // else**; see the note beside its entries below.
+  const admin = 'apps/admin/public'
 
   const favicon32 = await plate(alpha, 32, 32 * FAVICON_FILL)
   const favicon16 = await plate(alpha, 16, 16 * FAVICON_FILL)
@@ -370,6 +373,40 @@ export const buildAssets = async () => {
     // painted twice so the two colourways cannot drift apart in shape (FR-820b).
     [`${web}/brand/mark-coral.png`, await resampled(alpha, MARK, IN_APP_MARK_HEIGHT)],
     [`${web}/brand/mark-navy.png`, await resampled(alpha, MARK_NAVY, IN_APP_MARK_HEIGHT)],
+
+    /**
+     * T006 (011) — the administrative site's assets (FR-921).
+     *
+     * ═══════════════════════════════════════════════════════════════════════════════════════
+     * **The same one pipeline, and the omissions are the requirement.**
+     *
+     * 011 adds a second website on `admin.<host>`, and decision 30 binds it exactly as it binds
+     * MyNet: derived by this script, never committed as opaque binaries, so a reviewer verifies
+     * plate colour and crop geometry by reading code. Copying the four files across would have
+     * been quicker and would have created the first hand-placed brand binary in the repository.
+     *
+     * **What is deliberately NOT emitted here is the whole of FR-923**: no `icon-192`, no
+     * `icon-512`, no `icon-maskable-512`, no `apple-touch-icon`. The administrative product is
+     * not installable, so it has no install icons to declare — and because there is no manifest
+     * at all, a missing declaration cannot be the thing that reveals it. The absence is in the
+     * inventory, where FR-808 says the complete set of files must be legible at a glance.
+     *
+     * The marks are byte-identical to the attendee client's by construction: same matte, same
+     * heights, same two colourways. `scripts/brand-audit.mjs` compares every entry in this list
+     * against disk, so these are covered by FR-806 the moment they appear here.
+     * ═══════════════════════════════════════════════════════════════════════════════════════
+     */
+    [`${admin}/favicon-32.png`, favicon32],
+    [`${admin}/favicon-16.png`, favicon16],
+    [
+      `${admin}/favicon.ico`,
+      ico([
+        { size: 16, png: favicon16 },
+        { size: 32, png: favicon32 },
+      ]),
+    ],
+    [`${admin}/brand/mark-coral.png`, await resampled(alpha, MARK, IN_APP_MARK_HEIGHT)],
+    [`${admin}/brand/mark-navy.png`, await resampled(alpha, MARK_NAVY, IN_APP_MARK_HEIGHT)],
   ]
 
   return assets

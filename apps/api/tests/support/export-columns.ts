@@ -164,4 +164,30 @@ export const EXPORTED_COLUMNS: Record<string, ExportTarget> = {
   // The reported questions, alongside `message_ids` above (FR-783). Same section, same shape,
   // same absence of a foreign key.
   'abuse_reports.question_ids': { section: 'reports', field: 'questionIds' },
+
+  // ═════════════════════════════════════════════════════════════════════════════════════════
+  // T026 (011) — **organizer assignments, and they are the ONLY thing this feature exports**
+  // (FR-981).
+  //
+  // Of the five tables 011 adds, exactly one holds attendee data: an assignment is a fact about
+  // the attendee who holds it — that they were given authority over a named conference, by
+  // somebody, on a date, and possibly had it revoked. That belongs in their export exactly as
+  // their registrations do.
+  //
+  // The other four are declared not-attendee-data in `export-coverage.test.ts`, each with its
+  // reasoning. The one worth flagging here is `admin_audit_entries`: it *contains* an attendee
+  // identifier and is still not the attendee's data, because it records an **operator's act**.
+  // Exporting it would hand somebody a list of administrative decisions made about them,
+  // attributed to named operators — which is a different document with different governance,
+  // and is not what Principle VIII's portability right asks for.
+  //
+  // `assigned_by` is exported as the operator's **display name**, not their identifier. The
+  // attendee is entitled to know who granted their authority; a UUID tells them nothing and a
+  // raw operator id is an identifier for a principal they have no other way to resolve.
+  // ═════════════════════════════════════════════════════════════════════════════════════════
+  'organizer_assignments.id': { section: 'organizerAssignments', field: 'assignmentId' },
+  'organizer_assignments.event_id': { section: 'organizerAssignments', field: 'eventId' },
+  'organizer_assignments.assigned_by': { section: 'organizerAssignments', field: 'assignedBy' },
+  'organizer_assignments.assigned_at': { section: 'organizerAssignments', field: 'assignedAt' },
+  'organizer_assignments.revoked_at': { section: 'organizerAssignments', field: 'revokedAt' },
 }

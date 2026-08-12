@@ -1,5 +1,6 @@
 import { eq, sql } from 'drizzle-orm'
 
+import { addressTakenByOtherPrincipal } from '../../admin/identity.js'
 import { getDb } from '../client.js'
 import { attendeeCredentials, attendees } from '../schema/attendees.js'
 import { events, registrations } from '../schema/events.js'
@@ -42,6 +43,26 @@ import { normaliseEmail } from './attendees.js'
  * **`email_verified_at` is left null and `discoverable` takes its `true` default** (FR-319,
  * FR-359). Together those mean a brand-new account is discoverable-in-setting and invisible-in-
  * fact until its owner proves they can receive mail — which is what makes the default safe.
+ *
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ * **011 — AN ADDRESS ALREADY HELD BY A PLATFORM OPERATOR IS TAKEN, AND SIGN-UP SAYS SO THE SAME
+ * WAY IT SAYS SO FOR ANOTHER ATTENDEE** (FR-918).
+ *
+ * `ON CONFLICT` cannot see this: `attendees.email` and `operators.email` are two unique indexes
+ * on two tables, and Postgres has no constraint spanning them. So the one cross-table condition
+ * in the product is application-enforced, inside this transaction, and the weakness is recorded
+ * rather than hidden — `admin-concurrency.test.ts` drives both create paths against each other
+ * precisely because a weakness only reasoned about is one nobody has measured.
+ *
+ * **FR-915 is what depends on it.** Administrative sign-in resolves an address with a single
+ * lookup and no branch; if one address could name both principals, resolution would have to
+ * *choose*, and the choice would be observable in the timing.
+ *
+ * **The refusal is indistinguishable from an address held by another attendee** — the same
+ * `null`, which sign-up turns into FR-303's deliberate disclosure. Anything else would make this
+ * route an oracle for who holds an administrative account, which is the one set of addresses in
+ * the product worth enumerating.
+ * ═════════════════════════════════════════════════════════════════════════════════════════
  */
 export const createAccount = async ({
   email,
@@ -53,6 +74,11 @@ export const createAccount = async ({
   passwordHash: string
 }): Promise<{ id: string; email: string; displayName: string } | null> =>
   getDb().transaction(async (tx) => {
+    // Checked **before** the insert, not after: returning from this callback commits, so a
+    // late discovery would need an explicit rollback to undo a row that should never have
+    // existed. Nothing has been written at this point, so the early return commits nothing.
+    if (await addressTakenByOtherPrincipal(email, 'attendee', tx)) return null
+
     const inserted = await tx
       .insert(attendees)
       .values({ email: normaliseEmail(email), displayName })

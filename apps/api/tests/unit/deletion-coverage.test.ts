@@ -119,6 +119,54 @@ const NOT_ATTENDEE_DATA: Record<string, string> = {
     'attendee-attributable half of scheduling lives in `appointments`, whose two participant ' +
     'references both cascade. A slot is the grid, not the booking: removing an attendee must not ' +
     "remove a conference's 09:30 from everybody else's scheduling dialog.",
+
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════════════════════
+   * **T025 (011) — TWO OF THIS FEATURE'S FIVE TABLES ARE NOT ATTENDEE DATA, AND SAYING WHY IS
+   * HARDER HERE THAN ANYWHERE ABOVE, BECAUSE BOTH CONCERN PEOPLE.**
+   *
+   * Every other entry in this category is *conference content*: a session, a room, a slot. The
+   * question "does it hold attendee data" answers itself. These two hold identifiers of humans,
+   * and are still not attendee data — so the reasoning has to be explicit rather than obvious.
+   *
+   * The distinction Principle VIII actually draws is not "is a person mentioned" but **"is this
+   * a record about an attendee, attributable to one identity, that their erasure right
+   * reaches"**. An operator is not an attendee: they have no `attendees` row, no profile, no
+   * discoverability, and they appear on no attendee surface (FR-903). An audit entry is a record
+   * of an **operator's act**, not of the attendee it concerns — and the attendee half of it is
+   * removed on erasure, which is the whole of FR-997a.
+   *
+   * `operator_sessions` needs no entry at all, and the reason is worth noting because it looks
+   * like an omission: it carries a real `attendee_id` foreign key with `ON DELETE CASCADE` for
+   * the organizer tier, so this guard classifies it out of the schema without help. That is the
+   * outcome, not a gap — a conference organizer's administrative session must die with their
+   * account exactly as their MyNet session does.
+   *
+   * `organizer_assignments` likewise: it cascades from `attendees` and **is** attendee data, so
+   * it is deliberately absent from this list and present in `export-coverage` instead (FR-981).
+   * ═══════════════════════════════════════════════════════════════════════════════════════════
+   */
+  operators:
+    'The second actor is NOT an attendee (011, FR-901). No `attendees` row, no profile, no ' +
+    "discoverability, and no attendee surface names one (FR-903) — so Principle VIII's erasure " +
+    "right, which is an ATTENDEE's, does not reach it and no cascade can. The lifecycle is " +
+    '**deactivate-plus-clock**: deactivation (FR-908) is the terminal state, there is no ' +
+    'self-serve deletion, and the row is retained while any `admin_audit_entries` or ' +
+    '`report_resolutions` row names it (FR-909) — a resolution attributed to nobody is an ' +
+    'accountability record with the accountability removed. The sweep in RETENTION_SWEEPS ' +
+    'removes it once both conditions hold. Note this table IS therefore also swept, so this ' +
+    'entry is belt and braces: it records WHY no cascade exists, which the sweep alone does not.',
+
+  admin_audit_entries:
+    "A record of an OPERATOR'S ACT, not of the attendee it concerns (011, FR-994–FR-999). The " +
+    'attendee half is a plain nullable column with **no foreign key**, deliberately: CASCADE ' +
+    'would let the person an act indicts erase the record of it, RESTRICT would block a ' +
+    'deletion the erasure right requires, and SET NULL would produce the right outcome while ' +
+    'coupling a retention DECISION to a constraint rather than to a written rule (research R6). ' +
+    'The rule is **pseudonymise-plus-clock**: `deleteAccount` clears `subject_attendee_id` in ' +
+    'the same transaction (FR-997a) — no flag, no sentinel row, nothing reconstructible ' +
+    '(FR-997b) — and only then does the RETENTION_SWEEPS window start (FR-998). That window ' +
+    'must not be shorter than the retention of the records it explains.',
 }
 
 /**
@@ -156,6 +204,54 @@ interface TableFacts {
   readonly columns: readonly string[]
   readonly cascadesFromAttendees: boolean
   readonly referencesAttendees: boolean
+  /**
+   * T025 (011) — every table this one cascades **from**, whatever that table is.
+   *
+   * Recorded so transitive reachability can be **computed** rather than declared. See
+   * `reachedByCascade` below for why that distinction matters.
+   */
+  readonly cascadeParents: readonly string[]
+}
+
+/**
+ * ═════════════════════════════════════════════════════════════════════════════════════════════
+ * **T025 (011) — CASCADE COVERAGE IS A REACHABILITY QUESTION, NOT A ONE-HOP ONE.**
+ *
+ * This guard used to ask "does this table cascade directly from `attendees`". That was true of
+ * every table for four features, and 011 produced the first counter-example: `report_resolutions`
+ * has **no attendee column at all**. It cascades from `abuse_reports`, which cascades from both
+ * the reporter and the reported attendee — so an attendee's erasure does reach it, in two hops.
+ *
+ * The available responses were an allow-list entry or this. An allow-list entry would have been
+ * a *claim* that the chain exists, sitting next to entries that are claims about tables holding
+ * no attendee data — and the two would have looked alike while being completely different kinds
+ * of statement. Worse, the claim would not notice if somebody later changed
+ * `report_resolutions.report_id` to `ON DELETE NO ACTION`: the comment would still read
+ * correctly and the coverage would be gone.
+ *
+ * Computing it means the chain is checked on every run, against the schema, and a broken link
+ * anywhere along it fails the build naming the table that lost its cascade. That is the same
+ * standard every other assertion in this file already meets.
+ *
+ * The walk is depth-first over cascade edges only — a `NO ACTION` or `SET NULL` reference is not
+ * a path, because deleting the parent would fail or would leave the child behind.
+ * ═════════════════════════════════════════════════════════════════════════════════════════════
+ */
+const reachedByCascade = (name: string, byName: Map<string, TableFacts>): boolean => {
+  const seen = new Set<string>()
+
+  const walk = (current: string): boolean => {
+    if (current === ROOT_TABLE) return true
+    if (seen.has(current)) return false
+    seen.add(current)
+
+    const facts = byName.get(current)
+    if (!facts) return false
+
+    return facts.cascadeParents.some((parent) => walk(parent))
+  }
+
+  return byName.get(name)?.cascadeParents.some((parent) => walk(parent)) ?? false
 }
 
 /**
@@ -187,6 +283,11 @@ const readSchemaTables = async (): Promise<TableFacts[]> => {
         columns: config.columns.map((column) => column.name),
         referencesAttendees: toAttendees.length > 0,
         cascadesFromAttendees: toAttendees.some((key) => key.onDelete === 'cascade'),
+        // Cascade edges only. A `NO ACTION` or `SET NULL` reference is not a path — deleting
+        // the parent would fail, or would leave this row behind with a null.
+        cascadeParents: config.foreignKeys
+          .filter((key) => key.onDelete === 'cascade')
+          .map((key) => getTableConfig(key.reference().foreignTable).name),
       })
     }
   }
@@ -215,9 +316,13 @@ describe('deletion coverage (T014, FR-370)', () => {
   it('classifies EVERY table — an unclassified table is a failure, not a default', async () => {
     tables ??= await readSchemaTables()
 
+    const byName = new Map(tables.map((table) => [table.name, table]))
+
     const unclassified = tables
       .filter((table) => table.name !== ROOT_TABLE)
       .filter((table) => !table.cascadesFromAttendees)
+      // T025 (011) — and reached by no *chain* of cascades either. See `reachedByCascade`.
+      .filter((table) => !reachedByCascade(table.name, byName))
       .filter((table) => !sweptTables.has(table.name))
       .filter((table) => !(table.name in EXPLICITLY_DELETED))
       .filter((table) => !(table.name in NOT_ATTENDEE_DATA))
@@ -229,13 +334,48 @@ describe('deletion coverage (T014, FR-370)', () => {
         'retention rule removes them either (FR-370, constitution v2.3.0).\n\n' +
         'Pick one, in the change that introduced the table:\n' +
         '  1. Add `.references(() => attendees.id, { onDelete: "cascade" })` — the default, and ' +
-        'right for anything attributable to one attendee.\n' +
+        'right for anything attributable to one attendee. A cascade from a table that is ' +
+        'itself cascade-reachable also counts, and is COMPUTED rather than declared.\n' +
         '  2. Add it to RETENTION_SWEEPS in src/maintenance.ts with a stated window (FR-383).\n' +
         '  3. Add it to EXPLICITLY_DELETED here, with the reason no foreign key can reach it AND ' +
         'an integration test that proves the deletion against a real database.\n' +
         '  4. Add it to NOT_ATTENDEE_DATA here, with the reason it holds no attendee data.\n\n' +
         'Do not pick 4 to make this pass.',
     ).toEqual([])
+  })
+
+  /**
+   * T025 (011) — **the transitive walk is asserted, not assumed.**
+   *
+   * `reachedByCascade` is the newest and least obvious mechanism in this file, and the failure
+   * mode it introduces is the one every audit in this codebase has had to guard against: a
+   * predicate that quietly stops matching makes every table look classified. If the walk ever
+   * returned `true` for everything, the "classifies EVERY table" assertion above would pass
+   * vacuously while checking nothing at all.
+   *
+   * So both directions are pinned against known cases. `report_resolutions` is the reason the
+   * walk exists — it holds no attendee column and is reached in two hops through
+   * `abuse_reports`. `operators` must stay unreachable, because it is genuinely not attendee
+   * data and its classification comes from the allow-list plus a retention sweep.
+   */
+  it('computes transitive cascade reachability in both directions', async () => {
+    tables ??= await readSchemaTables()
+    const byName = new Map(tables.map((table) => [table.name, table]))
+
+    expect(
+      reachedByCascade('report_resolutions', byName),
+      '`report_resolutions` is no longer reached by a cascade chain. It holds no attendee ' +
+        'column, so its only coverage is `report_id` → `abuse_reports` → both attendees. If ' +
+        "that reference has been weakened to NO ACTION, an operator's resolution now survives " +
+        'the erasure of everybody it concerns.',
+    ).toBe(true)
+
+    expect(
+      reachedByCascade('operators', byName),
+      '`operators` is now reachable by a cascade from `attendees`, which would mean the second ' +
+        'actor has acquired an attendee row. That is a governance change, not a schema tidy ' +
+        '(FR-901).',
+    ).toBe(false)
   })
 
   it('never lets a reference to attendees exist without a cascade', async () => {

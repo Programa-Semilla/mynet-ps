@@ -105,3 +105,21 @@ export {
   RequestRefusedError,
   SessionExpiredError,
 } from './interfaces/index.js'
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 011 — the administrative interfaces. Appended, never merged into the lists above.
+//
+// **Not added to `Repositories`.** See `interfaces/administration.ts` for the full reasoning: the
+// aggregate is the ATTENDEE client's injected registry, and an administrative member there would
+// be an administrative surface inside MyNet (decision 33, FR-970).
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+export type {
+  AdminConference,
+  AdminConferenceRepository,
+  AdminIdentity,
+  AdminReportDetail,
+  AdminReportRepository,
+  AdminReportSummary,
+  AdminSessionRepository,
+  OperatorTier,
+} from './interfaces/administration.js'

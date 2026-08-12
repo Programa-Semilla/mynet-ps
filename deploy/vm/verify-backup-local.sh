@@ -81,10 +81,34 @@ CREATE TABLE interests (
   interest text NOT NULL,
   PRIMARY KEY (person_id, interest)
 );
+-- 011 (T156) — the two structures the administrative schema depends on that a row count cannot
+-- see. Synthetic, like everything above: what is under test is whether pg_dump/pg_restore
+-- preserve these SHAPES, not whether these particular tables exist.
+CREATE TABLE conferences (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  name text NOT NULL
+);
+CREATE TABLE assignments (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  person_id uuid NOT NULL REFERENCES people(id) ON DELETE CASCADE,
+  -- **NO ACTION, deliberately** — mirrors organizer_assignments.event_id (FR-937). It is the one
+  -- reference in the real schema that must NOT cascade: a conference deletion silently stripping
+  -- an organizer's authority would leave no audit entry to explain it.
+  conference_id uuid NOT NULL REFERENCES conferences(id) ON DELETE NO ACTION,
+  revoked_at timestamptz
+);
+-- Partial unique index: one LIVE assignment per person and conference, revoked rows unconstrained
+-- so they can accumulate as history.
+CREATE UNIQUE INDEX assignments_live_idx
+  ON assignments (person_id, conference_id) WHERE revoked_at IS NULL;
+
 INSERT INTO people (display_name)
 SELECT 'Attendee ' || n FROM generate_series(1, 250) AS n;
 INSERT INTO interests (person_id, interest)
 SELECT id, 'Design systems' FROM people;
+INSERT INTO conferences (name) VALUES ('A conference');
+INSERT INTO assignments (person_id, conference_id)
+SELECT id, (SELECT id FROM conferences LIMIT 1) FROM people LIMIT 1;
 SQL
 
 SOURCE_PEOPLE="$(psql -d verify_source -tAc 'SELECT count(*) FROM people' | tr -d '[:space:]')"
@@ -145,6 +169,38 @@ check "the unaccent extension survived (search depends on it)" "1" "$EXT"
 # The behaviour, not merely the presence: an extension row with a broken function is still a row.
 UNACCENTED="$(psql -d verify_restored -tAc "SELECT unaccent('Muñoz')" | tr -d '[:space:]')"
 check "unaccent still works in the restored database" "Munoz" "$UNACCENTED"
+
+# ─────────────────────────────────────────────────────────────────────────────────────────────
+# 011 (T156) — the administrative schema's two silent-loss shapes.
+#
+# Both fail the same way the cascade above does: the rows come back, the database looks correct,
+# and a guarantee is gone. They are the INVERSE of each other, which is why both are here — one
+# checks a reference that must NOT cascade, the other an index that must still constrain.
+# ─────────────────────────────────────────────────────────────────────────────────────────────
+
+# 'a' is NO ACTION. If this came back 'c' (cascade), deleting a conference would strip its
+# organizers' authority with nothing recording that it happened (FR-937, FR-939).
+NO_ACTION="$(psql -d verify_restored -tAc "
+  SELECT confdeltype FROM pg_constraint
+  WHERE conname LIKE 'assignments_conference_id%' AND contype = 'f'" | tr -d '[:space:]')"
+check "the ON DELETE NO ACTION survived (authority depends on it NOT cascading)" "a" "$NO_ACTION"
+
+# The partial index, WHERE clause included. A unique index restored without its predicate would
+# be *stricter* than intended and reject the revoked rows that are kept as history; restored
+# without the index at all, one person could hold two live assignments for one conference.
+PARTIAL="$(psql -d verify_restored -tAc "
+  SELECT count(*) FROM pg_indexes
+  WHERE indexname = 'assignments_live_idx'
+    AND indexdef ILIKE '%WHERE (revoked_at IS NULL)%'" | tr -d '[:space:]')"
+check "the partial unique index survived, predicate included" "1" "$PARTIAL"
+
+# The behaviour, not merely the definition — the same standard the unaccent check applies. A
+# second live assignment must be refused; a second REVOKED one must not be.
+psql -d verify_restored -c "
+  INSERT INTO assignments (person_id, conference_id)
+  SELECT person_id, conference_id FROM assignments LIMIT 1" >/dev/null 2>&1 \
+  && fail "the partial unique index does not constrain: a second LIVE assignment was accepted" \
+  || pass "a second live assignment is still refused in the restored database"
 
 echo
 if (( FAILURES > 0 )); then
