@@ -235,7 +235,7 @@ record.
 
 **Independent test**: Quickstart Scenario 7, steps 1–2.
 
-- [ ] T058 [US5] Generate one VAPID pair for UAT and store the private half as a repository environment secret, injected into the VM `.env` by `deploy/vm/deploy.sh` (FR-850, FR-851)
+- [X] T058 [US5] Generate one VAPID pair for UAT and store the private half as a repository environment secret, injected into the VM `.env` by `deploy/vm/deploy.sh` (FR-850, FR-851)
 - [X] T059 [P] [US5] Give the public key a single source of truth rather than one value on the API and another in the client build with nothing checking they agree (FR-853) — the `vapid-config-duplication` inbox entry, pulled in because its own wording says to settle it when the real adapter lands
 - [ ] T060 [P] [US5] Remove `PUSH_VAPID_SUBJECT` from `apps/api/src/config.ts` and `deploy/vm/.env.example` — it is read by nothing (FR-854)
 - [X] T061 [P] [US5] Verify that with **no** key pair configured the sink is used, the attendee is never asked for permission, and Messages, unread state and the poll are unaffected — re-run `push-denied-fallback.test.tsx` and confirm it passes unchanged (FR-855)
@@ -248,7 +248,7 @@ record.
 
 **Independent test**: Quickstart Scenario 7, steps 2–4.
 
-- [ ] T064 [US6] Set `MAIL_OPERATOR_ADDRESS=apps@programasemilla.com` in the VM `.env` and confirm the boot-time "not provisioned" warning no longer fires (FR-860)
+- [X] T064 [US6] Set `MAIL_OPERATOR_ADDRESS=apps@programasemilla.com` in the VM `.env` and confirm the boot-time "not provisioned" warning no longer fires (FR-860)
 - [ ] T065 [US6] Submit a report against the deployed address and confirm the block applies in the same action, the report is recorded, and mail arrives (FR-845, FR-862, SC-805)
 - [ ] T066 [US6] Inspect the delivered mail and confirm it carries identifiers and a timestamp only (FR-848)
 - [X] T067 [P] [US6] Break the SMTP URL, report again, and confirm the block still applies and the failed dispatch is **logged rather than dropped** (FR-847)
@@ -280,7 +280,7 @@ exposure that nothing else reports.
 - [X] T076 Render the marker as static text inside the existing shell header in `apps/web/src/app/shell/` — not a new full-width band, because mobile is where vertical space is scarcest (FR-828)
 - [X] T077 [P] Component test: the marker is not focusable, not dismissible, conveys its meaning in text rather than colour, and is exposed to assistive technology, in `apps/web/tests/unit/uat-marker.test.tsx`
 - [X] T078 [P] Test: the marker is absent from a production build, not merely hidden (FR-828, SC-818)
-- [ ] T079 [P] Verify at mobile width that the marker pushes no primary action below the fold and introduces no horizontal scrolling — if it cannot, adjust the header and **declare that as a layout change** rather than shipping a marker that costs the first viewport (spec Open Question 5)
+- [X] T079 [P] Verify at mobile width that the marker pushes no primary action below the fold and introduces no horizontal scrolling — if it cannot, adjust the header and **declare that as a layout change** rather than shipping a marker that costs the first viewport (spec Open Question 5)
 - [X] T080 [P] Add the absence guards required by FR-895 in `apps/api/tests/unit/deployment-absences.test.ts`, covering FR-890 (no migration), FR-891 (no route, screen, destination or Home card), FR-892 (no second notification trigger), FR-893 (no administrative interface, privileged role or in-product report reader), FR-894 (no production value filled), plus FR-861 (report unreadable from inside the product) and FR-806a (no card backfill), following 007's and 009's pattern **including stripping comments before matching** — every phrase also appears in the prose explaining it
 - [X] T081 [P] Confirm `apps/api/tests/unit/deletion-coverage.test.ts` and `export-coverage.test.ts` pass unchanged — if either fails, a schema change was introduced and FR-890 is broken (data-model.md)
 - [ ] T082 Verify SC-815 against the deployed environment: **nothing attendee-facing behaves differently** except that some requests are delayed, an unverified account cannot share a card, and UAT carries its marker. Walk one full core journey — inspect a session, discover an attendee, share a card, message, schedule — and confirm every other surface is as before

@@ -273,3 +273,62 @@ delete was not surgical, and any block created before it is gone.
 **Recorded by**: the 010 implementation, phases 7 and 10.
 
 ---
+
+## 2026-08-11 — CI credentials, and a dedicated deploy key
+
+**Act**: the `uat` GitHub environment was created and four of its five secrets stored.
+
+| Secret | Source | Note |
+| ------ | ------ | ---- |
+| `PUSH_VAPID_PRIVATE_KEY` | the VM's `.env` | piped straight from the host; never in a terminal |
+| `SSH_KNOWN_HOSTS` | `ssh-keyscan`, against fingerprints already verified out-of-band | FR-834 |
+| `MAIL_SMTP_URL` | the VM's `.env` | piped |
+| `DEPLOY_SSH_KEY` | **a new key, generated on the VM** | see below |
+| `AZURE_CREDENTIALS` | **NOT SET** | needs a service principal — see below |
+
+### The deploy key is its own key, and that was a deliberate refusal
+
+`provision-vm.sh` runs `az vm create --generate-ssh-keys`, which reuses the operator's
+**personal** `~/.ssh/id_rsa`. Storing that as `DEPLOY_SSH_KEY` would have been the quick path and
+would have handed every workflow run an identity that almost certainly opens other doors.
+
+So a dedicated `ed25519` pair was generated **on the host**, its public half appended to
+`authorized_keys`, and only the private half piped into the secret:
+
+```
+256 SHA256:Agt37YNhgpMB1mxnGRaT/VBq/2OX1bs+tIt0PLI128s mynet-uat-ci-deploy (ED25519)
+```
+
+It reaches exactly one machine and is revoked by deleting one line. Verified working by
+connecting with `IdentitiesOnly=yes` against that key alone.
+
+### `AZURE_CREDENTIALS` is outstanding and may not be obtainable
+
+The operator's account resolves as
+`danny.perez.u_gmail.com#EXT#@appsprogramasemilla.onmicrosoft.com` — **a guest in the tenant**.
+Guests usually cannot register applications, and the tenant's authorization policy is not readable
+by a guest to confirm either way. Until this exists, `deploy-uat` prints what it is blocked on and
+exits 0 rather than failing every merge.
+
+If it turns out to be unobtainable, R1's just-in-time NSG design needs Azure control-plane access
+**by construction**, so the design has to be revisited rather than worked around.
+
+### The UAT marker, measured on the live site (T079, FR-828)
+
+Chromium against `https://mynet-dev.programasemilla.com`, signed in, at four widths:
+
+| Width | Marker present | Horizontal overflow |
+| ----- | -------------- | ------------------- |
+| 320×568 | yes | **0px** |
+| 390×844 | yes | **0px** |
+| 768×1024 | yes | **0px** |
+| 1440×900 | yes | **0px** |
+
+320px is the width the requirement is really about — the header there already carries the product
+name, the conference switcher, the profile control and sign-out. The marker adds no row and costs
+no horizontal space. **The subjective half — whether it looks right — is still T082's and T084's,
+and belongs to a person.**
+
+**Recorded by**: the 010 implementation, phases 9 and 11.
+
+---
