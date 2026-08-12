@@ -184,7 +184,8 @@ up "people to meet".
                 └──────────┬───────────┘        ▲
                            │          core journey closes here
         ┌──────────────────▼──────────────────┐
-        │ 010 Launch Readiness                │
+        │ 010 UAT Deploy + Hardening          │
+        │ 011 Launch Readiness + Production   │
         └─────────────────────────────────────┘
 ```
 
@@ -202,7 +203,8 @@ that difference is the scheduling slack available if D4 is ever relaxed.
 | 007 | Messages | 004 | `0006` | Unread indicator |
 | 008 | Network & Appointments | 004, 007 | `0007` | Appointment summary |
 | 009 | Session Q&A | 005 | `0008` | — |
-| 010 | Launch Readiness | all | — | — |
+| 010 | UAT Deployment and Pre-Public Hardening | all | — | — |
+| 011 | Launch Readiness and Production | 010 | — | — |
 
 **Messages (007) is the one difference.** Its hard dependency is 004 alone — it needs profiles to
 render participants, not Discover. It is scheduled after 006 because Discover is where a conversation
@@ -404,22 +406,59 @@ parties' saved sessions, or a fixed grid. The prototype hardcodes `MEETING_SLOTS
 > already existed.
 > ═══════════════════════════════════════════════════════════════════════════════════════════
 
-### 010 — Launch Readiness · no schema
+### 010 — UAT Deployment and Pre-Public Hardening · no schema
+
+> **THIS ENTRY WAS SPLIT IN TWO, AND THE ROADMAP DESCRIBED THE UNSPLIT VERSION UNTIL NOW.**
+>
+> It read "010 — Launch Readiness": one phase carrying a deployment, a validation sweep and
+> production. Brainstorm #08 and constitution **v3.4.0** split it, because the two halves have
+> different blockers — and keeping them together would have held a working UAT hostage to a brand
+> mark. 010's own spec states that it departs from this roadmap; this is the roadmap catching up.
+
+**Shipped 2026-08-11.** `https://mynet-dev.programasemilla.com` serves the product over a
+Let's Encrypt certificate, with a seeded conference somebody can join.
+
+- Six security-and-abuse findings closed, all of which get worse the moment a URL is public: the
+  throttle now bounds a **burst** and not only a sustained rate; read bounds on the directory and
+  the message poll that may delay and may never deny; card sharing requires the **sharer** to be
+  verified; one clock for the throttle window and the served delay.
+- A real SMTP mail adapter behind the existing port — no vendor SDK in the tree at all.
+- Provision, DNS, automatic TLS, a VAPID pair, seed, and a UAT environment marker.
+- Just-in-time SSH admission for the deploy job, with unconditional teardown **and** a start-of-run
+  assertion that no rule from a previous run survived.
+
+**What it did NOT do, and why**:
+
+- **Backups were descoped for UAT** by owner decision — the environment carries seeded data that
+  `db:seed` recreates in seconds. **The restore obligation carries to production unchanged.**
+- **`AZURE_CREDENTIALS` is outstanding**, so continuous delivery is written and unexercised. The
+  operator is a guest in the Azure tenant and may be unable to register an application.
+
+---
+
+### 011 — Launch Readiness and Production · no schema
+
+**Blocked on register entries 2 and 4**, which is why it is a separate phase.
 
 - The full `requirements.md` validation checklist, end to end.
 - Accessibility sweep across all five destinations: labels, visible focus, Escape, keyboard journey.
 - Core-journey end-to-end test at desktop, tablet, and mobile widths.
 - PWA caching versioned against real data volumes; offline states consolidated and consistent.
 - Physical iPhone test (constitution requirement).
-- Confirmation that preview environments do not point at production data.
 - Performance pass.
+- **Register entry 22** — a cached conference can outlive a withdrawn registration by up to 24
+  hours. Product-wide, older than 009, and answerable once for every repository at once.
+- Production: `mynetcr.com` registered, provisioned, and **a restore actually performed** before it
+  holds real attendee data.
 
 **Two gates with long lead times — raise them early, not here.**
 
 - **No real brand mark or application icons exist** anywhere in this repository.
 - **The desktop and tablet experience has never been validated by the client.** The approved
   prototype is a mobile-only 390×844 frame. Every desktop layout built across 003–009 is unreviewed
-  design, and discovering a mismatch at 010 is the expensive outcome.
+  design, and discovering a mismatch here is the expensive outcome. **010 changed this from
+  unanswerable to merely unanswered**: reviewing a layout needs a running product at a real screen
+  width, and there now is one.
 
 ---
 
