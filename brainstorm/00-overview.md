@@ -10,7 +10,14 @@ Then #09 brainstormed **the administrative product** — the first work to requi
 Principle III *prohibition* rather than an omission — ratified as **v4.0.0**, the project's first
 MAJOR bump since v3.0.0, with **v4.1.0** following in the same session to close the three entries
 v4.0.0 opened. It opens a **second programme** of three features, delivered from **012** because
-011 was taken by the UAT work while the administrative branch was in flight)
+011 was taken by the UAT work while the administrative branch was in flight.
+
+**013 has since shipped** ([#20](https://github.com/Programa-Semilla/mynet-ps/pull/20)), and **#10
+brainstormed 014 — conference content authoring**, the second feature of that programme. It needs
+its own amendment, **v4.2.0**, carrying two changes: a **second notification trigger** — the first
+since v3.1.0 bounded delivery to a received message and nothing else — and an explicit statement
+that a conference organizer may **create** a conference, which decision 32's "only conferences they
+are assigned" did not anticipate)
 
 The authoritative registers live elsewhere — open questions in `.specify/memory/constitution.md`,
 delivery sequence in `docs/superpowers/specs/2026-08-06-mynet-delivery-roadmap-design.md`. This file
@@ -32,6 +39,7 @@ win and this is stale.
 | 08 | 2026-08-10 | brand-mark-and-app-icons | **specified, then implemented**; register entry 2 ratified in constitution **v3.4.0** | `specs/010-brand-mark-and-app-icons/` |
 | 08 | 2026-08-10 | uat-deployment-and-hardening | **shipped (PR #19)**; five owner decisions ratified in constitution **v3.5.0** | `brainstorm/08-uat-deployment-and-hardening.md` |
 | 09 | 2026-08-11 | administrative-product | **decided, and ratified as constitution v4.0.0** the same day — standing decisions 31–36. Opened entries 24, 25, 26; **all three closed by v4.1.0** as decisions 37–39. Delivered as **012** | `brainstorm/09-administrative-product.md` |
+| 10 | 2026-08-12 | conference-content-authoring | **decided**, pending amendment **v4.2.0** — which gates the first line of code, as v3.1.0/v3.2.0/v3.3.0/v4.0.0 each did. Live editing from day one; **cancel replaces delete once attendees have engaged**; an in-app marker **and** a push for a changed saved session; both tiers create conferences. One PR, migration `0011` | `brainstorm/10-conference-content-authoring.md` |
 
 Session 05 has no document of its own: 006 was specified without one, and the row records the
 session rather than a file. 009 likewise — it went straight to specification, and its row is
@@ -100,7 +108,7 @@ requires reversing a Principle III **prohibition** rather than filling an omissi
 | # | Phase | Status | Blocked by |
 |---|-------|--------|------------|
 | 013 | Administrative foundation — second actor, admin site, **abuse-report queue** | **shipped** — squash-merged to `develop`; amendments ratified as **v4.0.0** and **v4.1.0**. Migration `0009` | ~~24, 25, 26~~ — **all three closed by v4.1.0** |
-| 014 | Conference content authoring | **brainstormed** (#09); licensed by v4.0.0 | 013 |
+| 014 | Conference content authoring | **brainstormed** (#10) and decided; licensed by v4.0.0, but **gated on a new amendment v4.2.0** it opens itself. Live editing from day one, so #09's central question — what editing a live conference does to attendees who saved those sessions — is answered here rather than deferred. Migration `0011` | 013 ✓; v4.2.0 |
 | 015 | Registration and attendee management | **brainstormed** (#09); licensed by v4.0.0 | 013 |
 
 **Numbered 011–013 when #09 ran, and delivered as 013–015.** The UAT deployment work took 011 from a
@@ -364,6 +372,45 @@ deployment or release.
   is public, and `branches/develop/protection` returns **404 — no rule set**. Branch protection is
   free on public repositories, so this is a configuration task rather than an accepted risk
   (corrected 2026-08-06)
+
+### Design questions carried into 014's specification
+
+From #10. The decision itself is made; **the amendment it needs, v4.2.0, is not yet drafted and
+gates the first line of code.** These are for `/speckit-specify`, except where they are governance
+and must be escalated. **None may be silently resolved.**
+
+- **Which changes are "material" enough to dispatch?** Cancellation certainly, a start-time change
+  certainly, a room change probably; a title, summary or speaker swap probably not. **The amendment
+  must name the set**, because the set *is* the scope of the second trigger — leaving it to a
+  handler is exactly the drift v3.1.0's one-sentence rule was written to prevent.
+- **A saved-session push carries a session title to a lock screen.** v3.1.0 accepted the equivalent
+  for message content and explicitly did **not** solve whether an attendee may suppress it. 014
+  makes that unsolved question apply to a second content type, which is the second time it has come
+  up unanswered. Escalate rather than decide.
+- **Is the count that gates delete-vs-cancel a disclosure?** Showing an organizer "12 attendees
+  saved this, 4 wrote notes" is an aggregate over attendee state with no identity attached, so
+  probably not a Principle VIII exception — but v3.3.0's whole point is that this project records
+  such things rather than deriving them.
+- **Speakers are personal data about people who are not attendees.** Seeded rows already carry a
+  real person's name, title and company; what 014 changes is that they become *organizer-authored*,
+  which moves responsibility. `deletion-coverage.test.ts` and `export-coverage.test.ts` derive from
+  the schema, and Principle VIII has only ever considered attendees.
+- **May an attendee still ask questions on a cancelled session?** Its existing Q&A survives by
+  requirement; whether the composer stays open is undecided.
+- **Does the event timezone stay editable once sessions exist?** `timestamptz` means no absolute
+  instant moves, but every displayed local time shifts — including saved-session rows and Home's
+  "Up next". The same decision as the material-change question, approached from the other end.
+- **May a conference be deleted, and by whom?** The cancel-not-delete rule answers this for sessions
+  and says nothing one level up, where registrations make it worse.
+- **Nothing bounds how many conferences a promoted attendee may create.** Bounded by trust, since
+  promotion is platform-tier only. Worth a deliberate decision rather than an accident.
+- **Register entry 22 gets staler in a new way.** A cached conference can already outlive a
+  withdrawn registration by 24 hours; 014 makes an *edited* programme sit in the same cache. The
+  entry is filed against 012, 013 did not answer it, and 014 is the first feature to make the cached
+  copy wrong for a reason other than access.
+- **The roadmap's reserved-number table stops at the attendee programme**, and has now been wrong
+  for two features running. Housekeeping, not a decision — but it is the third collision, and 013
+  took `0009` while 012 holds `0010`, which is why 014 reserves `0011`.
 
 ### Design questions carried into 011's specification
 
