@@ -10,3 +10,12 @@
  * build" depends on.
  */
 declare const __UAT_MARKER__: boolean
+
+/**
+ * T059 (010) — the VAPID public key, substituted from `PUSH_VAPID_PUBLIC_KEY` (FR-853).
+ *
+ * Empty string when unconfigured, which the composition root turns back into `undefined` —
+ * absent is a supported state, and with no key `isSupported()` is false and nobody is ever asked
+ * for permission.
+ */
+declare const __VAPID_PUBLIC_KEY__: string

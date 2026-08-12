@@ -3,7 +3,7 @@ import { fileURLToPath, URL } from 'node:url'
 
 import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
 import { PRODUCT_NAME, PRODUCT_SHORT_NAME, PRODUCT_TAGLINE } from './src/app/branding.js'
@@ -18,6 +18,26 @@ const resolve = (path: string) => fileURLToPath(new URL(path, import.meta.url))
  * from the process environment, which `pnpm start` sets on the child it spawns.
  */
 const webPort = Number(process.env['MYNET_WEB_PORT'] ?? 5173)
+
+/**
+ * T059 (010) — the VAPID public key, resolved from ONE name (FR-853).
+ *
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ * **`loadEnv` IS LOAD-BEARING, AND LEAVING IT OUT BREAKS LOCAL DEVELOPMENT SILENTLY.**
+ *
+ * Vite reads `.env` into `import.meta.env`, not into `process.env` — and only `VITE_`-prefixed
+ * keys at that. So `process.env['PUSH_VAPID_PUBLIC_KEY']` is undefined during `pnpm start` no
+ * matter what the repository `.env` says, and the failure is the quiet kind: `isSupported()`
+ * returns false, no permission is ever requested, and notifications simply never appear with
+ * nothing anywhere reporting a problem.
+ *
+ * `loadEnv(mode, dir, '')` — the empty prefix — reads every key from that same file. The process
+ * environment still wins, because that is what `deploy.sh` sets when it builds for a deployment.
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ */
+const rootEnv = loadEnv(process.env['NODE_ENV'] ?? 'development', resolve('../..'), '')
+const vapidPublicKey =
+  process.env['PUSH_VAPID_PUBLIC_KEY'] ?? rootEnv['PUSH_VAPID_PUBLIC_KEY'] ?? ''
 
 /**
  * Reads a colour token out of the token file at build time.
@@ -184,6 +204,34 @@ export default defineConfig({
    */
   define: {
     __UAT_MARKER__: JSON.stringify(process.env['VITE_UAT_MARKER'] === 'true'),
+
+    /**
+     * T059 (010) — **one name for the VAPID public key, read by the API and by this build**
+     * (FR-853).
+     *
+     * ═══════════════════════════════════════════════════════════════════════════════════════
+     * **IT WAS CONFIGURED TWICE, AND NOTHING CHECKED THE TWO AGREED.**
+     *
+     * `PUSH_VAPID_PUBLIC_KEY` for the API and `VITE_PUSH_VAPID_PUBLIC_KEY` for the client — the
+     * same key, spelled twice, in one file. The `vapid-config-duplication` inbox entry raised it
+     * and said to settle it when the real adapter landed. It has landed.
+     *
+     * Two copies of a key is not a tidiness problem. A public key from one pair with a private
+     * key from another produces a push service that rejects **every** delivery with a 403, and a
+     * product that looks like it is working: subscriptions are created, sends are accepted, and
+     * nothing ever arrives. `config.ts` already refuses to start with only half a pair; it
+     * cannot detect halves of two *different* pairs, and neither could anything else.
+     *
+     * Reading the unprefixed name through `define` gives one variable for both consumers. The
+     * `VITE_` prefix exists to stop secrets reaching the bundle — this is a **public** key, and
+     * the prefix was never what made it safe to ship. `define` substitutes it as a literal, so
+     * the rule the prefix enforces is untouched: nothing else becomes reachable.
+     *
+     * Serving it from the API was the other candidate and is what the configuration contract
+     * suggests. It would have cost a new route, which FR-891 forbids this feature outright.
+     * ═══════════════════════════════════════════════════════════════════════════════════════
+     */
+    __VAPID_PUBLIC_KEY__: JSON.stringify(vapidPublicKey),
   },
   resolve: {
     alias: {

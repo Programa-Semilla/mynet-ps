@@ -146,7 +146,7 @@ if [[ "$DO_BUILD" == "true" ]]; then
   # of a production bundle entirely rather than hidden inside one. `vite.config.ts` turns this
   # into a build-time literal, so the element is dead code the bundler removes.
   VITE_UAT_MARKER="$([[ "$MYNET_ENV" == "uat" ]] && echo true || echo false)" \
-  VITE_API_BASE_URL=/api VITE_PUSH_VAPID_PUBLIC_KEY="$VAPID_PUBLIC" \
+  VITE_API_BASE_URL=/api PUSH_VAPID_PUBLIC_KEY="$VAPID_PUBLIC" \
     pnpm --filter @mynet/web build
 fi
 [[ -d apps/web/dist ]] || { echo "ERROR: apps/web/dist is missing. Run without --no-build." >&2; exit 1; }

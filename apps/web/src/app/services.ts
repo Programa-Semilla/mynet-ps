@@ -51,7 +51,15 @@ export const createServices = (): PlatformServices => {
     // **Absent is a supported state** (register entry 20): with no key `isSupported()` is false,
     // no permission is ever requested, and the product behaves exactly as it does for somebody
     // who declined — which FR-552 already requires to be a complete product.
-    vapidPublicKey: import.meta.env['VITE_PUSH_VAPID_PUBLIC_KEY'],
+    //
+    // 010 T059 — FR-853. **One name, shared with the API.** This was
+    // `import.meta.env['VITE_PUSH_VAPID_PUBLIC_KEY']`, a second spelling of the value the API
+    // reads as `PUSH_VAPID_PUBLIC_KEY`, with nothing checking they matched. A public key from one
+    // pair and a private key from another gives a push service that rejects every delivery with
+    // a 403 while the product looks like it is working. See `vite.config.ts` for the substitution.
+    // `exactOptionalPropertyTypes` is on, so the property is omitted rather than set to
+    // `undefined` — absent means absent, which is the state FR-552 makes a complete product.
+    ...(__VAPID_PUBLIC_KEY__ ? { vapidPublicKey: __VAPID_PUBLIC_KEY__ } : {}),
   })
 
   const http = new HttpClient({
