@@ -124,7 +124,6 @@ export const TopBar = () => {
           <EnvironmentMarker />
         </div>
 
-
         {attendee && (
           <div className="flex min-w-0 shrink items-center gap-2 tablet:gap-3">
             {/*

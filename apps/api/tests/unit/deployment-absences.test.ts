@@ -78,7 +78,7 @@ describe('no migration was added (FR-890)', () => {
       'A migration was added. FR-890 says this feature changes no schema — and the two throttle ' +
         'actions it introduces are union members in an existing text column precisely so that ' +
         'stays true. A migration here also means the Drizzle snapshot was regenerated, which the ' +
-        "migration README warns against: `drizzle-kit generate` JSON-parses every file in meta/.",
+        'migration README warns against: `drizzle-kit generate` JSON-parses every file in meta/.',
     ).toBe('0008_session_qa.sql')
   })
 
@@ -108,9 +108,7 @@ describe('no product surface was added (FR-891)', () => {
   })
 
   it('adds no Home card', () => {
-    const registry = stripComments(
-      readFileSync(`${REPO}apps/web/src/app/home/registry.ts`, 'utf8'),
-    )
+    const registry = stripComments(readFileSync(`${REPO}apps/web/src/app/home/registry.ts`, 'utf8'))
 
     // Home's seventh card was 008's and is the last one. This feature contributes nothing here —
     // an environment marker is not a card, and a deployment has nothing an attendee acts on.
@@ -118,9 +116,7 @@ describe('no product surface was added (FR-891)', () => {
   })
 
   it('adds no navigation destination', () => {
-    const navigation = stripComments(
-      readFileSync(`${REPO}apps/web/src/app/navigation.ts`, 'utf8'),
-    )
+    const navigation = stripComments(readFileSync(`${REPO}apps/web/src/app/navigation.ts`, 'utf8'))
 
     expect(
       /uat|environment marker|deployment/i.test(navigation),

@@ -52,15 +52,15 @@ Production is not provisioned and this feature deliberately did not touch it (FR
 
 ### Prerequisites — every one of them, because SC-814 asks for no step that exists only in a head
 
-| You need | Why | If you do not have it |
-| -------- | --- | --------------------- |
-| `az` CLI, logged in | provisioning and the subscription guard | `az login` |
-| Access to subscription `d428f98f-…` | it is pinned by id in `envs/uat.env` | you get a refusal naming the id; ask the subscription owner |
-| **Quota** for the VM family in the region | availability and quota are different questions | the preflight refuses and names the family and the limit |
-| An SSH key pair | `az vm create --generate-ssh-keys` reuses `~/.ssh/id_rsa` or makes one | nothing — it is created for you |
-| Control of the DNS zone | Caddy needs a resolving A record before it can get a certificate | **this is the blocking one.** `programasemilla.com` is served by GoDaddy, not Azure DNS, so no script here can create the record |
-| SMTP credentials | **the API will not boot without them** | see the warning below |
-| `docker`, `rsync`, `python3` locally | the image build, the sync, the cloud-init ASCII check | install them |
+| You need                                  | Why                                                                    | If you do not have it                                                                                                            |
+| ----------------------------------------- | ---------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `az` CLI, logged in                       | provisioning and the subscription guard                                | `az login`                                                                                                                       |
+| Access to subscription `d428f98f-…`       | it is pinned by id in `envs/uat.env`                                   | you get a refusal naming the id; ask the subscription owner                                                                      |
+| **Quota** for the VM family in the region | availability and quota are different questions                         | the preflight refuses and names the family and the limit                                                                         |
+| An SSH key pair                           | `az vm create --generate-ssh-keys` reuses `~/.ssh/id_rsa` or makes one | nothing — it is created for you                                                                                                  |
+| Control of the DNS zone                   | Caddy needs a resolving A record before it can get a certificate       | **this is the blocking one.** `programasemilla.com` is served by GoDaddy, not Azure DNS, so no script here can create the record |
+| SMTP credentials                          | **the API will not boot without them**                                 | see the warning below                                                                                                            |
+| `docker`, `rsync`, `python3` locally      | the image build, the sync, the cloud-init ASCII check                  | install them                                                                                                                     |
 
 ### The order, and it matters
 
@@ -267,14 +267,13 @@ psql postgresql://mynet:<password>@localhost:15432/<database>
 > buys close to nothing.
 >
 > **What that does not change.** Standing decision 17 requires a restore **actually performed**
-> before *production* holds real attendee data. `OPERATIONS-LOG.md` still records only one
+> before _production_ holds real attendee data. `OPERATIONS-LOG.md` still records only one
 > restore, against a throwaway container in 2026-08-07. **That obligation carries to production
 > and is not optional there.**
 >
 > The code is ready and unexercised: `backup.sh` copies each artifact off-host and refuses to
 > prune unless the copy is confirmed. It needs `BACKUP_REMOTE_CONTAINER` and
 > `BACKUP_REMOTE_CREDENTIAL`, and a storage account that does not yet exist.
-
 
 > **The constitution names three parts. Two are automated; the third is an act, and it is the one
 > that gets skipped.**

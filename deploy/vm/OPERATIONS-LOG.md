@@ -55,12 +55,12 @@ and restore **that artifact**. It cannot be done until the environments exist.
 
 **What exists now**, in resource group `rg-mynet-uat`:
 
-| Resource                                       | Note                                          |
-| ---------------------------------------------- | --------------------------------------------- |
-| `vm-mynet-uat` (`Standard_B2s`, Ubuntu 24.04)   | `provisioningState: Succeeded`, power: running |
-| `vm-mynet-uat_OsDisk_…` (64 GB StandardSSD_LRS) | —                                             |
-| `vm-mynet-uatPublicIP` → **20.9.29.146**        | Standard SKU, static                          |
-| `vm-mynet-uatVNET`, `vm-mynet-uatVMNic`         | —                                             |
+| Resource                                        | Note                                                         |
+| ----------------------------------------------- | ------------------------------------------------------------ |
+| `vm-mynet-uat` (`Standard_B2s`, Ubuntu 24.04)   | `provisioningState: Succeeded`, power: running               |
+| `vm-mynet-uat_OsDisk_…` (64 GB StandardSSD_LRS) | —                                                            |
+| `vm-mynet-uatPublicIP` → **20.9.29.146**        | Standard SKU, static                                         |
+| `vm-mynet-uatVNET`, `vm-mynet-uatVMNic`         | —                                                            |
 | `vm-mynet-uatNSG`                               | `allow-web` 80/443 from `*`; `allow-ssh` 22 from one address |
 
 **Observed**: SSH reachable, `cloud-init status: running`, Docker 29.7.2 already installed.
@@ -126,11 +126,11 @@ Resolves to `20.9.29.146` from the authoritative nameserver (`ns25.domaincontrol
 `envs/uat.env` was edited to name production's database — `DATABASE_NAME=mynet_prod` — and every
 script that takes an environment was run:
 
-| Script             | Outcome                                                      |
-| ------------------ | ------------------------------------------------------------ |
-| `provision-vm.sh`  | **REFUSED**, naming "UAT resolves to production's DATABASE NAME" and printing both values |
-| `deploy.sh`        | **REFUSED**, same message                                     |
-| `maintenance.sh`   | **REFUSED**, same message                                     |
+| Script            | Outcome                                                                                   |
+| ----------------- | ----------------------------------------------------------------------------------------- |
+| `provision-vm.sh` | **REFUSED**, naming "UAT resolves to production's DATABASE NAME" and printing both values |
+| `deploy.sh`       | **REFUSED**, same message                                                                 |
+| `maintenance.sh`  | **REFUSED**, same message                                                                 |
 
 The file was then restored and verified byte-identical to the commit (`git diff` empty), and the
 same scripts were re-run and proceeded.
@@ -138,7 +138,7 @@ same scripts were re-run and proceeded.
 **`backup.sh` is not in that table, and its absence is correct rather than a gap.** It was run and
 printed its usage instead of refusing, which looked like a hole for about a minute. It is not one:
 `backup.sh` runs **on the VM**, takes `run|install|status` rather than an environment, and reads
-only the `.env` beside it. It has no committed env file to be pointed at the wrong one *with* —
+only the `.env` beside it. It has no committed env file to be pointed at the wrong one _with_ —
 the misconfiguration FR-485 defends against is not expressible there. The guard covers the three
 scripts that resolve an environment from `envs/`, which is all of the ones that can.
 
@@ -188,11 +188,11 @@ This is the point of doing the first deploy by hand. None of these three could h
 review, by lint, or by any test in the repository — each lives in code that had never once been
 run, because nothing had ever been deployed.
 
-| # | Failure | Cause | Fix |
-| - | ------- | ----- | --- |
-| 1 | `scp: dest open ".../maintenance/index.html": No such file or directory` | `deploy.sh` enters maintenance at step 1b and rsyncs at step 3 — correct ordering, but on a **first** deploy the target directory does not exist yet | `mkdir -p` before the `scp` in `maintenance.sh` |
-| 2 | `ERROR: Unknown option: 'legacy'` building the API image | `apps/api/Dockerfile` ran `pnpm deploy --prod --legacy`; `--legacy` is a **pnpm 10** flag while `packageManager` pins **9.15.9** | dropped the flag; the Dockerfile's own header already warned it was "reviewed-but-untried" |
-| 3 | `TypeError: Invalid URL` in the migration runner | `POSTGRES_PASSWORD` was generated with `openssl rand -base64`, and `/` and `+` are not URL-safe. `docker-compose.yml` **substitutes** it into `DATABASE_URL`, and Compose cannot escape | regenerated with `tr '+/' '-_'`; the volume was destroyed and re-initialised, since `initdb` only runs on an empty data directory |
+| #   | Failure                                                                  | Cause                                                                                                                                                                                   | Fix                                                                                                                               |
+| --- | ------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | `scp: dest open ".../maintenance/index.html": No such file or directory` | `deploy.sh` enters maintenance at step 1b and rsyncs at step 3 — correct ordering, but on a **first** deploy the target directory does not exist yet                                    | `mkdir -p` before the `scp` in `maintenance.sh`                                                                                   |
+| 2   | `ERROR: Unknown option: 'legacy'` building the API image                 | `apps/api/Dockerfile` ran `pnpm deploy --prod --legacy`; `--legacy` is a **pnpm 10** flag while `packageManager` pins **9.15.9**                                                        | dropped the flag; the Dockerfile's own header already warned it was "reviewed-but-untried"                                        |
+| 3   | `TypeError: Invalid URL` in the migration runner                         | `POSTGRES_PASSWORD` was generated with `openssl rand -base64`, and `/` and `+` are not URL-safe. `docker-compose.yml` **substitutes** it into `DATABASE_URL`, and Compose cannot escape | regenerated with `tr '+/' '-_'`; the volume was destroyed and re-initialised, since `initdb` only runs on an empty data directory |
 
 **The third is worth more than its fix.** The driver's error message contained the entire
 connection string — password included — which is how a secret reaches a log at exactly the moment
@@ -201,14 +201,14 @@ URL-safe, why Compose cannot escape it, and gives a generator that produces one.
 
 ### Verified from OUTSIDE the host, not from it (T037, FR-824–FR-826)
 
-| Check | Observed |
-| ----- | -------- |
-| Certificate (FR-825) | `CN=mynet-dev.programasemilla.com`, issuer Let's Encrypt `YE1`, valid to 2026-11-09 |
-| HTTP → HTTPS | `308` to `https://mynet-dev.programasemilla.com/` |
-| Client served | `200`, `text/html`, 854 bytes |
-| API on the **same origin** (FR-824) | `GET /api/health` → `200`; `GET /api/ready` → `{"status":"ready"}` |
-| Database off-host (FR-826) | connection to `:5432` refused |
-| Security headers (SC-411) | every declared header present; `img-src` permits `data:` |
+| Check                               | Observed                                                                            |
+| ----------------------------------- | ----------------------------------------------------------------------------------- |
+| Certificate (FR-825)                | `CN=mynet-dev.programasemilla.com`, issuer Let's Encrypt `YE1`, valid to 2026-11-09 |
+| HTTP → HTTPS                        | `308` to `https://mynet-dev.programasemilla.com/`                                   |
+| Client served                       | `200`, `text/html`, 854 bytes                                                       |
+| API on the **same origin** (FR-824) | `GET /api/health` → `200`; `GET /api/ready` → `{"status":"ready"}`                  |
+| Database off-host (FR-826)          | connection to `:5432` refused                                                       |
+| Security headers (SC-411)           | every declared header present; `img-src` permits `data:`                            |
 
 ### The readiness gate, demonstrated rather than asserted (T038, FR-827)
 
@@ -246,22 +246,22 @@ wrong, because the happy path never exercises them.
 
 ### Account creation with mail broken (T048, FR-846, FR-847)
 
-| Check | Observed |
-| ----- | -------- |
-| `POST /api/auth/sign-up` | **204** — the account was created |
-| the attendee row | present |
-| the failure | **logged** (2 matching lines in the API log) |
+| Check                    | Observed                                     |
+| ------------------------ | -------------------------------------------- |
+| `POST /api/auth/sign-up` | **204** — the account was created            |
+| the attendee row         | present                                      |
+| the failure              | **logged** (2 matching lines in the API log) |
 
 ### A report with mail broken (T067, FR-847, FR-862)
 
-| Check | Observed |
-| ----- | -------- |
-| `POST /api/reports` | **204** |
-| the block, in the same action | **applied** |
-| the report row | **recorded** |
+| Check                         | Observed     |
+| ----------------------------- | ------------ |
+| `POST /api/reports`           | **204**      |
+| the block, in the same action | **applied**  |
+| the report row                | **recorded** |
 
-That is FR-847 exactly: *a report still blocks and is still recorded, and an account is still
-created*. Safety does not depend on an external service answering.
+That is FR-847 exactly: _a report still blocks and is still recorded, and an account is still
+created_. Safety does not depend on an external service answering.
 
 ### Restored
 
@@ -278,13 +278,13 @@ delete was not surgical, and any block created before it is gone.
 
 **Act**: the `uat` GitHub environment was created and four of its five secrets stored.
 
-| Secret | Source | Note |
-| ------ | ------ | ---- |
-| `PUSH_VAPID_PRIVATE_KEY` | the VM's `.env` | piped straight from the host; never in a terminal |
-| `SSH_KNOWN_HOSTS` | `ssh-keyscan`, against fingerprints already verified out-of-band | FR-834 |
-| `MAIL_SMTP_URL` | the VM's `.env` | piped |
-| `DEPLOY_SSH_KEY` | **a new key, generated on the VM** | see below |
-| `AZURE_CREDENTIALS` | **NOT SET** | needs a service principal — see below |
+| Secret                   | Source                                                           | Note                                              |
+| ------------------------ | ---------------------------------------------------------------- | ------------------------------------------------- |
+| `PUSH_VAPID_PRIVATE_KEY` | the VM's `.env`                                                  | piped straight from the host; never in a terminal |
+| `SSH_KNOWN_HOSTS`        | `ssh-keyscan`, against fingerprints already verified out-of-band | FR-834                                            |
+| `MAIL_SMTP_URL`          | the VM's `.env`                                                  | piped                                             |
+| `DEPLOY_SSH_KEY`         | **a new key, generated on the VM**                               | see below                                         |
+| `AZURE_CREDENTIALS`      | **NOT SET**                                                      | needs a service principal — see below             |
 
 ### The deploy key is its own key, and that was a deliberate refusal
 
@@ -317,12 +317,12 @@ If it turns out to be unobtainable, R1's just-in-time NSG design needs Azure con
 
 Chromium against `https://mynet-dev.programasemilla.com`, signed in, at four widths:
 
-| Width | Marker present | Horizontal overflow |
-| ----- | -------------- | ------------------- |
-| 320×568 | yes | **0px** |
-| 390×844 | yes | **0px** |
-| 768×1024 | yes | **0px** |
-| 1440×900 | yes | **0px** |
+| Width    | Marker present | Horizontal overflow |
+| -------- | -------------- | ------------------- |
+| 320×568  | yes            | **0px**             |
+| 390×844  | yes            | **0px**             |
+| 768×1024 | yes            | **0px**             |
+| 1440×900 | yes            | **0px**             |
 
 320px is the width the requirement is really about — the header there already carries the product
 name, the conference switcher, the profile control and sign-out. The marker adds no row and costs
