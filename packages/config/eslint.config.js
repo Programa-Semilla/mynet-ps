@@ -175,6 +175,84 @@ export default tseslint.config(
   },
 
   /**
+   * T032 (013) — the same three selectors for `OperatorScope` and `PlatformScope` (FR-905,
+   * FR-906).
+   *
+   * ═════════════════════════════════════════════════════════════════════════════════════════
+   * **A FOURTH SIBLING BLOCK, FOR THE REASON THE THIRD ONE RECORDS: `ignores` EXEMPTS A WHOLE
+   * FILE FROM EVERY SELECTOR IN ITS BLOCK.**
+   *
+   * Folding these into the event or conversation block would mean listing
+   * `admin/require-operator.ts` there — and that file would then be free to assert
+   * `as EventScope` and `as ConversationScope`, while `event-access.ts` would be free to assert
+   * `as PlatformScope`. Each exemption silently widens to cover brands it has no business
+   * constructing. Four blocks, four ignore lists, each exempting exactly the module that may
+   * construct its own brands.
+   *
+   * **`scope.ts` is NOT exempted, and that is deliberate.** Unlike the three brands above, this
+   * feature's classes live in a different file from their guard (plan.md's structure), so the
+   * minting functions are exported. `scope.ts` does not need to assert anything — it holds the
+   * `new` — and `require-operator.ts` is exempted because it names the types in its return
+   * positions. What stops any *other* module calling a mint function is the sole-importer
+   * assertion in `tests/unit/admin-scope-brand.test.ts`, which is the compensating control the
+   * split costs.
+   *
+   * `PlatformScope` gets its own three selectors rather than sharing them with `OperatorScope`,
+   * because the two are different guarantees: asserting the weaker one fabricates an
+   * administrative principal, and asserting the stronger one hands a conference organizer the
+   * abuse-report queue (decision 35).
+   * ═════════════════════════════════════════════════════════════════════════════════════════
+   */
+  {
+    name: 'mynet/operator-scope-brand',
+    files: ['apps/api/**/*.{ts,tsx,mts,cts}'],
+    ignores: ['apps/api/src/admin/require-operator.ts'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: 'TSAsExpression > TSTypeReference > Identifier[name="OperatorScope"]',
+          message:
+            'Do not assert a value to OperatorScope. It is proof that an administrative ' +
+            'principal is authenticated, and the only place that proof can be produced is ' +
+            'requireOperator in admin/require-operator.ts. An assertion here fabricates an ' +
+            'administrator (FR-905).',
+        },
+        {
+          selector: 'TSTypeAssertion > TSTypeReference > Identifier[name="OperatorScope"]',
+          message:
+            'Do not assert a value to OperatorScope — see admin/require-operator.ts (FR-905).',
+        },
+        {
+          selector: 'TSTypeAliasDeclaration > TSTypeReference > Identifier[name="OperatorScope"]',
+          message:
+            'Do not alias OperatorScope. An alias defeats the assertion rules above, which ' +
+            'match on the type name (FR-905).',
+        },
+        {
+          selector: 'TSAsExpression > TSTypeReference > Identifier[name="PlatformScope"]',
+          message:
+            'Do not assert a value to PlatformScope. It is proof that the caller is a PLATFORM ' +
+            'operator, and the only place that proof can be produced is requirePlatformOperator ' +
+            'in admin/require-operator.ts. An assertion here hands a conference organizer the ' +
+            'abuse-report queue, which decision 35 forbids outright (FR-906).',
+        },
+        {
+          selector: 'TSTypeAssertion > TSTypeReference > Identifier[name="PlatformScope"]',
+          message:
+            'Do not assert a value to PlatformScope — see admin/require-operator.ts (FR-906).',
+        },
+        {
+          selector: 'TSTypeAliasDeclaration > TSTypeReference > Identifier[name="PlatformScope"]',
+          message:
+            'Do not alias PlatformScope. An alias defeats the assertion rules above, which ' +
+            'match on the type name (FR-906).',
+        },
+      ],
+    },
+  },
+
+  /**
    * T017 (004) — **the `StorageService` boundary, made machine-checked** (FR-352, FR-393).
    *
    * ═════════════════════════════════════════════════════════════════════════════════════════
@@ -370,6 +448,61 @@ export default tseslint.config(
        * catching them in a browser.
        */
       ...jsxA11y.flatConfigs.recommended.rules,
+    },
+  },
+
+  /**
+   * T007 (013) — **the administrative client, held to the same rules as the attendee client.**
+   *
+   * ═══════════════════════════════════════════════════════════════════════════════════════════
+   * A separate application is not a relaxed one. FR-922 binds Principle IV over the whole
+   * administrative product, and FR-921 says it draws from the same token file — so the two rules
+   * that make those machine-checked are registered here identically.
+   *
+   * `mynet/no-direct-platform-access` does a second job in this app that it does not do in
+   * `apps/web`, and it is worth naming: **`serviceWorker` is one of the capability identifiers it
+   * reports**, so FR-923's central absence has a lint failure behind it as well as a unit test.
+   * The test (`apps/admin/tests/unit/no-service-worker.test.ts`) is still the primary guard,
+   * because it also catches the string in a comment-stripped source scan and this rule only sees
+   * a resolved global reference — but two independent mechanisms is the right number for the one
+   * absence that separates this product from an installable one.
+   *
+   * There is no `@mynet/platform` here to reach *through*, either: the package is absent from
+   * this app's dependencies by design (research R9), so the rule guards the direct route and the
+   * dependency graph guards the indirect one.
+   * ═══════════════════════════════════════════════════════════════════════════════════════════
+   */
+  {
+    name: 'mynet/admin-client',
+    files: ['apps/admin/**/*.{ts,tsx}'],
+    languageOptions: {
+      globals: { ...globals.browser },
+      parserOptions: { ecmaFeatures: { jsx: true } },
+    },
+    plugins: { mynet, 'react-hooks': reactHooks, 'jsx-a11y': jsxA11y },
+    rules: {
+      'mynet/no-colour-literals': 'error',
+      'mynet/no-direct-platform-access': 'error',
+      ...reactHooks.configs.recommended.rules,
+      ...jsxA11y.flatConfigs.recommended.rules,
+    },
+  },
+
+  {
+    /**
+     * The administrative composition root — one file, exempted by name, exactly as `apps/web`'s
+     * is. It finds the mount point and sets the document title; nothing else in this application
+     * may name a DOM global.
+     *
+     * Deliberately **shorter than the attendee client's list**: there is no `services.ts` here
+     * handing device implementations to a registry, because there are no device implementations.
+     * That single-file difference is what Principle V being "satisfied by subtraction" looks like
+     * in the lint configuration.
+     */
+    name: 'mynet/admin-composition-root',
+    files: ['apps/admin/src/main.tsx'],
+    rules: {
+      'mynet/no-direct-platform-access': 'off',
     },
   },
 

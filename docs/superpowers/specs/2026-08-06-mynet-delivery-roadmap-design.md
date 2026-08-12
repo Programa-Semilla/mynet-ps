@@ -602,7 +602,13 @@ specification rather than a convention of this document, and the spec template c
 
 Unchanged from the constitution, and not reopened by this roadmap:
 
-- Organizer administration, in any form — including content import.
+- ~~Organizer administration, in any form — including content import.~~ **REVERSED 2026-08-11 by
+  constitution v4.0.0** (ratified), which lifts Principle III's administration exclusion and D2's
+  seed-data clause. Administration is delivered as a **second programme** — features 013, 014 and
+  015 — which this roadmap does not cover and is not extended to cover: this document decomposes the
+  **attendee** product, and that decomposition is complete. Recording 013–015 here would misrepresent
+  a finished plan as unfinished. See `brainstorm/09-administrative-product.md`. **Payment processing
+  is not reopened.**
 - Payment processing.
 - Notification delivery and calendar integration. Their interfaces exist; they must not be wired to
   real delivery. The prototype's notification bell must not be reproduced.

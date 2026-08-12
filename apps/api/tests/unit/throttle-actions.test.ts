@@ -152,9 +152,39 @@ describe('throttle actions', () => {
     ).toBe(true)
   })
 
+  it('lets administrative sign-in delay but never deny (FR-916)', () => {
+    // ─────────────────────────────────────────────────────────────────────────────────────
+    // T040 (012). `reset_request`'s argument, arriving a second time: the action is
+    // **unauthenticated and keyed on a submitted address**, so anybody can drive the counter
+    // for an address they do not own — and the address they would choose is the platform
+    // operator's, who is the only principal that can read the report queue or promote anybody.
+    //
+    // The attendee `sign_in` action is `mayDeny: true` and that stays correct: a locked-out
+    // attendee is one of thousands and recovers by waiting. A locked-out operator may be the
+    // only person able to act on the product, with nobody to appeal to.
+    // ─────────────────────────────────────────────────────────────────────────────────────
+    expect(
+      THRESHOLDS.admin_sign_in.mayDeny,
+      'FR-916 — administrative sign-in is unauthenticated and keyed on a submitted address, so ' +
+        'an identifier-keyed denial only ever harms the operator being attacked. It may delay ' +
+        'and must never deny.',
+    ).toBe(false)
+  })
+
+  it('keeps administrative sign-in separate from attendee sign-in', () => {
+    // Separate counters, for the reason every action in this table is separate: administrative
+    // attempts must not slow any attendee's sign-in, and attendee traffic must not consume the
+    // operator's allowance. Asserted because "reuse `sign_in`" is the obvious simplification
+    // and it would silently couple the two populations — including their `mayDeny` settings,
+    // which deliberately differ.
+    expect(THROTTLE_ACTIONS).toContain('admin_sign_in')
+    expect(THRESHOLDS.admin_sign_in).not.toBe(THRESHOLDS.sign_in)
+    expect(THRESHOLDS.sign_in.mayDeny).toBe(true)
+  })
+
   /**
    * ═══════════════════════════════════════════════════════════════════════════════════════
-   * **010 EXTENDED THIS LIST, WHICH IS THE MAINTENANCE PATH THE CASE ITSELF PRESCRIBES.**
+   * **010 AND 012 EACH EXTENDED THIS LIST, WHICH IS THE MAINTENANCE PATH THE CASE PRESCRIBES.**
    *
    * The comment below says: do not add your action to make this pass — say which argument
    * applies to it, in its own `THRESHOLDS` entry, and then add it here. That is what happened.
@@ -168,12 +198,15 @@ describe('throttle actions', () => {
    *     indistinguishable from the product being broken: Discover never arrives, or a
    *     conversation appears to stop updating. What they bound is bulk collection, which is
    *     bounded perfectly well by cost (FR-802, FR-803).
+   *   * `admin_sign_in` — **the only one that repeats an existing argument rather than adding
+   *     a fourth.** It is `reset_request`'s exactly: unauthenticated, keyed on a submitted
+   *     address, so the denial falls on the operator being attacked (FR-916).
    *
-   * The assertion still pins an exact set, so it is extended rather than weakened: a ninth
-   * delay-only entry fails exactly as the seventh did.
+   * The assertion still pins an exact set, so it is extended rather than weakened: a sixth
+   * delay-only entry fails exactly as the fourth did.
    * ═══════════════════════════════════════════════════════════════════════════════════════
    */
-  it('keeps the delay-only set to exactly the four actions that earned it', () => {
+  it('keeps the delay-only set to exactly the five actions that earned it', () => {
     // ─────────────────────────────────────────────────────────────────────────────────────
     // The inverse of the assertions above, and the one that fails when a **future** feature
     // adds an action and copies the wrong neighbour's flag. Delay-only is the exceptional
@@ -188,12 +221,14 @@ describe('throttle actions', () => {
 
     expect(
       delayOnly,
-      'The set of delay-only throttle actions has changed. Four have earned it: `reset_request` ' +
+      'The set of delay-only throttle actions has changed. Five have earned it: `reset_request` ' +
         "(FR-331, keyed on a victim's address, so the denial is the attack), `message_send` " +
-        '(FR-511a, a refused message at a conference is a failure nobody can act on), and ' +
+        '(FR-511a, a refused message at a conference is a failure nobody can act on), ' +
         '`directory_read` / `thread_read` (FR-802, FR-803 — a refusal on either is ' +
-        'indistinguishable from the product being broken). Anything else here is either a new ' +
-        'requirement that needs recording, or a flag copied from the wrong neighbour.',
-    ).toEqual(['directory_read', 'message_send', 'reset_request', 'thread_read'])
+        'indistinguishable from the product being broken), and `admin_sign_in` (FR-916, ' +
+        "reset_request's argument again — a denial locks out the operator rather than the " +
+        'attacker). Anything else here is either a new requirement that needs recording, or a ' +
+        'flag copied from the wrong neighbour.',
+    ).toEqual(['admin_sign_in', 'directory_read', 'message_send', 'reset_request', 'thread_read'])
   })
 })

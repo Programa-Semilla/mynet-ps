@@ -148,8 +148,21 @@ if [[ "$DO_BUILD" == "true" ]]; then
   VITE_UAT_MARKER="$([[ "$MYNET_ENV" == "uat" ]] && echo true || echo false)" \
   VITE_API_BASE_URL=/api PUSH_VAPID_PUBLIC_KEY="$VAPID_PUBLIC" \
     pnpm --filter @mynet/web build
+
+  # ═══════════════════════════════════════════════════════════════════════════════════════════
+  # 011 — **the administrative client is a SECOND build, and it is not optional.** The Caddyfile
+  # serves `admin.{$APP_DOMAIN}` from `/srv/admin`; without this the administrative host answers
+  # 404 for its document while every other check in this script passes, because nothing else
+  # touches that origin.
+  #
+  # **No VAPID key**, deliberately. `apps/admin` registers no service worker and takes no
+  # dependency on `@mynet/platform` (FR-923) — it needs none of the seven device capabilities —
+  # so passing the key would build in a value nothing can read.
+  # ═══════════════════════════════════════════════════════════════════════════════════════════
+  VITE_API_BASE_URL=/api pnpm --filter @mynet/admin build
 fi
 [[ -d apps/web/dist ]] || { echo "ERROR: apps/web/dist is missing. Run without --no-build." >&2; exit 1; }
+[[ -d apps/admin/dist ]] || { echo "ERROR: apps/admin/dist is missing. Run without --no-build." >&2; exit 1; }
 
 echo "== [3/6] Sync source -> $REMOTE:$APP_DIR =="
 rsync -az --delete \
@@ -163,6 +176,7 @@ rsync -az --delete \
   --include '**/.env.example' \
   --exclude 'deploy/vm/backups' \
   --exclude 'deploy/vm/web' \
+  --exclude 'deploy/vm/admin' \
   --exclude 'deploy/vm/maintenance/ON' \
   --exclude 'deploy/vm/maintenance/index.html' \
   ./ "${REMOTE}:${APP_DIR}/"
@@ -180,6 +194,8 @@ rsync -az --delete \
 #   web          is the built client, pushed separately below — under --delete it would be
 #                removed a few seconds into every deploy, so Caddy would serve 404 for the
 #                document while the API was perfectly healthy.
+#   admin        the same, for the administrative client (013). It fails the same way and is
+#                *less* likely to be noticed, because no attendee-facing check touches that host.
 #   ON           is created on the VM and never exists locally, so --delete would take the site
 #                OUT of maintenance during the exact window this exists to cover — while every
 #                command still reported success.
@@ -191,6 +207,9 @@ rsync -az --delete \
 
 # The built client, pushed as its own tree so that `--delete` above cannot reach it.
 rsync -az --delete apps/web/dist/ "${REMOTE}:${COMPOSE_DIR}/web/"
+# The administrative client, likewise, into the directory `docker-compose.yml` mounts at
+# /srv/admin. Two trees, because the two products are two origins (011, decision 37).
+rsync -az --delete apps/admin/dist/ "${REMOTE}:${COMPOSE_DIR}/admin/"
 
 echo "== [4/6] Ensure .env and the database are up =="
 ssh "$REMOTE" "test -f ${COMPOSE_DIR}/.env" || {

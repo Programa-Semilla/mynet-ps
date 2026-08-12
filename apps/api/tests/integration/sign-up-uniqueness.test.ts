@@ -104,4 +104,75 @@ describe('address uniqueness is product-wide, not per conference (FR-302)', () =
         '(FR-302), and the event switcher would be switching between strangers.',
     ).not.toContain('event')
   })
+
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════════════════════
+   * **011 — THE ADDRESS IS UNIQUE ACROSS *PRINCIPALS*, NOT ONLY ACROSS ATTENDEES** (FR-918).
+   *
+   * The constraint read above cannot express this: `operators` is a second table with its own
+   * unique index, and Postgres has no constraint spanning the two. So FR-918 is the one
+   * uniqueness rule in the product enforced by application code — which is why it is driven here
+   * rather than read off `pg_constraint`, and why it went **unenforced entirely** through 011's
+   * first implementation. `addressTakenByOtherPrincipal` existed and was called only by tests.
+   *
+   * **FR-915 is what depends on it.** Administrative sign-in resolves an address with a single
+   * lookup and no branch; two principals sharing one address would force resolution to choose,
+   * and the choice would be observable in the timing.
+   *
+   * The refusal is the **same 409** an attendee-held address produces. Anything distinguishable
+   * would turn the product's most public route into an oracle for which addresses hold
+   * administrative accounts.
+   * ═══════════════════════════════════════════════════════════════════════════════════════════
+   */
+  it('refuses an address already held by a platform operator (FR-918)', async () => {
+    const operatorAddress = 'held-by-an-operator@mynet.invalid'
+
+    await getDb().execute(sql`
+      INSERT INTO operators (email, display_name) VALUES (${operatorAddress}, 'Holder')
+    `)
+
+    const attempt = await app.inject({
+      method: 'POST',
+      url: '/auth/sign-up',
+      payload: { email: operatorAddress, displayName: 'Would Be Attendee', password },
+    })
+
+    expect(
+      attempt.statusCode,
+      'Sign-up created an attendee account on an address a platform operator already holds ' +
+        '(FR-918). One address identifies at most one principal product-wide, and FR-915 ' +
+        'resolves administrative sign-in with a single lookup on that basis.',
+    ).toBe(409)
+
+    const created = await getDb().execute<{ count: string }>(sql`
+      SELECT count(*)::text AS count FROM attendees WHERE email = ${operatorAddress}
+    `)
+    expect(created[0]?.count).toBe('0')
+
+    await getDb().execute(sql`DELETE FROM operators WHERE email = ${operatorAddress}`)
+  })
+
+  it('matches the operator address case-insensitively and trimmed (FR-918)', async () => {
+    // `normaliseEmail` runs on both sides. Without it the rule is bypassed by typing an address
+    // in capitals, which is not a defence anybody would notice was missing.
+    const operatorAddress = 'mixed-case-operator@mynet.invalid'
+
+    await getDb().execute(sql`
+      INSERT INTO operators (email, display_name) VALUES (${operatorAddress}, 'Holder')
+    `)
+
+    const attempt = await app.inject({
+      method: 'POST',
+      url: '/auth/sign-up',
+      payload: {
+        email: operatorAddress.toUpperCase(),
+        displayName: 'Would Be Attendee',
+        password,
+      },
+    })
+
+    expect(attempt.statusCode).toBe(409)
+
+    await getDb().execute(sql`DELETE FROM operators WHERE email = ${operatorAddress}`)
+  })
 })

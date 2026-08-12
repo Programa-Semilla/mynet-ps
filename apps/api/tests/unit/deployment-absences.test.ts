@@ -64,22 +64,36 @@ describe('the guard itself is real', () => {
 /**
  * FR-890 — **no schema change.** The feature adds two throttled actions, and both are members of
  * a TypeScript union stored in an existing `text` column, which is what makes that possible.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════════════════════
+ * **AMENDED WHEN 013 LANDED, AND THE AMENDMENT IS DELIBERATE.**
+ *
+ * This was written as `.toBe('0008_session_qa.sql')` — an assertion about the whole repository
+ * made to express a claim about **one feature's diff**. 011 added no migration, which is what
+ * FR-890 says and what this verified at the time. It cannot keep verifying that from the tree
+ * alone once a later feature legitimately adds one, and 013 reserves `0009`.
+ *
+ * So the literal moves rather than the check being deleted: the ratchet still fires when a
+ * migration arrives that nobody has recorded here, which is the property worth keeping. What it
+ * no longer claims is that 011 in particular added none — that is now history, verified at its
+ * own merge and recorded in its spec.
+ * ═══════════════════════════════════════════════════════════════════════════════════════════
  */
 describe('no migration was added (FR-890)', () => {
   const MIGRATIONS = fileURLToPath(new URL('../../migrations/', import.meta.url))
 
-  it('the migration set still ends at 0008', () => {
+  it('the migration set ends where the last recorded feature left it', () => {
     const applied = readdirSync(MIGRATIONS)
       .filter((name) => name.endsWith('.sql'))
       .sort()
 
     expect(
       applied.at(-1),
-      'A migration was added. FR-890 says this feature changes no schema — and the two throttle ' +
-        'actions it introduces are union members in an existing text column precisely so that ' +
-        'stays true. A migration here also means the Drizzle snapshot was regenerated, which the ' +
-        'migration README warns against: `drizzle-kit generate` JSON-parses every file in meta/.',
-    ).toBe('0008_session_qa.sql')
+      'An unrecorded migration was added. 011 added none (FR-890) and 013 reserves `0009`; ' +
+        'anything past that has to be recorded here and in the roadmap first. A migration also ' +
+        'means the Drizzle snapshot was regenerated, which the migration README warns against: ' +
+        '`drizzle-kit generate` JSON-parses every file in meta/, so move that README aside first.',
+    ).toBe('0009_administrative_foundation.sql')
   })
 
   it('leaves the journal alone', () => {
@@ -87,22 +101,63 @@ describe('no migration was added (FR-890)', () => {
     // would "fix" that, and the README explains why both halves are load-bearing.
     const journal = readFileSync(`${MIGRATIONS}meta/_journal.json`, 'utf8')
     expect(journal).toContain('0008_session_qa')
+    expect(journal).toContain('0009_administrative_foundation')
   })
 })
 
 /**
  * FR-891 — **no product surface.** The UAT marker is the single permitted visible addition, and
  * it is a static span in an existing header rather than anything with an address.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════════════════════
+ * **AMENDED WHEN 013 LANDED, AND IT BECAME A STRONGER GUARD RATHER THAN A WEAKER ONE.**
+ *
+ * This forbade any `/admin` or `/operator` route anywhere in the API, which was correct for 011
+ * and was written in a branch that could not see v4.0.0 — the amendment that had *already*
+ * licensed exactly those routes as a second product. The prohibition it encodes was reversed
+ * before this file was written; the branches simply could not see each other.
+ *
+ * Narrowing it to exempt `src/routes/admin/` does not weaken it. It converts a
+ * "this feature adds no routes" assertion, which stops being checkable the moment any later
+ * feature adds one, into the **separation** guarantee that is actually load-bearing and
+ * permanent: administrative routes live in the administrative tree and **nowhere else**. An
+ * `/admin` route appearing in `routes/profile.ts` still fails, and that is the failure worth
+ * catching — it is FR-970's absence seen from the API side.
+ * ═══════════════════════════════════════════════════════════════════════════════════════════
  */
 describe('no product surface was added (FR-891)', () => {
-  it('registers no new route on the API', () => {
+  it('registers administrative routes only in the administrative tree', () => {
     // Every route this feature could have added would name one of these. The directory and the
     // message page gained a throttle CALL, not a route.
-    const forbidden = [/['"]\/admin/, /['"]\/operator/, /['"]\/reports\/[^'"]*['"]\s*,\s*\{/]
+    // ─────────────────────────────────────────────────────────────────────────────────────
+    // **Matches a route REGISTRATION, not a path literal**, which the original did not need to
+    // distinguish and this does. `app.ts` tests `request.url.startsWith('/admin/')` to decide
+    // which CORS origin applies — a dispatch condition in the composition root, and exactly the
+    // kind of line that must keep existing for the two products to be separable at all.
+    // Exempting `app.ts` wholesale would have been the easier repair and a worse one: it would
+    // stop checking the file most able to mount something.
+    // ─────────────────────────────────────────────────────────────────────────────────────
+    const forbidden = [
+      /\.(get|post|put|patch|delete|head|options|all)\(\s*['"]\/(admin|operator)/,
+      /url:\s*['"]\/(admin|operator)/,
+      /\.(get|post|put|patch|delete)\(\s*['"]\/reports\/[^'"]*['"]\s*,\s*\{/,
+    ]
+
+    // 013's own trees are where these belong: `src/admin/` holds the guards and the branded
+    // scopes, `src/routes/admin/` the routes. Matched on the directory rather than on filenames,
+    // so a new administrative module is covered without editing this list — and `require-operator`
+    // naming `/admin/session` to exempt it from the credential gate is administrative code doing
+    // its job, not a surface in MyNet.
+    const administrative = (path: string): boolean => path.includes('/admin/')
 
     for (const { path, code } of apiSources) {
+      if (administrative(path)) continue
       for (const pattern of forbidden) {
-        expect(pattern.test(code), `${path} registers an administrative route`).toBe(false)
+        expect(
+          pattern.test(code),
+          `${path} registers an administrative route outside the administrative tree. ` +
+            'Administration is a separate product (decision 33); MyNet gains no admin surface.',
+        ).toBe(false)
       }
     }
   })

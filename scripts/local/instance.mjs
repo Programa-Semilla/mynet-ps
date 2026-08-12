@@ -17,6 +17,17 @@ const OFFSET_RANGE = 200
 const BASE_WEB_PORT = 5173
 const BASE_API_PORT = 3000
 
+/**
+ * 011 — the administrative client's port.
+ *
+ * It carries the offset like the other two, which matters more here than it looks: the
+ * administrative site is a **separate origin**, and two worktrees sharing one origin would share
+ * its cookie jar and its storage. `apps/admin/vite.config.ts` defaults to 5174 when
+ * `MYNET_ADMIN_PORT` is unset, so the bare `pnpm dev:admin` documented in `quickstart.md` keeps
+ * working unchanged.
+ */
+const BASE_ADMIN_PORT = 5174
+
 export const databaseNameFor = (directory) => {
   const sanitised = basename(directory)
     .toLowerCase()
@@ -51,5 +62,6 @@ export const instanceFor = (directory, { isMainWorktree, overrides = {} }) => {
     portOffset,
     webPort: BASE_WEB_PORT + portOffset,
     apiPort: BASE_API_PORT + portOffset,
+    adminPort: BASE_ADMIN_PORT + portOffset,
   }
 }

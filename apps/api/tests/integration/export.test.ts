@@ -12,6 +12,9 @@ import {
 } from '../../src/db/schema/conversations.js'
 import { messages } from '../../src/db/schema/messages.js'
 import { pushSubscriptions } from '../../src/db/schema/push-subscriptions.js'
+import { operators } from '../../src/db/schema/operators.js'
+import { organizerAssignments } from '../../src/db/schema/organizer-assignments.js'
+import { registrations } from '../../src/db/schema/events.js'
 import { abuseReports } from '../../src/db/schema/reports.js'
 import {
   ADA,
@@ -208,6 +211,48 @@ describe('personal-data export', () => {
       authKey: 'an-auth-secret',
       lastDeliveredAt: new Date(),
     })
+
+    // ═══════════════════════════════════════════════════════════════════════════════════════
+    // T026 (013) — **an organizer assignment, and a REVOKED one, because both are exported.**
+    //
+    // FR-981 puts an assignment in the attendee's export: it is a fact about them, that somebody
+    // granted them authority over a named conference on a date. A revoked one is included too,
+    // deliberately — omitting it would make the document say the attendee never held the
+    // authority, and would make an export taken after a demotion differ from one taken before
+    // it in a way that hides something about *them* rather than about anybody else.
+    //
+    // The assignment needs an **operator** to have granted it (`assigned_by` is NOT NULL and
+    // references `operators`), which is the fixture's only new dependency and is why the
+    // operator is created here rather than relied on from the seed: this file rebuilds its own
+    // world and must not assume `db:seed` ran.
+    //
+    // `organizer_assignments.event_id` is `ON DELETE NO ACTION` (FR-937), so this row is what
+    // would refuse a `DELETE FROM events` — exactly the trap the seed clears for. Nothing here
+    // deletes events, but it is worth knowing why this insert is the one with a hard reference.
+    // ═══════════════════════════════════════════════════════════════════════════════════════
+    const [operator] = await db
+      .insert(operators)
+      .values({
+        email: `export-fixture-operator-${adaId}@mynet.invalid`,
+        displayName: 'Fixture Operator',
+        // Null, like the seed's — this fixture never signs in as an operator, and a usable
+        // credential here would be one more place a test password exists (FR-990).
+        passwordHash: null,
+      })
+      .returning({ id: operators.id })
+
+    const adasEvent = (
+      await db
+        .select({ eventId: registrations.eventId })
+        .from(registrations)
+        .where(eq(registrations.attendeeId, adaId))
+    )[0]
+
+    if (operator && adasEvent) {
+      await db
+        .insert(organizerAssignments)
+        .values([{ attendeeId: adaId, eventId: adasEvent.eventId, assignedBy: operator.id }])
+    }
   }
 
   /**

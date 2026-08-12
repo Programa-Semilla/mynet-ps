@@ -331,4 +331,47 @@ and belongs to a person.**
 
 **Recorded by**: the 010 implementation, phases 9 and 11.
 
+## 2026-08-11 — restore procedure re-exercised, with the administrative schema's shapes added
+
+**Act**: `deploy/vm/verify-backup-local.sh`, run from a developer machine, after extending it with
+three checks for 011 (T156).
+
+**Against**: a throwaway `postgres:17` container. Still **not** UAT and **not** production —
+neither environment exists yet, and the two owner decisions blocking them are unchanged.
+
+**Why it was re-run**: 011 adds administrative tables whose guarantees are structural rather than
+row-shaped, and the existing script checked one cascade, one extension, and row counts. A restore
+that reproduced every administrative row while losing either shape below would look completely
+correct.
+
+**Observed**:
+
+| Check                                                           | Result |
+| --------------------------------------------------------------- | ------ |
+| The dump is non-empty                                           | PASS   |
+| `pg_restore --list` parses the archive                          | PASS   |
+| `pg_restore` completes into a fresh database                    | PASS   |
+| Every row of `people` survived (250)                            | PASS   |
+| Every row of `interests` survived (250)                         | PASS   |
+| The `ON DELETE CASCADE` survived                                | PASS   |
+| The `unaccent` extension survived                               | PASS   |
+| `unaccent('Muñoz')` still returns `Munoz`                       | PASS   |
+| **The `ON DELETE NO ACTION` survived** (new)                    | PASS   |
+| **The partial unique index survived, predicate included** (new) | PASS   |
+| **A second live assignment is still refused** (new)             | PASS   |
+
+The three new ones model `organizer_assignments`: a reference that must **not** cascade (FR-937 —
+a conference deletion must never silently strip authority) and a partial unique index that must
+come back **with its `WHERE` clause** (without it the index is stricter than intended and rejects
+the revoked rows kept as history). The third is the behavioural half — an index present but not
+enforcing is still an index — and it is the same standard the `unaccent` check has always applied.
+
+**What this does NOT discharge.** Unchanged from the entry above: SC-413 asks for a restore
+performed before production holds real attendee data, and this is still the procedure proved to
+work as written rather than that run. 011 adds nothing to that half and does not move it.
+
+**Not exercised, and worth stating**: no restore has been performed against a database containing
+real administrative rows, because none exists. The shapes are verified; the data path is not.
+
+**Recorded by**: the 011 implementation.
 ---

@@ -10,13 +10,14 @@
  * auth stack rather than a substitute for it (research.md D11).
  */
 import fastifyCookie from '@fastify/cookie'
-import fastifyCors from '@fastify/cors'
-import Fastify, { type FastifyInstance, type RouteOptions } from 'fastify'
+import fastifyCors, { type FastifyCorsOptions } from '@fastify/cors'
+import Fastify, { type FastifyInstance, type FastifyRequest, type RouteOptions } from 'fastify'
 
 import { loadConfig } from './config.js'
 import { closeDb } from './db/client.js'
 import maintenance from './maintenance.js'
 import authContext from './plugins/auth-context.js'
+import requireOperatorPlugin from './admin/require-operator.js'
 import cardAccess from './plugins/card-access.js'
 import errors from './plugins/errors.js'
 import eventAccess from './plugins/event-access.js'
@@ -121,20 +122,58 @@ export const buildApp = async (options: BuildAppOptions = {}): Promise<FastifyIn
   // 2. CORS. Credentialed requests need an explicit origin — a wildcard is rejected by the
   //    browser when credentials are included, which is the behaviour we want: the allowed
   //    origin is named, not open.
-  await app.register(fastifyCors, {
-    origin: config.webOrigin,
-    credentials: true,
-    // PUT is here for `PUT /workspace/active-event` (002, T056). Without it the browser's
-    // preflight refuses the switch and the client sees an opaque network failure — which the
-    // integration suite cannot catch, because `fastify.inject()` performs no preflight.
-    //
-    // DELETE is here for 005: unsaving a session and clearing a note are both `DELETE`
-    // (research D6, FR-212). This is the *only* line 005 changes in this file, and it is
-    // changed for exactly the reason the sentence above already recorded — the lesson was
-    // written down in 002 precisely so the next feature would not have to learn it from a
-    // green test suite and a broken browser.
-    methods: ['GET', 'POST', 'PUT', 'DELETE'],
-  })
+  // ─────────────────────────────────────────────────────────────────────────────────────────
+  // 011 — **THE ALLOW-LIST IS PER ROUTE PREFIX, BECAUSE THE TWO PRODUCTS MUST NOT BE ABLE TO
+  // CALL EACH OTHER'S API.**
+  //
+  // This was one global list — `[webOrigin, adminOrigin]`, collapsing to `webOrigin` alone in
+  // every deployed environment, since `ADMIN_ORIGIN` is deliberately unset there. That named
+  // **the wrong party on the wrong routes**: the one origin permitted to read `/admin/*`
+  // responses was the *attendee* origin, and the administrative origin was not on the list at
+  // all.
+  //
+  // It worked anyway, which is what made it invisible: `admin.<host>` calling its own `/api/*`
+  // is same-origin, so CORS never engages. The hole is the other direction. `admin.<host>` is
+  // **same-site** with the apex (that is decision 37's whole point), so `SameSite=Lax` still
+  // sends the administrative session cookie on a cross-origin `fetch` from the attendee
+  // document — and with `credentials: true` and the apex echoed back as the allowed origin,
+  // the response was readable. One XSS on a public, self-sign-up product with attendee-uploaded
+  // avatars would read the report queue: reported private message content, which decision 38
+  // grants to the platform tier alone as the THIRD recorded Principle VIII exception.
+  //
+  // So: administrative routes permit the administrative origin and nothing else, and in a
+  // deployed environment they permit **no** cross-origin caller at all. Attendee routes are
+  // unchanged. The delegator form is what makes this expressible — the static `origin` option
+  // cannot vary by request, and this must.
+  // ─────────────────────────────────────────────────────────────────────────────────────────
+  const CORS_METHODS = ['GET', 'POST', 'PUT', 'DELETE']
+  await app.register(
+    fastifyCors,
+    () =>
+      (
+        request: FastifyRequest,
+        callback: (error: Error | null, options: FastifyCorsOptions) => void,
+      ) => {
+        // The prefix, not the Host header: `request.url` is what routing itself uses, so this
+        // cannot disagree with which handler will run. Host is proxy-supplied and spoofable.
+        const administrative = request.url.startsWith('/admin/') || request.url === '/admin'
+
+        callback(null, {
+          // `false` emits no `Access-Control-Allow-Origin`, so a cross-origin reader gets nothing.
+          // Same-origin requests are unaffected — the browser does not consult CORS for them, which
+          // is why the deployed administrative product keeps working with an empty allow-list.
+          origin: administrative ? (config.adminOrigin ?? false) : config.webOrigin,
+          credentials: true,
+          // PUT is here for `PUT /workspace/active-event` (002, T056). Without it the browser's
+          // preflight refuses the switch and the client sees an opaque network failure — which the
+          // integration suite cannot catch, because `fastify.inject()` performs no preflight.
+          //
+          // DELETE is here for 005: unsaving a session and clearing a note are both `DELETE`
+          // (research D6, FR-212), and 011 needs it for sign-out and demotion.
+          methods: CORS_METHODS,
+        })
+      },
+  )
 
   // 2a. T063 (006) — security response headers on **every** API response (FR-480, research D8).
   //
@@ -188,6 +227,25 @@ export const buildApp = async (options: BuildAppOptions = {}): Promise<FastifyIn
   //     name no conference, so `event-scope-audit` never examines them and reports success
   //     (research R1, FR-641).
   await app.register(cardAccess)
+
+  // ─────────────────────────────────────────────────────────────────────────────────────────
+  // 5a-quater. Administrative access (013). Decorates the instance with `requireOperator` and
+  //     `requirePlatformOperator`, which produce the `OperatorScope` and `PlatformScope` every
+  //     administrative route demands (FR-905, FR-906).
+  //
+  //     **The fourth sibling, and the first that does NOT follow auth-context in spirit.** Steps
+  //     5a, 5a-bis and 5a-ter each verify a relationship for `request.attendee`, so identity has
+  //     to be bound first. This one establishes *which principal is calling at all*, and the
+  //     principal may not be an attendee: a platform operator has no `attendees` row (FR-901).
+  //     It reads its own cookie and resolves its own session store, so it depends on
+  //     auth-context for nothing — the position here is for readability beside its three
+  //     siblings, not for ordering.
+  //
+  //     It needs a fourth guard for the structural reason 007 and 008 each met: administrative
+  //     routes name no conference, so `event-scope-audit` never examines them and **reports
+  //     success** (research R5, FR-905). `tests/unit/operator-audit.test.ts` is the fourth audit.
+  // ─────────────────────────────────────────────────────────────────────────────────────────
+  await app.register(requireOperatorPlugin)
 
   // 5b. The two ports 004 introduces — durable binary content and transactional account mail
   //     (FR-352, FR-394). Appended after the guards and before maintenance: nothing in steps

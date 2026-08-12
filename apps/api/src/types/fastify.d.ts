@@ -1,6 +1,7 @@
 import 'fastify'
 import type { FastifyReply, FastifyRequest } from 'fastify'
 
+import type { OperatorScope, PlatformScope } from '../admin/scope.js'
 import type { MailService } from '../mail/service.js'
 import type { PushService } from '../notifications/service.js'
 import type { CardScope } from '../plugins/card-access.js'
@@ -68,6 +69,46 @@ declare module 'fastify' {
      * widening of either existing one (research R1).
      */
     cardScope?: CardScope
+    /**
+     * ═══════════════════════════════════════════════════════════════════════════════════════
+     * 011 — proof that an **administrative principal** is authenticated, of either tier
+     * (FR-905).
+     *
+     * **The fourth sibling, and the first that is not about an attendee's relationship to a
+     * record.** The three above each verify a relationship — a registration, a symmetric
+     * membership, a directional holding — and each presupposes an `attendees` row. This one
+     * establishes *which principal is calling at all*, and a platform operator has no
+     * `attendees` row and never will (FR-901).
+     *
+     * Administrative routes name no conference, so `event-scope-audit` walks past them
+     * reporting success — the same finding 007 and 008 each had to answer, met a third time.
+     * `tests/unit/operator-audit.test.ts` is the fourth audit (research R5).
+     *
+     * Set only by `requireOperator` or `requirePlatformOperator`. A handler reads it through
+     * `operatorScopeOf` rather than directly.
+     * ═══════════════════════════════════════════════════════════════════════════════════════
+     */
+    operatorScope?: OperatorScope
+    /**
+     * 011 — proof that the caller is specifically a **platform operator** (FR-906).
+     *
+     * A **branded refinement**, not a flag: a handler declaring `PlatformScope` fails to
+     * typecheck when handed an `OperatorScope`. The rejected alternative — one guard returning
+     * `{ tier }` and handlers writing `if (tier === 'platform')` — makes FR-906 a convention
+     * that every new route can forget, and the thing it would forget is decision 35's central
+     * condition: **a conference organizer must not read the report queue.**
+     *
+     * Set only by `requirePlatformOperator`, which also sets `operatorScope` — so a
+     * platform-tier route satisfies both, and an organizer-reachable route can be written
+     * against the weaker one without knowing whether the stronger applies.
+     */
+    platformScope?: PlatformScope
+    /**
+     * 011 — the current administrative session id, used by sign-out to revoke exactly this
+     * device (FR-919). The sibling of `authSessionId`, and separate for the same reason the
+     * table is: ending one product's session must not end the other's (decision 37).
+     */
+    adminSessionId?: string
   }
 
   interface FastifyInstance {
@@ -94,6 +135,24 @@ declare module 'fastify' {
      * Directional, deliberately, unlike `requireParticipation`. See `plugins/card-access.ts`.
      */
     requireHeldCard: (request: FastifyRequest, reply: FastifyReply) => Promise<void>
+    /**
+     * 011 — route-level administrative guard, of either tier. Resolves an `operator_sessions`
+     * row, enforces **both** expiry bounds (FR-919a, FR-919b), re-checks an organizer's live
+     * assignment on every request (decision 39), and populates `request.operatorScope`.
+     *
+     * Refuses with **401 and no detail** (FR-917): an unauthenticated caller learns nothing
+     * about what exists at any administrative address. The one refusal that explains itself is
+     * an unreplaced initial credential, which is a fact about the reader that they can fix.
+     */
+    requireOperator: (request: FastifyRequest, reply: FastifyReply) => Promise<void>
+    /**
+     * 011 — the platform tier alone (FR-906, decision 35). Populates **both** scopes.
+     *
+     * A conference organizer is refused with **404**, identical to a route that does not exist.
+     * A 403 would confirm that the surface exists and that they are not on it — which for the
+     * report queue tells somebody exactly what to go looking for.
+     */
+    requirePlatformOperator: (request: FastifyRequest, reply: FastifyReply) => Promise<void>
     /**
      * 004 — durable binary content, behind a project-owned port (FR-352, research D3).
      *

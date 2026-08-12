@@ -144,6 +144,26 @@ export const THROTTLE_ACTIONS = [
   'report_submit',
 
   // ───────────────────────────────────────────────────────────────────────────────────────
+  // 012 — FR-916. **The first entry in this list to arrive at `mayDeny: false` by the SAME
+  // reasoning as an existing one rather than a new one** — `reset_request`'s, exactly.
+  //
+  // Administrative sign-in is unauthenticated and keyed on a **submitted address**, which is
+  // the property that separates `reset_request` from every `mayDeny: true` action here: the
+  // person a denial falls on is not the person making the requests. An attacker who can lock
+  // out an address they do not own has locked out the platform operator — and the operator is
+  // the only principal who can read the abuse-report queue or promote anybody.
+  //
+  // The attendee `sign_in` action IS `mayDeny: true`, and the difference is the population. A
+  // denied attendee is one of thousands and recovers by waiting; a denied operator may be the
+  // only person who can act on the product at all, and there is nobody to appeal to. So this
+  // action **may delay but can never deny**, exactly as FR-331 requires of `reset_request`.
+  //
+  // Separate from `sign_in` for the reason every entry here is separate: administrative
+  // sign-in attempts must not slow any attendee's sign-in, and attendee traffic must not
+  // consume the operator's allowance.
+  // ───────────────────────────────────────────────────────────────────────────────────────
+  'admin_sign_in',
+
   // 010 — FR-801 and FR-803. **The first READS in this list, and the first two entries that may
   // never deny for a reason neither `reset_request` nor `message_send` gives.**
   //

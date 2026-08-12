@@ -26,6 +26,11 @@ export const unitProject: UserWorkspaceConfig = {
       'packages/*/tests/**/*.test.ts',
       'apps/api/tests/unit/**/*.test.ts',
       'apps/web/tests/unit/**/*.test.ts',
+      // T004 (013) — the administrative client is a second application, and Principle VII binds
+      // it in full. Its guards are the reason this line matters more than it looks:
+      // `no-service-worker.test.ts` and `no-platform-dependency.test.ts` assert FR-923's
+      // absences, and an absence guard that the runner cannot see is not a guard.
+      'apps/admin/tests/unit/**/*.test.ts',
       // The local-run orchestration is plain `.mjs`, matching `scripts/asset-budget.mjs`. Its
       // pure logic — instance identity, drift classification — is exactly the part worth
       // testing, so the runner has to be able to see it.
@@ -82,8 +87,18 @@ export const componentProject: UserWorkspaceConfig = {
     name: 'component',
     environment: 'jsdom',
     globals: true,
+    /**
+     * One setup file for both clients, and the path is the only misleading thing about it.
+     *
+     * `apps/web/tests/setup.ts` configures the **jsdom environment** — the `<dialog>` shim and
+     * the async-utility timeout — not the attendee product. 011's administrative dialogs
+     * (`ResolveDialog`, `PromoteDialog`, `RemoveQuestionDialog`) need exactly the same shim, and
+     * duplicating it would give the two clients two subtly different `showModal` stand-ins.
+     * It stays where 005 put it rather than moving, because moving it would rewrite a file for
+     * no behavioural reason.
+     */
     setupFiles: ['apps/web/tests/setup.ts'],
-    include: ['apps/web/tests/**/*.test.tsx'],
+    include: ['apps/web/tests/**/*.test.tsx', 'apps/admin/tests/**/*.test.tsx'],
     exclude: ['**/node_modules/**', '**/dist/**'],
   },
 }

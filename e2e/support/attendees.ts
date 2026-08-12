@@ -25,7 +25,27 @@ export const GRACE = {
   notHerEvent: 'Frontend Horizons',
 } as const
 
-export type SeededAttendee = typeof ADA | typeof GRACE
+/**
+ * 011 — the **third** attendee at the shared conference, and 011 is the first suite to need him.
+ *
+ * He exists so that a spec can have an observer who is neither the author of something nor the
+ * person who reported it. Reporting **blocks** in the same action (007), and a block filters
+ * audience questions from both sides (009) — so a reporter is precisely the wrong person to ask
+ * "is it gone?", because it was already invisible to them and would be whether or not any
+ * moderation happened.
+ *
+ * He is deliberately unverified and has no profile, which is what makes him a good third party
+ * here and changes nothing about this: verification gates discoverability alone, and the Q&A
+ * author join consults it not at all (FR-735).
+ */
+export const ALAN = {
+  email: 'alan@example.com',
+  displayName: 'Alan Turing',
+  events: ['Product & Design Summit'],
+  notHerEvent: 'Frontend Horizons',
+} as const
+
+export type SeededAttendee = typeof ADA | typeof GRACE | typeof ALAN
 
 /**
  * Switches to a conference the attendee is **not** currently in, and returns its name.

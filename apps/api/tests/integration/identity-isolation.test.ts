@@ -269,6 +269,21 @@ describe('every route is bound to the authenticated attendee (SC-307)', () => {
     // identically to a conference that does not exist (FR-148).
     const eventScoped = routes
       .filter((route) => /:eventId/.test(route.url))
+      // ─────────────────────────────────────────────────────────────────────────────────────
+      // T028 (013) — **administrative routes are excluded, and the reason is that this probe
+      // asserts the wrong thing about them rather than that they are exempt from isolation.**
+      //
+      // The probe signs in as an *attendee* and expects 404 from every event-scoped route. An
+      // administrative route answers **401** to an attendee cookie — it reads a different cookie
+      // from a different store, so Ada is not "in the wrong conference", she is nobody. Both are
+      // refusals that disclose nothing; only the number differs, and demanding 404 here would be
+      // demanding that administrative routes leak *less* by leaking a different constant.
+      //
+      // What actually covers them: `admin-tier-boundary.test.ts` drives an organizer at a
+      // conference they are not assigned and requires 404, which is this guarantee stated for
+      // the principal it applies to.
+      // ─────────────────────────────────────────────────────────────────────────────────────
+      .filter((route) => !/^\/admin(\/|$)/.test(route.url))
       .flatMap((route) =>
         methodsOf(route)
           .filter((method) => method !== 'HEAD')

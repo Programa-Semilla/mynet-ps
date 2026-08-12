@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>MyNet Administration</title>
+
+    <!--
+      T005 (013) — the browser-chrome icons, and **nothing else** (FR-923).
+
+      ══════════════════════════════════════════════════════════════════════════════════════
+      WHAT IS MISSING FROM THIS DOCUMENT IS THE REQUIREMENT, NOT AN OVERSIGHT.
+
+      `apps/web/index.html` carries an `apple-touch-icon` link, and its build injects a
+      `<link rel="manifest">` and a service-worker registration. None of those appear here:
+      the administrative product is not installable and has no offline behaviour, and research
+      R1 chose a separate application precisely so that this is a document with nothing to
+      exclude rather than a build with an exclusion somebody could widen later.
+
+      There is no `viewport-fit=cover` either. That exists in the attendee client for a
+      standalone display cutting into a phone's safe area — a state this product cannot enter.
+
+      `noindex` because an administrative sign-in has no reason to be in a search index. It is
+      not a security control: FR-980 puts authorisation on the server, and this line would be
+      worth nothing if it were load-bearing.
+
+      The icons are derived from the same brand board by the same script
+      (`node scripts/generate-brand-assets.mjs`) and are byte-identical to the attendee
+      client's. `scripts/brand-audit.mjs` fails the build if either drifts (FR-806).
+    -->
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png" />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

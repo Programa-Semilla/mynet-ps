@@ -10,10 +10,42 @@ import { connect } from 'node:net'
 /** Matches `SEED_PASSWORD` in apps/api/src/db/seed/attendees.ts. */
 const SEED_PASSWORD = 'correct-horse-battery-staple'
 
-export const renderBanner = ({ branch, instance, hostPort }) => `
+/**
+ * What the administrative half of the banner says, which depends on what the bootstrap was
+ * allowed to do (FR-993).
+ *
+ * Each branch prints something the reader can **act on**. The failure this avoids is printing a
+ * password unconditionally: after an operator has chosen their own, a freshly generated one is
+ * not merely unhelpful, it sends somebody to debug a sign-in that is working correctly.
+ */
+const adminLines = (credential) => {
+  if (credential?.status === 'issued') {
+    return `  Administration at the second origin — a separate product, a separate session.
+
+     ${credential.email}
+     password: ${credential.password}
+
+     Generated for this run and stored nowhere. You will be asked to choose a
+     new one at first sign-in — that is FR-992, not a fault.`
+  }
+
+  if (credential?.status === 'kept') {
+    return `  Administration — ${credential.email} already has a password you chose.
+     Forgotten it?  pnpm start --reset-admin`
+  }
+
+  if (credential?.status === 'no-operator') {
+    return `  Administration — no seeded operator yet. Run:  pnpm db:seed`
+  }
+
+  return '  Administration — credential step skipped.'
+}
+
+export const renderBanner = ({ branch, instance, hostPort, adminCredential }) => `
   MyNet is running
 
-  →  http://localhost:${instance.webPort}
+  →  http://localhost:${instance.webPort}          MyNet
+  →  http://localhost:${instance.adminPort}          Administration
 
      branch    ${branch}
      instance  ${instance.name}
@@ -22,6 +54,8 @@ export const renderBanner = ({ branch, instance, hostPort }) => `
 
   Sign in as ada@example.com or grace@example.com
   password: ${SEED_PASSWORD}
+
+${adminLines(adminCredential)}
 
   Ctrl-C to stop.
 `
@@ -65,6 +99,9 @@ export const startServers = async ({ instance, root }) => {
     ...process.env,
     // Read by `apps/web/vite.config.ts`, which is evaluated before Vite loads `.env.local`.
     MYNET_WEB_PORT: String(instance.webPort),
+    // Read by `apps/admin/vite.config.ts`, which defaults to 5174 when this is absent — so a
+    // bare `pnpm dev:admin` still works, and a worktree still gets its own origin.
+    MYNET_ADMIN_PORT: String(instance.adminPort),
     MYNET_INSTANCE_NAME: instance.name,
     MYNET_DATABASE_NAME: instance.databaseName,
   }
@@ -72,6 +109,9 @@ export const startServers = async ({ instance, root }) => {
   const children = [
     spawn('pnpm', ['dev:api'], { cwd: root, env, stdio: 'inherit' }),
     spawn('pnpm', ['dev:web'], { cwd: root, env, stdio: 'inherit' }),
+    // 011 — the administrative site. A third origin, not a third route: read
+    // `apps/admin/vite.config.ts` for why it is a separate application rather than a path.
+    spawn('pnpm', ['dev:admin'], { cwd: root, env, stdio: 'inherit' }),
   ]
 
   /**

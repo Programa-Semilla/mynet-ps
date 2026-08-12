@@ -8,15 +8,69 @@
  */
 import { fileURLToPath, URL } from 'node:url'
 
+import { drizzle } from 'drizzle-orm/postgres-js'
 import { migrate } from 'drizzle-orm/postgres-js/migrator'
+import postgres from 'postgres'
 
-import { closeDb, getDb } from './client.js'
+import { loadConfig } from '../config.js'
+import { closeDb } from './client.js'
 
 const migrationsFolder = fileURLToPath(new URL('../../migrations', import.meta.url))
 
+/**
+ * ═══════════════════════════════════════════════════════════════════════════════════════════════
+ * **HOW LONG A MIGRATION MAY WAIT FOR A LOCK BEFORE GIVING UP.**
+ *
+ * `ALTER TABLE … ADD CONSTRAINT … FOREIGN KEY` takes a `SHARE ROW EXCLUSIVE` lock on **both**
+ * tables, and `ALTER TABLE … ADD COLUMN` with a volatile default rewrites the table under an
+ * `ACCESS EXCLUSIVE` one. Without a timeout, either statement **queues behind an open transaction
+ * and then blocks every subsequent query on that table** — including reads, because a pending
+ * `ACCESS EXCLUSIVE` request stops new lock acquisitions from jumping the queue. A migration that
+ * waits is not the failure; a migration that waits *silently while the product stops answering*
+ * is.
+ *
+ * Ten seconds — expressed in milliseconds, which is how Postgres reads a unitless value — then
+ * the statement fails and the migration aborts with a lock error naming the table. That is the
+ * outcome to want: a deploy that stops with a diagnosable message beats one that takes the site
+ * down and looks like it is still working.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────────────────────
+ * **SET HERE RATHER THAN IN THE MIGRATION FILES, FOR TWO REASONS.**
+ *
+ * Every `.sql` under `migrations/` is written by `drizzle-kit generate`, and a hand-added
+ * `SET lock_timeout` line is erased the next time a feature regenerates — a protection that
+ * disappears without anybody deciding to remove it. Setting it on the connection also applies it
+ * to **every** migration, including `0003`, whose missing timeout is a recorded unclaimed defect
+ * from 004's review: it rewrites `events` under a volatile default and could not be fixed without
+ * regenerating a snapshot the migration README warns against touching casually.
+ *
+ * **On its own connection, not the application pool.** A `lock_timeout` on ordinary request
+ * traffic would turn contention into user-visible 500s, which is a different decision nobody has
+ * made. `max: 1` because migrations are strictly sequential and the setting must hold for all of
+ * them — a pooled connection that the driver replaces mid-run would silently lose it.
+ * ─────────────────────────────────────────────────────────────────────────────────────────────
+ * ═══════════════════════════════════════════════════════════════════════════════════════════════
+ */
+const MIGRATION_LOCK_TIMEOUT_MS = 10_000
+
 export const runMigrations = async (): Promise<void> => {
-  const db = getDb()
-  await migrate(db, { migrationsFolder })
+  const config = loadConfig()
+
+  const sql = postgres(config.databaseUrl, {
+    max: 1,
+    connect_timeout: 10,
+    types: {},
+    onnotice: () => {},
+    // Applied as a startup parameter, so it is in force for the first statement rather than
+    // after one the runner remembered to send. Unitless, which Postgres reads as milliseconds.
+    connection: { lock_timeout: MIGRATION_LOCK_TIMEOUT_MS },
+  })
+
+  try {
+    await migrate(drizzle(sql), { migrationsFolder })
+  } finally {
+    await sql.end({ timeout: 5 })
+  }
 }
 
 // Executed directly by `pnpm db:migrate`, and imported by the integration test harness.

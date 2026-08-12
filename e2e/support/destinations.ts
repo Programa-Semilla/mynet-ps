@@ -62,3 +62,33 @@ export const WIDTHS: readonly Width[] = [
 export const SCROLL_WIDTHS: readonly number[] = [
   320, 360, 375, 414, 600, 767, 768, 834, 1024, 1279, 1280, 1440, 1920,
 ]
+
+/**
+ * The administrative destinations, as `AdminShell`'s rail declares them (013).
+ *
+ * ═════════════════════════════════════════════════════════════════════════════════════════════
+ * **HERE, RATHER THAN IN A SPEC FILE, SO THE "DECLARED ONCE" CLAIM IS TRUE.**
+ *
+ * This list began inside `admin-accessibility.spec.ts` while a comment elsewhere described it as
+ * declared once — which it was not, and a second suite needing it would have copied it. The
+ * responsive sweep is that second suite: FR-020's no-horizontal-scrolling obligation covers
+ * *every* surface in the product, and until it was written the helper enforcing it had never been
+ * pointed at an administrative page. Axe reports nothing about a page that scrolls sideways, so
+ * the accessibility suite walking these same four addresses did not cover it.
+ * ═════════════════════════════════════════════════════════════════════════════════════════════
+ *
+ * The overview's heading is the greeting rather than the rail's label — it names the operator and
+ * their tier, which is FR-924's "the tier is visible at all times".
+ */
+export interface AdminDestination {
+  readonly path: string
+  readonly heading: RegExp
+  readonly label: string
+}
+
+export const ADMIN_DESTINATIONS: readonly AdminDestination[] = [
+  { path: '/', heading: /signed in as/i, label: 'Overview' },
+  { path: '/conferences', heading: /conferences/i, label: 'Conferences' },
+  { path: '/reports', heading: /reports/i, label: 'Reports' },
+  { path: '/operators', heading: /operators/i, label: 'Operators' },
+]

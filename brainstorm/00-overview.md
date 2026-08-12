@@ -1,11 +1,16 @@
 # Brainstorm Overview
 
-Last updated: 2026-08-11 (**the delivery roadmap is complete**. Two sessions numbered #08 ran in
+Last updated: 2026-08-12 (**the delivery roadmap is complete**. Two sessions numbered #08 ran in
 parallel and both shipped: the **brand mark and application icons**, ratified as constitution
 **v3.4.0**, closing register entry 2 — the oldest in the register; and **UAT deployment and
-pre-public hardening**, ratified as **v3.5.0**, which rescopes the roadmap's 010 into **011** and
-moves the validation pass to **012**. MyNet is deployed and serving at
-`mynet-dev.programasemilla.com`)
+pre-public hardening**, ratified as **v3.5.0**. MyNet is deployed and serving at
+`mynet-dev.programasemilla.com`.
+
+Then #09 brainstormed **the administrative product** — the first work to require reversing a
+Principle III *prohibition* rather than an omission — ratified as **v4.0.0**, the project's first
+MAJOR bump since v3.0.0, with **v4.1.0** following in the same session to close the three entries
+v4.0.0 opened. It opens a **second programme** of three features, delivered from **012** because
+011 was taken by the UAT work while the administrative branch was in flight)
 
 The authoritative registers live elsewhere — open questions in `.specify/memory/constitution.md`,
 delivery sequence in `docs/superpowers/specs/2026-08-06-mynet-delivery-roadmap-design.md`. This file
@@ -25,7 +30,8 @@ win and this is stale.
 | 06 | 2026-08-07 | messages-and-notification-delivery | **implemented in full**, including Web Push; its amendment ratified in constitution **v3.1.0** | `specs/007-messages-and-notification-delivery/` |
 | 07 | 2026-08-10 | network-and-appointments | **specified, then implemented**; entries 7, 8 and 9 ratified in constitution **v3.2.0** | `specs/008-network-and-appointments/` |
 | 08 | 2026-08-10 | brand-mark-and-app-icons | **specified, then implemented**; register entry 2 ratified in constitution **v3.4.0** | `specs/010-brand-mark-and-app-icons/` |
-| 08 | 2026-08-10 | uat-deployment-and-hardening | **active** — phase 010 rescoped, 011 added; five owner decisions taken, awaiting amendment | `brainstorm/08-uat-deployment-and-hardening.md` |
+| 08 | 2026-08-10 | uat-deployment-and-hardening | **shipped (PR #19)**; five owner decisions ratified in constitution **v3.5.0** | `brainstorm/08-uat-deployment-and-hardening.md` |
+| 09 | 2026-08-11 | administrative-product | **decided, and ratified as constitution v4.0.0** the same day — standing decisions 31–36. Opened entries 24, 25, 26; **all three closed by v4.1.0** as decisions 37–39. Delivered as **012** | `brainstorm/09-administrative-product.md` |
 
 Session 05 has no document of its own: 006 was specified without one, and the row records the
 session rather than a file. 009 likewise — it went straight to specification, and its row is
@@ -83,6 +89,49 @@ the index, and it now differs from the roadmap in the ways #02 records.
 | 010 | Launch Readiness — **brand mark and application icons** | **shipped** — FR-800–FR-850, amendment ratified as **v3.4.0**. Replaces the three deliberately-ugly provisional icons, adds the favicon and `apple-touch-icon` that `index.html` has **never had**, puts the mark on the rail, top bar and five auth screens, and adds a gate that fails a **declared icon with no file** — which nothing catches today. Scope is core-only; splash matrix, monochrome and the vector redraw are booked follow-ups. **No migration**, so it does not contend with 009's `0008`. **Takes the brand gate only** — the rest of Launch Readiness stays outstanding | ~~brand assets~~ ✓ (owner supplied 2026-08-10); ~~register entry 2~~ ✓ (v3.4.0); palette adoption is new entry 23; client validation of desktop still open |
 | 011 | **UAT Deployment & Pre-Public Hardening** — *rescoped from the roadmap's 010* | **shipped** — six abuse paths closed, SMTP mail, provisioned and serving at `mynet-dev.programasemilla.com`; amendment ratified as **v3.5.0** | — |
 | 012 | **Launch Readiness & Production** | queued | client validation of desktop and tablet (entry 4); register entry 22; production domain |
+
+### A second programme: administration (#09)
+
+**The roadmap above is complete.** Every phase 001–010 is delivered, and every destination
+`requirements.md` names answers its question. What follows is not the roadmap's remainder — it is a
+new programme, opened by the owner on 2026-08-11, and it is the first work in this project that
+requires reversing a Principle III **prohibition** rather than filling an omission.
+
+| # | Phase | Status | Blocked by |
+|---|-------|--------|------------|
+| 013 | Administrative foundation — second actor, admin site, **abuse-report queue** | **shipped** — squash-merged to `develop`; amendments ratified as **v4.0.0** and **v4.1.0**. Migration `0009` | ~~24, 25, 26~~ — **all three closed by v4.1.0** |
+| 014 | Conference content authoring | **brainstormed** (#09); licensed by v4.0.0 | 013 |
+| 015 | Registration and attendee management | **brainstormed** (#09); licensed by v4.0.0 | 013 |
+
+**Numbered 011–013 when #09 ran, and delivered as 013–015.** The UAT deployment work took 011 from a
+parallel branch while this programme was in flight, so it shifted rather than renumbering a phase
+already on `develop`. The same thing happened to this session's constitution amendment, which was
+drafted against 3.4.0 and restacked onto 3.5.0 — parallel branches cannot see each other's
+reservations, and the number is settled at merge.
+
+**One amendment, not three.** The second actor is a single decision, and splitting it across three
+amendments would let it drift. **Ratified as v4.0.0 on 2026-08-11** — MAJOR, on three independent
+triggers: Principle III's actor clause is redefined, the prohibition that Principle III and D2 each
+named an amendment as the precondition for is lifted, and delivered requirements are retracted
+(FR-132, FR-134, FR-191, FR-311, and FR-548 for the administrative product only). That last is the
+reasoning that made v3.0.0 major for withdrawing 001's FR-066, and this is the **second** such
+retraction.
+
+**The shape**: administration is **its own website** against the same API and database, so MyNet
+itself gains no admin surface and Principle III's *product* framing survives nearly intact. Two
+tiers — seeded **platform operators** (product-wide; the only tier that may promote or read
+reports) and promoted **conference organizers** (limited to assigned conferences). No self sign-up
+into either. The **seed stays** as the dev and test fixture, and seeded conferences become ordinary
+editable ones — one class of conference.
+
+**Moderation ships first, not authoring**, though authoring is what the owner asked about. It is the
+smallest of the three subsystems, so it proves the whole new architecture where being wrong costs
+least — and it closes **register entries 19 and 21**, which have stayed open *specifically* because
+no administrative actor exists. Reports are already arriving from 007 and 009 with nowhere to go:
+the reporting dialog tells the attendee a person will read it, and that sentence is not yet true.
+
+Migrations run to `0008_session_qa.sql`; **011 reserves `0009`**. The roadmap's reserved-number table
+stops at the shipped programme and must be extended.
 
 **002 carries the most leverage and the most risk in the queue, and #02 enlarged it further.** It is
 not only the event switcher: it commits to the Home card composition contract and the per-event
@@ -263,7 +312,11 @@ deployment or release.
 - ~~**The operator address a report is emailed to.**~~ — **ANSWERED 2026-08-10 by #08:
   `apps@programasemilla.com`.** *Register entry 21.* The response expectation travels with it and is
   not discharged by naming an address: the dialog tells the attendee a person will read it, and that
-  sentence becomes true only when somebody does
+  sentence becomes true only when somebody does. **#09 changes what this entry is.** 012 makes
+  reports readable *inside* the product by a platform operator, so the question stops being "which
+  mailbox" and becomes "who is the operator, and what does the queue disclose". The mail path does
+  not disappear — but the promise the dialog makes becomes true by a surface rather than by an
+  address. *Register entry 21, addressed by 012.*
 - **The constitution amendment bringing engagement notification delivery in.** #06's push decision
   reverses an exclusion that has held since 001 and needs its own numbered standing decision and a
   version bump. Decision 20 made the last retraction a major version; this is at minimum a minor
@@ -280,8 +333,11 @@ deployment or release.
   administration *inside the product* but not an operator. If that reading holds, avatars can follow
   the same route (narrowed 2026-08-07 by #06). **#08 changed its urgency without resolving it**:
   UAT is now openly reachable with public sign-up, so this stops being hypothetical — and the
-  operator mailbox the precedent needs now has an address. *Register entry 19, still open, and the
-  leading open question against 011*
+  operator mailbox the precedent needs now has an address. **#09 then supplied the actor rather
+  than another precedent**: 012 introduces an administrative tier and a moderation surface, which is
+  the first thing in this project capable of discharging this entry — though a capability is not a
+  policy, and who moderates against what standard is still undecided. *Register entry 19, still
+  open, and the leading open question against the administrative programme*
 - ~~**Preview environments must never point at production data**; preview access control
   undecided~~ — **the access half ANSWERED 2026-08-10 by #08**. *Register entry 14.* UAT is
   **openly reachable and carries seeded data only**: FR-067 is satisfied by the data rather than by
@@ -308,6 +364,54 @@ deployment or release.
   is public, and `branches/develop/protection` returns **404 — no rule set**. Branch protection is
   free on public repositories, so this is a configuration task rather than an accepted risk
   (corrected 2026-08-06)
+
+### Design questions carried into 011's specification
+
+From #09. The decision itself is made and ratified as v4.0.0. **Three of these turned out to be
+governance rather than spec detail, became register entries 24, 25 and 26, and were closed the same
+day by v4.1.0** — the subdomain topology with host-only sessions, the report queue disclosing
+reported content and the reporter's reason as a **third** Principle VIII exception, and organizer
+assignments ending with access. They are marked below and are now binding text. The rest are for
+`/speckit-specify`. **None may be silently resolved.**
+
+- **[ENTRY 25 — CLOSED by v4.1.0] A promoted organizer can delete their own account.** Standing
+  decision 12 makes deletion
+  self-serve, complete and cascading with no tombstone. If the only organizer of a conference
+  exercises that right, the conference is orphaned by a guaranteed action — and the sessions they
+  authored are conference content, so they survive, ownerless. Neither the deletion guarantee nor
+  the ownership model can simply win. **Owner decision.**
+- **Does withdrawing from a conference revoke an organizer assignment for it?** 008 established that
+  withdrawal cancels live meetings in the same transaction; the analogous question is unanswered.
+- **[ENTRY 26 — CLOSED by v4.1.0] The admin site needs its own session topology.** Standing
+  decision 19 — one origin for client
+  and API — is what keeps `SameSite=Lax` a genuine CSRF defence and `connect-src 'self'` literally
+  true. A second site is a second origin and cannot inherit that reasoning unexamined. **This is the
+  exact trap v3.0.0 was written to escape**, where the previous configuration could not sign anyone
+  in. It also meets two long-parked inbox entries head-on — `session-topology-and-csrf` and
+  `security-response-headers` — which have been filed since 001 as "cheapest to settle before the
+  first environment is opened".
+- **[ENTRY 24 — CLOSED by v4.1.0] What does the report queue disclose?** The operator mail
+  deliberately carries identifiers and a
+  timestamp, never message text and never the reason (decision 23). If reports become readable in a
+  product surface, does that surface show the reported content? Message content is the most
+  sensitive data in the product, and Principle VIII requires an exception to be *recorded* rather
+  than derived — as v3.3.0 required for Q&A visibility. **Likely a third recorded exception.**
+- **What may a moderator actually do?** Removing a question, suspending an attendee and replacing an
+  avatar are three powers with three different reversibility stories. 009 settled that a *withdrawn*
+  question takes everybody's votes with it; a *moderator-removed* one is not obviously the same case.
+- **Does an organizer appear in Discover, and can they be blocked?** They are an attendee, so by
+  default yes. Blocking a moderator is a coherent attendee action with incoherent consequences.
+- **What does editing a live conference do to attendees who saved the affected sessions?** Moving or
+  deleting a session sitting in somebody's Agenda, or on Home's "Up next" card, has no defined
+  behaviour today. This is **012's central problem** and is worth naming now.
+- **Is "organizer" the right word?** It is the exact term Principle III uses for the excluded actor.
+  Reusing it makes the amendment's diff read clearly and makes every older comment ambiguous.
+- **Deletion and export coverage for the new tables.** Both coverage tests derive expectations from
+  the Drizzle schema, so **a new table or column fails by existing**. Operator records are personal
+  data about somebody who is not necessarily an attendee — a case Principle VIII has never had to
+  consider.
+- **Is the admin site installable?** MyNet is a PWA with a manifest, icons and a service worker. The
+  admin site probably should not be, and that belongs in the spec as a stated absence.
 
 ### Design questions carried into 010's specification
 
@@ -593,10 +697,11 @@ than provisional — with the single exception noted under Client decisions abov
 
 ## Parked Ideas
 
-**Twenty-three entries** in `brainstorm/idea-inbox.md` — six from the 001 deep review, four from
-002's, six from 004's, four from 006's, and three from 007's. #07 consumed none: every entry is a
-deep-review deferral, and none of them seeds Network. *(Count corrected 2026-08-10 by #07, which
-found this line still reading "ten".)*
+**Thirty-four entries** in `brainstorm/idea-inbox.md` — six from the 001 deep review, four from
+002's, six from 004's, four from 006's, three from 007's, six from 008's and five from 009's. #09
+consumed none: every entry is a deep-review deferral, and none of them seeds administration.
+*(Count corrected 2026-08-11 by #09, which found this line still reading "twenty-three" and omitting
+008's and 009's review deferrals entirely. Corrected once before, on 2026-08-10 by #07, from "ten".)*
 
 From 001: session topology and CSRF, security response headers, the production deployment path,
 readiness versus liveness, throttle clock provenance, and substitutability proven without the

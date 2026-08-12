@@ -40,6 +40,16 @@ services:
       # deployed something other than what was verified.
       # ─────────────────────────────────────────────────────────────────────────────────────
       - ./web:/srv/web:ro
+      # ─────────────────────────────────────────────────────────────────────────────────────
+      # 011 — **the administrative client, a SECOND artifact from a second build**, served by
+      # the `admin.{$APP_DOMAIN}` block in the Caddyfile.
+      #
+      # A separate directory rather than a subdirectory of `./web`, and that is structural: the
+      # attendee service worker is registered at **root scope**, so anything served from under
+      # `/srv/web` inherits an origin on which that worker intercepts navigations. Two
+      # directories is what makes the two products two origins on disk as well as in DNS.
+      # ─────────────────────────────────────────────────────────────────────────────────────
+      - ./admin:/srv/admin:ro
       # The maintenance page and its ON flag. Read-only is correct: Caddy only ever READS the
       # flag; `maintenance.sh` writes it on the host side over SSH.
       - ./maintenance:/srv/maintenance:ro
@@ -121,6 +131,31 @@ services:
       PUSH_VAPID_SUBJECT: ${PUSH_VAPID_SUBJECT:-mailto:no-reply@mynet.invalid}
       AVATAR_DIMENSION_PX: ${AVATAR_DIMENSION_PX:-512}
       AVATAR_CARD_DIMENSION_PX: ${AVATAR_CARD_DIMENSION_PX:-96}
+      # ─────────────────────────────────────────────────────────────────────────────────────
+      # 011 — **the administrative settings, and without these lines the feature cannot be
+      # brought into service at all.**
+      #
+      # Compose reads the sibling `.env` for `${...}` interpolation into THIS file; it does not
+      # inject it into containers. A variable that is not named here does not exist in the API
+      # process. `.env.example` documents all four and `README.md` gives the bootstrap command,
+      # so the operator fills them in, runs the command, and it exits 0 having done nothing —
+      # `loadConfig` sees `undefined`, `bootstrapOperatorCredential` returns `not-configured`,
+      # and a seeded operator (whose `password_hash` is null by design, FR-990) stays unable to
+      # sign in **forever**. No report queue, no promotion, no moderation.
+      #
+      # The two session bounds fail more quietly: they would be silently ignored and the code
+      # defaults applied, so an operator who shortens the absolute cap in `.env` would believe
+      # a bound that is not in force — the same class of inert configuration `config.ts` refuses
+      # to tolerate for the idle/absolute relationship.
+      #
+      # **`ADMIN_ORIGIN` is deliberately absent** and must stay absent: Caddy makes the
+      # administrative site same-origin with its API in every deployed environment, so the CORS
+      # allow-list must not be widened to an origin nobody named. It is development-only.
+      # ─────────────────────────────────────────────────────────────────────────────────────
+      ADMIN_SESSION_IDLE_MINUTES: ${ADMIN_SESSION_IDLE_MINUTES:-30}
+      ADMIN_SESSION_ABSOLUTE_HOURS: ${ADMIN_SESSION_ABSOLUTE_HOURS:-8}
+      ADMIN_BOOTSTRAP_EMAIL: ${ADMIN_BOOTSTRAP_EMAIL:-}
+      ADMIN_BOOTSTRAP_PASSWORD: ${ADMIN_BOOTSTRAP_PASSWORD:-}
     healthcheck:
       # ─────────────────────────────────────────────────────────────────────────────────────
       # `/ready`, not `/health` (FR-482). A container that is "running" with an unreachable

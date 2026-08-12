@@ -4,6 +4,9 @@ import fp from 'fastify-plugin'
 import { prunePasswordResets } from './auth/password-reset.js'
 import { pruneAttempts, pruneSessions } from './auth/throttle.js'
 import { pruneVerifications } from './auth/verification.js'
+import { pruneAdminSessions } from './admin/session.js'
+import { AUDIT_RETENTION_DAYS, pruneAuditEntries } from './db/queries/admin-audit.js'
+import { OPERATOR_RETENTION_DAYS, pruneDeactivatedOperators } from './db/queries/operators.js'
 import { pruneExpiredReports, REPORT_RETENTION_DAYS } from './db/queries/reports.js'
 
 /**
@@ -104,6 +107,80 @@ export const RETENTION_SWEEPS: readonly RetentionSweep[] = [
       'hidden: a report can be lost if dispatch fails and the reported attendee then deletes ' +
       'their account — the erasure right was chosen over the evidence.',
     run: pruneExpiredReports,
+  },
+  {
+    // ═══════════════════════════════════════════════════════════════════════════════════════
+    // T027 (013) — **pseudonymise-plus-clock**, and it is the first two-stage rule in this list.
+    //
+    // Every sweep above is a single clock. This one has a prior step that is not a sweep at all:
+    // an entry naming a living attendee is **cleared** when that attendee exercises erasure
+    // (FR-997a), inside the deletion transaction, and only *then* does the clock start. That is
+    // what makes the rule "pseudonymise-plus-clock" rather than a retention window, and it is
+    // why `deletion-coverage.test.ts`'s allow-list entry has to state it in words: a reader
+    // seeing only this line would conclude an audit entry survives an erasure for a year.
+    //
+    // **No cascade reaches this table, by design.** `subject_attendee_id` deliberately carries
+    // no foreign key — see `schema/admin-audit.ts` for why all three of CASCADE, RESTRICT and
+    // SET NULL are wrong here — so this sweep is not a second line. It is the only one.
+    // ═══════════════════════════════════════════════════════════════════════════════════════
+    table: 'admin_audit_entries',
+    window: `${AUDIT_RETENTION_DAYS} days after pseudonymisation`,
+    reason:
+      'FR-998. Pseudonymised entries are personal data about nobody identifiable, in exactly ' +
+      'the sense `sign_in_attempts` is — pseudonymous rather than anonymous — so Principle ' +
+      "VIII's third rule applies and a window is the only thing that can clear them. The " +
+      'window **must not be shorter than the retention of the records it explains**: reports ' +
+      'are swept at 90 days and resolutions cascade with them, so a year is comfortably past ' +
+      'the point where an entry could be the only surviving account of an act. An entry still ' +
+      'naming a living attendee is NOT swept — it is cleared when they are erased (FR-997a), ' +
+      'and the clock starts then.',
+    run: pruneAuditEntries,
+  },
+  {
+    // T027 (013) — **deactivate-plus-clock**, and the clock alone is not the rule.
+    //
+    // An operator has no `attendees` row, so no cascade reaches this table either. FR-909
+    // requires a deactivated operator to keep resolving on records that name them, so the sweep
+    // removes only rows that are both long deactivated **and** referenced by nothing. See
+    // `db/queries/operators.ts` for why that second condition is checked explicitly rather than
+    // left to the foreign key to enforce by failing.
+    table: 'operators',
+    window: `${OPERATOR_RETENTION_DAYS} days after deactivation, and only once unreferenced`,
+    reason:
+      'FR-909, FR-984. There is no self-serve deletion here and no cascade can reach this ' +
+      "table: Principle VIII's erasure right is an ATTENDEE's, and an operator is not one. " +
+      'Deactivation (FR-908) is the terminal state, and the row is retained while any ' +
+      '`admin_audit_entries` or `report_resolutions` row names it — a resolution attributed to ' +
+      'nobody is an accountability record with the accountability removed.',
+    run: pruneDeactivatedOperators,
+  },
+  {
+    // ═══════════════════════════════════════════════════════════════════════════════════════
+    // 011 — **`operator_sessions`, registered at the deep-review gate because it was written
+    // and then never wired up.**
+    //
+    // `pruneAdminSessions` existed in `admin/session.ts` with a comment calling itself "a
+    // second line against accumulation", and **nothing called it** — no entry here, no route,
+    // no test. That is the defect this file's own header was written to record: *"`pruneAttempts`
+    // and `pruneSessions` existed before this file and nothing called either of them. Their
+    // comments described a retention policy the service did not implement, which is worse than
+    // an acknowledged gap."* The same mistake, one file over, in the feature that added it.
+    //
+    // The justification it carried — that the table is "classified by its cascades" from
+    // `operators` and `attendees` — does not bound it. An operator is never deleted in normal
+    // operation: deactivation is terminal, and the sweep above removes the row only once it is
+    // unreferenced, which takes a year. So an operator's rows had no clock at all, and an
+    // organizer's only had one if that attendee deleted their whole account.
+    // ═══════════════════════════════════════════════════════════════════════════════════════
+    table: 'operator_sessions',
+    window: '7 days after expiry or revocation',
+    reason:
+      'FR-983. Each row records when a named person was administering the product, which is ' +
+      'the same argument `auth_sessions` is swept on — and for an organizer the row is ' +
+      'attendee data. The cascades from `operators` and `attendees` are real but reach almost ' +
+      'nothing: an operator is retained while any audit entry names them, so without this the ' +
+      'table grows one permanent row per administrative sign-in, forever.',
+    run: pruneAdminSessions,
   },
 ]
 

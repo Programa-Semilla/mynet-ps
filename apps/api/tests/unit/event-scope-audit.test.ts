@@ -7,6 +7,10 @@ import { requireAttendee } from '../../src/plugins/auth-context.js'
 // name it; every other guarantee about card routes lives in `card-audit.test.ts`.
 import { requireHeldCard } from '../../src/plugins/card-access.js'
 import { assertVerifiedScope, requireEventAccess } from '../../src/plugins/event-access.js'
+// 011 — imported so the unauthenticated-route assertion can exclude administrative routes by
+// **the guard they carry** rather than by their path. See that assertion for why the difference
+// matters.
+import { requireOperator, requirePlatformOperator } from '../../src/admin/require-operator.js'
 
 /**
  * T068, T072 (002) — the route audit (FR-149, FR-132, FR-134, SC-105).
@@ -67,6 +71,76 @@ const VERIFIES_INSIDE_ITS_QUERY = new Set([
   // would verify the same registration twice.
   'PUT /workspace/active-event',
 ])
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════════════════════════
+ * **T028 (013) — THE ADMINISTRATIVE PRODUCT IS OUT OF THIS AUDIT'S SCOPE, AND THAT IS THE MOST
+ * DANGEROUS SENTENCE IN THIS FILE. READ THE WHOLE NOTE BEFORE ADDING ANYTHING TO IT.**
+ *
+ * Every assertion below was written about **the attendee surface**, and each rests on a premise
+ * that is simply false of an administrative route:
+ *
+ *   - `requireEventAccess` proves *an attendee is registered for this conference*. A platform
+ *     operator has **no `attendees` row at all** (FR-901), so the guard would refuse them
+ *     entirely correctly — and the route would be unreachable by the only principal entitled to
+ *     call it.
+ *   - `requireAttendee` binds an **attendee** identity. Administrative sessions are a different
+ *     store, a different cookie and a different principal (decision 37).
+ *   - "no route names an attendee identifier in a write" (FR-106) exists so that nothing may act
+ *     on somebody else *as an attendee*. Promotion and demotion act on somebody else **as an
+ *     administrative decision**, which is exactly the power v4.0.0 admitted.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────────────────────
+ * **THIS IS NOT A HOLE, BECAUSE A FOURTH AUDIT COVERS EVERY ROUTE EXCLUDED HERE.**
+ *
+ * `tests/unit/operator-audit.test.ts` fails any route beneath `/admin` carrying neither
+ * `requireOperator` nor `requirePlatformOperator`, holds a **positive** table of the routes only
+ * the platform tier may call, and — critically — asserts that **no administrative route carries
+ * an attendee-shaped guard**. That last assertion is the other half of this exclusion: without
+ * it, somebody could satisfy this audit by adding `requireEventAccess` to an administrative
+ * route and produce something that passes every gate and works for nobody.
+ *
+ * The one route where the two audits genuinely disagree about the same path is
+ * `POST /admin/conferences/:eventId/organizers`, which declares an event parameter and must not
+ * have the event guard. It is named individually below rather than covered only by the prefix,
+ * so that the disagreement is a written decision rather than a side effect of a regular
+ * expression.
+ *
+ * **Adding a non-`/admin` path to this predicate would be a genuine hole.** The prefix is the
+ * whole population, and `operator-audit.test.ts` uses the same prefix — so a route that escapes
+ * this one is caught by that one, and a route that escapes both would have to be outside
+ * `/admin` while claiming administrative status, which nothing registers.
+ * ─────────────────────────────────────────────────────────────────────────────────────────────
+ * ═══════════════════════════════════════════════════════════════════════════════════════════════
+ */
+const ADMINISTRATIVE = /^\/admin(\/|$)/
+
+/**
+ * The single administrative route that declares an event parameter, named explicitly.
+ *
+ * It is here so that the disagreement between the two audits is a decision somebody wrote down.
+ * If this route is renamed and this entry is not updated, the assertion below fails — which is
+ * the same discipline every allow-list in this file and in `deletion-coverage.test.ts` applies.
+ */
+const ADMIN_ROUTES_NAMING_AN_EVENT = new Map([
+  [
+    'POST /admin/conferences/:eventId/organizers',
+    'Promotion names the conference it grants authority over. The caller is a PLATFORM ' +
+      'OPERATOR who is not registered for it and has no attendees row, so `requireEventAccess` ' +
+      'would refuse them correctly and the route would be unreachable by the only principal ' +
+      'entitled to call it (FR-930, FR-906). Guarded by `requirePlatformOperator` and audited ' +
+      'by `operator-audit.test.ts`, which additionally forbids it carrying an attendee guard.',
+  ],
+  [
+    'DELETE /admin/conferences/:eventId/organizers/:attendeeId',
+    'Demotion, for the same reason as promotion above. It also names an ATTENDEE identifier in ' +
+      'a write path, which FR-106 forbids on the attendee surface — and which is precisely the ' +
+      'power constitution v4.0.0 admitted: an administrative act on somebody else, performed ' +
+      'by a principal who is not an attendee (FR-934).',
+  ],
+])
+
+const isAdministrative = (route: RouteOptions): boolean => ADMINISTRATIVE.test(route.url)
 
 const acceptsEventIdentifier = (route: RouteOptions): boolean =>
   EVENT_PARAM.test(route.url) ||
@@ -191,6 +265,10 @@ describe('event scope route audit', () => {
   it('every route accepting a conference identifier carries the access guard', () => {
     const unguarded = routes
       .filter(acceptsEventIdentifier)
+      // T028 (013) — administrative routes are covered by `operator-audit.test.ts` instead.
+      // See `ADMINISTRATIVE` above for why the event guard cannot apply to them, and note that
+      // the two routes this excludes are named individually in `ADMIN_ROUTES_NAMING_AN_EVENT`.
+      .filter((route) => !isAdministrative(route))
       .filter((route) => !preHandlersOf(route).includes(requireEventAccess))
       .map((route) => `${methodsOf(route).join('/')} ${route.url}`)
       .filter((label) => !VERIFIES_INSIDE_ITS_QUERY.has(label))
@@ -202,6 +280,42 @@ describe('event scope route audit', () => {
         'conference content must pass through it — the verification is a precondition of ' +
         'reading, not a step a reader may omit (FR-147).',
     ).toEqual([])
+  })
+
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════════════════════
+   * **T028 (013) — the administrative exclusion is bounded, and this is what bounds it.**
+   *
+   * The assertion above stops examining `/admin/*`. On its own that is a licence to add any
+   * number of event-naming administrative routes and have none of them checked by anything this
+   * file knows about. This closes that: the set of administrative routes naming a conference
+   * must be **exactly** the two written down, with their reasons.
+   *
+   * A third one fails here, naming itself, and the person adding it has to say why the event
+   * guard cannot apply — which is the same conversation `VERIFIES_INSIDE_ITS_QUERY` forces one
+   * level up, and the same one `deletion-coverage.test.ts` forces about a new table.
+   * ═══════════════════════════════════════════════════════════════════════════════════════════
+   */
+  it('bounds the administrative exclusion to the routes that declared themselves', () => {
+    const naming = routes
+      .filter(isAdministrative)
+      .filter(acceptsEventIdentifier)
+      .flatMap((route) => methodsOf(route).map((method) => `${method} ${route.url}`))
+      .filter((label) => !label.startsWith('HEAD '))
+      .sort()
+
+    expect(
+      naming,
+      'An administrative route names a conference and is not declared in ' +
+        '`ADMIN_ROUTES_NAMING_AN_EVENT`. This audit no longer examines `/admin/*`, so an ' +
+        'undeclared route here is covered by the operator audit alone — which checks that it ' +
+        'has an OPERATOR guard, not that naming a conference was the right shape. Write down ' +
+        'why the event guard cannot apply to it.',
+    ).toEqual([...ADMIN_ROUTES_NAMING_AN_EVENT.keys()].sort())
+
+    for (const [label, reason] of ADMIN_ROUTES_NAMING_AN_EVENT) {
+      expect(reason.length, `${label} is declared without a written reason`).toBeGreaterThan(80)
+    }
   })
 
   it('every event-scoped route binds identity FIRST, by reference not by count', () => {
@@ -341,6 +455,22 @@ describe('event scope route audit', () => {
   it('lets no Q&A route omit its conference from the address (T022, FR-742)', () => {
     const qa = routes
       .filter((route) => /\bquestions?\b/.test(route.url))
+      // ─────────────────────────────────────────────────────────────────────────────────────
+      // T028 (013) — **`DELETE /admin/questions/:questionId` is a Q&A-shaped path that must NOT
+      // name a conference, and excluding it here is a decision rather than a convenience.**
+      //
+      // 009's rule exists because Q&A routes are covered by the *event* audit and only by it, so
+      // omitting the conference makes them invisible to the one guard they have. That premise
+      // does not hold for the administrative removal route: it is covered by
+      // `operator-audit.test.ts`, which examines it by prefix and cannot be evaded by naming or
+      // not naming anything.
+      //
+      // Adding `:eventId` to it to satisfy this assertion would be actively wrong. A platform
+      // operator's authority is product-wide, so the conference in the path would assert a
+      // scope the caller does not have and does not need — and would drag the route into the
+      // event audit, which would then demand a guard that refuses platform operators.
+      // ─────────────────────────────────────────────────────────────────────────────────────
+      .filter((route) => !isAdministrative(route))
       // Fastify registers a `HEAD` alongside every `GET`, so the route table carries six entries
       // for the five routes this feature declares. Dropping it here keeps the count an assertion
       // about the feature rather than about Fastify's conveniences.
@@ -372,15 +502,55 @@ describe('event scope route audit', () => {
     expect(unguarded, 'These Q&A routes name a conference but do not verify it.').toEqual([])
   })
 
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════════════════════
+   * **T028 (013) — THE PREDICATE LOST `admin`, AND THE REPLACEMENT IS STRICTER RATHER THAN
+   * LOOSER.**
+   *
+   * This matched `/import|bulk|upload|admin/` on the reasoning that the constitution forbade a
+   * content import path *and* forbade an administrative surface at all — so the word `admin`
+   * anywhere in a URL was itself the violation.
+   *
+   * **Half of that premise is gone.** v4.0.0 admitted the administrative product, and `/admin/*`
+   * is now twelve legitimate routes. Leaving `admin` in the pattern would fail the build for
+   * every one of them, and the natural repair — deleting the assertion — would take the *content
+   * import* half with it, which is still binding: FR-974 keeps `catalog-read-only.test.ts` in
+   * force, and conference content authoring is **012's**, not this feature's.
+   *
+   * So the pattern keeps the three words that describe an import and drops the one that
+   * described an actor, and a second assertion below names what must still be absent from the
+   * administrative surface specifically. That is stricter than the original, which would have
+   * been satisfied by any content-writing route that avoided four words.
+   * ═══════════════════════════════════════════════════════════════════════════════════════════
+   */
   it('exposes no route that could import conference content in bulk', () => {
     const imports = routes
-      .filter((route) => /import|bulk|upload|admin/i.test(route.url))
+      .filter((route) => /import|bulk|upload/i.test(route.url))
       .map((route) => route.url)
 
     expect(
       imports,
-      'The constitution forbids a content import path without an amendment — it would be a route ' +
-        'around the organizer-administration exclusion.',
+      'The constitution forbids a content import path without an amendment. Administration came ' +
+        'IN at v4.0.0; **conference content authoring did not** — that is 012, and FR-974 keeps ' +
+        '`catalog-read-only.test.ts` in force until it lands.',
+    ).toEqual([])
+  })
+
+  it('exposes no administrative route that writes conference content (FR-974)', () => {
+    // The half of the assertion above that used to be carried by the word `admin`. 011 builds
+    // moderation and promotion; it builds no way to create, edit or delete a session, track,
+    // room, speaker or event. A route here would be 012 arriving without its amendment.
+    const authoring = routes
+      .filter(isAdministrative)
+      .filter((route) => methodsOf(route).some((method) => WRITE_METHODS.includes(method)))
+      .filter((route) => /\/(events|sessions|tracks|rooms|speakers)(\/|$)/.test(route.url))
+      .map((route) => `${methodsOf(route).join('/')} ${route.url}`)
+
+    expect(
+      authoring,
+      'An administrative route writes conference content. 011 delivers moderation and ' +
+        'promotion; authoring is 012 (FR-974). `/admin/conferences` is a READ of which ' +
+        'conferences exist and who organizes them — it writes assignments, never content.',
     ).toEqual([])
   })
 
@@ -416,6 +586,21 @@ describe('event scope route audit', () => {
 
     const writes = naming
       .filter((route) => methodsOf(route).some((method) => WRITE_METHODS.includes(method)))
+      // ─────────────────────────────────────────────────────────────────────────────────────
+      // T028 (013) — **administrative routes are excluded, and this is the exclusion that most
+      // needs its reasoning written down**, because it looks like the rule being abandoned.
+      //
+      // FR-106's purpose is that nothing may act on somebody else **as an attendee**: identity
+      // is bound from the sign-in session and no attendee may name another in a write. That
+      // purpose is completely intact — every attendee-facing route is still checked here.
+      //
+      // Demotion names an attendee in a write **because acting on somebody else is exactly the
+      // power constitution v4.0.0 admitted** (FR-934). It is performed by a principal who is not
+      // an attendee, through a guard the attendee product has no access to, on a separate
+      // origin. Excluding it is not a weakening of FR-106; applying it would be a claim that the
+      // second actor does not exist.
+      // ─────────────────────────────────────────────────────────────────────────────────────
+      .filter((route) => !isAdministrative(route))
       .map((route) => `${methodsOf(route).join('/')} ${route.url}`)
 
     expect(
@@ -461,6 +646,11 @@ describe('event scope route audit', () => {
 
     const unguarded = routes
       .filter((route) => /:attendeeId|\{attendeeId\}/.test(route.url))
+      // T028 (013). A third predicate — `requirePlatformOperator` — is acceptable on the
+      // administrative surface and only there, so it is expressed as an exclusion rather than
+      // added to ACCEPTABLE: adding it would make it acceptable on ATTENDEE routes too, which
+      // would be a way for an operator guard to satisfy an attendee-facing read.
+      .filter((route) => !isAdministrative(route))
       .filter((route) => !ACCEPTABLE.some((guard) => preHandlersOf(route).includes(guard)))
       .map((route) => route.url)
 
@@ -520,10 +710,45 @@ describe('event scope route audit', () => {
         'Requested by somebody who cannot sign in, which is why they are here (FR-326).',
       ],
       ['POST /auth/reset', 'Followed out of a mail client, like verification (FR-328).'],
+      // ─────────────────────────────────────────────────────────────────────────────────────
+      // T028 (013) — **every administrative route requires no ATTENDEE session, and eleven of
+      // the twelve require an ADMINISTRATIVE one.**
+      //
+      // `requireAttendee` is the wrong question here: an administrative principal is not an
+      // attendee, and a platform operator has no `attendees` row at all. Listing the twelve
+      // individually would say "unauthenticated" about eleven routes that are nothing of the
+      // kind, so they are excluded from the population below and covered by
+      // `operator-audit.test.ts`, which checks the guard they actually carry.
+      //
+      // The ONE genuinely unauthenticated administrative route is declared here, in the same
+      // list and to the same standard as the six above, because it is the same kind of thing:
+      // a route that establishes a session and therefore cannot require one.
+      // ─────────────────────────────────────────────────────────────────────────────────────
+      [
+        'POST /admin/session',
+        'Obtaining an administrative session is what it is for (FR-914). Rate-limited under ' +
+          'its own `admin_sign_in` counter, which is configured `mayDeny: false` (FR-916) — an ' +
+          'identifier-keyed denial here would lock out the operator rather than the attacker.',
+      ],
     ])
 
     const unauthenticated = routes
       .filter((route) => !preHandlersOf(route).includes(requireAttendee))
+      // ─────────────────────────────────────────────────────────────────────────────────────
+      // Administrative routes carry an OPERATOR guard, not an attendee one — see the note in the
+      // list above. Excluded by **the guard they actually carry**, not by their path: a route
+      // beneath `/admin` with neither guard stays in the population and must be declared, which
+      // is how `POST /admin/session` reaches the list above and how a future unguarded one would.
+      //
+      // Filtering on the path instead would have excluded every administrative route including
+      // an unguarded one — a hole the operator audit would catch, but which this assertion
+      // should not have opened in the first place.
+      // ─────────────────────────────────────────────────────────────────────────────────────
+      .filter(
+        (route) =>
+          !preHandlersOf(route).includes(requireOperator) &&
+          !preHandlersOf(route).includes(requirePlatformOperator),
+      )
       .flatMap((route) => methodsOf(route).map((method) => `${method} ${route.url}`))
       // Fastify registers a HEAD for every GET; it inherits the GET's guards and is not a
       // separate surface.

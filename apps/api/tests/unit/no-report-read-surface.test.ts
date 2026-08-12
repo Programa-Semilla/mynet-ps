@@ -7,26 +7,53 @@ import { beforeAll, describe, expect, it } from 'vitest'
 import { buildApp } from '../../src/app.js'
 
 /**
- * T073 (007) — **nothing in this product may read a report** (FR-548, SC-508).
+ * T073 (007) — **nothing in MYNET may read a report** (FR-548, SC-508, and now FR-972).
  *
  * ═════════════════════════════════════════════════════════════════════════════════════════
- * **THE TIGHTEST CONSTRAINT IN THE FEATURE, AND IT FOLLOWS DIRECTLY FROM PRINCIPLE III.**
+ * **T151 (013) — THIS GUARD IS NARROWED TO THE ATTENDEE PRODUCT, AND THE NARROWING IS THE
+ * SINGLE MOST DELICATE CHANGE THIS FEATURE MAKES TO ANOTHER FEATURE'S TEST.**
  *
- * A report is the classic reason to introduce a moderator, and a moderator is an organizer: the
- * actor this product excludes by construction. So rather than smuggle one in as "just an admin
- * screen", the report leaves the product entirely — it is written, mailed to an operator, and
- * then left alone until a 90-day sweep removes it.
+ * It used to say *nothing in this product may read a report*, on the reasoning that a
+ * report-reading screen needs a moderator, and a moderator is an organizer — the actor
+ * Principle III excluded by construction.
  *
- * **A reviewer looking for the missing half of this feature should find nothing, and finding
- * nothing is the pass condition.** That is a strange thing to assert, which is exactly why it is
- * asserted: an absence with no test is a gap somebody eventually fills in good faith, and the
- * good faith here is real — "operators need to see reports" is true, and the answer is that they
- * see them in their inbox and in the database, not through a surface this product ships.
+ * **That reasoning was correct and its premise is gone.** Constitution v4.0.0 reversed the
+ * exclusion, and this table is one of the two obligations that *forced* the reversal: register
+ * entry 21 records that the reporting dialog has promised a human reader since 007 shipped, and
+ * for the whole life of this project no such human existed. An exclusion whose cost is an
+ * unkeepable safety promise must be paid for or reversed.
  *
- * Four directions, because the absence can erode from four places: the route table, the query
- * layer, the repository interface, and the client.
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ * **WHAT SURVIVES IS EVERYTHING EXCEPT THE ONE ROUTE GROUP v4.1.0 NAMED.**
+ *
+ * FR-972 keeps FR-548 in force for MyNet, and decision 38 bounds the new read on four sides:
+ * the administrative product only, the platform tier only, only what was reported, and the
+ * reporter still told nothing. This file now enforces the first of those — every assertion
+ * below excludes `apps/api/src/routes/admin/` and `apps/api/src/db/queries/admin-reports.ts`
+ * **by exact path**, and nothing else.
+ *
+ * **The narrowing is by PATH, not by weakening a pattern.** 009 recorded that weakening the
+ * pattern until it passes is the natural wrong repair, and it applies exactly here: relaxing
+ * `/report/i` to something that happens not to match the new routes would stop catching a
+ * `GET /reports` added to the attendee surface tomorrow. Two named exclusions leave the guard
+ * as strong as it was everywhere it still applies.
+ *
+ * **A reviewer looking for a report-reading surface in `apps/web` or in the attendee API should
+ * still find nothing, and finding nothing is still the pass condition.**
+ * ─────────────────────────────────────────────────────────────────────────────────────────
  * ═════════════════════════════════════════════════════════════════════════════════════════
  */
+
+/**
+ * The administrative surface, excluded by exact path.
+ *
+ * Two entries and no wildcards beyond the directory itself. Every other file in `routes/` and
+ * `db/queries/` is still checked, so a report read added to the attendee surface fails exactly
+ * as it did before this feature.
+ */
+const ADMINISTRATIVE_ROUTE_PREFIX = /^\/admin(\/|$)/
+const ADMINISTRATIVE_QUERY_MODULE = 'admin-reports.ts'
+const ADMINISTRATIVE_ROUTE_DIRECTORY = 'admin'
 
 const methodsOf = (route: RouteOptions): string[] =>
   Array.isArray(route.method) ? route.method : [route.method]
@@ -61,31 +88,50 @@ describe('no report can be read from inside this product (FR-548)', () => {
   it('EXPOSES NO ROUTE THAT READS A REPORT, BY ANY METHOD OR ADDRESS', () => {
     const readable = routes
       .filter((route) => /report/i.test(route.url))
+      // T151 (013) — the administrative queue is the one permitted reader (decision 38). Every
+      // attendee-facing address is still checked.
+      .filter((route) => !ADMINISTRATIVE_ROUTE_PREFIX.test(route.url))
       .filter((route) => !methodsOf(route).every((method) => method === 'POST'))
       .map((route) => `${methodsOf(route).join('/')} ${route.url}`)
 
     expect(
       readable,
-      'A report-reading route exists. FR-548 forbids any interface, role or route by which a ' +
-        'report can be read from within this product — a report-reading screen needs a moderator, ' +
-        'and a moderator is an organizer, the actor Principle III excludes by construction.',
+      'A report-reading route exists on the ATTENDEE surface. FR-972 keeps FR-548 in force for ' +
+        'MyNet: the queue exists only in the administrative product, only for the platform ' +
+        'tier, and the reporter is still promised nothing they can observe (FR-946).',
     ).toEqual([])
   })
 
-  it('exposes no admin, moderation or operator address of any kind', () => {
-    // ───────────────────────────────────────────────────────────────────────────────────────
-    // Broader than reports, deliberately. The failure mode FR-548 guards against is not
-    // "somebody adds `GET /reports`" — it is somebody adding an administrative area, of which a
-    // report list is the first tenant. There is no privileged role in this product and no
-    // address that would need one.
-    // ───────────────────────────────────────────────────────────────────────────────────────
-    const administrative = routes
-      .filter((route) =>
-        /\/(admin|moderation|moderator|operator|staff|internal)\b/i.test(route.url),
-      )
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════════════════════
+   * **T151 (013) — THIS ASSERTION IS INVERTED RATHER THAN DELETED, AND THAT IS THE POINT.**
+   *
+   * It used to say *no administrative address of any kind exists*, on the reasoning that the
+   * failure mode was not "somebody adds `GET /reports`" but "somebody adds an administrative
+   * area, of which a report list is the first tenant."
+   *
+   * There is now an administrative area, deliberately, and deleting the assertion would lose the
+   * guarantee it was actually protecting. What that guarantee reduces to, after v4.0.0, is:
+   * **an administrative address must live under `/admin` and nowhere else.**
+   *
+   * That matters because the alternative is administrative capability leaking into the attendee
+   * route tree under some other name — `/moderation/…`, `/internal/…`, `/staff/…` — where the
+   * fourth route audit, which matches on the `/admin` prefix, would never examine it. An
+   * administrative route outside `/admin` is a route with no guard checking it at all.
+   * ═══════════════════════════════════════════════════════════════════════════════════════════
+   */
+  it('exposes no administrative address outside the /admin prefix', () => {
+    const misplaced = routes
+      .filter((route) => /\/(moderation|moderator|operator|staff|internal)\b/i.test(route.url))
+      .filter((route) => !ADMINISTRATIVE_ROUTE_PREFIX.test(route.url))
       .map((route) => `${methodsOf(route).join('/')} ${route.url}`)
 
-    expect(administrative).toEqual([])
+    expect(
+      misplaced,
+      'An administrative address exists outside `/admin`. `operator-audit.test.ts` — the only ' +
+        'guard covering administrative routes — matches on that prefix, so a route here is ' +
+        'examined by nothing at all. Move it under `/admin` (FR-905).',
+    ).toEqual([])
   })
 
   it('the query layer exports no way to read one', () => {
@@ -118,6 +164,10 @@ describe('no report can be read from inside this product (FR-548)', () => {
     const directory = join(import.meta.dirname, '../../src/db/queries')
     const offending = readdirSync(directory)
       .filter((name) => name !== 'account.ts')
+      // T151 (013) — the administrative queue module, excluded by exact filename. It is the
+      // permitted reader under decision 38, and `queries/reports.ts` — 007's module — is still
+      // checked and is still write-and-sweep only.
+      .filter((name) => name !== ADMINISTRATIVE_QUERY_MODULE)
       .filter((name) => {
         const source = readFileSync(join(directory, name), 'utf8')
         return /select[\s\S]{0,200}from\s+abuse_reports/i.test(source)
@@ -137,13 +187,17 @@ describe('no report can be read from inside this product (FR-548)', () => {
         entry.isDirectory() ? walk(join(directory, entry.name)) : [join(directory, entry.name)],
       )
 
-    const offending = walk(join(import.meta.dirname, '../../src/routes')).filter((file) =>
-      /abuse_reports|abuseReports/.test(readFileSync(file, 'utf8')),
-    )
+    const offending = walk(join(import.meta.dirname, '../../src/routes'))
+      // T151 (013) — the administrative route group, excluded by directory. Every attendee
+      // route file is still checked, which is where a report read would actually erode.
+      .filter((file) => !file.split('/').includes(ADMINISTRATIVE_ROUTE_DIRECTORY))
+      .filter((file) => /abuse_reports|abuseReports/.test(readFileSync(file, 'utf8')))
 
     expect(
       offending.map((file) => file.split('/').slice(-2).join('/')),
-      'A route reaching the reports table directly bypasses the query layer this test guards.',
+      'An ATTENDEE route reaches the reports table directly, bypassing the query layer this ' +
+        'test guards. The administrative queue reads it through `queries/admin-reports.ts`, ' +
+        'where the four bounds of decision 38 are expressed as the query itself.',
     ).toEqual([])
   })
 

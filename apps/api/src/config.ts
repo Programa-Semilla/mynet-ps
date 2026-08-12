@@ -93,6 +93,27 @@ export interface AppConfig {
   readonly host: string
   readonly port: number
   readonly webOrigin: string
+  /**
+   * 011 — where the **administrative** client is served, for local development only.
+   *
+   * ═════════════════════════════════════════════════════════════════════════════════════════
+   * **IN A DEPLOYED ENVIRONMENT THIS IS `undefined`, AND THAT IS THE CORRECT VALUE.**
+   *
+   * Caddy serves the administrative site at `admin.<host>` and reverse-proxies `/api/*` beneath
+   * it (decision 37), so administrative requests are **same-origin** and CORS never enters the
+   * picture — which is the whole reason the topology was chosen: it is what keeps
+   * `connect-src 'self'` literally true and the host-only session cookie sendable.
+   *
+   * Locally there is no proxy and no DNS, so the two clients are two ports — two *origins* — and
+   * a credentialed request from the administrative one is refused by CORS with an opaque network
+   * failure. That is a **development-only** problem and it gets a development-only setting.
+   *
+   * `absent` rather than `optional`, deliberately: a default would silently widen the allow-list
+   * in production to an origin nobody named. An unset value means the deployed configuration is
+   * exactly what it was before this feature — one named origin.
+   * ═════════════════════════════════════════════════════════════════════════════════════════
+   */
+  readonly adminOrigin: string | undefined
   readonly databaseUrl: string
   /**
    * How many reverse proxies sit in front of this service (FR-031a).
@@ -175,6 +196,50 @@ export interface AppConfig {
      * ───────────────────────────────────────────────────────────────────────────────────────
      */
     readonly cardDimensionPx: number
+  }
+  /**
+   * T010 (013) — the administrative product's settings (FR-919a, FR-919b, FR-991).
+   *
+   * ═════════════════════════════════════════════════════════════════════════════════════════
+   * **Two session bounds, and they are not two spellings of the same idea.**
+   *
+   * `sessionIdleMs` is advanced on every authenticated request, so it measures inactivity.
+   * `sessionAbsoluteMs` is resolved to an instant **once, when the session is established**, and
+   * stored on the row — never recomputed and never advanced. A session used every four minutes
+   * would live forever under an idle rule alone, which is precisely the exposure an
+   * administrative principal must not have.
+   *
+   * Storing the resolved instant rather than deriving it from `created_at` is the design
+   * decision plan.md tracks under Complexity: **a configuration change must not retroactively
+   * alter a live session.** Deriving is simpler and would make the governing value mutable
+   * after the fact — an operator lengthening the cap would silently extend every session
+   * already open, including one whose browser is unattended. This is the deliberate opposite of
+   * 008's `lapsed`, which is derived precisely because it must track the *current* slot grid.
+   *
+   * Both are `positiveInt`, so there is **no value meaning "never expires"**. Disabling either
+   * bound has to be a code change somebody reviews, not a zero in a `.env`.
+   *
+   * The bootstrap pair is `absent` rather than `optional`, and that is the same distinction 007
+   * drew for the operator mail address: there is no sensible default for an administrative
+   * credential, and their absence is the **expected, safe state** in which nobody can sign in to
+   * the administrative site at all (FR-991). A default would be a well-known password in a
+   * public repository.
+   * ═════════════════════════════════════════════════════════════════════════════════════════
+   */
+  readonly admin: {
+    /** Sliding inactivity window, advanced on use (FR-919a). */
+    readonly sessionIdleMs: number
+    /** Fixed at establishment, never advanced (FR-919b). */
+    readonly sessionAbsoluteMs: number
+    /**
+     * The seeded operator identity `pnpm admin:bootstrap` gives a credential to (FR-991).
+     *
+     * Read here like every other secret (FR-041), and consumed **only** by
+     * `apps/api/src/admin/bootstrap.ts` — never by a route, so no request can reach the value
+     * and no sign-in path can fall back to it.
+     */
+    readonly bootstrapEmail: string | undefined
+    readonly bootstrapPassword: string | undefined
   }
   readonly mail: {
     /**
@@ -308,6 +373,9 @@ export const loadConfig = (): AppConfig => {
     host: optional('API_HOST', '0.0.0.0'),
     port: positiveInt('API_PORT', 3000),
     webOrigin: optional('WEB_ORIGIN', 'http://localhost:5173'),
+    // 011 — see the interface. Absent in every deployed environment, where Caddy makes
+    // administrative requests same-origin and there is nothing for CORS to allow.
+    adminOrigin: absent('ADMIN_ORIGIN'),
     databaseUrl: required('DATABASE_URL'),
     // Defaults to 1 — the deployed topology. A local run has no proxy, but trusting one hop
     // that does not exist is harmless there, whereas defaulting to 0 and forgetting to set it
@@ -350,6 +418,17 @@ export const loadConfig = (): AppConfig => {
       dimensionPx: positiveInt('AVATAR_DIMENSION_PX', 512),
       // 006 — the card rendition. 96px covers a 48px card avatar at 2× density.
       cardDimensionPx: positiveInt('AVATAR_CARD_DIMENSION_PX', 96),
+    },
+    admin: {
+      // 30 minutes. Short because an unattended administrative browser is a different exposure
+      // from an unattended attendee one — the attendee session's window is fourteen *days*.
+      sessionIdleMs: positiveInt('ADMIN_SESSION_IDLE_MINUTES', 30) * 60 * 1000,
+      // Eight hours: one working day. Long enough that nobody is signed out mid-task, short
+      // enough that a session cannot survive the night.
+      sessionAbsoluteMs: positiveInt('ADMIN_SESSION_ABSOLUTE_HOURS', 8) * 60 * 60 * 1000,
+      // 011 — absent is the expected state; see the interface. No default, ever.
+      bootstrapEmail: absent('ADMIN_BOOTSTRAP_EMAIL'),
+      bootstrapPassword: absent('ADMIN_BOOTSTRAP_PASSWORD'),
     },
     mail: {
       from: optional('MAIL_FROM', 'MyNet <no-reply@mynet.invalid>'),
@@ -412,6 +491,45 @@ export const loadConfig = (): AppConfig => {
       'PUSH_VAPID_PUBLIC_KEY and PUSH_VAPID_PRIVATE_KEY must be set together or not at all. ' +
         'Exactly one is set, which starts the API, lets devices subscribe, and then fails every ' +
         'delivery at signing time. Leave both unset to run the sink adapter.',
+    )
+  }
+
+  /**
+   * T010 (013) — **the idle window must fit inside the absolute cap.**
+   *
+   * If it does not, the idle rule can never fire: a session reaching its idle expiry would
+   * already be past its absolute one, so `ADMIN_SESSION_IDLE_MINUTES` would be configuration
+   * that reads as if it governs something and governs nothing. Two bounds where one is
+   * unreachable is worse than one bound, because an operator believes both are in effect.
+   *
+   * Refused rather than clamped, for the reason the reset-budget floor above gives: a silently
+   * corrected value looks exactly like a working one.
+   */
+  if (cached.admin.sessionIdleMs >= cached.admin.sessionAbsoluteMs) {
+    throw new Error(
+      `ADMIN_SESSION_IDLE_MINUTES resolves to ${cached.admin.sessionIdleMs}ms, which is not ` +
+        `shorter than ADMIN_SESSION_ABSOLUTE_HOURS (${cached.admin.sessionAbsoluteMs}ms). The ` +
+        `idle window would then be unreachable — every session would hit its absolute cap first ` +
+        `— so one of the two bounds FR-919a and FR-919b require would silently not exist.`,
+    )
+  }
+
+  /**
+   * **Both bootstrap halves, or neither** — the same shape as the VAPID pair above, for a
+   * different failure.
+   *
+   * An address with no password cannot set a credential and reads as "bootstrap is configured";
+   * a password with no address names no identity to apply it to. Either half alone is a
+   * deployment where somebody believes an operator can sign in and nobody can. Neither set
+   * remains entirely normal: that is the state FR-991 describes, in which administrative
+   * sign-in is impossible rather than defaulted.
+   */
+  const { bootstrapEmail, bootstrapPassword } = cached.admin
+  if ((bootstrapEmail === undefined) !== (bootstrapPassword === undefined)) {
+    throw new Error(
+      'ADMIN_BOOTSTRAP_EMAIL and ADMIN_BOOTSTRAP_PASSWORD must be set together or not at all. ' +
+        'Exactly one is set, which cannot establish a credential and reads as if it could. ' +
+        'Leave both unset to keep administrative sign-in impossible (FR-991).',
     )
   }
 

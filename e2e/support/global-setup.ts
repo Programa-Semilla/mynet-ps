@@ -11,6 +11,7 @@ import { promisify } from 'node:util'
 
 import { startApi, stopApi } from './api-process.js'
 import { API_ORIGIN } from './env.js'
+import { bootstrapOperatorCredential } from './operators.js'
 
 const run = promisify(execFile)
 const ROOT = fileURLToPath(new URL('../..', import.meta.url))
@@ -29,6 +30,21 @@ export default async (): Promise<void> => {
 
   await run('pnpm', ['db:migrate'], { cwd: ROOT, env: process.env })
   await run('pnpm', ['db:seed'], { cwd: ROOT, env: process.env })
+
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 011 — **the administrative credential, here and nowhere else.**
+  //
+  // A seeded operator has no credential at all (FR-990), so the suite cannot sign in as one
+  // without this. It must run *after* `db:seed`, which returns operators to that state — FR-993
+  // forbids resetting a credential an operator has chosen, so bootstrapping only works on a
+  // freshly seeded row.
+  //
+  // It belongs here rather than in `signInAsOperator` because the seed it depends on **deletes
+  // every attendee**. Run from inside a test, it destroyed MyNet sessions established earlier in
+  // that same test — including, with some irony, the one in `admin-sessions.spec.ts` that exists
+  // to prove the two products' sessions are independent.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  await bootstrapOperatorCredential()
 
   // A server left over from an earlier run holds the port and may be running older code.
   // Replace it rather than reusing it, so what is tested is what is committed.

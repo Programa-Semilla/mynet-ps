@@ -10,6 +10,7 @@ import { execFile } from 'node:child_process'
 import { fileURLToPath, URL } from 'node:url'
 import { promisify } from 'node:util'
 
+import { ensureAdminCredential, resetOperatorCredential } from './local/admin-credential.mjs'
 import { ensureEnvFile, writeEnvLocal } from './local/env-file.mjs'
 import { instanceFor } from './local/instance.mjs'
 import {
@@ -20,6 +21,7 @@ import {
   ensureContainer,
   ensureDatabase,
   HOST_PORT,
+  runSql,
 } from './local/postgres.mjs'
 import { classifyDrift, committedMigrations } from './local/schema.mjs'
 import { portInUse, renderBanner, startServers } from './local/servers.mjs'
@@ -30,6 +32,16 @@ const ROOT = fileURLToPath(new URL('..', import.meta.url))
 const MIGRATIONS = fileURLToPath(new URL('../apps/api/migrations', import.meta.url))
 
 const reset = process.argv.includes('--reset')
+
+/**
+ * Puts the administrative credential back to just-seeded so a fresh one is issued and printed.
+ *
+ * Separate from `--reset` because they answer different questions. `--reset` rebuilds the whole
+ * database and costs every attendee, session and note in it; forgetting an administrative
+ * password should not require that. Implied by `--reset`, since a rebuilt database has a
+ * re-seeded operator anyway.
+ */
+const resetAdmin = process.argv.includes('--reset-admin')
 
 const git = async (args) => (await run('git', args, { cwd: ROOT })).stdout.trim()
 
@@ -70,6 +82,7 @@ const main = async () => {
   for (const [label, port] of [
     ['web', instance.webPort],
     ['API', instance.apiPort],
+    ['admin', instance.adminPort],
   ]) {
     if (await portInUse(port)) {
       throw new Error(
@@ -92,6 +105,7 @@ const main = async () => {
     apiPort: instance.apiPort,
     webOrigin: `http://localhost:${instance.webPort}`,
     apiOrigin: `http://localhost:${instance.apiPort}`,
+    adminOrigin: `http://localhost:${instance.adminPort}`,
   })
 
   // Every child below reads DATABASE_URL from the real environment, which beats both files.
@@ -124,10 +138,37 @@ const main = async () => {
     await pnpm(['db:seed'], env)
   }
 
-  console.log('Starting the API and the client…')
+  // ─────────────────────────────────────────────────────────────────────────────────────────
+  // **The administrative credential, which the seed deliberately does not create** (FR-990).
+  //
+  // Idempotent like every step above, and idempotent *because* of FR-993 rather than in spite
+  // of it: the bootstrap only writes where `credential_is_initial` is still true, so a re-run
+  // never overwrites a password an operator chose. That guard is what makes this safe to put in
+  // a command people run several times a day.
+  // ─────────────────────────────────────────────────────────────────────────────────────────
+  if (resetAdmin) {
+    const found = await resetOperatorCredential(instance.databaseName, { runSql })
+    console.log(
+      found
+        ? 'Clearing the administrative credential so a fresh one is issued (--reset-admin).'
+        : 'No seeded operator to reset — the database will need `pnpm db:seed`.',
+    )
+  }
+
+  console.log('Issuing an administrative credential…')
+  const adminCredential = await ensureAdminCredential({ pnpm, env })
+
+  console.log('Starting the API, MyNet and the administrative site…')
   const { stop } = await startServers({ instance, root: ROOT })
 
-  console.log(renderBanner({ branch: await currentBranch(), instance, hostPort: HOST_PORT }))
+  console.log(
+    renderBanner({
+      branch: await currentBranch(),
+      instance,
+      hostPort: HOST_PORT,
+      adminCredential,
+    }),
+  )
 
   // Leave the container running: starting it again is cheap, and stopping it would only make
   // the next run slower for no benefit.

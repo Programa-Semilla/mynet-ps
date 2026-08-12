@@ -17,7 +17,19 @@ import { fileURLToPath, URL } from 'node:url'
 import { API_ORIGIN } from './env.js'
 
 const API_DIR = fileURLToPath(new URL('../../apps/api', import.meta.url))
-const PID_FILE = fileURLToPath(new URL('../../test-results/.api-pid', import.meta.url))
+
+/**
+ * **Deliberately NOT under `test-results/`, and that placement is a fix.**
+ *
+ * Playwright wipes its output directory at the start of every run. The pid file lived there, so
+ * the handle to a previous run's detached server was destroyed *before* `stopApi()` looked for
+ * it — which meant an interrupted run leaked a server that no later run could find or stop. It
+ * then held the port, the next run's child died with `EADDRINUSE`, and the health poll was
+ * answered by the leaked server. `node_modules/.cache/` is ignored by git and survives the wipe.
+ */
+const PID_FILE = fileURLToPath(
+  new URL('../../node_modules/.cache/mynet-e2e-api.pid', import.meta.url),
+)
 
 /**
  * 004 — where the API's output goes, so a spec can read a verification or reset link.
@@ -94,7 +106,11 @@ export const apiIsUp = async (): Promise<boolean> => {
  * redeployment case must be able to leave a healthy server behind for the specs that follow.
  */
 export const startApi = async (): Promise<void> => {
+  // Both, and separately — they deliberately live in different places now. The pid file sits
+  // outside `test-results/` so it survives Playwright's wipe; the log sits inside it because it
+  // *should* be truncated per run. Creating one directory used to create the other by accident.
   mkdirSync(dirname(PID_FILE), { recursive: true })
+  mkdirSync(dirname(API_LOG), { recursive: true })
 
   // Truncated per run, so one run's links cannot be read by the next.
   writeFileSync(API_LOG, '', 'utf8')
@@ -112,9 +128,49 @@ export const startApi = async (): Promise<void> => {
   }
 
   writeFileSync(PID_FILE, String(child.pid), 'utf8')
-  child.unref()
 
-  await waitForHealth()
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // **A CHILD THAT DIES MUST FAIL THE RUN, BECAUSE `waitForHealth` CANNOT TELL WHOSE SERVER IT
+  // IS TALKING TO.**
+  //
+  // This is the hole that let a whole suite run against a server nobody owned. `startApi` is
+  // called after `stopApi`, which kills only the pid it recorded in `test-results/.api-pid` —
+  // and **Playwright wipes `test-results/` at the start of every run**, so on the run after any
+  // interrupted one there is no pid file, nothing is killed, and a detached server from an
+  // earlier run is still holding :3000. The new child then dies instantly with `EADDRINUSE`,
+  // `waitForHealth` polls `/ready`, the *stale* server answers `ok`, and global setup reports
+  // success. Everything downstream tests a process started from different code with a different
+  // environment, which is the exact failure the `stopApi` call above exists to prevent.
+  //
+  // Racing the health poll against the child's own exit is what closes it: whichever happens
+  // first is the truth, and a child that exits before serving is never a healthy start.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  const died = new Promise<never>((_resolve, reject) => {
+    child.once('error', (error) => reject(error))
+    child.once('exit', (code, signal) => {
+      reject(
+        new Error(
+          `The API process exited before it became ready (code ${code}, signal ${signal}).\n` +
+            `Its output is in ${API_LOG}.\n\n` +
+            'If that says EADDRINUSE, a server from an earlier run is still holding the port. ' +
+            'This run would otherwise have tested THAT server rather than this code. Stop it:\n' +
+            "  ss -ltnp | grep ':3000'   # then kill the pid it names",
+        ),
+      )
+    })
+  })
+  // Nothing must be left listening to `died` once the race is settled, or an ordinary shutdown
+  // later in the run would reject an unobserved promise and crash the worker.
+  died.catch(() => {})
+
+  try {
+    await Promise.race([waitForHealth(), died])
+  } finally {
+    child.removeAllListeners('exit')
+    child.removeAllListeners('error')
+  }
+
+  child.unref()
 }
 
 /** Stops the recorded API process, if it is still running. */

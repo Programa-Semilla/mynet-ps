@@ -5,7 +5,7 @@ Guidance for Claude Code (claude.ai/code) working in this repository.
 This file is the **working brief**: what the product is, what has been decided, and how work is
 done here. It is deliberately short. Depth lives elsewhere, and these are authoritative over it:
 
-1. **`.specify/memory/constitution.md` (v3.4.0)** — governance and the authoritative decision
+1. **`.specify/memory/constitution.md` (v4.1.0)** — governance and the authoritative decision
    register. Supersedes tool defaults, habit, and any conflicting statement in this file.
 2. **`docs/superpowers/specs/2026-08-06-mynet-delivery-roadmap-design.md`** — the decomposition of
    the remaining product into features, with dependency order, reserved migration numbers, and gate
@@ -25,6 +25,9 @@ question and settle it with the client.
 GroundZero/       # Initialization brief, requirements.md, approved prototype (reference only)
 apps/api/         # Fastify + Drizzle over PostgreSQL; versioned migrations
 apps/web/         # React + TypeScript PWA; shell, sign-in, five destinations
+apps/admin/       # 013 — the SEPARATE administrative website (admin.<host>). No PWA, no
+                  #   service worker, no @mynet/platform: it needs none of the seven device
+                  #   capabilities, and its absences are structural rather than configured.
 packages/data/    # Repository interfaces + HTTP implementations + generated contract types
 packages/platform/# Device-capability + storage interfaces, web implementations, repository registry
 packages/config/  # Shared TypeScript and Vitest bases
@@ -48,8 +51,30 @@ The core journey: inspect the next session → discover a relevant attendee → 
 them → schedule a networking appointment.
 
 The **attendee** is the only actor. Speakers and other attendees are data the attendee interacts
-with, not users of the system. **Organizer administration is out of scope**, and seed data must not
-become a route around that: no admin interface, no privileged role, no content import path.
+with, not users of the system.
+
+**Organizer administration was out of scope for the whole life of this project, and constitution
+v4.0.0 — ratified 2026-08-11 — reverses that.** It is the second time this project has retracted
+delivered requirements, after v3.0.0 withdrew 001's FR-066, and it is MAJOR for that reason among
+two others: Principle III's *"the attendee is the only actor in scope"* is redefined, and the
+prohibition that Principle III and D2 each named an amendment as the precondition for is lifted.
+
+**A second actor now exists, in two tiers, and neither is reachable by self sign-up** — which is the
+mirror of decision 11's reasoning, because anyone who can sign themselves up as an administrator is
+not an administrator. A **platform operator** is seeded, holds product-wide authority, and is the
+only tier that may promote or read reports. A **conference organizer** is a promoted attendee whose
+authority reaches only conferences they are assigned, and promotion must not alter their attendee
+experience at all.
+
+**Administration is a separate website** against the same API and database. **MyNet itself gains no
+admin surface, no privileged view, and no role-dependent rendering** — that absence is what keeps
+Principle III's attendee-workspace framing true while its actor clause changes, and it must be
+testable as an absence rather than asserted. **No administrative tier may edit anybody's profile**:
+conference content is authorable, a person is not. The seed stays the dev/test fixture and seeded
+conferences become ordinary editable ones — one class of conference.
+
+**Payment processing is NOT reversed.** It shared a sentence with administration and was never the
+same decision.
 
 ### The five destinations
 
@@ -308,10 +333,51 @@ at all*; unit, component and integration were all green on it and only e2e caugh
 owner reported the scheduling dialog rendering in the **top-left corner**, which no behavioural
 test could see. Both are written up as invariants above.
 
-**Migrations claimed so far run to `0007`.** The journal lists `0003` before `0004` while carrying a
+**013 (Administrative foundation, the second actor, and the report queue) is shipped**,
+squash-merged to `develop` in [#20](https://github.com/Programa-Semilla/mynet-ps/pull/20) — the
+first feature with a second actor, and the first to ship a **second product**. It is the delivery
+of standing decisions 31–39, and the reversal was **forced rather than sought**: register entries
+19 and 21 had both been traced in writing to the administration exclusion, and 009 recorded that a
+public Q&A surface "needs a moderator, and a moderator is an organizer". An exclusion whose cost is
+an unkeepable safety promise must be paid for or reversed.
+
+`apps/admin/` is a separate website on `admin.<host>`, against the same API and database. **MyNet
+gained no admin surface, no privileged view and no role-dependent rendering**, and that is asserted
+as an absence rather than claimed. A platform operator is seeded with **no credential**; a
+conference organizer is a promoted attendee whose attendee experience is unchanged in every
+observable way.
+
+**Its by-hand validation is outstanding, and it is the only thing outstanding.** T158 and T159 —
+the eleven `quickstart.md` scenarios — join the same unwalked scenarios from 007, 008 and 009.
+`pnpm start` now brings up the API, MyNet **and** the administrative site together and prints a
+generated operator credential, so that walk is one command away rather than four.
+
+**A deep review recorded 49 findings and deferred nine as needing decisions; those were then taken
+as an explicit decision round rather than carried into the merge** — eight fixed, one accepted.
+`specs/013-administrative-foundation/review-findings.md` records both passes.
+
+**Four of the nine were one defect, and it is the most transferable thing 013 produced: four
+functions whose emphatic headers described call relationships that did not exist.**
+`appendAuditEntry` said *"every write path"* passed a transaction and **none did**;
+`assertVerifiedOperator` said it was called at the query layer and was called nowhere;
+`addressTakenByOtherPrincipal` said it ran inside the caller's transaction and was called only by
+tests; three helpers named callers that were inlined copies. In a codebase whose discipline is that
+the comment is the record, a header is a claim that needs a guard like any other — and **three of
+the four already had the executor parameter**, so what looked like design work was wiring.
+
+**Migrations claimed so far run to `0009`** (`0009_administrative_foundation.sql`; 010 added no
+schema). **012 reserves `0010`.** The journal lists `0003` before `0004` while carrying a
 later timestamp — `apps/api/migrations/meta/README.md` explains why both halves are load-bearing and
 what a regenerating feature must not "fix". Anyone regenerating must move that README aside first,
 because `drizzle-kit generate` JSON-parses every file in `meta/`.
+
+**`0009` was regenerated once, deliberately, and that is only safe before a migration has been
+applied anywhere.** Two foreign keys had no covering index. Because `0009` had reached no database,
+the file could be rebuilt rather than followed by an `0010`; the diff is two `CREATE INDEX` lines
+and a later `when`. **`lock_timeout` went into `migrate.ts`, not the SQL** — a hand edit to a
+generated file is erased by the next regeneration, and putting it on a dedicated migration
+connection covers *every* migration, including `0003`, whose missing timeout was a recorded
+unclaimed defect from 004's review.
 
 ## Architectural invariants
 
@@ -584,6 +650,70 @@ refactor.
   the prose explaining the absence — matching raw text fails on a correct implementation, and the
   natural repair is to weaken the pattern until it checks nothing.
 
+**Administration (013)**
+
+- **A second product, not a second surface.** `apps/admin/` is its own Vite application on its own
+  origin. The cheaper option — a second entry point inside `apps/web` with the PWA plugin
+  configured to exclude it — was rejected because **an exclusion is configuration a later change
+  can widen, while a separate application has nothing to exclude.** There is no manifest to omit an
+  entry from, no worker to scope away, and no precache glob that could pick these assets up.
+- **A subdomain, because it is the only topology that is both same-site and different-origin.**
+  `SameSite` is evaluated against the **registrable domain**, so `admin.<host>` keeps decision 19's
+  CSRF defence with no synchroniser token, while still getting its own storage, worker scope and
+  CSP. A path shares the origin and the attendee worker is registered at **root scope**, so it
+  would intercept administrative navigations; a separate registrable domain stops `SameSite=Lax`
+  being sent, which is the exact v3.0.0 failure where nobody could sign in.
+- **A fourth branded scope, and the tier is a TYPE-level refinement.** `VerifiedPlatformScope`
+  extends `VerifiedOperatorScope` and adds a **second private field**, which makes a platform scope
+  usable where an operator scope is wanted and not the reverse. A subclass adding nothing would be
+  assignable both ways with every test still green, and the thing that gets through is a conference
+  organizer reading the report queue. Asserted with `@ts-expect-error`, so it fails the
+  **typecheck** rather than the test run.
+- **The minting functions are exported, and a sole-importer test is what replaces a private
+  constructor.** The other three scopes hold their class and guard in one file, so `new` is simply
+  unavailable elsewhere; 013 splits them across two files and pays for it with one reviewable test.
+  That test scans `src/` **only** — a test fabricating a scope proves nothing about what a request
+  can reach.
+- **The report queue is the third recorded Principle VIII exception**, and every bound is visible
+  in the query: platform tier only, only what was reported, only in the queue, and the reporter is
+  still told nothing. **`content unavailable` is a first-class state, not an error** — reported ids
+  are a plain array rather than a foreign key precisely because the content is usually gone before
+  anybody looks.
+- **Reading one report writes an audit entry; reading the queue does not.** The list carries no
+  content, so an operator scrolling has disclosed nothing, and a trail recording it would be a
+  record of *scrolling* rather than of disclosure.
+- **An administrative act and the entry accounting for it commit in one transaction** (FR-994).
+  This was the headline post-review fix: `appendAuditEntry` had taken an executor from the start
+  and no caller passed one, so a failing entry left the act committed and unrecorded. Guarded
+  twice — a source assertion that every call passes the transaction, and a behavioural test that
+  fails the insert and asserts the act is gone.
+- **`removeQuestion`'s `FOR UPDATE` lock must be given a TRANSACTION, and the type cannot say so.**
+  Handed the pool, each statement autocommits, the lock is released by the `SELECT` itself, and the
+  vote it exists to serialise slips in before the `DELETE` — invisibly, because the question is
+  still removed and what breaks is an attendee's upvote 500ing later.
+- **FR-918 is the one uniqueness rule in the product enforced by application code.**
+  `attendees.email` and `operators.email` are two unique indexes on two tables and no constraint
+  spans them, so it is checked inside the caller's transaction on **both** create paths — and the
+  refusal is the *same* 409 an attendee-held address gives, or sign-up becomes an oracle for which
+  addresses hold administrative accounts. **FR-915 depends on it**: administrative sign-in resolves
+  an address with a single lookup and no branch.
+- **The bootstrap never resets a password an operator chose**, expressed as
+  `WHERE credential_is_initial = true` rather than a prior read. An idempotent upsert would be a
+  credential reset triggered by an environment variable that stays on the host forever. This is
+  what makes `pnpm start` safe to run repeatedly while issuing a credential.
+- **The seed creates operator identities with NO credential**, and that is the requirement: this
+  repository is public, so a committed administrative password is a *published* credential for the
+  tier that reads the report queue.
+- **An organizer's authority cannot outlive their access.** Deleting an account revokes every
+  assignment in the same transaction; withdrawing from a conference revokes that one. A conference
+  left with no organizer enters an explicit derived **`unassigned`** state rather than silently
+  reverting to the platform tier — a tidier invariant that would hide the event nobody is prompted
+  to act on.
+- **Absences with tests**: no admin surface, privileged view or role-dependent rendering in MyNet
+  (FR-970–FR-984); no route that suspends, removes or restricts an *attendee* — an operator acts on
+  content and on authority, never on a person; no profile edit at any tier; and no read path over
+  the audit trail (FR-999).
+
 **Deployment**
 
 - **`deploy/vm/` is the whole platform**: Caddy with automatic Let's Encrypt TLS serving the built
@@ -780,9 +910,12 @@ explicitly that there is **one visibility decision per attendee** and that no fe
 individual field its own audience. 008 had specified a contact line carried only by a shared card;
 the owner rejected that reading and the field was withdrawn before any migration was written.
 
-**2026-08-10** (ratified in constitution v3.3.0) — **this closed the oldest entry in the register**:
+**2026-08-10** (ratified in constitution **v3.4.0**) — **this closed the oldest entry in the
+register**. *Two corrections made 2026-08-11: this block cited v3.3.0, which is the Q&A amendment
+above, and it numbered its decision 27, which the Q&A block already used. The brand mark is decision
+**30**.*
 
-27. **MyNet has a brand mark, and the owner's board is its single source.** Supplied 2026-08-10: a
+30. **MyNet has a brand mark, and the owner's board is its single source.** Supplied 2026-08-10: a
     continuous round-capped "N" with two node terminals, in coral on navy and navy on cream, with
     both lockups and 32/24/16px scale tests. *Closes register entry 2*, open since 1.0.0 — it
     needed an asset only the client could provide, which is why nothing here could close it sooner
@@ -799,6 +932,100 @@ the owner rejected that reading and the field was withdrawn before any migration
     is new register entry 22, and the resulting seam between the icon plate and the token-derived
     `theme_color` is knowingly accepted. **Deliberately not closed**: register entry 4, the
     unvalidated desktop and tablet layouts, which this work *escalates* by putting a mark in both.
+
+**2026-08-11** (ratified in constitution **v4.0.0**) — **the amendment that reverses the oldest
+prohibition in this document, and the first to introduce a second actor**:
+
+31. **Administration enters product scope; payment processing does not move.** The two were named in
+    one sentence in Principle III and were never one decision. This is the second time this project
+    has retracted delivered requirements — after v3.0.0 withdrew 001's FR-066 — and it is MAJOR for
+    that reason plus two others: Principle III's *"the attendee is the only actor in scope"* is
+    redefined, and the prohibition that Principle III and decision 8's seed clause each named an
+    amendment as the precondition for is lifted. **The reversal was forced rather than sought**:
+    register entry 19 (nobody moderates an avatar) and entry 21 (the reporting dialog promises a
+    human reader) had both been traced in writing to this exclusion, and 009 recorded that a public
+    Q&A surface "needs a moderator, and a moderator is an organizer — the actor Principle III
+    excludes by construction". An exclusion whose cost is an unkeepable safety promise must be paid
+    for or reversed.
+32. **A second actor exists, in two tiers, and neither is reachable by self sign-up.** A **platform
+    operator** is seeded as committed reviewed data, holds product-wide authority, and is the only
+    tier that may promote an attendee or read the report queue. A **conference organizer** is an
+    attendee promoted by a platform operator, whose authority reaches only conferences they are
+    assigned. The no-self-sign-up rule is load-bearing and is **the mirror of decision 11**: self
+    sign-up was mandatory for attendees because it was the only model leaving the attendee sole
+    actor, and it is forbidden here because anyone who can sign themselves up as an administrator is
+    not one. A tier reachable by self sign-up is a privilege escalation with a form.
+33. **Administration is a separate website** against the same API and database. **MyNet gains no
+    admin surface, no privileged view, and no role-dependent rendering**, and that must be testable
+    as an absence rather than asserted in prose. This is what keeps Principle III's
+    attendee-workspace framing true while its actor clause changes, and it is why the amendment is
+    smaller than the prohibition it reverses. A promoted organizer's *attendee* experience must be
+    unchanged in every observable way. **No administrative tier may edit anybody's profile** —
+    conference content is authorable, a person is not.
+34. **The seed remains the dev and test fixture, and there is one class of conference.** A seeded
+    conference is an ordinary editable conference: no privileged content, no immutable content, no
+    control that renders for a conference it cannot act on. A reviewed change to committed seed data
+    stays a valid route and stops being the only one. The seed's fixture properties are load-bearing
+    and must survive: `assertDisjoint`'s two-disjoint-programmes guarantee, and the deliberately
+    empty third conference that exists so the "no programme" state cannot rot.
+35. **A platform operator may read reports; FR-548 survives for MyNet.** The original rule rested on
+    "a report-reading surface needs a moderator, and a moderator is an organizer — the actor
+    Principle III excludes by construction", and that actor now exists. Three conditions bind it:
+    only the platform tier (a conference organizer must not read reports); the reporter is still
+    promised nothing, so a queue must not become a status they can see; and **what the queue may
+    disclose is register entry 24 and is NOT decided** — the operator-mail floor (identifiers and a
+    timestamp, never message text, never the reason) holds until it is. A queue showing reported
+    message text would need a **third** recorded exception under Principle VIII.
+36. **Delivery is three features behind one amendment** — 013 (administrative foundation and the
+    report queue), 014 (conference content authoring), 015 (registration and attendee management).
+    *Numbered 011–013 when the amendment was ratified; the UAT deployment work took 011 from a
+    parallel branch, so the programme shifted rather than renumbering a phase already on `develop`.*
+    **013 reserves migration `0009`.** One amendment rather than three, because the second actor is a
+    single decision and splitting it would let it drift. **Moderation ships first, not authoring**,
+    though authoring is what prompted the work: it is the smallest subsystem, so it proves the new
+    architecture where being wrong costs least, and reports are already arriving from 007 and 009
+    with nowhere to go.
+
+**Five code-level guards enforce the reversed prohibition and must each be amended deliberately**,
+never weakened until they stop checking anything: `apps/api/src/db/seed/catalog.ts` (its header
+asserts no write path and no import path at any privilege), `catalog-read-only.test.ts` (FR-191),
+`join-grants-nothing.test.ts` (FR-132, FR-134, FR-311), `qa-absences.test.ts` (no moderation route),
+and `no-report-read-surface.test.ts` (FR-548, which survives for MyNet).
+
+**2026-08-11** (ratified in constitution **v4.1.0**) — **closes all three entries v4.0.0 opened, in
+the same session. The administrative programme is unblocked:**
+
+37. **The administrative site is a subdomain, and its operator holds a separate session.**
+    `admin.<host>`, with `/api/*` reverse-proxied under it so its calls stay same-origin, and a
+    **host-only** session cookie — so one person signed into both products holds **two independent
+    sessions**, and signing out of one does not sign out of the other. *Closes register entry 26.*
+    **The reasoning turns on a distinction that must not be re-derived carelessly**: `SameSite` is
+    evaluated against the **registrable domain, not the origin**, so a subdomain is *same-site*
+    (decision 19's CSRF defence survives untouched, no synchroniser token needed) **and**
+    *different-origin* (its own service-worker scope, storage and CSP). No other topology gives
+    both. A path shares the origin and the attendee service worker is registered at **root scope**,
+    so it would intercept admin navigations. A separate registrable domain stops `SameSite=Lax`
+    being sent — the exact v3.0.0 failure where the cookie was never sent and nobody could sign in.
+38. **The report queue discloses the reported content and the reporter's stated reason**, to
+    platform operators only. *Closes register entry 24.* **This is the THIRD recorded Principle VIII
+    exception** — v4.0.0 predicted it would be one and refused to grant it by inference, which is
+    the point. Four conditions bind: platform tier only (a conference organizer may not read reports
+    at all); only what was reported, never the surrounding thread; only in the queue; and the
+    reporter is still told nothing. The **operator mail is unchanged** — identifiers and a timestamp
+    only — because it was written that way to stop the text living in an inbox outside every
+    retention rule this project controls, and a queue reading the row is not that.
+    **`content unavailable` is a first-class state, not an error**: reported message ids are stored
+    as a plain array rather than a foreign key precisely because the messages are usually gone
+    before anyone looks.
+39. **An organizer's assignments end with their access.** Deleting an account revokes that person's
+    organizer assignments **in the same transaction**, and withdrawing from a conference revokes the
+    assignment for it — 008's precedent, because **authority must not outlive the access it depends
+    on**. *Closes register entry 25.* **Deletion is never conditional**: decision 12 holds
+    absolutely and no administrative role may make an attendee's erasure right depend on another
+    person existing. A conference left with no organizer enters an explicit **`unassigned`** state
+    that platform operators can see; the conference and its content survive untouched, because
+    conference content is not attendee data. Reverting ownership silently to the platform tier was
+    rejected — it is a tidier invariant that hides the event nobody is prompted to act on.
 
 ## How work is done here
 
@@ -829,8 +1056,16 @@ open questions.
 - **Every feature declares its own completeness** (Principle IX): offline behaviour, all three
   layouts, empty/loading/failure states, accessibility, checklist items discharged, identity
   scoping, event scoping, register position, reserved migration number — declared in the spec, or
-  presumed unmet. **None may be deferred to a later polish pass.**
-- **Out of product scope**: organizer administration, payment processing. **Calendar integration**
+  presumed unmet. **None may be deferred to a later polish pass.** The section is called *Feature
+  Declarations*, and as of 2026-08-11 it is **finally in `.specify/templates/spec-template.md`** —
+  it had been mandatory since v2.1.0 and hand-copied into every spec from 002 to 010, because the
+  template never carried it despite the roadmap saying it did. Draft v4.0.0 adds a first row,
+  **Actor and tier**: every feature through 010 had one actor and never had to say so.
+- **Out of product scope**: payment processing. **Organizer administration came IN at v4.0.0**
+  (standing decisions 31–36), under four binding conditions — a separate product, a second actor in
+  two tiers, no self sign-up into either, and no admin surface in MyNet. An administrative
+  capability failing any one of those is outside the reversal and needs its own amendment.
+  **Calendar integration**
   stays out until a recorded decision brings it in — its interface exists but must not be wired.
   **Engagement notification delivery came IN at v3.1.0** (standing decision 21), bounded to a
   received message and nothing else; **the notification bell and an in-app notification centre
@@ -911,19 +1146,54 @@ is a working summary. Each names what it blocks, because *when* to ask matters a
 
 ### Require a client decision
 
-**No open question blocks any remaining feature, and there are no remaining features.** v3.2.0
-closed the connection model, card-exchange semantics and Q&A attribution; **v3.3.0** closed public
-Q&A visibility and withdrew FR-756a; **v3.4.0** closed the oldest entry of all, the brand mark; and
-**v3.5.0** closed four more — the UAT address, the mail provider, VAPID custody and the operator
-address. **009, 010 and 011 are all shipped, and the delivery roadmap is complete.** Everything
-below blocks **release**, not code.
+**No open question blocks any feature.** v3.2.0 closed the connection model, card-exchange semantics
+and Q&A attribution; **v3.3.0** closed public Q&A visibility and withdrew FR-756a; **v3.4.0** closed
+the oldest entry of all, the brand mark; **v3.5.0** closed four more — the UAT address, the mail
+provider, VAPID custody and the operator address; and **v4.0.0/v4.1.0** opened entries 24, 25 and 26
+and closed all three in the same session. **009, 010, 011 and 013 are shipped, and the attendee
+delivery roadmap is complete.** Everything below blocks **release**, not code.
+
+**Two programmes are now in flight and their numbering interleaves, which is worth stating once
+rather than re-deriving.** The attendee roadmap ends at **012 — Launch Readiness & Production**,
+still queued. The administrative programme runs **013, 014, 015** and began while 011 was in a
+parallel branch; 013 took the next free number rather than the next number in its own sequence,
+because parallel branches cannot see each other's reservations. The constitution records the same
+lesson about version numbers three times over.
+
+The closing sequence for 24, 25 and 26 is worth keeping, because it is the argument for opening
+entries you cannot yet answer: those three produced a **third privacy exception**, a
+**CSRF-adjacent topology decision**, and a **deletion rule touching decision 12**. None is a spec
+detail, and all three would have been settled by inference inside a feature specification had they
+not been opened deliberately.
+
+- ~~**Register entries 24, 25 and 26**~~ — **RESOLVED 2026-08-11 in v4.1.0** as standing decisions
+  38, 39 and 37 respectively. They are now binding text rather than questions.
+
+- **Register entries 19 and 21 are ADDRESSED but NOT closed — by v4.0.0, v4.1.0, or 013 shipping.**
+  013 built the first actor capable of moderating an avatar and of reading a report queue, and
+  v4.1.0 decided what that operator may *see* — but **a capability is not a policy**. Who moderates,
+  against what standard, on whose complaint, with what appeal, and whether a removed avatar is
+  replaced or blanked are all undecided (19); and somebody still has to *be* that operator, which
+  v3.5.0's address does not appoint (21). **These two are the oldest live entries in the register**,
+  and they are the reason the administration exclusion was reversed at all.
+
+- **Whether the audit trail's retention clock should start at pseudonymisation, as two comments
+  already claim it does.** Opened by 013 (`deviations.md` D11) and found only by writing the sweep's
+  first behavioural test. `maintenance.ts` declares *"365 days after pseudonymisation"* and
+  `admin-audit.ts` says the clock "starts then"; the predicate measures `occurred_at`, so an entry
+  written 400 days ago and pseudonymised *yesterday* — because that is when somebody exercised
+  erasure — is swept on the next hourly pass rather than a year later. **The accountability record
+  for a recent erasure disappears immediately.** Fixing it needs a `pseudonymised_at` column and
+  therefore a migration, which makes it a decision about the retention rule rather than a repair.
+  `retention-sweep.test.ts` pins the shipped behaviour and says in its own message that it encodes
+  current rather than desired behaviour. **Blocks nothing.**
 
 - **Register entry 22 — a cached conference can outlive a withdrawn registration by up to 24
   hours.** Conceded by 009 when FR-756a was withdrawn, and **product-wide rather than 009's**: no
   undecorated repository — Messages, Discover, cards, profile or Q&A — purges on refusal. Filed
   against the phase that became 011, which did not answer it: 011 adds no repository and no cached
-  read, so the single answer that covers all of them is still owed. **Blocks 012.**
-
+  read, so the single answer that covers all of them is still owed. **013 did not answer it
+  either** — the administrative client caches nothing at all. **Blocks 012.**
 - **Desktop and tablet layouts are unvalidated.** The approved prototype is mobile-only — a fixed
   390×844 frame. Every desktop layout built before this is answered is unreviewed design, so the
   cost compounds with each feature. **008 turned this from a risk into an observed defect**: the

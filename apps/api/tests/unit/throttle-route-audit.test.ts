@@ -93,6 +93,33 @@ const UNTHROTTLED_READS: Record<string, string> = {
   'GET /profile/export':
     'charged to the `export` action, which MAY deny — the most expensive request the product ' +
     'serves. A second read bound on top would be two throttles on one route.',
+
+  // ─────────────────────────────────────────────────────────────────────────────────────────
+  // **013 — the administrative reads, and the population is the whole argument.**
+  //
+  // FR-803a bounds reads a *client* issues repeatedly without a person acting, and the harm it
+  // names is bulk collection. Neither applies here, for a reason that is structural rather than
+  // circumstantial: **neither administrative tier is reachable by self sign-up** (decision 32).
+  // The population is a handful of operators seeded as reviewed data, so there is no way to
+  // acquire an administrative session at scale — and the one door that *is* unauthenticated,
+  // `POST /admin/session`, is bounded on its own `admin_sign_in` action.
+  //
+  // **Nothing in `apps/admin/src` polls**, verified against the source: there is no interval, no
+  // refetch timer, and `ReportDetail.tsx` records why the reporter is given nothing to poll.
+  // If a live queue is ever added, these belong in `THROTTLED_READ_ROUTES` instead.
+  //
+  // **The report reads are additionally covered by something a throttle is not**: reading one
+  // report writes an audit entry (FR-995), so bulk reading is *attributable* rather than merely
+  // slowed — which is the control decision 38 actually asked for.
+  // ─────────────────────────────────────────────────────────────────────────────────────────
+  'GET /admin/me': 'the operator’s own identity and tier, resolved once when the shell mounts',
+  'GET /admin/conferences': 'the conference list, read when that destination is opened',
+  'GET /admin/reports':
+    'the report queue, read when the destination is opened. Carries **no content** — that is why ' +
+    'reading the list writes no audit entry — so there is no bulk collection to bound.',
+  'GET /admin/reports/:reportId':
+    'one report, opened from the queue by a person. **Writes an audit entry** (FR-995), which ' +
+    'makes repeated reading accountable rather than rate-limited.',
 }
 
 const methodsOf = (route: RouteOptions): string[] =>

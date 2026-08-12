@@ -534,6 +534,20 @@ describe('attendee data isolation', () => {
       const declared: string[] = []
       const probe = await buildApp({
         onRoute: (route) => {
+          // ───────────────────────────────────────────────────────────────────────────────────
+          // T028 (013) — administrative routes are excluded from this inventory.
+          //
+          // `EVENT_ROUTES` below drives each declared route with an **attendee's** cookie and
+          // requires the same 404 for "another attendee's conference" as for one that does not
+          // exist. An administrative route reads a different cookie from a different store, so
+          // an attendee is refused as **401 — nobody** rather than as 404 — not a weaker
+          // refusal, a different question.
+          //
+          // The equivalent guarantee for the principal it applies to is
+          // `admin-tier-boundary.test.ts`: an organizer at a conference they are not assigned
+          // gets 404, indistinguishable from one that does not exist (FR-906).
+          // ───────────────────────────────────────────────────────────────────────────────────
+          if (/^\/admin(\/|$)/.test(route.url)) return
           if (/:eventId/.test(route.url)) declared.push(route.url)
         },
       })

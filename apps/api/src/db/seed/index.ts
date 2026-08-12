@@ -6,6 +6,7 @@ import { catalogSeed } from './catalog.js'
 import { conversationSeed } from './conversations.js'
 import { eventSeed } from './events.js'
 import { networkSeed } from './network.js'
+import { operatorSeed } from './operators.js'
 
 /**
  * T003 (002) — the seed registry, replacing the single `db/seed.ts` (FR-182).
@@ -74,6 +75,25 @@ export const SEED_MODULES: readonly SeedModule[] = [
   // identity — so both seeded accounts begin with an empty Network, which is what puts the
   // empty states on screen at first run. See `network.ts`.
   networkSeed,
+  // ─────────────────────────────────────────────────────────────────────────────────────────
+  // 011 — platform-operator identities, appended **last**.
+  //
+  // Position matters twice here, and both are the registry's own rule rather than a special
+  // case. The list is walked **forwards to insert and backwards to delete**, so last means:
+  //
+  //   - inserted after `attendees` and `events` exist — which this module does not need, since
+  //     it references neither; and
+  //   - **cleared first**, which it absolutely does need. `organizer_assignments.event_id` is
+  //     `ON DELETE NO ACTION` (FR-937), so a surviving assignment refuses `DELETE FROM events`
+  //     and `eventSeed.clear` fails with a constraint error naming neither table. Clearing that
+  //     domain before anything else is what keeps the re-seed working (FR-938).
+  //
+  // It seeds identities with **no credential** (FR-990). This repository is public, so a
+  // committed administrative password would be a published credential for the tier that reads
+  // the abuse-report queue. `pnpm admin:bootstrap` is how one gets a usable credential, and it
+  // is deliberately not this.
+  // ─────────────────────────────────────────────────────────────────────────────────────────
+  operatorSeed,
 ]
 
 /**

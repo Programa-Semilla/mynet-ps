@@ -7,18 +7,47 @@ import { attendees } from './attendees.js'
  * T008 (007) — an attendee's report of another attendee's conduct (FR-542–FR-549).
  *
  * ═════════════════════════════════════════════════════════════════════════════════════════
- * **NOTHING IN THIS PRODUCT MAY READ THIS TABLE** (FR-548).
+ * **NOTHING IN MYNET MAY READ THIS TABLE** (FR-548, and now FR-972).
  *
- * No route, no repository method, no screen, no role. It is written and then left alone. The
- * operator reaches it out-of-band, and the durable record they actually act on is the **mail**
- * that FR-547 dispatches — not this row.
+ * No route, no repository method, no screen, no role, on the attendee product's whole surface.
+ * `tests/unit/no-report-read-surface.test.ts` fails the build if one appears there, because the
+ * requirement is an absence and an absence erodes without a test.
  *
- * This is the tightest constraint in the feature and it follows directly from Principle III.
- * A report is the classic reason to introduce a moderator, and a moderator is an organizer:
- * the actor this product excludes by construction. Rather than smuggle one in as "just an
- * admin screen", the report leaves the product entirely. `tests/unit/no-report-read-surface.
- * test.ts` (T073) fails the build if a read surface ever appears, because the requirement is
- * an absence and an absence erodes without a test.
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ * **T022 (013) — THIS HEADER IS AMENDED, NOT DELETED, AND BOTH HALVES OF THAT MATTER.**
+ *
+ * It used to say *"nothing in this product may read this table"* and explain at length that a
+ * report-reading surface needs a moderator, and a moderator is an organizer — the actor
+ * Principle III excludes by construction.
+ *
+ * **That reasoning was correct and its premise is gone.** Constitution v4.0.0 reversed the
+ * administration exclusion, and this table is one of the two obligations that *forced* the
+ * reversal: register entry 21 records that the reporting dialog promises a human reader, and
+ * for the whole life of this project no such human existed. An exclusion whose cost is an
+ * unkeepable safety promise must be paid for or reversed.
+ *
+ * So there is now exactly one read surface, and it is bounded on four sides (v4.1.0, decision
+ * 38 — **the third recorded Principle VIII exception**):
+ *
+ *   1. It exists **only in the administrative product**, never in MyNet (FR-972).
+ *   2. It is reachable **only by the platform tier**. A conference organizer may not read
+ *      reports at all — the queue is `requirePlatformOperator`, and the route audit asserts it.
+ *   3. It discloses **only what was reported** — the specific messages or question the reporter
+ *      identified, and their stated reason. Never the surrounding thread, never the pair's other
+ *      conversations, never a third party (FR-942).
+ *   4. **The reporter is still told nothing.** No status, no case identifier, nothing to poll
+ *      (FR-946). What FR-548 protected on their side is unchanged.
+ *
+ * **Deleting this comment would have lost the reasoning that still governs MyNet**; leaving it
+ * unamended would make the next reader believe the guard is stronger than it is. Both failures
+ * were available and neither is acceptable, which is why the instruction in tasks.md is
+ * "amend, do not delete".
+ *
+ * **The dispatched mail is unchanged** (FR-947). It still carries identifiers and a timestamp
+ * only — never message text and never the reason — because it was written that way to stop that
+ * text living in an inbox outside every retention rule this project controls. A queue reading
+ * this row is not that, and the two must not be conflated.
+ * ─────────────────────────────────────────────────────────────────────────────────────────
  * ═════════════════════════════════════════════════════════════════════════════════════════
  *
  * **SCOPING: CROSS-EVENT.** A report concerns conduct, not a conference. Someone's behaviour
