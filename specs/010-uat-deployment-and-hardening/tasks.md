@@ -265,10 +265,10 @@ record.
 exposure that nothing else reports.
 
 - [ ] T068 [US2] Create the `uat` environment secrets: `AZURE_CREDENTIALS` (scoped to the resource group plus network-write on the one NSG), `DEPLOY_SSH_KEY`, `MAIL_SMTP_URL` and `PUSH_VAPID_PRIVATE_KEY` (FR-832)
-- [ ] T069 [US2] Verify the host fingerprint out-of-band and store it as `SSH_KNOWN_HOSTS`, rather than accepting it on first connection (FR-834) — `deploy/vm/deploy.sh` prints the commands
-- [ ] T070 [US2] Add just-in-time NSG admission to the `deploy-uat` job in `.github/workflows/verify.yml`: discover the runner's egress address and add a port-22 rule scoped to that **single** address (FR-833, research R1)
-- [ ] T071 [US2] Add teardown that runs on **every** exit path including cancellation, and a start-of-run assertion that no rule from a previous run survives — **teardown that runs is not teardown that worked**, and the assertion is the part that matters
-- [ ] T072 [P] [US2] Ensure no secret value reaches deployment output or logs (FR-835)
+- [X] T069 [US2] Verify the host fingerprint out-of-band and store it as `SSH_KNOWN_HOSTS`, rather than accepting it on first connection (FR-834) — `deploy/vm/deploy.sh` prints the commands
+- [X] T070 [US2] Add just-in-time NSG admission to the `deploy-uat` job in `.github/workflows/verify.yml`: discover the runner's egress address and add a port-22 rule scoped to that **single** address (FR-833, research R1)
+- [X] T071 [US2] Add teardown that runs on **every** exit path including cancellation, and a start-of-run assertion that no rule from a previous run survives — **teardown that runs is not teardown that worked**, and the assertion is the part that matters
+- [X] T072 [P] [US2] Ensure no secret value reaches deployment output or logs (FR-835)
 - [ ] T073 [US2] Merge a trivial change to `develop` and confirm it reaches the address with nobody running a script; inspect the NSG during and after (FR-831, SC-816)
 - [ ] T074 [US2] Cancel a deploy mid-run, start another, and confirm the second **fails loudly** on the stale rule rather than proceeding
 
