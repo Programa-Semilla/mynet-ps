@@ -142,7 +142,11 @@ if [[ "$DO_BUILD" == "true" ]]; then
 
   # `VITE_API_BASE_URL=/api` (T066) — the only client-side configuration one origin needs. The
   # HTTP layer already defaults to a relative base, so this is configuration rather than code.
-  VITE_API_BASE_URL=/api VITE_PUSH_VAPID_PUBLIC_KEY="$VAPID_PUBLIC" \
+  # 010 T075 — FR-828. Set for UAT and unset for production, which is what keeps the marker out
+  # of a production bundle entirely rather than hidden inside one. `vite.config.ts` turns this
+  # into a build-time literal, so the element is dead code the bundler removes.
+  VITE_UAT_MARKER="$([[ "$MYNET_ENV" == "uat" ]] && echo true || echo false)" \
+  VITE_API_BASE_URL=/api PUSH_VAPID_PUBLIC_KEY="$VAPID_PUBLIC" \
     pnpm --filter @mynet/web build
 fi
 [[ -d apps/web/dist ]] || { echo "ERROR: apps/web/dist is missing. Run without --no-build." >&2; exit 1; }

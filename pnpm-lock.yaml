@@ -71,6 +71,9 @@ importers:
       fastify-plugin:
         specifier: ^6.0.0
         version: 6.0.0
+      nodemailer:
+        specifier: ^9.0.5
+        version: 9.0.5
       postgres:
         specifier: ^3.4.9
         version: 3.4.9
@@ -87,6 +90,9 @@ importers:
       '@types/node':
         specifier: ^26.1.2
         version: 26.1.2
+      '@types/nodemailer':
+        specifier: ^8.0.1
+        version: 8.0.1
       '@types/web-push':
         specifier: ^3.6.4
         version: 3.6.4
@@ -1949,6 +1955,9 @@ packages:
   '@types/node@26.1.2':
     resolution: {integrity: sha512-Vu4a5UFA9rIIFJ7rB/Vaafh9lrCQszopTCx6KjFboXTGQbPNasehVR5TEiithSDGyd1DEiUByggTZsg8jukeIg==}
 
+  '@types/nodemailer@8.0.1':
+    resolution: {integrity: sha512-PxpaInm8V1JQDd4j0ds5HfvWQk8JupS1C0Picb96QJsrrRDjBH+DlK7L4ZdNSqNULhiZRQHc40nLVShaGxXAMw==}
+
   '@types/react-dom@19.2.4':
     resolution: {integrity: sha512-Bsc+QHgp+P/F02XDzNCY9jnZNCUuLki36KT7VKrTXXLdHf+vHMNZnW1rVu5DNW/rCK+fya3DATySbLM4yhtKUw==}
     peerDependencies:
@@ -3290,6 +3299,10 @@ packages:
   node-releases@2.0.52:
     resolution: {integrity: sha512-MRlTqhAfoMx/4mhEbPo3Hi02g9LJZaJkka69V6h67Cb1gjrAG0jsTE4CZX1eptNx+VCAwJmfpnDIF4P0Nh1A7A==}
     engines: {node: '>=18'}
+
+  nodemailer@9.0.5:
+    resolution: {integrity: sha512-wvjiKvjczmsN7U/8006JOdXubgBk2XFAbioDMbT+sM7cPs0QrhJTa6KBRX7P5REGGkDcLUz/EarWidb8G8C1jQ==}
+    engines: {node: '>=6.0.0'}
 
   object-inspect@1.13.4:
     resolution: {integrity: sha512-W67iLl4J2EXEGTbfeHCffrjDfitvLANg0UlX3wFUUSTx92KXRFegMHUVgSqE+wvhAbi4WqjGg9czysTV2Epbew==}
@@ -5651,6 +5664,10 @@ snapshots:
     dependencies:
       undici-types: 8.3.0
 
+  '@types/nodemailer@8.0.1':
+    dependencies:
+      '@types/node': 26.1.2
+
   '@types/react-dom@19.2.4(@types/react@19.2.18)':
     dependencies:
       '@types/react': 19.2.18
@@ -7071,6 +7088,8 @@ snapshots:
   node-gyp-build@4.8.4: {}
 
   node-releases@2.0.52: {}
+
+  nodemailer@9.0.5: {}
 
   object-inspect@1.13.4: {}
 

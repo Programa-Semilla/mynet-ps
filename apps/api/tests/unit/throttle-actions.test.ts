@@ -152,7 +152,28 @@ describe('throttle actions', () => {
     ).toBe(true)
   })
 
-  it('keeps the delay-only set to exactly the two actions that earned it', () => {
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════════════════
+   * **010 EXTENDED THIS LIST, WHICH IS THE MAINTENANCE PATH THE CASE ITSELF PRESCRIBES.**
+   *
+   * The comment below says: do not add your action to make this pass — say which argument
+   * applies to it, in its own `THRESHOLDS` entry, and then add it here. That is what happened.
+   * `directory_read` and `thread_read` are delay-only under a **third** argument, distinct from
+   * both of the originals:
+   *
+   *   * `reset_request` — keyed on a *victim's* address, so the denial IS the attack (FR-331).
+   *   * `message_send` — a refused message at the moment a conference contact mattered is a
+   *     failure the attendee cannot act on (FR-511a).
+   *   * **The two reads** — they are the product's central journeys, and a refusal is
+   *     indistinguishable from the product being broken: Discover never arrives, or a
+   *     conversation appears to stop updating. What they bound is bulk collection, which is
+   *     bounded perfectly well by cost (FR-802, FR-803).
+   *
+   * The assertion still pins an exact set, so it is extended rather than weakened: a ninth
+   * delay-only entry fails exactly as the seventh did.
+   * ═══════════════════════════════════════════════════════════════════════════════════════
+   */
+  it('keeps the delay-only set to exactly the four actions that earned it', () => {
     // ─────────────────────────────────────────────────────────────────────────────────────
     // The inverse of the assertions above, and the one that fails when a **future** feature
     // adds an action and copies the wrong neighbour's flag. Delay-only is the exceptional
@@ -167,11 +188,12 @@ describe('throttle actions', () => {
 
     expect(
       delayOnly,
-      'The set of delay-only throttle actions has changed. `reset_request` (FR-331, keyed on a ' +
-        "victim's address) and `message_send` (FR-511a, a refused message at a conference is a " +
-        'failure nobody can act on) are the two that have earned it. Anything else here is ' +
-        'either a new requirement that needs recording, or a flag copied from the wrong ' +
-        'neighbour.',
-    ).toEqual(['message_send', 'reset_request'])
+      'The set of delay-only throttle actions has changed. Four have earned it: `reset_request` ' +
+        "(FR-331, keyed on a victim's address, so the denial is the attack), `message_send` " +
+        '(FR-511a, a refused message at a conference is a failure nobody can act on), and ' +
+        '`directory_read` / `thread_read` (FR-802, FR-803 — a refusal on either is ' +
+        'indistinguishable from the product being broken). Anything else here is either a new ' +
+        'requirement that needs recording, or a flag copied from the wrong neighbour.',
+    ).toEqual(['directory_read', 'message_send', 'reset_request', 'thread_read'])
   })
 })

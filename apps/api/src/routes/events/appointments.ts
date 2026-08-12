@@ -1,9 +1,9 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify'
 
 import {
+  beginAttempt,
   failureDelayMs,
   hashAttemptValue,
-  recordRequest,
   serveDelay,
   type ThrottleAction,
 } from '../../auth/throttle.js'
@@ -136,8 +136,9 @@ const throttle = async (
     action,
   }
 
-  const outstanding = await serveDelay(await failureDelayMs(key))
-  await recordRequest(key)
+  // 010 T017 — recorded before it is judged (FR-804); excluded from its own count (FR-805).
+  const attemptId = await beginAttempt(key)
+  const outstanding = await serveDelay(await failureDelayMs(key, attemptId))
 
   if (outstanding > 0) throw tooManyAttempts(outstanding, what)
 }

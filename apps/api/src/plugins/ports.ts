@@ -4,6 +4,7 @@ import fp from 'fastify-plugin'
 import { loadConfig } from '../config.js'
 import type { MailService } from '../mail/service.js'
 import { SinkMailService } from '../mail/sink-adapter.js'
+import { SmtpMailService } from '../mail/smtp-adapter.js'
 import type { PushService } from '../notifications/service.js'
 import { SinkPushService } from '../notifications/sink-adapter.js'
 import { WebPushService } from '../notifications/web-push-adapter.js'
@@ -56,9 +57,32 @@ const portsPlugin = async (app: FastifyInstance, options: PortOverrides): Promis
 
   app.decorate('storage', options.storage ?? new DbStorageService())
 
-  // The sink throws under production rather than being silently swapped for a no-op, so the
-  // absence of a provider is a startup failure with a message naming the register entry.
-  app.decorate('mail', options.mail ?? new SinkMailService())
+  // ───────────────────────────────────────────────────────────────────────────────────────
+  // T029 (010) — **the real mail adapter, selected by configuration alone** (FR-841).
+  //
+  // Deliberately identical in shape to the push selection below, because it is the same rule:
+  // **credentials present selects real delivery, credentials absent selects the sink, in every
+  // environment identically.** There is no `isProduction` branch here and there must never be
+  // one — an environment branch would make a local end-to-end walk of the sign-up journey
+  // exercise a path production never runs, so the first execution of the real path would be
+  // against real people. `tests/unit/mail-selection.test.ts` asserts the absence.
+  //
+  // The sink still throws under production rather than being silently swapped for a no-op, so a
+  // deployment with no `MAIL_SMTP_URL` fails at boot instead of writing verification and reset
+  // links into its log. That refusal is what sequenced feature 010 (research R2): the adapter had
+  // to exist before the first deploy, not as an improvement to a running environment.
+  // ───────────────────────────────────────────────────────────────────────────────────────
+  app.decorate(
+    'mail',
+    options.mail ??
+      (config.mail.smtpUrl
+        ? new SmtpMailService({
+            smtpUrl: config.mail.smtpUrl,
+            from: config.mail.from,
+            log: app.log,
+          })
+        : new SinkMailService()),
+  )
 
   // ───────────────────────────────────────────────────────────────────────────────────────
   // 007 — the third port, and **its unconfigured state is deliberately less severe than mail's**.
@@ -106,9 +130,12 @@ const portsPlugin = async (app: FastifyInstance, options: PortOverrides): Promis
   // Not under test, where the harness builds an application per file and the warning would be
   // sixteen identical lines of noise around the assertions somebody is trying to read. The
   // integration suite asserts the sink's *behaviour* instead, which is the stronger signal.
-  if (config.nodeEnv === 'development' && !options.mail) {
+  // 010 — the warning now fires on the *unconfigured* case rather than on "no provider chosen",
+  // because a provider has been chosen (constitution v3.4.0, decision 33) and what is left is
+  // whether this deployment was given its URL.
+  if (config.nodeEnv === 'development' && !options.mail && !config.mail.smtpUrl) {
     app.log.warn(
-      'Transactional mail is not provisioned (register entry 18). Verification and reset links ' +
+      'Transactional mail is not configured (no MAIL_SMTP_URL). Verification and reset links ' +
         'are written to the development sink, not sent.',
     )
   }

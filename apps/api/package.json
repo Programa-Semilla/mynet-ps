@@ -23,6 +23,7 @@
     "drizzle-orm": "^0.45.2",
     "fastify": "^5.11.2",
     "fastify-plugin": "^6.0.0",
+    "nodemailer": "^9.0.5",
     "postgres": "^3.4.9",
     "sharp": "^0.35.3",
     "web-push": "^3.6.7"
@@ -30,6 +31,7 @@
   "devDependencies": {
     "@mynet/config": "workspace:*",
     "@types/node": "^26.1.2",
+    "@types/nodemailer": "^8.0.1",
     "@types/web-push": "^3.6.4",
     "drizzle-kit": "^0.31.10",
     "tsx": "^4.23.6",

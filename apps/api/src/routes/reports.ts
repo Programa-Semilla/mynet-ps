@@ -1,6 +1,6 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify'
 
-import { failureDelayMs, hashAttemptValue, recordRequest, serveDelay } from '../auth/throttle.js'
+import { beginAttempt, failureDelayMs, hashAttemptValue, serveDelay } from '../auth/throttle.js'
 import { loadConfig } from '../config.js'
 import { blockAttendee } from '../db/queries/blocks.js'
 import { writeReport } from '../db/queries/reports.js'
@@ -58,8 +58,10 @@ const throttleReport = async (request: FastifyRequest): Promise<void> => {
     action: 'report_submit' as const,
   }
 
-  const outstanding = await serveDelay(await failureDelayMs(key))
-  await recordRequest(key)
+  // 010 T017 — recorded before it is judged (FR-804); excluded from its own count (FR-805).
+  // FR-863: this action still MAY deny, and `throttle-thresholds.test.ts` asserts it.
+  const attemptId = await beginAttempt(key)
+  const outstanding = await serveDelay(await failureDelayMs(key, attemptId))
 
   if (outstanding > 0) throw tooManyAttempts(outstanding, 'reports')
 }

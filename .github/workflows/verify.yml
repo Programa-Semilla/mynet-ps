@@ -753,33 +753,174 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: deploy to UAT
+      # ═══════════════════════════════════════════════════════════════════════════════════════
+      # T070, T071 (010) — **JUST-IN-TIME SSH ADMISSION** (FR-833, research R1).
+      #
+      # `provision-vm.sh` locks port 22 to the provisioning operator's own address, and a hosted
+      # runner has no stable one. Three ways out were considered and two rejected:
+      #
+      #   * **Widen the rule to GitHub's published Actions ranges** — thousands of addresses
+      #     belonging to anybody who can run a workflow. This is what FR-833 exists to forbid.
+      #   * **A self-hosted runner on a known address** — removes the problem and adds a machine
+      #     to patch. Putting it *on the UAT VM* was rejected outright: two vCPUs already shared
+      #     between an API, a database and a client build is the wrong place for a build agent.
+      #   * **This**: one address, for the length of one deploy.
+      #
+      # R1 records a fourth as the intended successor — deploying through the Azure agent with no
+      # SSH at all — and declines it here, because rewriting the transport in the same change that
+      # first proves the deploy works leaves you unable to tell which half is broken.
+      # ═══════════════════════════════════════════════════════════════════════════════════════
+      - name: assert no firewall rule survived a previous run
         env:
           AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
         run: |
           set -euo pipefail
-          if [ -z "${AZURE_CREDENTIALS:-}" ]; then
-            echo "::notice::UAT is not provisioned yet, so there is nothing to deploy to."
-            echo "Blocked on two owner decisions the specification records as open:"
-            echo "  * no domain is registered   -> Caddy cannot obtain a certificate (FR-479)"
-            echo "  * no subscription is named  -> deploy/vm/envs/uat.env leaves SUBSCRIPTION blank"
-            echo ""
-            echo "AZURE_CREDENTIALS ALONE IS NOT ENOUGH to make this job work. deploy.sh reaches"
-            echo "the VM over SSH, and az login grants control-plane access, not SSH. Before"
-            echo "enabling this job you must ALSO:"
-            echo "  * add a DEPLOY_SSH_KEY secret and load it into an agent in this job;"
-            echo "  * add a SSH_KNOWN_HOSTS secret (verify the fingerprint through"
-            echo "    'az vm run-command invoke' first -- deploy.sh prints the exact commands);"
-            echo "  * admit the runner to port 22, since provision-vm.sh locks the NSG rule to the"
-            echo "    provisioning operator's address and hosted runners have dynamic egress."
-            echo "Recorded here rather than discovered at cutover."
-            exit 0
-          fi
+          [ -n "${AZURE_CREDENTIALS:-}" ] || exit 0
+
+          # ─────────────────────────────────────────────────────────────────────────────────
+          # **THIS IS THE STEP THAT MATTERS, AND IT RUNS BEFORE ANYTHING ELSE.**
+          #
+          # Teardown that runs is not teardown that worked. `if: always()` covers failure and
+          # cancellation; it does not cover a runner that is killed, an API call that times out,
+          # or a token that expires between admission and cleanup. In every one of those cases
+          # port 22 stays open to one address **indefinitely**, and nothing anywhere reports it.
+          #
+          # So the next run looks. It **fails** rather than tidying up, because silently deleting
+          # a leaked rule would erase the only evidence that the environment was exposed, and for
+          # how long. A red build is how a person finds out.
+          # ─────────────────────────────────────────────────────────────────────────────────
+          source deploy/vm/_common.sh
+          mynet::load_env uat
+          CLIENT_SECRET="$(echo "$AZURE_CREDENTIALS" | jq -r .clientSecret)"
+          echo "::add-mask::$CLIENT_SECRET"
           az login --service-principal \
             -u "$(echo "$AZURE_CREDENTIALS" | jq -r .clientId)" \
-            -p "$(echo "$AZURE_CREDENTIALS" | jq -r .clientSecret)" \
+            -p "$CLIENT_SECRET" \
             --tenant "$(echo "$AZURE_CREDENTIALS" | jq -r .tenantId)" >/dev/null
+
+          STALE="$(mynet::az network nsg rule list -g "$RESOURCE_GROUP" \
+            --nsg-name "${VM_NAME}NSG" --query "[?starts_with(name,'allow-ssh-ci-')].name" -o tsv)"
+
+          if [ -n "$STALE" ]; then
+            echo "::error::A just-in-time SSH rule from a previous run is still in place:"
+            printf '  %s\n' $STALE
+            echo ""
+            echo "Port 22 on ${VM_NAME} has been open to that run's runner address since it ended."
+            echo "This run is REFUSING rather than cleaning up, because deleting it quietly would"
+            echo "erase the only evidence of how long the environment was exposed."
+            echo ""
+            echo "Investigate, then remove it by hand:"
+            for rule in $STALE; do
+              echo "  az network nsg rule delete -g $RESOURCE_GROUP --nsg-name ${VM_NAME}NSG -n $rule"
+            done
+            exit 1
+          fi
+          echo "No stale admission rule. Proceeding."
+
+      - name: admit this runner to port 22
+        id: admit
+        env:
+          AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
+        run: |
+          set -euo pipefail
+          [ -n "${AZURE_CREDENTIALS:-}" ] || exit 0
+          source deploy/vm/_common.sh
+          mynet::load_env uat
+
+          # Several services, because any one of them can be down and a deploy that fails on
+          # somebody else's outage is a bad deploy. Same reasoning as provision-vm.sh.
+          RUNNER_IP=""
+          for svc in https://api.ipify.org https://checkip.amazonaws.com https://ifconfig.me; do
+            [ -n "$RUNNER_IP" ] && break
+            RUNNER_IP="$(curl -fsS --max-time 8 "$svc" 2>/dev/null | tr -d '[:space:]' || true)"
+          done
+          [ -n "$RUNNER_IP" ] || { echo "::error::Could not determine this runner's address."; exit 1; }
+
+          # Named for the run, so a leak names the run that leaked it.
+          RULE="allow-ssh-ci-${GITHUB_RUN_ID}"
+          echo "rule=$RULE" >> "$GITHUB_OUTPUT"
+
+          # Priority 1150: below the operator's 1100 rule, so this ADDS an address rather than
+          # replacing one. A single /32 — FR-833's whole point.
+          mynet::az network nsg rule create -g "$RESOURCE_GROUP" --nsg-name "${VM_NAME}NSG" \
+            -n "$RULE" --priority 1150 --direction Inbound --access Allow --protocol Tcp \
+            --source-address-prefixes "${RUNNER_IP}/32" --destination-port-ranges 22 -o none
+          echo "Admitted ${RUNNER_IP}/32 to port 22 as $RULE."
+
+      - name: trust the host key, verified out-of-band (FR-834)
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          [ -n "${DEPLOY_SSH_KEY:-}" ] || exit 0
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          # From a secret, never from ssh-keyscan at deploy time: accepting a key on first
+          # connection is trust-on-first-use against a host whose address is public. The stored
+          # value was compared against the fingerprints the VM reported through the Azure guest
+          # agent — a channel independent of SSH. See OPERATIONS-LOG.md.
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          cat >> ~/.ssh/config <<'CONF'
+          Host *
+            IdentityFile ~/.ssh/id_deploy
+            StrictHostKeyChecking yes
+          CONF
+
+      - name: deploy to UAT
+        env:
+          AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
+          MAIL_SMTP_URL: ${{ secrets.MAIL_SMTP_URL }}
+          PUSH_VAPID_PRIVATE_KEY: ${{ secrets.PUSH_VAPID_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${AZURE_CREDENTIALS:-}" ]; then
+            echo "::notice::UAT deployment credentials are not configured, so there is nothing to do."
+            echo "The environment itself IS provisioned and serving — see OPERATIONS-LOG.md."
+            echo "What is missing is the automation's own credentials. To enable this job, add to"
+            echo "the 'uat' environment:"
+            echo "  * AZURE_CREDENTIALS  -- a service principal scoped to rg-mynet-uat, with"
+            echo "                          network-write on vm-mynet-uatNSG for the rule above;"
+            echo "  * DEPLOY_SSH_KEY     -- az login grants control-plane access, not shell;"
+            echo "  * SSH_KNOWN_HOSTS    -- verified out-of-band, NOT accepted on first connection."
+            exit 0
+          fi
           ./deploy/vm/deploy.sh uat --migrate
+
+      # ═══════════════════════════════════════════════════════════════════════════════════════
+      # **UNCONDITIONAL. `always()` COVERS CANCELLATION, WHICH IS THE CASE THAT LEAKS.**
+      #
+      # A merge cancelled mid-deploy is not exotic — it is what happens when somebody notices a
+      # mistake and pushes a fix. Without `always()` the rule outlives the run and port 22 stays
+      # open to a hosted runner's address forever.
+      #
+      # `continue-on-error` so a failed teardown cannot mask the deploy's own result, and so the
+      # error is visible rather than swallowed. The stale-rule assertion at the top of the NEXT
+      # run is what actually catches a teardown that did not work.
+      # ═══════════════════════════════════════════════════════════════════════════════════════
+      - name: withdraw the runner's admission
+        if: always()
+        continue-on-error: true
+        env:
+          AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
+          RULE: ${{ steps.admit.outputs.rule }}
+        run: |
+          set -euo pipefail
+          [ -n "${AZURE_CREDENTIALS:-}" ] && [ -n "${RULE:-}" ] || exit 0
+          source deploy/vm/_common.sh
+          mynet::load_env uat
+          mynet::az network nsg rule delete -g "$RESOURCE_GROUP" \
+            --nsg-name "${VM_NAME}NSG" -n "$RULE" -o none
+          echo "Withdrew $RULE."
+
+          REMAINING="$(mynet::az network nsg rule list -g "$RESOURCE_GROUP" \
+            --nsg-name "${VM_NAME}NSG" --query "[?starts_with(name,'allow-ssh-ci-')].name" -o tsv)"
+          if [ -n "$REMAINING" ]; then
+            echo "::error::Teardown ran and something remains: $REMAINING"
+            exit 1
+          fi
 
   deploy-prod:
     name: deploy-prod

@@ -1,6 +1,12 @@
 import type { FastifyInstance } from 'fastify'
 
-import { failureDelayMs, hashAttemptValue, recordAttempt, serveDelay } from '../../auth/throttle.js'
+import {
+  beginAttempt,
+  failureDelayMs,
+  hashAttemptValue,
+  serveDelay,
+  settleAttempt,
+} from '../../auth/throttle.js'
 import { findEventById, joinConference } from '../../db/queries/identity.js'
 import { notFound, tooManyAttempts } from '../../errors.js'
 
@@ -114,11 +120,13 @@ export const joinRoutes = async (app: FastifyInstance): Promise<void> => {
       const sourceHash = hashAttemptValue(request.ip)
       const action = 'join_code' as const
 
+      // 010 T017 — recorded before it is judged (FR-804), excluded from its own count (FR-805).
+      // The row starts `succeeded: false`, so a refusal is recorded by not settling it.
+      const attemptId = await beginAttempt({ identifierHash, sourceHash, action })
       const outstanding = await serveDelay(
-        await failureDelayMs({ identifierHash, sourceHash, action }),
+        await failureDelayMs({ identifierHash, sourceHash, action }, attemptId),
       )
       if (outstanding > 0) {
-        await recordAttempt({ identifierHash, sourceHash, action, succeeded: false })
         throw tooManyAttempts(outstanding, 'join-code attempts')
       }
 
@@ -126,7 +134,7 @@ export const joinRoutes = async (app: FastifyInstance): Promise<void> => {
 
       if (outcome.status === 'unrecognised') {
         // Counts as a failure, which is the whole of FR-314: guessing costs escalating time.
-        await recordAttempt({ identifierHash, sourceHash, action, succeeded: false })
+        // The row already says `succeeded: false` — not settling it is what counts the failure.
         // One refusal for every cause — no such code, a conference with no code seeded, a
         // malformed value. The caller cannot tell them apart (FR-313).
         throw notFound()
@@ -134,7 +142,7 @@ export const joinRoutes = async (app: FastifyInstance): Promise<void> => {
 
       // A correct code ends the streak, so an attendee who mistyped twice and then got it right
       // is not carrying those failures into their next conference.
-      await recordAttempt({ identifierHash, sourceHash, action, succeeded: true })
+      await settleAttempt(attemptId, true)
 
       const event = await findEventById(outcome.eventId)
       // Only reachable if the conference was deleted between the two statements. Refused rather

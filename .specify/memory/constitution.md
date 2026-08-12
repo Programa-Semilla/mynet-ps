@@ -1,5 +1,121 @@
 <!--
 SYNC IMPACT REPORT
+Version change: 3.4.0 → 3.5.0
+
+
+═══════════════════════════════════════════════════════════════════════════════════════════════
+**RENUMBERED FROM 3.4.0 TO 3.5.0, AND THE RULE APPLIED IS THIS CONSTITUTION'S OWN.**
+
+This amendment and the brand-mark amendment below were **both drafted as 3.4.0 and both ratified on
+2026-08-10**, in parallel branches neither of which could see the other. The brand mark merged
+first, so it keeps 3.4.0 and its new register entry 23; this one renumbered to 3.5.0.
+
+That is not an ad-hoc choice. The 3.4.0 report below records the identical thing happening one
+version earlier — 009 and the brand mark were both drafted as 3.3.0, 009 merged first and kept the
+number. **Merge order decides, nothing published is rewritten, and the two remain separate
+decisions because that is what they are.** Applying the same rule twice is what makes it a rule.
+
+The feature renumbered with it: `specs/010-uat-deployment-and-hardening` became **011**, and the
+validation-and-production phase became **012**.
+═══════════════════════════════════════════════════════════════════════════════════════════════
+
+
+RATIFICATION STATUS: **RATIFIED 2026-08-10 by the project owner**, who took five decisions in
+brainstorm #08 (`brainstorm/08-uat-deployment-and-hardening.md`) and asked for them to be ratified
+before this phase's specification is written. Follows the precedent of 3.2.0 and 3.3.0 — the
+amendment precedes the code it licenses — with one difference worth naming: **this amendment gates
+a deployment rather than a feature.** Nothing here changes what the product does. It changes where
+it runs, who may reach it, and who holds the keys.
+
+Rationale: MINOR. Four register entries are resolved, one binding-constraint block gains concrete
+values it had deliberately left blank, and two blocks are extended. **No principle is removed or
+redefined, nothing delivered is retracted, and no work performed under 3.4.0 is invalidated.** It is
+not PATCH because four entries close and new binding constraints are added — a named address, a
+named subscription, a named provider and a named key-custody rule are rules a later change can
+violate, which a clarification is not.
+
+Owner decisions cited by this amendment (all 2026-08-10, from brainstorm #08):
+  L1. **The UAT environment is `mynet-dev.programasemilla.com`, openly reachable, carrying seeded
+      data only.** Resolves entry 14's remaining half. FR-067 is satisfied by the *data* rather than
+      by the access control. Basic auth and an IP allowlist were both considered and rejected for
+      the same reason: each breaks the two things the validation phase depends on — handing the
+      client a link for the entry-4 layout review, and installing the PWA on a physical iPhone over
+      cellular.
+  L2. **The production address is `mynetcr.com`, provisionally.** Not registered, not final,
+      documented rather than committed. Recorded because a consequence travels with it: UAT and
+      production are **separate registrable domains**, so a UAT session cookie is structurally
+      incapable of reaching production. That is the strongest available form of the isolation
+      FR-067 demands, and it arrived by accident of naming rather than by design — which is exactly
+      why it is written down before somebody "tidies" UAT onto a production subdomain.
+  L3. **The Azure subscription is `d428f98f-a3c4-49c3-ae24-06ec3de08477` (LinaSys-DevEnv),
+      `centralus`, for both environments.** Entry 11 was already resolved in 3.0.0; it never named
+      a subscription, and `deploy/vm/envs/*.env` left `SUBSCRIPTION` blank for that reason.
+  L4. **The transactional email provider is Mailgun.** Resolves entry 18.
+  L5. **VAPID key custody: one pair per environment, generated once, held as a GitHub Actions
+      environment secret and injected into the VM's `.env` by `deploy.sh`; rotation only on
+      compromise.** Resolves entry 20's custody half. **The entry's other half is withdrawn as
+      never having existed**: Web Push signs with the project's own key pair and posts to whatever
+      endpoint the browser issued — there is no provider, no account and no third party to choose.
+      The entry has been worded as "the push provider" since 3.1.0 and that wording was wrong.
+  L6. **Abuse reports are dispatched to `apps@programasemilla.com`.** Resolves entry 21.
+
+Added and amended binding constraints:
+  - "Deployment environments" — gains the two addresses, the subscription, and the UAT access rule,
+    plus the separate-registrable-domain constraint L2 makes explicit. The backup obligation gains
+    the off-host requirement: an artifact on the same disk as the database it protects does not
+    survive the event it exists for, and a restore drill run against such artifacts proves the
+    wrong thing.
+  - "Notification delivery" — the vendor-free port rule is corrected (there is no push vendor) and
+    gains the custody and rotation rule from L5.
+  - "Reporting conduct out of the product" — the "operator address is undecided" bullet is replaced
+    by the address, with the obligation that travels with it stated rather than discharged by
+    naming it.
+
+Register changes:
+  - 14. RESOLVED by L1. 18. RESOLVED by L4. 20. RESOLVED by L5, with its "push provider" half
+    withdrawn as never having existed. 21. RESOLVED by L6.
+  - 11. Already resolved in 3.0.0; annotated in place with the subscription L3 names.
+  - 19. NOT resolved, and **escalated a third time**: L1 makes a permanent, openly reachable
+    environment with public self sign-up and avatar upload a present fact rather than a prospect.
+    Recorded so that this amendment cannot be read as having closed it by proximity. L6 supplies
+    the operator address the nearest-available answer needs, which narrows it without answering it.
+  - 2. **Already RESOLVED by 3.4.0**, which this amendment follows rather than precedes. An
+    earlier draft of this block said entry 2 still blocked the validation phase; it does not, and
+    the correction is recorded rather than made silently.
+  - 4. Unchanged in substance; it blocks the validation phase rather than this one. Entry 4 becomes
+    materially cheaper once UAT exists — it has never been answerable without a running product at
+    a real screen width, and after this amendment there is one.
+
+Delivery-plan change recorded here because it changes which entries block what, not because the
+roadmap is governance:
+  - The roadmap's **010 — Launch Readiness** is split. **011** becomes UAT deployment and
+    pre-public hardening, and is fully unblocked by this amendment. **012** becomes the validation
+    pass and production, and remains blocked by entry 4. The halves were split because
+    their blockers differ, and keeping them together would have held a working UAT hostage to a
+    brand mark.
+
+Templates and dependent artifacts:
+  - .specify/templates/spec-template.md, plan-template.md, tasks-template.md — ✅ no change
+    required. plan-template.md's Constitution Check derives its gates from this file and pins no
+    version; the other two carry no constitution reference.
+  - CLAUDE.md — ✅ updated in the same change. **3.3.0's report recorded it as pending across two
+    amendments and that was stale when written**: CLAUDE.md carries 3.2.0's and 3.3.0's content in
+    full. Corrected here rather than repeated, because a propagation checklist that reports a
+    false pending is worse than one that reports nothing.
+  - brainstorm/00-overview.md — ✅ updated by session #08 in the same change.
+  - docs/superpowers/specs/2026-08-06-mynet-delivery-roadmap-design.md — ⚠ pending: it still
+    describes 010 as the validation pass and has no 011.
+  - deploy/vm/envs/uat.env — ⚠ pending: `SUBSCRIPTION` and `APP_DOMAIN` are blank by design, and
+    this amendment is what licenses filling them. That is phase 010's work, not this command's.
+
+Deferred: none. No placeholder tokens remain in this document.
+
+PRIOR REPORT (3.2.0 → 3.3.0):
+
+Version change: 3.2.0 → 3.3.0
+
+───────────────────────────────────────────────────────────────────────────────────────────────
+
 Version change: 3.3.0 → 3.4.0
 
 RATIFICATION STATUS: **RATIFIED 2026-08-10 by the project owner**, who supplied the brand board on
@@ -1072,6 +1188,37 @@ Principle VII no longer requires.
   unchanged in substance and unchanged in force — the environment it binds has changed, the rule has
   not. **Separate configuration is not sufficient**: the separation MUST be enforced, and a
   deployment tool that can be pointed at the wrong database MUST refuse rather than proceed.
+
+*The following four rules were added in 3.4.0 by decisions L1–L3. Until then this block described a
+topology with no addresses in it, and `deploy/vm/envs/*.env` left `SUBSCRIPTION` and `APP_DOMAIN`
+blank because naming them was a decision no feature was entitled to take.*
+
+- **Both environments run in Azure subscription `d428f98f-a3c4-49c3-ae24-06ec3de08477`
+  (LinaSys-DevEnv), region `centralus`.** Scripts MUST pin every call to this subscription by id
+  rather than inherit whatever is active; a name is mutable and an inherited default silently
+  provisions into the wrong place. Sharing one subscription does not weaken the isolation rule
+  above — that rule is about hosts, databases, secrets and addresses, and each environment MUST
+  still have its own of all four.
+- **UAT is `mynet-dev.programasemilla.com`. Production is `mynetcr.com`**, provisionally: it is not
+  registered, and it MUST NOT be committed to `prod.env` until it is, because a blank value is what
+  makes the deploy jobs' refusal honest.
+- **UAT and production MUST remain separate registrable domains.** Not a naming preference — it is
+  what makes a UAT session cookie structurally incapable of reaching production, which is a stronger
+  guarantee than configuration can offer and the one form of the FR-067 separation that cannot be
+  undone by a mistake. A change that moves UAT onto a subdomain of the production domain MUST amend
+  this rule, and would be trading a structural guarantee for a convention.
+- **UAT is openly reachable and carries seeded data only.** Public self sign-up stays open; access
+  is not restricted by credential, allowlist or network boundary. **FR-067 is satisfied by the data
+  rather than by the access control**, and that is the whole of the reasoning: nothing that must be
+  kept from a stranger is ever present. The rejected alternatives are recorded because they look
+  safer and are not — basic auth in front of everything breaks service-worker registration and push,
+  and an IP allowlist breaks a physical-device test on cellular, so each buys secrecy for data that
+  does not need it by disabling the validation the environment exists to make possible.
+
+  *Consequence, stated rather than left to be discovered*: an openly reachable environment with
+  public sign-up and image upload makes register entry 19 — that nobody moderates uploaded avatars —
+  a present fact rather than a prospect. That entry is **not** resolved by this rule, and this rule
+  MUST NOT be cited as having resolved it.
 - **The client and the API MUST be served from one origin.** This is not an implementation
   preference: it is what keeps the session cookie's `SameSite` attribute a genuine CSRF defence
   rather than a nominal one, and it is why no synchroniser-token scheme is required. A topology that
@@ -1085,6 +1232,14 @@ Principle VII no longer requires.
   procedure MUST be written down; and **the restore MUST have been performed successfully at least
   once before production holds real attendee data.** A documented restore that has never been run is
   a hope, not a procedure.
+
+  **A backup MUST be copied off the host before local artifacts are pruned**, and local pruning MUST
+  be conditional on that copy being confirmed. *Added 3.4.0.* Every artifact currently lives on the
+  same VM and the same disk as the database it protects, so the most likely event a daily backup
+  exists for destroys the database and every backup of it together — which discharges the schedule
+  and the retention period while leaving the *purpose* undischarged. This is binding on the restore
+  drill too: **a drill run against artifacts that share a failure domain with their source proves
+  the wrong thing**, and would convert an untested procedure into a false one.
 - **A rollback procedure MUST exist and MUST state what happens when the schema has moved ahead of
   the application.** A rollback path that assumes the database can always follow the code backwards
   is the one that fails when it is needed.
@@ -1335,8 +1490,23 @@ construction rather than by convention.
   header's bell with its unread dot remains forbidden.
 
 - **Delivery MUST go through `NotificationService`** (Principle V), over a domain shape rather than
-  the browser's own `PushSubscription` type. A push provider is an external dependency and a secret;
-  neither may appear in feature code, and the server-side port MUST be vendor-free.
+  the browser's own `PushSubscription` type. The signing key is a secret and MUST NOT appear in
+  feature code; the server-side port MUST stay vendor-free.
+
+  *Corrected in 3.4.0.* This rule read "a push provider is an external dependency and a secret".
+  **There is no push provider and there never was one** — Web Push signs with the project's own
+  VAPID pair and posts to whatever endpoint the browser issued, with no account, no SDK and no third
+  party. The vendor-free requirement is unchanged and was met by 007; what is corrected is the
+  premise, which had been carried since 3.1.0 and had a register entry attached to it.
+
+- **The VAPID private key is held as one pair per environment**, generated once, stored as a
+  repository *environment* secret and injected into that host's `.env` at deploy time — the same
+  path as every other secret this project holds, deliberately, so that key custody is not a second
+  mechanism to reason about. **It MUST NOT be rotated except on compromise.** *Added 3.4.0 by L5.*
+  Rotation invalidates every existing subscription, so every attendee silently stops receiving until
+  their browser re-registers — and nothing in the product tells them to, or could. A routine
+  rotation schedule would therefore be a routine outage of a capability nobody would notice failing.
+  A rotation that does become necessary MUST be treated as a delivery outage and planned as one.
 
 - **Permission is deniable, so notification delivery MUST NOT be the only path to freshness.** Every
   capability except delivery itself MUST work identically for an attendee who refuses permission,
@@ -1375,9 +1545,16 @@ construction — so the report goes to a human who acts out-of-band.
   reporter's reason. Both are two attendees' personal data, and an inbox is outside every retention
   rule this project controls, for a recipient who can query the database directly.
 - **A failure to dispatch MUST NOT fail the report or the block.** Safety cannot depend on an
-  external service succeeding, and an unprovisioned provider is the expected state (entry 18).
-- **The operator address is undecided** — register entry 21. Until it exists, a report is still
-  blocked and still recorded, and the skipped dispatch MUST be logged rather than silently dropped.
+  external service succeeding. This rule is unchanged now that a provider and an address exist:
+  Mailgun being unreachable MUST still leave the block applied and the report recorded, and the
+  failed dispatch MUST be logged rather than silently dropped.
+- **Reports are dispatched to `apps@programasemilla.com`**, sent through Mailgun. *Added 3.4.0 by L4
+  and L6, resolving entries 18 and 21.* **Naming the address does not discharge the obligation
+  attached to it.** The reporting dialog tells the attendee that a person will read it, and the
+  product deliberately promises nothing further — no case identifier, no status, nothing to poll,
+  because FR-548 forbids the surface that would answer any of them. That sentence becomes true only
+  when somebody actually reads the inbox, and keeping it true is an ongoing obligation the project
+  owner personally holds rather than a configuration value that has now been set.
 
 ### Brand identity and application icons
 
@@ -1740,6 +1917,42 @@ Owner decision taken on 2026-08-10, recorded in brainstorm #08
   five review agents and CodeRabbit. **This amendment does not close it**, and feature 010 must not
   be read as having validated anything.
 
+### 3.5.0 — UAT deployment addressing, secret custody, four entries closed
+
+Owner decisions taken on 2026-08-10 in brainstorm #08
+(`brainstorm/08-uat-deployment-and-hardening.md`). **This is the first amendment that gates a
+deployment rather than a feature** — nothing here changes what the product does, only where it runs,
+who may reach it, and who holds the keys. With entries 14, 18, 20 and 21 closed, **no register entry
+blocks phase 011**, and what remains open blocks phase 012 or nothing.
+
+- ~~14. Public non-production URLs~~ — **RESOLVED: `mynet-dev.programasemilla.com`, openly
+  reachable, seeded data only.** FR-067 is satisfied by the data rather than by the access control.
+  Two rejected alternatives are recorded because they read as safer and are not: basic auth breaks
+  service-worker registration and push, an IP allowlist breaks a physical-device test on cellular,
+  and both buy secrecy over data that does not need it by disabling the validation the environment
+  exists for. **Does not resolve entry 19, and escalates it.**
+- ~~18. The transactional email provider~~ — **RESOLVED: Mailgun.** DNS verification lands on
+  `programasemilla.com`, the same records as UAT's address. `MailService` stays a vendor-free port
+  with the adapter chosen by configuration identically in every environment, following the shape 007
+  proved for `PushService`.
+- ~~20. The push provider, and VAPID key custody~~ — **RESOLVED, its two halves differently.** The
+  provider half is **withdrawn as never having existed**: Web Push signs with the project's own key
+  pair and posts to the endpoint the browser issued, so there is no vendor to choose and the entry's
+  wording has misdescribed it since 3.1.0. The custody half is resolved: one pair per environment, a
+  repository environment secret injected into the VM's `.env`, **rotation only on compromise**.
+- ~~21. The operator address abuse reports are dispatched to~~ — **RESOLVED:
+  `apps@programasemilla.com`.** The address closes the entry and does not discharge the obligation
+  behind it, which was filed as something the owner personally holds.
+
+**Annotated rather than resolved**: entry 11 gains the Azure subscription it never named
+(`d428f98f-a3c4-49c3-ae24-06ec3de08477`, LinaSys-DevEnv, `centralus`, both environments) — it was
+correctly closed in 3.0.0 and lacked a value, not a decision.
+
+**Two cautions this amendment adds to the ones 2.3.0 and 3.2.0 already record about how entries are
+phrased.** Entry 20 was phrased by analogy to entry 18, its neighbour, and imported a vendor that
+did not exist along with its urgency — half an entry described nothing for two versions. And entries
+18 and 20 *were* answered together as 3.1.0 predicted, but for none of the reasons it gave.
+
 **Open — require a client decision**
 
 *Numbering is stable.* Resolved entries are **struck through in place** rather than removed, and
@@ -1762,6 +1975,15 @@ so a gap in the source would silently render as the wrong number against a neigh
    unreviewed design, so the cost of leaving it open compounds with each feature. *Escalated
    2026-08-07 in 3.0.0*: phase 006 adds a card-dense multi-column directory grid and a second modal
    overlay, making it the largest single addition of unreviewed desktop design so far.
+
+   **Narrowed and made answerable 2026-08-10 in 3.4.0.** It blocks phase **011**, not 010. More
+   usefully: it has never been answerable, because reviewing a layout requires a running product at
+   a real screen width and there has never been one. L1's openly reachable UAT is what makes it a
+   question somebody can actually be asked, which is a reason to sequence 010 first rather than a
+   reason to keep waiting. **008 turned this entry from a risk into an observed defect** — the first
+   dialog a person looked at was rendering in the top-left corner, having passed 135 end-to-end
+   tests, five review agents and an automated reviewer — so the compounding cost it warns about is
+   demonstrated rather than hypothetical.
 5. ~~**Attendee identity model.**~~ **RESOLVED 2026-08-07 in 2.3.0** — self sign-up with an event
    join code. Retained in place so the numbering stays stable; see "Resolved in 2.3.0" above.
 6. ~~**Data retention, deletion, and export obligations.**~~ **RESOLVED 2026-08-07 in 2.3.0** — full
@@ -1799,7 +2021,16 @@ so a gap in the source would silently render as the wrong number against a neigh
     `StorageService` backed by a volume on the same host. All three halves of this entry close
     together, which is what the 2.3.0 widening anticipated. Retained in place so the numbering stays
     stable; see "Resolved in 3.0.0" below.
-12. **Authentication ownership** — self-implemented versus a delegated provider.
+
+    **ANNOTATED 2026-08-10 in 3.4.0 by L3.** The resolution named a topology and no subscription,
+    which is why `deploy/vm/envs/*.env` shipped with `SUBSCRIPTION` blank for three phases. It is
+    `d428f98f-a3c4-49c3-ae24-06ec3de08477` (LinaSys-DevEnv), `centralus`, for both environments —
+    now binding text under "Deployment environments". Recorded as an annotation rather than a
+    reopening: the entry was correctly closed, and what it lacked was a value rather than a decision.
+12. **Authentication ownership** — self-implemented versus a delegated provider. *Still open, and
+    worth stating what "open" now means*: authentication is self-implemented and has been shipped
+    since 004. The question is whether that is the settled answer or an unratified default, and
+    nothing is blocked on it.
 13. ~~**Attendee avatar handling.**~~ **RESOLVED 2026-08-07 in 2.3.0** — real upload, with resizing
     and EXIF stripping mandatory. Retained in place; see "Resolved in 2.3.0" above.
 14. **Public non-production URLs.** *Changed, not closed, 2026-08-07 in 3.0.0 by D13.* The original
@@ -1810,6 +2041,15 @@ so a gap in the source would silently render as the wrong number against a neigh
     (Deployment environments, above, carrying 001's FR-067 forward). **Access control remains
     undecided**, and it is now a question about a permanent address rather than a transient one.
     Interacts with entries 16 and 19.
+
+    **RESOLVED 2026-08-10 in 3.4.0 by L1: openly reachable, seeded data only.** The address is
+    `mynet-dev.programasemilla.com`. Access is not restricted by credential, allowlist or network
+    boundary, because **the separation FR-067 demands is carried by the data and not by the door** —
+    nothing that must be kept from a stranger is ever present. Basic auth and an IP allowlist were
+    considered and rejected for the same reason: each disables the validation the environment exists
+    to make possible (service-worker registration and push; a physical-device test on cellular) in
+    exchange for secrecy over data that does not need it. Now binding text under "Deployment
+    environments". **Entry 19 is not resolved with it and is escalated by it** — see below.
 15. **Server-side branch protection is unconfigured** — a configuration task, not an accepted risk.
     *Corrected 2026-08-07*: this entry previously recorded it as "unavailable (private repository,
     free personal account; APIs return 403)". **Both halves were wrong.** The repository is public
@@ -1889,6 +2129,20 @@ so a gap in the source would silently render as the wrong number against a neigh
     dispatch, but it means nobody is currently told a report was filed. Interacts with entry 21,
     which is the address rather than the sender, and with entry 20 — the push provider and the mail
     provider may well be answered together.
+
+    **RESOLVED 2026-08-10 in 3.4.0 by L4: Mailgun.** Its sender verification is DNS records on
+    `programasemilla.com`, the same records as UAT's address, which is why the two were settled in
+    one session. **The speculation that this and entry 20 would be answered together turned out to
+    be half right and instructively so**: they were answered together, but not because they shared a
+    vendor — entry 20 had no vendor to share. Worth carrying forward as a caution about how an entry
+    is phrased, alongside the same note on entries 5, 7 and 8.
+
+    Two consequences bind: `MailService` MUST stay a vendor-free port with the adapter selected by
+    configuration in every environment identically — the shape 007 proved for `PushService`, so a
+    local run exercises the production path — and the vendor SDK MUST stay confined to
+    `apps/api/src/mail/` by the same lint boundary that confines storage and push. **Real mail is
+    not optional for a usable environment**: verification gates discoverability, so with only the
+    sink adapter every attendee is invisible to every other one.
 19. **Nobody moderates uploaded avatar images.** D5 opens public self sign-up and D7 admits image
     upload, in a product with no administrative actor by construction — and the
     organizer-administration exclusion in Principle III is precisely what forecloses the usual
@@ -1911,6 +2165,20 @@ so a gap in the source would silently render as the wrong number against a neigh
     per-person, after the fact, and routes to an operator who does not yet exist (entries 18, 21).
     Still unchanged in substance.
 
+    **ESCALATED A THIRD TIME 2026-08-10 in 3.4.0, and NOT resolved.** L1 makes UAT permanently and
+    openly reachable with public self sign-up and avatar upload, so this stops being a description
+    of a future environment. The entry is unchanged in substance and is now a present fact. **This
+    is recorded explicitly so that 3.4.0 cannot be read as having closed it by proximity** — it
+    resolves the entry beside it (14) and deliberately does not resolve this one.
+
+    L4 and L6 **narrow it without answering it**: the operator mailbox that entries 18 and 21 left
+    unprovisioned now exists, so the nearest thing this project has to a moderation answer — 007's
+    report-to-an-operator path, on the reading that Principle III forecloses organizer
+    administration *inside the product* but not an operator acting out-of-band — is now actually
+    available rather than merely argued for. Whether avatars follow that route is undecided. What is
+    materially better than at 3.1.0 is that UAT carries **seeded data only**, so the exposure is
+    bounded to whoever finds an unpublished URL and uploads an image of their own.
+
 20. **The push provider, and VAPID key custody.** *Added 2026-08-08 in 3.1.0, created by M4.* The
     project's second pending external dependency and secret after entry 18, and the two may well be
     answered together. Two halves, and the second is the one that needs a person rather than a
@@ -1919,6 +2187,24 @@ so a gap in the source would silently render as the wrong number against a neigh
     subscription, so every attendee silently stops receiving until their browser re-registers.
     Blocks only the real adapter: the port, the sink adapter and every test against it are buildable
     without it, exactly as `SinkMailService` is for entry 18.
+
+    **RESOLVED 2026-08-10 in 3.4.0, in two different ways for its two halves.**
+
+    The **provider half is withdrawn as never having existed.** Web Push signs with the project's own
+    VAPID pair and posts to whatever endpoint the browser issued — `fcm.googleapis.com` for
+    Chromium, Mozilla's for Firefox — with no account, no SDK, no bill and no third party to select.
+    007 discovered this while implementing `WebPushService` and delivered against it end to end;
+    the entry's wording has been wrong since 3.1.0 and is corrected here rather than left to mislead
+    a reader into shopping for a vendor. **This is the first register entry this project has closed
+    by finding that half of it described nothing**, and it is worth the words: an entry phrased by
+    analogy to a neighbour — entry 18, which does have a vendor — imported that neighbour's shape
+    along with its urgency.
+
+    The **custody half is RESOLVED by L5**: one pair per environment, generated once, held as a
+    repository environment secret and injected into the VM's `.env` by `deploy.sh` — the same path as
+    every other secret, chosen so that key custody is not a second mechanism — and **rotated only on
+    compromise**, because rotation is a silent delivery outage for every attendee until their browser
+    re-registers. Now binding text under "Notification delivery".
 21. **The operator address abuse reports are dispatched to, and the response expectation attached to
     it.** *Added 2026-08-08 in 3.1.0, created by M8.* Not a vendor question — **an obligation the
     owner personally holds.** Somebody has to read that inbox, and the product deliberately promises
@@ -1927,6 +2213,14 @@ so a gap in the source would silently render as the wrong number against a neigh
     is that a person will read it. **That sentence is only true once this entry is answered.**
     Interacts with entry 18 (who sends it) and entry 19 (it is the nearest thing to a moderation
     path this product has).
+
+    **RESOLVED 2026-08-10 in 3.4.0 by L6: `apps@programasemilla.com`.** Now binding text under
+    "Reporting conduct out of the product". **The address closes the entry; it does not discharge
+    the obligation**, and the entry's own wording is what makes that distinction survive its
+    resolution — this was filed as an obligation the owner personally holds, not as a configuration
+    value, and naming a mailbox does not make somebody read it. The response expectation the entry
+    also named remains exactly as the product states it: a person reads the report, and nothing
+    further is promised, because FR-548 forbids the surface that would report back.
 22. **A cached conference outlives a withdrawn registration by up to 24 hours.** *Added 2026-08-10
     in 3.3.0, created by Q2. Against phase 010.* The offline caching decorator revokes on **age
     alone** — a 24-hour lifetime keyed `(attendeeId, eventId, resource)` — so when the server begins
@@ -1966,4 +2260,4 @@ so a gap in the source would silently render as the wrong number against a neigh
 stay consistent with this constitution and MUST NOT contain implementation plans, session tasks,
 progress updates, or invented requirements.
 
-**Version**: 3.4.0 | **Ratified**: 2026-08-04 | **Last Amended**: 2026-08-10
+**Version**: 3.5.0 | **Ratified**: 2026-08-04 | **Last Amended**: 2026-08-10

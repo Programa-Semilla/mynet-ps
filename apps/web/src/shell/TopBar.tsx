@@ -8,6 +8,7 @@ import { PRODUCT_NAME } from '../app/branding.js'
 import { destinationFor } from '../app/navigation.js'
 import { useAuth } from '../auth/useAuth.js'
 import { BrandMark } from './BrandMark.js'
+import { EnvironmentMarker } from './EnvironmentMarker.js'
 import { EventSwitcher } from './EventSwitcher.js'
 
 /**
@@ -107,6 +108,20 @@ export const TopBar = () => {
           <span className="hidden shrink truncate font-display text-lg font-semibold text-text-primary tablet:inline">
             {current?.label ?? 'Not found'}
           </span>
+
+          {/*
+            011 T076 — FR-828. **Inside this group, not a sibling of it.** The header is
+            `justify-between`, so a third top-level child would be spread into the middle of the
+            bar — floating between the brand and the attendee's controls, attached to neither.
+            Beside the label is where it belongs and what its own requirement describes.
+
+            Not a band above the header either: a band costs vertical space on every screen, and
+            mobile is where Principle III puts a success criterion on the first viewport.
+
+            It renders to nothing in a production build — the guard is a build-time literal, so
+            the element is not in the bundle at all rather than hidden inside it.
+          */}
+          <EnvironmentMarker />
         </div>
 
         {attendee && (

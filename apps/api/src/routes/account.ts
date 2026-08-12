@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify'
 
 import { clearSessionCookie, revokeAllSessions } from '../auth/session.js'
-import { failureDelayMs, hashAttemptValue, recordRequest, serveDelay } from '../auth/throttle.js'
+import { beginAttempt, failureDelayMs, hashAttemptValue, serveDelay } from '../auth/throttle.js'
 import { assembleExport, deleteAccount, withdrawFromConference } from '../db/queries/account.js'
 import { notFound, tooManyAttempts } from '../errors.js'
 import { eventScopeOf, type EventParams } from '../plugins/event-access.js'
@@ -83,12 +83,15 @@ export const accountRoutes = async (app: FastifyInstance): Promise<void> => {
         sourceHash: hashAttemptValue(request.ip),
         action: 'export' as const,
       }
-      const outstanding = await serveDelay(await failureDelayMs(key))
-      // Hoisted above the branch: both paths counted this request identically, and two adjacent
-      // identical statements are a diff a reader has to do character by character. Counted on
-      // success too — see `recordRequest`: an export reads every table holding anything about
-      // one person and embeds the avatar, so the cost is paid regardless of the outcome.
-      await recordRequest(key)
+      // 010 T017 — recorded BEFORE it is judged, so concurrent exports count each other
+      // (FR-804), and excluded from its own count so the allowance is unchanged (FR-805).
+      //
+      // Never settled, and that is the policy `beginAttempt` used to carry as a name: an export
+      // reads every table holding anything about one person and embeds the avatar, so the cost is
+      // paid regardless of the outcome. Settling on success would reset the streak and make the
+      // limit unreachable.
+      const attemptId = await beginAttempt(key)
+      const outstanding = await serveDelay(await failureDelayMs(key, attemptId))
       if (outstanding > 0) throw tooManyAttempts(outstanding, 'export requests')
 
       const exported = await assembleExport(attendeeId, app.storage)
