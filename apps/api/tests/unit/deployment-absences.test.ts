@@ -256,7 +256,16 @@ describe('nothing production was created or filled (FR-894)', () => {
       'bash',
       [
         '-c',
-        `grep -rhE --exclude-dir=tests --exclude='*.test.*' 'mynetcr\\.com' ` +
+        // ─────────────────────────────────────────────────────────────────────────────
+        // `node_modules` excluded explicitly, and not because it would match — because of what
+        // it costs to look. pnpm's store is a symlink graph with cycles, and a recursive search
+        // that FOLLOWS symlinks descends it forever: an ad-hoc `grep -rn` over `apps` on this
+        // repository burned 284 CPU-minutes before it was killed. GNU grep does not follow them
+        // (`-r`, not `-R`), so this is already safe — the exclusion is here so it stays safe if
+        // the tool ever changes underneath it.
+        // ─────────────────────────────────────────────────────────────────────────────
+        `grep -rhE --exclude-dir=node_modules --exclude-dir=dist ` +
+          `--exclude-dir=tests --exclude='*.test.*' 'mynetcr\\.com' ` +
           `${REPO}deploy ${REPO}apps ${REPO}.github 2>/dev/null ` +
           `| grep -vE '^\\s*[#*]|^\\s*//|\\*' || true`,
       ],
