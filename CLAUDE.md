@@ -5,7 +5,7 @@ Guidance for Claude Code (claude.ai/code) working in this repository.
 This file is the **working brief**: what the product is, what has been decided, and how work is
 done here. It is deliberately short. Depth lives elsewhere, and these are authoritative over it:
 
-1. **`.specify/memory/constitution.md` (v4.1.0)** — governance and the authoritative decision
+1. **`.specify/memory/constitution.md` (v5.0.0)** — governance and the authoritative decision
    register. Supersedes tool defaults, habit, and any conflicting statement in this file.
 2. **`docs/superpowers/specs/2026-08-06-mynet-delivery-roadmap-design.md`** — the decomposition of
    the remaining product into features, with dependency order, reserved migration numbers, and gate
@@ -217,8 +217,9 @@ alternative — the mark at the head of `TabletRail` in coral, mirroring `Deskto
 weighed, because the spec recorded that surface as not existing. Corrected in the spec; the
 arrangement is an owner decision under register entry 4.
 
-A contact is somebody whose digital business card you hold. Sharing is **one-directional** — it
-gives your card and takes nothing — and a held card resolves the sharer's **live** profile under a
+A contact is somebody whose digital business card you hold. Sharing was **one-directional** as
+shipped — **reversed 2026-08-12 by constitution v5.0.0 (C1): it is now a mutual exchange**, one act
+and both parties hold each other's card, delivered by **016**. A held card resolves the sharer's **live** profile under a
 standing consent that outlives both the conference and the discoverability toggle. Appointments are
 proposed, then accepted or declined, over a seeded 30-minute slot grid whose availability is a
 function of the reader's own commitments alone. Home gained its seventh and last card, which is the
@@ -246,7 +247,19 @@ a Q&A surface with **no way to report anything on it** — which the Success Cri
 complete. The boundary survives as a reading order rather than as two merges.
 
 A question is asked on a session, published to **every attendee registered for the conference
-under the author's real name with no opt-out**, and ranked by upvotes. That visibility is the
+under the author's real name with no opt-out**, and ranked by upvotes.
+
+**All of that is reversed by constitution v5.0.0 (C2), ratified 2026-08-12, and 017 rebuilds it.**
+The client's model replaces it: a question is **moderated before it is public** (submit → moderate →
+publish → vote), carries **resolved/pending** state that survives the event, may be **grouped
+manually** with its duplicates, and is **projectable** in vote order. The premise that forbade this
+expired rather than being overturned — 009 recorded against itself that a public Q&A surface *"needs
+a moderator, and a moderator is an organizer"*, and v4.0.0 created that actor. **Attribution is NOT
+part of the reversal**: full name still stands as shipped, and whether it becomes first-name-only is
+**register entry 27**, open, blocking 017. Until 009 is rebuilt, everything below describes what is
+running.
+
+That visibility is the
 **second recorded exception** to Principle VIII's "private content stays private" — constitution
 **v3.3.0, ratified 2026-08-10**, which gated the first line of code exactly as v3.2.0 gated 008's.
 009's own artifacts drafted it as a *third* exception, counting v3.2.0's N2; **N2 is an exception
@@ -1027,6 +1040,61 @@ the same session. The administrative programme is unblocked:**
     conference content is not attendee data. Reverting ownership silently to the platform tier was
     rejected — it is a tidier invariant that hides the event nobody is prompted to act on.
 
+**2026-08-12** (ratified in constitution **v5.0.0**) — **the project's third MAJOR, and the first
+amendment driven by the client USING the product rather than by a design session.** It retracts two
+delivered guarantees, one of them **48 hours after it was ratified**. Sources: brainstorms #10 and
+#11, and `assets/feedback-1.md` — 118 requirements extracted from a 52-minute client conversation:
+
+40. **Sharing a card is a mutual exchange.** One act, both parties hold each other's card, the
+    recipient is not asked. **Reverses decision 25 / v3.2.0 N2** and the sentence that carried it —
+    *"nothing about a person may become durable without that person's own act"*. **The physical-card
+    metaphor is NOT the argument and must never be cited as one**: it was available to N2 and is not
+    what N2 was argued from, so it cannot be what unmakes it. The operative ground is that a card
+    resolves only what its owner already published to co-attendees under decision 16's single
+    visibility decision — so the exchange moves *when* a co-attendee sees those fields, not
+    *whether*. The client reached the same position independently (REQ-046). Three bounds: **both
+    records commit in one transaction or neither**; blocking still severs resolution **both ways**,
+    so the escape hatch predates the change; and nothing else about a card moves — no recall, live
+    resolution, no verification check. **Not decided**: whether the recipient must be discoverable at
+    the moment of sharing. Delivered by **016**.
+41. **The Q&A model is replaced by the client's, in full.** Moderated before publication, resolved/
+    pending lifecycle surviving the event, manual grouping, projectable in vote order. **Reverses
+    decision 27 / v3.3.0** and retracts shipped 009 requirements. **A premise expired rather than a
+    mind changing**: 009 wrote against itself that a public Q&A surface *"needs a moderator, and a
+    moderator is an organizer — the actor Principle III excludes by construction"*, and v4.0.0
+    created that actor. **Moderation does not replace reporting** — pre-publication screening and
+    post-publication reporting cover different moments and both ship. **A moderator reading an
+    unpublished question is not a fourth privacy exception** (content submitted for publication was
+    never private), but **a refused question is stored personal data** and needs cascade, export and
+    retention like anything else. **Attribution is explicitly NOT ratified** — register entry 27.
+    Delivered by **017**.
+42. **Every feature declares its administrative counterpart**, including where it is explicitly
+    none. A Principle IX obligation and a Feature Declarations row. **"None, because…" is valid and
+    common; silence is not — the obligation is to have looked.** Set the day a request to add a
+    confirm-password field turned out to span **five screens across two products**, where the natural
+    reading was one, and the two nobody was looking at guarded the tier that reads the report queue.
+    Since v4.0.0 there are two actors and two sites against one database, and the failure mode is a
+    capability attendees have that no administrator can see, undo or answer for.
+43. **The install icon derives from a SECOND brand source, and this is not a rebrand.**
+    `assets/brand/logo.png` remains the source for every **in-app** mark; `assets/brand/new-logo.png`
+    is the source for **install icons and favicons only**. The in-app coral mark is untouched and
+    **register entry 23 is unaffected**. Three rules bind the second source, each because it
+    contradicts something already binding: the **wordmark is cropped away** (a raster lockup stays
+    forbidden); the **plate colour is chosen deliberately and recorded**, because the board's navy
+    was derived mechanically from a source with no alpha and this one has alpha; and the ~4× upscale
+    is a **measured, named exception** in `brand-audit.mjs` — naming this file, this factor and these
+    outputs, so a *second* upscale still fails. **Weakening the check until it stops checking
+    anything is forbidden.** The home-screen icon will visibly differ from the in-app mark:
+    **knowingly accepted**, and **register entry 28** is why that is recorded rather than left to be
+    rediscovered. Delivered by **016**.
+
+**Three things v5.0.0 deliberately did NOT decide, and none may be read as settled**: notification
+triggers 2 and 3 are present in the client conversation (REQ-095 document published, REQ-112 session
+starting in 15 minutes) and are **not granted** — each needs its own amendment, and REQ-112 needs a
+scheduled-work mechanism this product has never had; **payment-gated event access** (REQ-024) does
+not move, exactly as it did not at v4.0.0; and **networking outside an event** (REQ-047, REQ-048) is
+blocked on the client's own legal review (REQ-049).
+
 ## How work is done here
 
 ### Branching and change flow
@@ -1060,7 +1128,9 @@ open questions.
   Declarations*, and as of 2026-08-11 it is **finally in `.specify/templates/spec-template.md`** —
   it had been mandatory since v2.1.0 and hand-copied into every spec from 002 to 010, because the
   template never carried it despite the roadmap saying it did. Draft v4.0.0 adds a first row,
-  **Actor and tier**: every feature through 010 had one actor and never had to say so.
+  **Actor and tier**: every feature through 010 had one actor and never had to say so. **v5.0.0 adds
+  a second, `Administrative counterpart`** (decision 42) — for every capability a feature adds to
+  MyNet, whether the administrative half exists, must be built here, or is explicitly none.
 - **Out of product scope**: payment processing. **Organizer administration came IN at v4.0.0**
   (standing decisions 31–36), under four binding conditions — a separate product, a second actor in
   two tiers, no self sign-up into either, and no admin surface in MyNet. An administrative
@@ -1146,12 +1216,33 @@ is a working summary. Each names what it blocks, because *when* to ask matters a
 
 ### Require a client decision
 
-**No open question blocks any feature.** v3.2.0 closed the connection model, card-exchange semantics
+**One open question now blocks a feature again — entry 27 blocks 017.** That is new as of
+2026-08-12 and reverses the position this section has held since v3.2.0. Everything else below blocks
+**release**, not code.
+
+- **Register entry 27 — Q&A attribution: full name, first name alone, or attendee-chosen.** Opened
+  by **v5.0.0 (C2)**. **Blocks 017.** v3.3.0 bound the full real name and argued it at length; the
+  client asks for the first name alone (REQ-062, REQ-063); **her own extraction records the thread as
+  unresolved** (OPEN-002) and the transcript carries both positions in one conversation. REQ-061 adds
+  something neither position states — the system must know the true author whatever is displayed —
+  which is compatible with all three answers. **Opened rather than settled deliberately**: the
+  client's stated preference was available and taking it would have closed by inference a thread she
+  herself recorded as open. The case that decides it is mundane and should be put to her directly:
+  two attendees named Ana at one event.
+- **Register entry 28 — two brand marks now coexist, and which one is MyNet's is undecided.** Opened
+  by **v5.0.0 (C4)**. **Blocks nothing**; the product behaves as directed. Recorded because a
+  knowingly accepted divergence and an unnoticed one look identical six months later, and because
+  resolving it either way is expensive. **No feature may resolve it by quietly replacing one mark
+  with the other.**
+
+Historically: v3.2.0 closed the connection model, card-exchange semantics
 and Q&A attribution; **v3.3.0** closed public Q&A visibility and withdrew FR-756a; **v3.4.0** closed
 the oldest entry of all, the brand mark; **v3.5.0** closed four more — the UAT address, the mail
 provider, VAPID custody and the operator address; and **v4.0.0/v4.1.0** opened entries 24, 25 and 26
 and closed all three in the same session. **009, 010, 011 and 013 are shipped, and the attendee
-delivery roadmap is complete.** Everything below blocks **release**, not code.
+delivery roadmap is complete.** Two of those closures — card-exchange semantics and Q&A visibility —
+were **reversed on 2026-08-12 by v5.0.0**, which is the first time this project has reopened settled
+ground on client feedback rather than on a design finding.
 
 **Two programmes are now in flight and their numbering interleaves, which is worth stating once
 rather than re-deriving.** The attendee roadmap ends at **012 — Launch Readiness & Production**,
