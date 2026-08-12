@@ -66,6 +66,27 @@ consequence, and the third is the one worth noticing.
    would have been settled inside a specification had they not been asked. That is the argument the
    4.1.0 report makes about entries 24, 25 and 26, arriving again one amendment later.
 
+### Iteration 3 — 2026-08-12 (review-spec gate)
+
+**Eight findings, all fixed.** Five Important, three Minor. The two that mattered both defeated the
+feature's central safety guarantee, and both had an established precedent in this codebase that the
+first draft failed to cite.
+
+| # | Severity | Finding | Fix |
+|---|---|---|---|
+| 1 | Important | The engagement check had no transactional or locking rule, so an attendee saving a session between the check and the delete lost their row — SC-1002 was false under concurrency | **FR-1019a**, citing 009's FR-714 and the same lock-conflict mechanism |
+| 2 | Important | Engagement was enumerated over four tables, so a later attendee-state table referencing a session would silently stop counting and deletes would resume destroying data with every test green | **FR-1018a**, a schema-derived predicate in the shape of the two coverage tests |
+| 3 | Important | FR-1022 forced a cancelled session into Home's "Up next", which answers *where do I go now* | **FR-1022a** — "Up next" skips it; the rest-of-day timeline shows it cancelled |
+| 4 | Important | Nothing excluded the acting principal, so an organizer notified themselves | **FR-1028a** |
+| 5 | Important | Coalescing was per action, but nothing said so — an implementer could read it as per attendee per time window, which would suppress a cancellation because a room moved earlier | **FR-1028b** |
+| 6 | Minor | FR-1039 required per-action throttling and named no actions | Five named |
+| 7 | Minor | Engagement counts approach identification at seed and pilot scale | Stated in Assumptions with the threshold-not-count mitigation |
+| 8 | Minor | SC-1004 had no metric | One minute, subscription-conditional |
+
+Four acceptance scenarios were added to carry findings 1, 3, 4 and 5 — the race, the "Up next"
+skip, self-notification, and two-acts-two-notifications — so each is testable rather than only
+asserted.
+
 **Two items to re-examine at the plan gate rather than here:**
 
 1. *"No implementation details"* passes, but the Feature Declarations table names concrete

@@ -88,6 +88,13 @@ exists and is readable, and that the session is presented as cancelled rather th
    Agenda and Home's "Up next" reflect the new time.
 5. **Given** an organizer is deciding between deleting and cancelling, **Then** they are shown how
    many attendees have engaged with the session, as counts only, with no attendee identified.
+6. **Given** an untouched session the organizer is deleting, **When** an attendee saves it after the
+   engagement check has read zero and before the delete commits, **Then** the attendee's row
+   survives — either the delete is refused or the save blocks until the transaction ends, and in no
+   ordering is the row destroyed.
+7. **Given** a cancelled session that was the attendee's next, **When** they open Home, **Then**
+   "Up next" names the next session actually happening, and the cancelled one appears in the
+   rest-of-day timeline marked as cancelled.
 
 ---
 
@@ -120,6 +127,10 @@ that the Agenda row carries a marker until the attendee has looked at it.
    and no marker, whatever changed.
 5. **Given** a change to a session's title, summary or speakers, **Then** no notification is
    dispatched, because those changes are content rather than logistics.
+6. **Given** an organizer who is registered for their own conference and has saved the session they
+   are changing, **Then** they receive no notification and no marker for their own act.
+7. **Given** two separate organizer actions an hour apart, each materially changing a session the
+   same attendee saved, **Then** that attendee receives two notifications, not one.
 
 ---
 
@@ -226,15 +237,32 @@ conference they were not assigned to.
 
 - **FR-1018**: A session that **no** attendee has engaged with MUST be deletable. Engagement means a
   saved session, a private note, a question, or a vote on a question.
+- **FR-1018a**: The engagement predicate MUST be **derived from the schema, not enumerated in a
+  handler.** Any table holding attendee data that references a session MUST count as engagement by
+  existing, in the shape `deletion-coverage.test.ts` and `export-coverage.test.ts` already
+  establish — a new such table MUST fail the build until it is either covered by the predicate or
+  allow-listed with a written reason. **An enumerated list is a list that ages**, and the failure
+  mode is silent: deletions resume destroying attendee data with every existing test still green.
 - **FR-1019**: A session that **any** attendee has engaged with MUST NOT be deletable. The refusal
   MUST explain why and MUST offer cancellation.
+- **FR-1019a**: The engagement check MUST be performed **inside the deleting transaction, with the
+  session row locked**, so that engagement arriving between the check and the delete blocks rather
+  than being destroyed. This is **009's FR-714 precedent** and it is the same mechanism: the lock a
+  reader takes on the parent row MUST conflict with the lock a child insert takes on it, so an
+  attendee saving the session mid-delete waits for the transaction to end rather than losing their
+  row. **Checking before the transaction is the race this requirement exists to close**, and it is
+  the one property no layer above a real database can test.
 - **FR-1020**: Cancellation MUST be stored state on the session, not a deletion and not a value
   derived from the clock.
 - **FR-1021**: Cancelling a session MUST leave every saved-session row, private note, question and
   vote attached to it intact and readable.
-- **FR-1022**: A cancelled session MUST be presented as cancelled wherever it appears to an attendee
-  — the programme, Agenda, the session detail panel, and Home's "Up next" and rest-of-day surfaces —
-  rather than disappearing.
+- **FR-1022**: A cancelled session MUST be presented as cancelled — rather than disappearing —
+  wherever an attendee would otherwise see it: the programme, Agenda, the session detail panel, and
+  Home's rest-of-day timeline.
+- **FR-1022a**: **Home's "Up next" MUST skip a cancelled session** and name the attendee's next
+  session that is actually happening. "Up next" answers *where do I go now*, and a cancelled session
+  is not an answer to it. This is the one surface where presenting the cancellation would be worse
+  than omitting it, and it is the product's most prominent viewport.
 - **FR-1023**: An attendee MUST be able to remove a cancelled session from their own saved list.
 - **FR-1024**: Cancellation MUST be reversible by an organizer, and reinstating a session MUST NOT
   dispatch a notification.
@@ -250,6 +278,14 @@ conference they were not assigned to.
 - **FR-1027**: A change to a session's title, summary, track or speakers MUST NOT dispatch a
   notification.
 - **FR-1028**: A change to a session **no** attendee has saved MUST dispatch nothing.
+- **FR-1028a**: The **acting principal MUST NOT be notified of their own act.** An organizer who is
+  also an attendee registered for their own conference, and who has saved the session they are
+  changing, receives no notification and no marker for that change. They already know.
+- **FR-1028b**: **Each organizer act dispatches independently.** Two acts an hour apart that each
+  materially change the same attendee's saved sessions produce **two** notifications. Coalescing is
+  per **action** (FR-1034), never per attendee per time window — a time-window rule would suppress a
+  cancellation because a room moved earlier, which is the failure this whole trigger exists to
+  prevent.
 - **FR-1029**: A notification covering a **single** changed session MUST name that session and what
   changed, and activating it MUST open that session.
 - **FR-1030**: A materially changed saved session MUST carry an **in-app marker** on its row in
@@ -289,8 +325,12 @@ conference they were not assigned to.
 - **FR-1038**: An audit entry MUST record the principal, the conference, the act, the entity acted
   on and the instant. There MUST remain **no read path over the audit trail** in either product
   (013, FR-999).
-- **FR-1039**: Authoring routes MUST be throttled per action, in the shape the product already
-  applies to every other write path.
+- **FR-1039**: Authoring routes MUST be throttled **per action**, in the shape the product already
+  applies to every other write path, and each action MUST be named rather than covered by a generic
+  bucket: `conference_create`, `session_write`, `session_cancel`, `session_delete`, and
+  `catalog_write` for tracks, rooms and speakers. `conference_create` and `session_cancel` are the
+  two that matter — the first is the only product-wide act an organizer holds, and the second is the
+  only authoring act that reaches attendees' phones.
 
 #### Absences
 
@@ -336,8 +376,9 @@ conference they were not assigned to.
   against such a session.
 - **SC-1003**: After a session is cancelled, 100% of the notes, questions and votes attached to it
   remain readable by the attendees who wrote them.
-- **SC-1004**: An attendee who saved a session that is cancelled or moved learns of it without
-  opening the application, provided they granted permission.
+- **SC-1004**: An attendee who saved a session that is cancelled or moved learns of it **without
+  opening the application and within one minute of the organizer confirming the change**, provided
+  they granted permission and hold a live subscription.
 - **SC-1005**: An attendee who denied notification permission completes every task in Agenda, Home
   and the session panel identically to one who granted it.
 - **SC-1006**: A change to a session's title, summary, track or speakers produces zero
@@ -370,7 +411,7 @@ conference they were not assigned to.
 | **Accessibility** (Principle IV) | Every control accessibly labelled, visible focus, keyboard operable. Any modal introduced — the delete-versus-cancel confirmation, the overlap warning — is a native `<dialog>` opened with `showModal()`, dismissible with Escape, **centred by the base rule in `theme/tokens.css` rather than by a local `m-auto`**, with focus restored to the opener after closing. The marker MUST be conveyed to assistive technology by text, never by colour alone. |
 | **Validation checklist discharged** (Principle VII) | Discharges **session save + notes + Q&A** end-to-end under content change, and **keyboard focus visibility and accessible labels** for the new administrative surfaces. Explicitly does **not** discharge desktop and mobile rendering review (register entry 4, and this feature escalates it), the physical iPhone test, or the by-hand quickstart walkthroughs outstanding from 007, 008, 009 and 013. |
 | **Identity scoping & server-side authorization** (Principle VIII) | Authoring authority is a **server-enforced predicate** over the administrative principal and the named conference, in the shape `EventScope`, `ConversationScope`, `CardScope` and `VerifiedOperatorScope` establish. A conference the principal has no authority over is refused **identically to one that does not exist**. On the attendee side, the marker and notification are scoped to the attendee's own saved sessions and disclose nothing about anyone else's. |
-| **Deletion & export coverage** (Principle VIII) | **Session cancellation state** and **session change records** are conference content, not attendee data: no cascade from `attendees` and no export coverage, declared with that reason rather than allow-listed silently. **The per-attendee viewed-state on a saved session IS attendee data**: it cascades from `attendees` and from `sessions`, and appears in the personal-data export alongside the saved session it belongs to. Both coverage tests derive from the schema, so each new column fails by existing until declared. |
+| **Deletion & export coverage** (Principle VIII) | **Session cancellation state** and **session change records** are conference content, not attendee data: no cascade from `attendees` and no export coverage, declared with that reason rather than allow-listed silently. **The per-attendee viewed-state on a saved session IS attendee data**: it cascades from `attendees` and from `sessions`, and appears in the personal-data export alongside the saved session it belongs to. Both coverage tests derive from the schema, so each new column fails by existing until declared. **A third schema-derived guard joins them** (FR-1018a): the engagement predicate that governs whether a session may be deleted MUST also be derived from the schema, so a later feature adding an attendee-state table referencing a session cannot silently fall outside it. |
 | **Event scoping** (Standing decision D1/7) | **Per-event, throughout, and this is not a default being assumed.** Conference content is per-event by D1. Organizer assignments are already per-event. The marker is per-event because it is about a session. The one cross-event thing this feature touches is the **push subscription**, which is per device and already cross-event by 007's design — it carries delivery, not content. |
 | **Register position** (Governance) | **Blocked by**: constitution v4.2.0, drafted and not yet ratified — nothing else. **Resolves**: none. **Escalates**: entry **4** (desktop and tablet unvalidated) by adding a substantial new administrative surface; entry **22** (a cached conference outliving its registration) by giving the cached programme a **second** way to be wrong — it can now be stale rather than merely unauthorised — which 014 does not close and which remains filed against 012. **Opens**: none beyond entries **27** and **28**, which v4.2.0 opens. |
 | **Reserved migration number** (Branching — parallel work) | **`0011`.** 013 holds `0009` and 012 reserves `0010`. The roadmap's reserved-number table does not cover the administrative programme and MUST be extended; this spec's departure note records that. |
@@ -387,6 +428,13 @@ reversed without re-specifying the feature.
   therefore not a Principle VIII disclosure requiring a recorded exception. This is written down
   rather than derived, following v3.3.0's discipline; if the owner reads it as a disclosure, FR-1025
   is where it changes.
+
+  **The aggregate is thin at small scale, and that is stated rather than glossed.** At a conference
+  with three registrants, "1 attendee wrote a note on this" is close to a name, and an organizer can
+  see who is registered. It holds at conference scale and it does not hold at seed or pilot scale.
+  The mitigation available without a decision is to present engagement as a **threshold rather than
+  a count** — "attendees have saved this" versus a number — and that is the shape to reach for if
+  the owner reads FR-1025 as a disclosure.
 - **The event timezone is frozen once a session exists** (FR-1015), which sidesteps the question of
   whether a timezone change is a "change of start time" under N1. Structurally no instant moves, but
   every displayed local time shifts — so freezing it is the answer that needs no new rule.
