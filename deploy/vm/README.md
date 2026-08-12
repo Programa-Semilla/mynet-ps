@@ -198,6 +198,36 @@ completely correct in a browser and silently defeats every uptime check for the 
 
 ---
 
+## 4a. Web Push on iPhone — read this before reporting it broken
+
+**iOS will not deliver Web Push to a browser tab, and will not deliver it to Chrome at all.**
+Apple exposes push only to **Home Screen web apps**, from iOS 16.4 onwards, and every browser on
+iOS is WebKit underneath — so a third-party browser cannot receive it however it is configured.
+
+Someone testing on a phone will open the address in whatever browser they normally use, see no
+notification, and conclude the feature is broken. It is not, and neither is their phone.
+
+**The procedure that works:**
+
+1. Open the address **in Safari** — not Chrome, not Firefox.
+2. **Share → Add to Home Screen.**
+3. Launch MyNet **from the Home Screen icon**, not from Safari.
+4. The notification control now appears, and the permission prompt with it.
+
+Step 2 produces a real installed web app rather than a bookmark because the manifest declares
+`display: standalone`, which is the condition Apple requires. `vite.config.ts` sets it.
+
+**The product already handles this correctly and silently.** In a browser that cannot deliver,
+`PushManager` is absent from `window`, so `NotificationService.isSupported()` is false and the
+attendee is never offered a prompt that could not lead anywhere — the same complete-outcome
+behaviour FR-552 requires for somebody who declines. There is nothing to fix; there is only this
+to know.
+
+**Verified 2026-08-11**: delivery works on desktop Chrome against the deployed environment. The
+iPhone half is 011's physical-device test.
+
+---
+
 ## 4. Checking an environment
 
 ```bash
