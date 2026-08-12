@@ -30,6 +30,13 @@ Owner decisions cited by this amendment (all 2026-08-12):
   N2. THE IN-APP MARKER IS PER-ROW STATE, NOT AN INBOX. 014 marks a changed saved session on the row
       itself, in Agenda and on Home. The bell and the in-app notification centre remain forbidden,
       unchanged and unweakened, and the distinction MUST be testable as an absence.
+      **The prohibition governs surfaces INSIDE the product**, and that scope is stated rather than
+      assumed: a single organizer act may materially change several of one attendee's saved sessions
+      at once, and it dispatches **one coalesced notification** whose body carries a count. A
+      notification is a single interruption by nature, and twelve interruptions for one act is the
+      outcome 3.1.0's exclusion existed to prevent — so the count is permitted in the payload and
+      **forbidden everywhere it could become a surface**. Activating it MUST land on the destination
+      holding the per-row markers, never on a list of changes.
   N3. A CONFERENCE ORGANIZER MAY CREATE A CONFERENCE and is assigned to it. A2's "authority reaches
       only the conferences they are assigned" cannot describe the act of creating one. This is the
       **only** product-wide capability the tier holds; authority over conferences it did not create
@@ -1998,6 +2005,17 @@ the end of this block rather than glossed.
   009's and 013's absence guards already establish. It is written down because a per-row marker is
   the natural first step toward the centre this rule forbids, and the second step would not feel
   like a decision at the time somebody took it.
+
+  **This prohibition governs surfaces INSIDE the product, and that scope is deliberate.** One
+  organizer act may materially change several of an attendee's saved sessions at once, and it
+  dispatches **one coalesced notification whose body carries a count** rather than one notification
+  per session. A notification is a single interruption by its nature, and a dozen interruptions from
+  one act is precisely the product 3.1.0's exclusion existed to prevent — so a count is permitted
+  **in the payload** and forbidden everywhere it could become something to look at. Two rules make
+  that boundary hold rather than blur: **activating such a notification MUST land on the destination
+  carrying the per-row markers**, never on a list of what changed; and **no view inside either
+  product may present that count**. The moment a screen answers "how many things changed", this rule
+  has been broken regardless of what the payload does.
 
 - **Delivery MUST go through `NotificationService`** (Principle V), over a domain shape rather than
   the browser's own `PushSubscription` type. The signing key is a secret and MUST NOT appear in
