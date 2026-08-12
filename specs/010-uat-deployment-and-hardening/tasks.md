@@ -162,7 +162,7 @@ record.
 - [X] T037 [US2] Verify TLS, the HTTP redirect, same-origin API requests, and that the database is unreachable from off-host (FR-824, FR-825, FR-826, SC-801)
 - [X] T038 [US2] Verify the deployment gates on readiness by stopping the database container and confirming the gate refuses while `/health` alone would have passed (FR-827)
 - [X] T039 [P] [US2] Assert in `apps/api/tests/unit/deployment-config.test.ts` that **no credential, allowlist or other access restriction sits in front of UAT** — no basic-auth directive in `deploy/vm/Caddyfile`, no source restriction on ports 80/443 (FR-829). Adding basic auth "temporarily" is exactly the helpful change that would breach this silently
-- [ ] T040 [P] [US2] Record the provisioning run in `deploy/vm/README.md` with every prerequisite an operator who did not build it would need (FR-830, SC-814)
+- [X] T040 [P] [US2] Record the provisioning run in `deploy/vm/README.md` with every prerequisite an operator who did not build it would need (FR-830, SC-814)
 
 **Checkpoint**: the product is reachable at a real address.
 
@@ -183,11 +183,11 @@ record.
 **Independent test**: Quickstart Scenario 5, end to end, under five minutes.
 
 - [X] T044 [US3] Seed the deployed environment so a conference with a join code, its sessions and its meeting slots exist — `deploy.sh --migrate` migrates and does not seed (FR-884)
-- [ ] T045 [US3] Add the re-seed warning to `deploy/vm/README.md`, stating plainly that re-seeding UAT **destroys every account created against it**, including a reviewer's (FR-885, research R9)
+- [X] T045 [US3] Add the re-seed warning to `deploy/vm/README.md`, stating plainly that re-seeding UAT **destroys every account created against it**, including a reviewer's (FR-885, research R9)
 - [ ] T046 [US3] Walk sign-up → verification mail → verify → join by code → visible in Discover from a second profile, against the deployed address (FR-844, SC-802)
 - [ ] T047 [US3] Walk the password-reset journey against the deployed address (FR-844, SC-803)
-- [ ] T048 [P] [US3] Confirm a broken SMTP URL leaves account creation succeeding and logs the failure honestly (FR-846, FR-847)
-- [ ] T049 [P] [US3] Inspect the deployed data and confirm it holds only seeded content and accounts created against UAT (FR-880, SC-812); record in `deploy/vm/README.md` that seeded credentials are **committed and world-readable by intent** — the repository is public, UAT holds no real attendee data, and they must never be reused anywhere else (FR-883)
+- [X] T048 [P] [US3] Confirm a broken SMTP URL leaves account creation succeeding and logs the failure honestly (FR-846, FR-847)
+- [X] T049 [P] [US3] Inspect the deployed data and confirm it holds only seeded content and accounts created against UAT (FR-880, SC-812); record in `deploy/vm/README.md` that seeded credentials are **committed and world-readable by intent** — the repository is public, UAT holds no real attendee data, and they must never be reused anywhere else (FR-883)
 
 **Checkpoint**: the environment is usable by a person.
 
@@ -239,7 +239,7 @@ record.
 - [X] T059 [P] [US5] Give the public key a single source of truth rather than one value on the API and another in the client build with nothing checking they agree (FR-853) — the `vapid-config-duplication` inbox entry, pulled in because its own wording says to settle it when the real adapter lands
 - [ ] T060 [P] [US5] Remove `PUSH_VAPID_SUBJECT` from `apps/api/src/config.ts` and `deploy/vm/.env.example` — it is read by nothing (FR-854)
 - [X] T061 [P] [US5] Verify that with **no** key pair configured the sink is used, the attendee is never asked for permission, and Messages, unread state and the poll are unaffected — re-run `push-denied-fallback.test.tsx` and confirm it passes unchanged (FR-855)
-- [ ] T062 [US5] Document in `deploy/vm/README.md` that the pair is **rotated only on compromise**, because rotation silently stops delivery for every attendee until their browser re-registers and nothing tells them (FR-852)
+- [X] T062 [US5] Document in `deploy/vm/README.md` that the pair is **rotated only on compromise**, because rotation silently stops delivery for every attendee until their browser re-registers and nothing tells them (FR-852)
 - [ ] T063 [US5] Verify delivery against the deployed address from two browser profiles, including that activating the notification opens **that** conversation (SC-804)
 
 ---
@@ -251,7 +251,7 @@ record.
 - [ ] T064 [US6] Set `MAIL_OPERATOR_ADDRESS=apps@programasemilla.com` in the VM `.env` and confirm the boot-time "not provisioned" warning no longer fires (FR-860)
 - [ ] T065 [US6] Submit a report against the deployed address and confirm the block applies in the same action, the report is recorded, and mail arrives (FR-845, FR-862, SC-805)
 - [ ] T066 [US6] Inspect the delivered mail and confirm it carries identifiers and a timestamp only (FR-848)
-- [ ] T067 [P] [US6] Break the SMTP URL, report again, and confirm the block still applies and the failed dispatch is **logged rather than dropped** (FR-847)
+- [X] T067 [P] [US6] Break the SMTP URL, report again, and confirm the block still applies and the failed dispatch is **logged rather than dropped** (FR-847)
 
 ---
 

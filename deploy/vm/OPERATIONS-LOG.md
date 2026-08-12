@@ -233,3 +233,43 @@ walked. Backups are not installed on the host and the off-host container does no
 **Recorded by**: the 010 implementation, phase 5.
 
 ---
+
+## 2026-08-11 — the mail failure paths, provoked on the live environment
+
+**Act**: `MAIL_SMTP_URL`'s host was pointed at a domain that does not resolve — credential
+untouched — the API was restarted, and the two actions that send mail were exercised against
+`https://mynet-dev.programasemilla.com`. Then it was restored.
+
+FR-846 and FR-847 say a dispatch failure must be logged rather than discarded, and must not fail
+the action that triggered it. Both are the kind of claim that is easy to assert and easy to have
+wrong, because the happy path never exercises them.
+
+### Account creation with mail broken (T048, FR-846, FR-847)
+
+| Check | Observed |
+| ----- | -------- |
+| `POST /api/auth/sign-up` | **204** — the account was created |
+| the attendee row | present |
+| the failure | **logged** (2 matching lines in the API log) |
+
+### A report with mail broken (T067, FR-847, FR-862)
+
+| Check | Observed |
+| ----- | -------- |
+| `POST /api/reports` | **204** |
+| the block, in the same action | **applied** |
+| the report row | **recorded** |
+
+That is FR-847 exactly: *a report still blocks and is still recorded, and an account is still
+created*. Safety does not depend on an external service answering.
+
+### Restored
+
+`MAIL_SMTP_URL` was put back and re-authenticated against `smtp.mailgun.org:465` — `235
+Authentication successful`, no message sent. The probe account and **all** rows in
+`attendee_blocks` were deleted so that a by-hand walkthrough is not confused by test data; that
+delete was not surgical, and any block created before it is gone.
+
+**Recorded by**: the 010 implementation, phases 7 and 10.
+
+---
