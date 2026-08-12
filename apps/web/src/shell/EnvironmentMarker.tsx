@@ -1,10 +1,10 @@
 /**
- * T076 (010) — **this is not production, and every view says so** (FR-828, research R6).
+ * T076 (011) — **this is not production, and every view says so** (FR-828, research R6).
  *
  * ═════════════════════════════════════════════════════════════════════════════════════════
  * **UAT IS OPENLY REACHABLE AND CARRIES A REAL SIGN-UP FORM, WHICH IS WHY THIS EXISTS.**
  *
- * Constitution v3.4.0 (decision 30) put the environment on a public address with no credential
+ * Constitution v3.5.0 (decision 30) put the environment on a public address with no credential
  * and no allowlist, because the validation it exists for — service-worker registration, Web Push,
  * a physical-device test on cellular — is disabled by putting a door in front of it. The cost of
  * that decision is that somebody can arrive here having followed a link, see a working product,
@@ -43,7 +43,23 @@
  * of the artifact rather than of a runtime check.
  */
 export const EnvironmentMarker = () => {
-  if (!__UAT_MARKER__) return null
+  // ───────────────────────────────────────────────────────────────────────────────────────────
+  // **`typeof` GUARD, BECAUSE A `define` ONLY EXISTS INSIDE THE VITE BUILD.**
+  //
+  // `__UAT_MARKER__` is substituted by `vite.config.ts`. Anything that renders this component
+  // WITHOUT going through that build — the component test suite, which has its own vitest config
+  // — meets an undefined global and throws `ReferenceError`, taking the whole shell down with it.
+  //
+  // That is not hypothetical: it crashed `brand-mark.test.tsx` the moment both features' headers
+  // met in one file. This component's own test stubbed the global and so never saw it, which is
+  // the more useful half of the lesson — a guard that only its author's test exercises is a guard
+  // whose failure mode is somebody else's test.
+  //
+  // Dead-code elimination survives. Vite replaces the identifier with the literal `false`, so
+  // this folds to `typeof false !== 'undefined' && false` and then to `false`, and the element is
+  // still absent from the production bundle rather than hidden inside it (FR-828).
+  // ───────────────────────────────────────────────────────────────────────────────────────────
+  if (typeof __UAT_MARKER__ === 'undefined' || !__UAT_MARKER__) return null
 
   return (
     <span

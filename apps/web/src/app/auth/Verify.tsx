@@ -3,6 +3,7 @@ import { useIdentityRepository } from '@mynet/platform'
 import { useEffect, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
 
+import { BrandMark } from '../../shell/BrandMark.js'
 import { PRODUCT_NAME } from '../branding.js'
 
 /**
@@ -82,9 +83,17 @@ export const Verify = () => {
   return (
     <main className="flex min-h-screen items-center justify-center bg-surface px-4 py-10">
       <div className="w-full max-w-md rounded-lg bg-surface-raised p-6 shadow-card sm:p-8">
-        <h1 className="mb-4 font-display text-2xl font-semibold text-text-primary">
-          Verify your email address
-        </h1>
+        {/*
+          T043 (010) — the stacked lockup, centred as a unit (FR-826). Navy on this light card.
+          The heading text is exactly as it was: this screen tells somebody what to do, and a
+          brand mark does not change that. Only the alignment moves; the body below stays left.
+        */}
+        <header className="mb-4 text-center">
+          <BrandMark colourway="navy" className="mx-auto mb-3 block h-10" />
+          <h1 className="font-display text-2xl font-semibold text-text-primary">
+            Verify your email address
+          </h1>
+        </header>
 
         {state === 'pending' && (
           <p role="status" aria-live="polite" className="text-sm text-text-body">

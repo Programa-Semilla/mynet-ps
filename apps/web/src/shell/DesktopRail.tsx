@@ -2,6 +2,7 @@ import { NavLink } from 'react-router'
 
 import { DESTINATIONS } from '../app/navigation.js'
 import { PRODUCT_NAME } from '../app/branding.js'
+import { BrandMark } from './BrandMark.js'
 
 /**
  * T073 — the persistent left navigation rail (FR-016).
@@ -21,7 +22,19 @@ export const DesktopRail = () => (
     data-nav-layout="desktop"
     className="hidden w-(--spacing-rail-desktop) shrink-0 flex-col gap-1 border-r border-border-subtle bg-surface-inverse px-3 py-5 desktop:flex"
   >
-    <span className="mb-4 px-3 font-display text-lg font-semibold text-text-inverse">
+    {/*
+      T038 (010) — the mark beside the product name, in the **coral** colourway (FR-822).
+
+      The colourway is not a preference. This rail is `bg-surface-inverse`, and the navy mark on
+      it would be invisible while passing every assertion available: present, correctly sized,
+      correctly hidden from assistive technology (FR-820b, SC-814). The product name stays live
+      text — the mark joins it rather than replacing it.
+
+      This is the only surface that carries the mark at desktop width. The top bar hides its own
+      there, because two marks a few centimetres apart is worse than one (FR-824).
+    */}
+    <span className="mb-4 flex items-center gap-2 px-3 font-display text-lg font-semibold text-text-inverse">
+      <BrandMark colourway="coral" className="h-6" />
       {PRODUCT_NAME}
     </span>
 

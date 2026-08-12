@@ -31,7 +31,9 @@
     "db:seed": "pnpm --filter @mynet/api db:seed",
     "db:generate": "pnpm --filter @mynet/api db:generate",
     "budget": "node scripts/asset-budget.mjs",
-    "verify": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm test:unit && pnpm test:component && pnpm contract:check && pnpm test:integration && pnpm build && pnpm budget && pnpm test:e2e",
+    "brand:audit": "node scripts/brand-audit.mjs",
+    "brand:generate": "node scripts/generate-brand-assets.mjs",
+    "verify": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm test:unit && pnpm test:component && pnpm contract:check && pnpm test:integration && pnpm build && pnpm budget && pnpm brand:audit && pnpm test:e2e",
     "verify:clean": "node scripts/verify-clean.mjs"
   },
   "devDependencies": {
@@ -44,6 +46,7 @@
     "eslint-plugin-react-hooks": "^7.1.1",
     "globals": "^17.9.0",
     "prettier": "^3.9.6",
+    "sharp": "^0.35.3",
     "typescript": "6.0.3",
     "typescript-eslint": "^8.66.0",
     "vitest": "^4.1.10"

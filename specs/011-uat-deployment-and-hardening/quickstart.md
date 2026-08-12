@@ -92,7 +92,7 @@ never set at all and were invisible because an unrelated step failed first.
 4. Confirm in the browser's network panel that API requests are **same-origin**.
 5. Stop the database container and re-run the readiness check.
    → Refused on readiness. `/health` alone would have passed, which is why it is not the gate.
-6. **Look at the layouts.** Desktop, tablet and mobile. This is not in scope for 010's requirements
+6. **Look at the layouts.** Desktop, tablet and mobile. This is not in scope for 011's requirements
    — it is 011's — but you are here, in a browser, in front of the real thing. The dialog in the
    top-left corner was found exactly like this.
 

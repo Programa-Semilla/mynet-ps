@@ -7,6 +7,7 @@ import { Link, useLocation } from 'react-router'
 import { PRODUCT_NAME } from '../app/branding.js'
 import { destinationFor } from '../app/navigation.js'
 import { useAuth } from '../auth/useAuth.js'
+import { BrandMark } from './BrandMark.js'
 import { EnvironmentMarker } from './EnvironmentMarker.js'
 import { EventSwitcher } from './EventSwitcher.js'
 
@@ -77,20 +78,52 @@ export const TopBar = () => {
         name and the sign-out control share one row. Something has to give, and it must be a
         label rather than a control (FR-020, SC-006).
       */}
-        <span className="shrink truncate font-display text-lg font-semibold text-text-primary tablet:hidden">
-          {PRODUCT_NAME}
-        </span>
-        <span className="hidden shrink truncate font-display text-lg font-semibold text-text-primary tablet:inline">
-          {current?.label ?? 'Not found'}
-        </span>
+        <div className="flex min-w-0 shrink items-center gap-2">
+          {/*
+            T039, T040 (010) — the mark, in the **navy** colourway for this raised surface, at
+            the mobile and tablet bands only (FR-820b, FR-823, FR-824).
 
-        {/*
-          010 T076 — FR-828. Sits beside the label rather than in a band of its own, because a
-          full-width band costs vertical space on every screen and mobile is where the first
-          viewport is a success criterion. It renders to nothing in a production build — the guard
-          is a build-time literal, so the element is not in the bundle at all.
-        */}
-        <EnvironmentMarker />
+            Not FR-822: that one is the *desktop rail's* requirement, and this element is defined
+            against it by `desktop:hidden`. The citations in this codebase are a navigable index —
+            people grep them to find every site bound by a requirement — so naming the wrong one
+            sends the search to the wrong file.
+
+            `desktop:hidden` is what stops two marks appearing at once: above 1280px the rail
+            carries it, six centimetres to the left, and both showing is worse than neither.
+            The band is chosen in **CSS, never in JavaScript** (FR-827) — `display: none` takes
+            the hidden form out of the accessibility tree and the tab order as well as off the
+            page, and reading the viewport in feature code is a direct platform access that
+            `mynet/no-direct-platform-access` forbids.
+
+            It is `shrink-0` at a fixed 24px while the label beside it keeps `shrink truncate`,
+            so at 320px the **label** yields and the conference switcher, the profile control and
+            the sign-out control are all untouched — which is the rule this bar's own comment
+            already sets (FR-825).
+          */}
+          <BrandMark colourway="navy" className="h-6 desktop:hidden" />
+
+          <span className="shrink truncate font-display text-lg font-semibold text-text-primary tablet:hidden">
+            {PRODUCT_NAME}
+          </span>
+          <span className="hidden shrink truncate font-display text-lg font-semibold text-text-primary tablet:inline">
+            {current?.label ?? 'Not found'}
+          </span>
+
+          {/*
+            011 T076 — FR-828. **Inside this group, not a sibling of it.** The header is
+            `justify-between`, so a third top-level child would be spread into the middle of the
+            bar — floating between the brand and the attendee's controls, attached to neither.
+            Beside the label is where it belongs and what its own requirement describes.
+
+            Not a band above the header either: a band costs vertical space on every screen, and
+            mobile is where Principle III puts a success criterion on the first viewport.
+
+            It renders to nothing in a production build — the guard is a build-time literal, so
+            the element is not in the bundle at all rather than hidden inside it.
+          */}
+          <EnvironmentMarker />
+        </div>
+
 
         {attendee && (
           <div className="flex min-w-0 shrink items-center gap-2 tablet:gap-3">

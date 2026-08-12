@@ -453,12 +453,37 @@ Let's Encrypt certificate, with a seeded conference somebody can join.
 
 **Two gates with long lead times — raise them early, not here.**
 
-- **No real brand mark or application icons exist** anywhere in this repository.
+- ~~**No real brand mark or application icons exist** anywhere in this repository.~~ **ANSWERED
+  2026-08-10.** The owner supplied a brand board, closing constitution register entry 2 by
+  amendment **v3.4.0**. Raising it early worked exactly as this line intended.
+
+  **The brand half of 010 has been split out and specified on its own**, at
+  `specs/010-brand-mark-and-app-icons/` — a departure from this section that its spec declares. It
+  takes the brand gate and nothing else; **every other item in the list above remains outstanding
+  and still belongs to this phase.** It claims no migration, so it does not contend with 009's
+  reserved `0008`.
+
+  **It is now built.** The mark reaches every surface that identifies the product: the three
+  install icons, an opaque 180px apple-touch icon, a favicon set and `favicon.ico`, the head links
+  `index.html` had never carried, the desktop rail, the top bar, all five authentication screens,
+  and manifest screenshots. Every asset is derived from `assets/brand/logo.png` by
+  `scripts/generate-brand-assets.mjs`, byte-identically. A new gate,
+  `apps/web/tests/unit/icon-declarations.test.ts`, fails a declared icon that has no file — the
+  hole where a manifest could name a missing path while all ten gates stayed green.
+
+  **Three items are booked, not done**, and are recorded per-item in
+  `specs/010-brand-mark-and-app-icons/follow-ups.md`: the iOS `apple-touch-startup-image` splash
+  matrix (FR-840), the `purpose: "monochrome"` variant (FR-841), and the vector redraw (FR-842).
+  The redraw's reason is **resolution independence for sizes not yet asked for, not present
+  degradation** — planning corrected the spec's "1.37× upscale" claim, and nothing 010 ships is
+  upscaled.
 - **The desktop and tablet experience has never been validated by the client.** The approved
   prototype is a mobile-only 390×844 frame. Every desktop layout built across 003–009 is unreviewed
-  design, and discovering a mismatch here is the expensive outcome. **010 changed this from
-  unanswerable to merely unanswered**: reviewing a layout needs a running product at a real screen
-  width, and there now is one.
+  design, and discovering a mismatch here is the expensive outcome. **Escalated twice and now
+  cheapened once.** 008 turned it from a risk into an observed defect when a dialog was found
+  rendering in the top-left corner having passed every gate; the brand work then added a visible
+  element to both unreviewed bands. But **011 changed it from unanswerable to merely unanswered** —
+  reviewing a layout needs a running product at a real screen width, and there now is one.
 
 ---
 
@@ -533,7 +558,7 @@ When to ask matters as much as what to ask.
 |---|---|---|---|
 | **Now** | Attendee identity model | 004 | Client |
 | **Now** | Data retention, deletion, export obligations | 004 | Client |
-| **Now** | Real brand mark and application icons | 010, long lead time | Client |
+| ~~**Now**~~ | ~~Real brand mark and application icons~~ — **ANSWERED 2026-08-10** (board supplied, v3.4.0, built) | — | Client |
 | After 002–003 lands | Client review of desktop and tablet experience | 003–009 build unreviewed desktop design | Client |
 | Before 008 | Connection model behind Network contacts | 008 entirely | Client |
 | Before 008 | What a card exchange records; whether it is mutual | 008 entirely | Client |

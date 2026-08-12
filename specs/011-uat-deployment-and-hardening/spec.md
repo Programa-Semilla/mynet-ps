@@ -1,6 +1,24 @@
 # Feature Specification: UAT Deployment and Pre-Public Hardening
 
-**Feature Branch**: `spec/010-uat-deployment-and-hardening`
+> ## ⚠ RENUMBERED FROM 010 TO 011 — 2026-08-11
+>
+> This feature was specified, built and deployed as **010**. While it was in flight, a second
+> feature — **brand mark and application icons** — was specified, built and **merged to `develop`
+> first**, also as 010, with its own constitution amendment also numbered **v3.4.0**. Neither
+> branch could see the other.
+>
+> The rule applied is this project's own, and it is applied here for the second time: the
+> constitution's 3.4.0 report records 009 and the brand mark both being drafted as 3.3.0, 009
+> merging first and keeping the number. **Merge order decides, nothing published is rewritten.**
+>
+> So the brand mark keeps **010** and **v3.4.0**; this feature became **011** and its amendment
+> **v3.5.0**; and the validation-and-production phase became **012**. The artifacts below were
+> written under the old number and have been updated in place — where the reasoning refers to what
+> "010" decided, read it as this feature.
+
+
+
+**Feature Branch**: `spec/011-uat-deployment-and-hardening`
 
 **Created**: 2026-08-10
 

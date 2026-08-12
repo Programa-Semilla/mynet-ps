@@ -4,6 +4,7 @@ import { useId, useState, type FormEvent } from 'react'
 import { Link } from 'react-router'
 
 import { PRODUCT_NAME, PRODUCT_TAGLINE } from '../app/branding.js'
+import { BrandMark } from '../shell/BrandMark.js'
 import { useAuth } from './useAuth.js'
 
 /**
@@ -72,7 +73,22 @@ export const SignInScreen = () => {
   return (
     <main className="flex min-h-screen items-center justify-center bg-surface px-4 py-10">
       <div className="w-full max-w-md rounded-lg bg-surface-raised p-6 shadow-card sm:p-8">
-        <header className="mb-6">
+        {/*
+          T041 (010) — the stacked lockup: mark centred above the heading, in the **navy**
+          colourway for this light card (FR-826).
+
+          **The header block is centred as a unit, and that is the arrangement rather than a
+          preference.** The board draws the stacked lockup with the mark centred over the
+          wordmark; centring only the image would leave it floating above a left-aligned name,
+          which reads as a misalignment rather than a lockup. Owner decision, 2026-08-10.
+
+          Only the *alignment* moves. Every heading's text is exactly what it was (SC-808), and
+          what this heading must not become is the board's raster lockup dropped in whole: on
+          **this** screen the product name is the `<h1>` — the only one of the five where that is
+          so. An image cannot be a heading, so the mark sits above it and stays decorative.
+        */}
+        <header className="mb-6 text-center">
+          <BrandMark colourway="navy" className="mx-auto mb-3 block h-10" />
           <h1 className="font-display text-2xl font-semibold text-text-primary">{PRODUCT_NAME}</h1>
           <p className="mt-1 text-sm text-text-muted">{PRODUCT_TAGLINE}</p>
         </header>

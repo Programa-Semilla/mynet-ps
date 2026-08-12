@@ -1,6 +1,6 @@
 # Tasks: UAT Deployment and Pre-Public Hardening
 
-**Input**: Design documents from `/specs/010-uat-deployment-and-hardening/`
+**Input**: Design documents from `/specs/011-uat-deployment-and-hardening/`
 
 **Prerequisites**: plan.md, spec.md, research.md, data-model.md, contracts/, quickstart.md
 
@@ -285,7 +285,7 @@ exposure that nothing else reports.
 - [X] T081 [P] Confirm `apps/api/tests/unit/deletion-coverage.test.ts` and `export-coverage.test.ts` pass unchanged — if either fails, a schema change was introduced and FR-890 is broken (data-model.md)
 - [ ] T082 Verify SC-815 against the deployed environment: **nothing attendee-facing behaves differently** except that some requests are delayed, an unverified account cannot share a card, and UAT carries its marker. Walk one full core journey — inspect a session, discover an attendee, share a card, message, schedule — and confirm every other surface is as before
 - [X] T083 Update `deploy/vm/README.md` into a runbook an operator who did not build this can follow, and reconcile `docs/superpowers/specs/2026-08-06-mynet-delivery-roadmap-design.md`, which still describes the unsplit 010 and has no 011
-- [ ] T084 Walk `specs/010-uat-deployment-and-hardening/quickstart.md` end to end — **all nine scenarios**. 007, 008 and 009 each shipped with this outstanding, and the first defect a person found by looking had passed 135 e2e tests and five review agents
+- [ ] T084 Walk `specs/011-uat-deployment-and-hardening/quickstart.md` end to end — **all nine scenarios**. 007, 008 and 009 each shipped with this outstanding, and the first defect a person found by looking had passed 135 e2e tests and five review agents
 
 ---
 

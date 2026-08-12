@@ -1,8 +1,8 @@
 # Implementation Plan: UAT Deployment and Pre-Public Hardening
 
-**Branch**: `spec/010-uat-deployment-and-hardening` | **Date**: 2026-08-10 | **Spec**: [spec.md](./spec.md)
+**Branch**: `spec/011-uat-deployment-and-hardening` | **Date**: 2026-08-10 | **Spec**: [spec.md](./spec.md)
 
-**Input**: Feature specification from `/specs/010-uat-deployment-and-hardening/spec.md`
+**Input**: Feature specification from `/specs/011-uat-deployment-and-hardening/spec.md`
 
 ## Summary
 
@@ -93,7 +93,7 @@ not written down.
 ### Documentation (this feature)
 
 ```text
-specs/010-uat-deployment-and-hardening/
+specs/011-uat-deployment-and-hardening/
 ├── plan.md                     # This file
 ├── spec.md                     # 73 FRs, 19 SCs, 5 open questions
 ├── research.md                 # Phase 0 — R1..R9

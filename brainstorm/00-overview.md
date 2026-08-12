@@ -1,9 +1,11 @@
 # Brainstorm Overview
 
-Last updated: 2026-08-10 (**the delivery roadmap is complete** — 009 shipped and every destination
-carries content. Session #08 rescopes phase 010 to **UAT deployment and pre-public hardening** and
-adds **011** for the validation pass, and takes the five owner decisions that had gated the first
-deploy since 006)
+Last updated: 2026-08-11 (**the delivery roadmap is complete**. Two sessions numbered #08 ran in
+parallel and both shipped: the **brand mark and application icons**, ratified as constitution
+**v3.4.0**, closing register entry 2 — the oldest in the register; and **UAT deployment and
+pre-public hardening**, ratified as **v3.5.0**, which rescopes the roadmap's 010 into **011** and
+moves the validation pass to **012**. MyNet is deployed and serving at
+`mynet-dev.programasemilla.com`)
 
 The authoritative registers live elsewhere — open questions in `.specify/memory/constitution.md`,
 delivery sequence in `docs/superpowers/specs/2026-08-06-mynet-delivery-roadmap-design.md`. This file
@@ -22,7 +24,7 @@ win and this is stale.
 | 05 | 2026-08-07 | discover-and-the-deployment-platform | ratified in constitution **v3.0.0** | `specs/006-discover-and-deployment-platform/` |
 | 06 | 2026-08-07 | messages-and-notification-delivery | **implemented in full**, including Web Push; its amendment ratified in constitution **v3.1.0** | `specs/007-messages-and-notification-delivery/` |
 | 07 | 2026-08-10 | network-and-appointments | **specified, then implemented**; entries 7, 8 and 9 ratified in constitution **v3.2.0** | `specs/008-network-and-appointments/` |
-| — | 2026-08-10 | session-qa | specified without a brainstorm; ratified in constitution **v3.3.0** | `specs/009-session-qa/` |
+| 08 | 2026-08-10 | brand-mark-and-app-icons | **specified, then implemented**; register entry 2 ratified in constitution **v3.4.0** | `specs/010-brand-mark-and-app-icons/` |
 | 08 | 2026-08-10 | uat-deployment-and-hardening | **active** — phase 010 rescoped, 011 added; five owner decisions taken, awaiting amendment | `brainstorm/08-uat-deployment-and-hardening.md` |
 
 Session 05 has no document of its own: 006 was specified without one, and the row records the
@@ -77,9 +79,10 @@ the index, and it now differs from the roadmap in the ways #02 records.
 | 006 | Discover, and the deployment platform | **implemented** — awaiting the two owner decisions that gate the first deploy (a domain, an Azure subscription). Migration `0005`: five indexes and one extension, **no new table and no new column** | 004 ✓ |
 | 007 | Messages **and the notification-delivery platform** | **shipped** — squash-merged to `develop`. Web Push delivers for real, verified end to end on a desktop. T148's by-hand walkthrough is partial (scenario 5 only) and carries forward. Migration `0006` | 004 ✓, 006 ✓ |
 | 008 | Network & Appointments | **implemented** — 149 tasks, FR-601–FR-659. Migration `0007` adds three tables under **two different scoping rules**: `shared_cards` cross-event, `appointments` and `meeting_slots` per-event. A **third** branded scope and a **third** route audit (`CardScope`, `card-audit.test.ts`), because a card route names no conference and `event-scope-audit` walks past it. T148's by-hand walkthrough is outstanding | ~~connection model~~ ✓, ~~card-exchange semantics~~ ✓ |
-| 009 | Session Q&A | **shipped** — squash-merged to `develop` ([#17](https://github.com/Programa-Semilla/mynet-ps/pull/17)), with constitution v3.3.0 in the same PR. Migration `0008`. Four defects found during implementation, three of them only by tests written for the purpose. T097's by-hand walkthrough is outstanding and joins 007's and 008's | ~~question attribution~~ ✓ |
-| 010 | **UAT Deployment & Pre-Public Hardening** — *rescoped by #08* | queued, **fully unblocked**. No schema. Six security entries, then provision, DNS, TLS, a Mailgun adapter behind `MailService`, VAPID, seed, and an exercised restore on the real host | — |
-| 011 | **Launch Readiness & Production** — *added by #08* | queued | brand assets (entry 2); client validation of desktop and tablet (entry 4) |
+| 009 | Session Q&A | **shipped** — squash-merged to `develop` ([#17](https://github.com/Programa-Semilla/mynet-ps/pull/17)); its amendment ratified as **v3.3.0**. Migration `0008` | ~~question attribution~~ ✓ |
+| 010 | Launch Readiness — **brand mark and application icons** | **shipped** — FR-800–FR-850, amendment ratified as **v3.4.0**. Replaces the three deliberately-ugly provisional icons, adds the favicon and `apple-touch-icon` that `index.html` has **never had**, puts the mark on the rail, top bar and five auth screens, and adds a gate that fails a **declared icon with no file** — which nothing catches today. Scope is core-only; splash matrix, monochrome and the vector redraw are booked follow-ups. **No migration**, so it does not contend with 009's `0008`. **Takes the brand gate only** — the rest of Launch Readiness stays outstanding | ~~brand assets~~ ✓ (owner supplied 2026-08-10); ~~register entry 2~~ ✓ (v3.4.0); palette adoption is new entry 23; client validation of desktop still open |
+| 011 | **UAT Deployment & Pre-Public Hardening** — *rescoped from the roadmap's 010* | **shipped** — six abuse paths closed, SMTP mail, provisioned and serving at `mynet-dev.programasemilla.com`; amendment ratified as **v3.5.0** | — |
+| 012 | **Launch Readiness & Production** | queued | client validation of desktop and tablet (entry 4); register entry 22; production domain |
 
 **002 carries the most leverage and the most risk in the queue, and #02 enlarged it further.** It is
 not only the event switcher: it commits to the Home card composition contract and the per-event
@@ -207,13 +210,27 @@ deployment or release.
   design, so the cost compounds per phase. **Now more urgent than when it was written**: absorbing
   the catalog means 002 builds the Home dashboard *and* the catalog screens before any desktop review
   happens, and the roadmap's gate — scheduled for "after 002–003" — now fires after 002 alone.
-  *Worth pulling forward* (from #01, escalated by #02). **#08 both narrows and cheapens it**: it now
-  blocks **011** rather than 010, and once UAT exists the client reviews the running product at
-  their own screen width instead of a description — which is also the only way the register entry
-  has ever been answerable. *Register entry 4*
-- **Real brand mark and application icons** — no logo exists in the repository. *Blocks **011**, not
-  010, since #08 split the phase; long lead time, so it is the item most worth starting now.*
-  *Register entry 2* (from #01)
+  *Worth pulling forward* (from #01, escalated by #02). **Escalated again by #08**: 010 puts a brand
+  mark on the rail, the top bar and five auth screens across all three width bands, and a mark's
+  position and size is precisely the class of thing no behavioural gate can see — the same class as
+  the dialog that shipped in the top-left corner having passed 135 e2e tests and five review agents.
+- ~~**Real brand mark and application icons**~~ — **ANSWERED 2026-08-10 by #08.** The owner supplied
+  a brand board, now tracked at `assets/brand/logo.png`: the MyNet mark (a round-capped "N" with
+  two node terminals) on
+  navy and cream, horizontal and stacked lockups, scale tests to 16px, and a monochrome test. This
+  is the client decision the entry was waiting for, so 010 is no longer blocked on an asset that
+  does not exist. **RATIFIED 2026-08-10 as constitution v3.4.0** — standing decision 27, and the
+  rule now lives in a binding block, "Brand identity and application icons", rather than in a
+  struck-through entry. The board was moved to `assets/brand/` by owner decision, and 010 carried
+  the move out: in this repository "seed" means database seed data, and a brand board filed beside
+  it reads as conference fixture data. Two things it deliberately did **not** settle: whether the UI palette adopts the brand's
+  navy and coral — now **register entry 23** — and the vector redraw the raster crop defers, which
+  010 books rather than notes.
+
+  **Cheapened, not closed, by 011.** Entry 4 now blocks **012**, and once UAT exists the client
+  reviews the running product at their own screen width instead of a description — which is the
+  only way this entry has ever been answerable. It is the last register entry standing between the
+  product and a release.
 - **`GroundZero/requirements.md` is knowingly out of step** with the constitution on product name,
   delivery mode, persistence, authentication, and routing. Amend it, or record the divergence?
   (from #01)
@@ -291,6 +308,43 @@ deployment or release.
   is public, and `branches/develop/protection` returns **404 — no rule set**. Branch protection is
   free on public repositories, so this is a configuration task rather than an accepted risk
   (corrected 2026-08-06)
+
+### Design questions carried into 010's specification
+
+From #08. None blocks the specification. The brand decision itself is answered above.
+
+- **Whether `navy-800` and `coral-500` adopt the brand's values.** Measured from the board, they
+  disagree with the tokens: brand navy `#0d1942` against `navy-800 #1b2340`, brand coral `#fe6551`
+  against `coral-500 #e8634d`. Cream matches. **Deliberately deferred** — navy-800 is the primary
+  surface and coral-500 the accent, so adopting them repaints the whole product and the
+  accessibility suite must re-pass on new contrast ratios. The interim cost is knowingly accepted: a
+  visible seam between the icon plate and the token-derived `theme_color` on the splash screen.
+- ~~**The brand source is filed beside database seed data, and the collision is not cosmetic.**~~
+  **SETTLED by 010**: the board is tracked at `assets/brand/logo.png`, and the directory it arrived
+  in is gone. In this repository "seed" means database seed data (`pnpm db:seed`), so the path was
+  settled before any build script referenced it.
+- **Whether the mobile top bar carries the mark at all.** It is contextual by design — product name
+  at mobile widths, current destination above them — so a mark competes for the same small strip.
+- **The iOS splash device matrix**, which is the bulk of the extras bundle's cost and the whole of
+  its precache risk: `injectManifest` globs `**/*.png`, so every splash image is precached at
+  install unless deliberately excluded. Several megabytes, on a phone at a venue.
+- **Whether the asset budget (FR-072) counts `public/` assets.** It reads the entry chunk and its
+  static imports, so these probably fall outside it — meaning the extras bundle could add megabytes
+  to the install with **no gate objecting**. Confirm rather than assume.
+- **Whether `purpose: "monochrome"` is worth shipping.** Platform support is thin; the board's
+  monochrome test is suggestive, not decisive.
+- **Nothing asserts the manifest's declared icons exist on disk.** A manifest naming a missing file
+  passes every one of the ten correctness gates and fails only when a real device tries to install.
+  010 should close this in the spirit of `deletion-coverage` and `export-coverage` — derive the
+  expectation from the declaration, so a newly declared icon with no file **fails by existing**.
+- **The vector redraw is a follow-up that must be booked, not noted** — but **not for the reason #08
+  gave.** The session reasoned that the two 512px assets are a 1.37× upscale of the 283×300px mark
+  and are therefore degraded. **010's planning corrected this** (research R1): the maskable safe
+  zone is a *circle* of 80% diameter, not 80% of the side, so the largest mark that fits a 512px
+  maskable icon is **297.9px — 0.993× of native**, and nothing the feature ships is upscaled at all.
+  Worse, sizing the mark to 80% of the *side* as #08 assumed would put the node terminals **outside**
+  the safe zone, to be clipped by any circular mask. The redraw stays booked for resolution
+  independence at sizes not yet asked for; it is not rescuing a soft asset.
 
 ### Design questions carried into 008's specification
 
