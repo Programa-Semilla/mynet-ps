@@ -5,7 +5,7 @@ import { fileURLToPath, URL } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 /**
- * T014 (011) — **Principle V is satisfied here by subtraction, and that is worth asserting**
+ * T014 (013) — **Principle V is satisfied here by subtraction, and that is worth asserting**
  * (research R9).
  *
  * ═════════════════════════════════════════════════════════════════════════════════════════════

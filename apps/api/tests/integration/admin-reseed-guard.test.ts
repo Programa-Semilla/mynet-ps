@@ -11,7 +11,7 @@ import { seed } from '../../src/db/seed/index.js'
 import { ADA, attendees, events } from './helpers.js'
 
 /**
- * T117 (011) — **the re-seed survives a live organizer assignment, and this test is why it does**
+ * T117 (013) — **the re-seed survives a live organizer assignment, and this test is why it does**
  * (FR-937, FR-938, FR-939).
  *
  * ═════════════════════════════════════════════════════════════════════════════════════════════

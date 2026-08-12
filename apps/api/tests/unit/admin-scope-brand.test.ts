@@ -13,7 +13,7 @@ import {
 } from '../../src/admin/scope.js'
 
 /**
- * T033 (011) — **the fourth branded scope, and the compensating control its file split costs**
+ * T033 (013) — **the fourth branded scope, and the compensating control its file split costs**
  * (FR-905, FR-906).
  *
  * ═════════════════════════════════════════════════════════════════════════════════════════════

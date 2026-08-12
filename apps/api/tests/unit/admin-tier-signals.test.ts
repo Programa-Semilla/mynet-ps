@@ -5,7 +5,7 @@ import { fileURLToPath, URL } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 /**
- * T016 (011) — **the administrative guards consult neither verification nor discoverability**
+ * T016 (013) — **the administrative guards consult neither verification nor discoverability**
  * (FR-907).
  *
  * ═════════════════════════════════════════════════════════════════════════════════════════════

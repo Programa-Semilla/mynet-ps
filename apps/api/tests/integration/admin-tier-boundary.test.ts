@@ -22,7 +22,7 @@ import {
 } from './helpers.js'
 
 /**
- * T078, T082, T115 (011) — the tier boundary, and the audit entry that only a disclosure writes
+ * T078, T082, T115 (013) — the tier boundary, and the audit entry that only a disclosure writes
  * (FR-906, FR-995, SC-904, decision 35, decision 38).
  *
  * ═════════════════════════════════════════════════════════════════════════════════════════════

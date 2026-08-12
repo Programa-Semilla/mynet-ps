@@ -8,7 +8,7 @@ import { organizerAssignments } from '../schema/organizer-assignments.js'
 import { reportResolutions } from '../schema/report-resolutions.js'
 
 /**
- * T017, T140 (011) — reads and lifecycle writes for the platform-operator identity (FR-900,
+ * T017, T140 (013) — reads and lifecycle writes for the platform-operator identity (FR-900,
  * FR-908, FR-909).
  *
  * **There is no `deleteOperator` here, and there is no route that could call one.** Principle

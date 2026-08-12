@@ -6,7 +6,7 @@ import { useAdminSession } from '../session.js'
 import { PromoteDialog } from './PromoteDialog.js'
 
 /**
- * T128, T130 (011) — conferences, their organizers, and the unassigned state (FR-926, FR-936).
+ * T128, T130 (013) — conferences, their organizers, and the unassigned state (FR-926, FR-936).
  *
  * ═════════════════════════════════════════════════════════════════════════════════════════════
  * **`unassigned` IS RENDERED PROMINENTLY, AND DECISION 39 IS WHY.**

@@ -5,7 +5,7 @@ import { useAdminSession } from '../session.js'
 import { AdminDialog } from '../shell/AdminDialog.js'
 
 /**
- * T142, T144 (011) — ending a platform operator's access (FR-908, FR-909).
+ * T142, T144 (013) — ending a platform operator's access (FR-908, FR-909).
  *
  * ═════════════════════════════════════════════════════════════════════════════════════════════
  * **THERE IS NO LIST OF OPERATORS TO READ, AND THAT IS NOT AN OVERSIGHT.**

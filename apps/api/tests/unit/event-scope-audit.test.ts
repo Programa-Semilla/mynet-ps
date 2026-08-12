@@ -74,7 +74,7 @@ const VERIFIES_INSIDE_ITS_QUERY = new Set([
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════════════════════════
- * **T028 (011) — THE ADMINISTRATIVE PRODUCT IS OUT OF THIS AUDIT'S SCOPE, AND THAT IS THE MOST
+ * **T028 (013) — THE ADMINISTRATIVE PRODUCT IS OUT OF THIS AUDIT'S SCOPE, AND THAT IS THE MOST
  * DANGEROUS SENTENCE IN THIS FILE. READ THE WHOLE NOTE BEFORE ADDING ANYTHING TO IT.**
  *
  * Every assertion below was written about **the attendee surface**, and each rests on a premise
@@ -265,7 +265,7 @@ describe('event scope route audit', () => {
   it('every route accepting a conference identifier carries the access guard', () => {
     const unguarded = routes
       .filter(acceptsEventIdentifier)
-      // T028 (011) — administrative routes are covered by `operator-audit.test.ts` instead.
+      // T028 (013) — administrative routes are covered by `operator-audit.test.ts` instead.
       // See `ADMINISTRATIVE` above for why the event guard cannot apply to them, and note that
       // the two routes this excludes are named individually in `ADMIN_ROUTES_NAMING_AN_EVENT`.
       .filter((route) => !isAdministrative(route))
@@ -284,7 +284,7 @@ describe('event scope route audit', () => {
 
   /**
    * ═══════════════════════════════════════════════════════════════════════════════════════════
-   * **T028 (011) — the administrative exclusion is bounded, and this is what bounds it.**
+   * **T028 (013) — the administrative exclusion is bounded, and this is what bounds it.**
    *
    * The assertion above stops examining `/admin/*`. On its own that is a licence to add any
    * number of event-naming administrative routes and have none of them checked by anything this
@@ -456,7 +456,7 @@ describe('event scope route audit', () => {
     const qa = routes
       .filter((route) => /\bquestions?\b/.test(route.url))
       // ─────────────────────────────────────────────────────────────────────────────────────
-      // T028 (011) — **`DELETE /admin/questions/:questionId` is a Q&A-shaped path that must NOT
+      // T028 (013) — **`DELETE /admin/questions/:questionId` is a Q&A-shaped path that must NOT
       // name a conference, and excluding it here is a decision rather than a convenience.**
       //
       // 009's rule exists because Q&A routes are covered by the *event* audit and only by it, so
@@ -504,7 +504,7 @@ describe('event scope route audit', () => {
 
   /**
    * ═══════════════════════════════════════════════════════════════════════════════════════════
-   * **T028 (011) — THE PREDICATE LOST `admin`, AND THE REPLACEMENT IS STRICTER RATHER THAN
+   * **T028 (013) — THE PREDICATE LOST `admin`, AND THE REPLACEMENT IS STRICTER RATHER THAN
    * LOOSER.**
    *
    * This matched `/import|bulk|upload|admin/` on the reasoning that the constitution forbade a
@@ -587,7 +587,7 @@ describe('event scope route audit', () => {
     const writes = naming
       .filter((route) => methodsOf(route).some((method) => WRITE_METHODS.includes(method)))
       // ─────────────────────────────────────────────────────────────────────────────────────
-      // T028 (011) — **administrative routes are excluded, and this is the exclusion that most
+      // T028 (013) — **administrative routes are excluded, and this is the exclusion that most
       // needs its reasoning written down**, because it looks like the rule being abandoned.
       //
       // FR-106's purpose is that nothing may act on somebody else **as an attendee**: identity
@@ -646,7 +646,7 @@ describe('event scope route audit', () => {
 
     const unguarded = routes
       .filter((route) => /:attendeeId|\{attendeeId\}/.test(route.url))
-      // T028 (011). A third predicate — `requirePlatformOperator` — is acceptable on the
+      // T028 (013). A third predicate — `requirePlatformOperator` — is acceptable on the
       // administrative surface and only there, so it is expressed as an exclusion rather than
       // added to ACCEPTABLE: adding it would make it acceptable on ATTENDEE routes too, which
       // would be a way for an operator guard to satisfy an attendee-facing read.
@@ -711,7 +711,7 @@ describe('event scope route audit', () => {
       ],
       ['POST /auth/reset', 'Followed out of a mail client, like verification (FR-328).'],
       // ─────────────────────────────────────────────────────────────────────────────────────
-      // T028 (011) — **every administrative route requires no ATTENDEE session, and eleven of
+      // T028 (013) — **every administrative route requires no ATTENDEE session, and eleven of
       // the twelve require an ADMINISTRATIVE one.**
       //
       // `requireAttendee` is the wrong question here: an administrative principal is not an

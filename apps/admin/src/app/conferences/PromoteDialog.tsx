@@ -6,7 +6,7 @@ import { useAdminSession } from '../session.js'
 import { AdminDialog } from '../shell/AdminDialog.js'
 
 /**
- * T129 (011) — promoting a registered attendee to organizer (FR-930, FR-933).
+ * T129 (013) — promoting a registered attendee to organizer (FR-930, FR-933).
  *
  * ═════════════════════════════════════════════════════════════════════════════════════════════
  * **THE ATTENDEE IS NAMED BY IDENTIFIER, AND THERE IS DELIBERATELY NO SEARCH.**

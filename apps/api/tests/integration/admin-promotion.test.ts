@@ -25,7 +25,7 @@ import {
 } from './helpers.js'
 
 /**
- * T113, T114, T116, T118 (011) — promotion, demotion, and the two things that must NOT happen
+ * T113, T114, T116, T118 (013) — promotion, demotion, and the two things that must NOT happen
  * (FR-930–FR-935, FR-904).
  *
  * ═════════════════════════════════════════════════════════════════════════════════════════════

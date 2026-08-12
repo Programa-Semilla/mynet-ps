@@ -10,7 +10,7 @@
 > rather than spec detail. **v4.1.0 closed all three the same session** as decisions 37–39: a
 > subdomain with host-only sessions; the report queue disclosing reported content and the reporter's
 > reason, as the **third** Principle VIII exception; and organizer assignments ending with access.
-> Features 011, 012 and 013 are licensed and **nothing blocks 011.**
+> Features 013, 014 and 015 are licensed and **nothing blocks 013.**
 >
 > The remaining Open Questions below are for `/speckit-specify`, not for governance.
 
@@ -196,11 +196,11 @@ v3.3.0 gated 009.
 
 | Feature | Contents |
 |---|---|
-| **011** | Amendment v4.0.0; platform-operator identity and promotion; the admin site with its own authentication and shell; **the abuse-report queue**. Closes register entries 19 and 21. |
-| **012** | Conference content authoring — events, sessions, tracks, rooms, speakers. |
-| **013** | Registration and attendee management — join codes, registration visibility, removal/suspension. |
+| **013** | Amendment v4.0.0; platform-operator identity and promotion; the admin site with its own authentication and shell; **the abuse-report queue**. Closes register entries 19 and 21. |
+| **014** | Conference content authoring — events, sessions, tracks, rooms, speakers. |
+| **015** | Registration and attendee management — join codes, registration visibility, removal/suspension. |
 
-Migrations run to `0008_session_qa.sql`; **011 reserves `0009`.** The delivery roadmap's reserved-
+Migrations run to `0008_session_qa.sql`; **013 reserves `0009`.** The delivery roadmap's reserved-
 number table stops at the shipped programme and must be extended.
 
 ## Key Requirements
@@ -261,7 +261,7 @@ details. **None may be silently resolved.**
   default yes. Blocking a moderator is a coherent attendee action with incoherent consequences.
 - **What does editing a live conference do to attendees who saved the affected sessions?** Moving or
   deleting a session that sits in somebody's Agenda, or on Home's "Up next" card, has no defined
-  behaviour today. This is 012's central problem and is worth naming now.
+  behaviour today. This is 014's central problem and is worth naming now.
 - **Is "organizer" the right word?** It is the exact term Principle III uses for the excluded actor.
   Reusing it makes the amendment's diff read clearly; it also makes every older comment in the
   codebase ambiguous.

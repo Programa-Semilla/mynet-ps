@@ -4,7 +4,13 @@ import type { FastifyInstance } from 'fastify'
 
 import { SESSION_COOKIE, sessionCookieOptions } from '../../auth/cookie.js'
 import { hashPassword, verifyPassword } from '../../auth/password.js'
-import { failureDelayMs, hashAttemptValue, recordAttempt, serveDelay } from '../../auth/throttle.js'
+import {
+  beginAttempt,
+  failureDelayMs,
+  hashAttemptValue,
+  serveDelay,
+  settleAttempt,
+} from '../../auth/throttle.js'
 import { issueToken } from '../../auth/token.js'
 import { loadConfig } from '../../config.js'
 import { getDb } from '../../db/client.js'
@@ -151,8 +157,24 @@ export const signInRoutes = async (app: FastifyInstance): Promise<void> => {
         // 004 — `action` scopes the count to sign-in alone (FR-307a). Without it, a sign-up or
         // join-code storm aimed at this address would inflate the streak read below and slow
         // its rightful owner's sign-ins, which is FR-031b's lockout arriving by a new route.
-        await recordAttempt({ identifierHash, sourceHash, action: 'sign_in', succeeded: false })
+        await beginAttempt({ identifierHash, sourceHash, action: 'sign_in' })
 
+        // ═════════════════════════════════════════════════════════════════════════════════════
+        // **010 T017 — NO ATTEMPT IDENTIFIER IS PASSED BELOW, AND THAT IS DELIBERATE.**
+        //
+        // Every other call site in the product evaluated *before* recording, so the rework hands
+        // `failureDelayMs` the row it just wrote and the count excludes it — which is what keeps
+        // each of those allowances exactly where it was (FR-805).
+        //
+        // **Sign-in is the one route that has recorded first since 001.** The write above is not
+        // new; only its spelling is. So this count must continue to include the caller's own row,
+        // and passing an identifier here would make the fourth consecutive failure free where it
+        // is currently delayed — widening the one allowance FR-307a names as unchangeable.
+        //
+        // A consequence worth stating: sign-in was already burst-safe, for exactly this reason.
+        // FR-804's defect never applied to it.
+        // ═════════════════════════════════════════════════════════════════════════════════════
+        //
         // FR-031a — the escalating delay, applied to the *failure*. Served in-request up to a
         // bound; anything beyond becomes retry-after guidance. Both branches are reached
         // identically whether or not the identifier exists, so FR-031d still holds.
@@ -166,8 +188,13 @@ export const signInRoutes = async (app: FastifyInstance): Promise<void> => {
         throw invalidCredentials()
       }
 
-      // A correct credential is never throttled. This is the line SC-003a rests on.
-      await recordAttempt({ identifierHash, sourceHash, action: 'sign_in', succeeded: true })
+      // A correct credential is never throttled. This is the line SC-003a rests on: the success
+      // is recorded, and recording it is what ends the identifier streak so the next attempt from
+      // this address starts clean.
+      await settleAttempt(
+        await beginAttempt({ identifierHash, sourceHash, action: 'sign_in' }),
+        true,
+      )
 
       // FR-026 — an opaque high-entropy token; only its hash is stored.
       const { token, tokenHash } = issueToken()

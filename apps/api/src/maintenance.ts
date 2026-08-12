@@ -110,7 +110,7 @@ export const RETENTION_SWEEPS: readonly RetentionSweep[] = [
   },
   {
     // ═══════════════════════════════════════════════════════════════════════════════════════
-    // T027 (011) — **pseudonymise-plus-clock**, and it is the first two-stage rule in this list.
+    // T027 (013) — **pseudonymise-plus-clock**, and it is the first two-stage rule in this list.
     //
     // Every sweep above is a single clock. This one has a prior step that is not a sweep at all:
     // an entry naming a living attendee is **cleared** when that attendee exercises erasure
@@ -137,7 +137,7 @@ export const RETENTION_SWEEPS: readonly RetentionSweep[] = [
     run: pruneAuditEntries,
   },
   {
-    // T027 (011) — **deactivate-plus-clock**, and the clock alone is not the rule.
+    // T027 (013) — **deactivate-plus-clock**, and the clock alone is not the rule.
     //
     // An operator has no `attendees` row, so no cascade reaches this table either. FR-909
     // requires a deactivated operator to keep resolving on records that name them, so the sweep

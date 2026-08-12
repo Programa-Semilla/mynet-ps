@@ -16,7 +16,7 @@ import {
 import { refreshAdminSessionCookie, resolveAdminSession } from './session.js'
 
 /**
- * T030, T031 (011) — **the administrative principal, and the tier boundary** (FR-905, FR-906,
+ * T030, T031 (013) — **the administrative principal, and the tier boundary** (FR-905, FR-906,
  * FR-907, FR-917, FR-992).
  *
  * ═════════════════════════════════════════════════════════════════════════════════════════════

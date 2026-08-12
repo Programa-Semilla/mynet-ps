@@ -9,7 +9,7 @@ import { reportResolutions } from '../schema/report-resolutions.js'
 import type { SeedModule } from './index.js'
 
 /**
- * T054 (011) — **platform-operator identities, with NO credential** (FR-990, FR-991, FR-901).
+ * T054 (013) — **platform-operator identities, with NO credential** (FR-990, FR-991, FR-901).
  *
  * ═════════════════════════════════════════════════════════════════════════════════════════════
  * **THIS SEED CREATES ACCOUNTS NOBODY CAN SIGN IN TO, AND THAT IS THE REQUIREMENT.**
@@ -67,7 +67,7 @@ export const operatorSeed: SeedModule = {
 
   /**
    * ═══════════════════════════════════════════════════════════════════════════════════════════
-   * **T125 (011) — CLEARS THE WHOLE ORGANIZER-ASSIGNMENT DOMAIN, NOT ONLY WHAT IT SEEDED**
+   * **T125 (013) — CLEARS THE WHOLE ORGANIZER-ASSIGNMENT DOMAIN, NOT ONLY WHAT IT SEEDED**
    * (FR-938), and this is 008's `shared_cards` trap arriving exactly as the constitution
    * predicted it would.
    *

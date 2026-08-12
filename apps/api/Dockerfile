@@ -36,7 +36,25 @@ RUN pnpm install --frozen-lockfile
 RUN pnpm --filter @mynet/api build
 # Prunes to production dependencies and flattens the workspace symlinks into a self-contained
 # directory, so the runtime stage carries no dev dependencies and no build toolchain.
-RUN pnpm --filter @mynet/api deploy --prod --legacy /out
+#
+# ─────────────────────────────────────────────────────────────────────────────────────────
+# **`--legacy` WAS REMOVED HERE BECAUSE IT DOES NOT EXIST IN THE PINNED pnpm** (010, first
+# real deploy).
+#
+# The root `package.json` pins `packageManager: pnpm@9.15.9` and `corepack enable` above honours
+# it, so the image gets pnpm 9. `pnpm deploy --legacy` is a **pnpm 10** flag — it opts back into
+# the v9 behaviour after v10 changed `deploy` to require `inject-workspace-packages`. On v9 it is
+# simply an unknown option and the build fails at this line.
+#
+# It failed on the first attempt ever made to build this image. The header above says why that is
+# not surprising and is worth reading rather than deleting: nothing had ever been deployed, so
+# this stage had never once been executed. A flag written against a version of the tool the image
+# does not use is invisible to review, to lint, and to every test in the repository.
+#
+# If the pin ever moves to pnpm 10, this line needs `--legacy` back **or** the workspace needs
+# `inject-workspace-packages=true` — and the image build is the only thing that will tell you.
+# ─────────────────────────────────────────────────────────────────────────────────────────
+RUN pnpm --filter @mynet/api deploy --prod /out
 
 FROM base AS runtime
 ENV NODE_ENV=production

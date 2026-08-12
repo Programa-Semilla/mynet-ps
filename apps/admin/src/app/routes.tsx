@@ -10,7 +10,7 @@ import { AdminHome } from './shell/AdminHome.js'
 import { AdminShell } from './shell/AdminShell.js'
 
 /**
- * T047 (011) — the administrative route table (FR-920).
+ * T047 (013) — the administrative route table (FR-920).
  *
  * ═════════════════════════════════════════════════════════════════════════════════════════════
  * **THIS MIRRORS `apps/web/src/app/navigation.ts`'s CONTRACT WITHOUT REUSING IT, AND THE

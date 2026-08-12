@@ -2,11 +2,11 @@ import type { FastifyInstance } from 'fastify'
 
 import { verificationLink } from '../../auth/links.js'
 import {
+  beginAttempt,
   failureDelayMs,
   hashAttemptValue,
-  recordAttempt,
-  recordRequest,
   serveDelay,
+  settleAttempt,
 } from '../../auth/throttle.js'
 import { hashToken } from '../../auth/token.js'
 import { consumeVerification, issueVerification } from '../../auth/verification.js'
@@ -94,11 +94,14 @@ export const verifyRoutes = async (app: FastifyInstance): Promise<void> => {
       const sourceHash = hashAttemptValue(request.ip)
       const action = 'verify_token' as const
 
+      // 010 T017 — recorded before it is judged (FR-804), excluded from its own count (FR-805).
+      // The row starts `succeeded: false`, so both refusal branches record themselves by simply
+      // not settling.
+      const attemptId = await beginAttempt({ identifierHash, sourceHash, action })
       const outstanding = await serveDelay(
-        await failureDelayMs({ identifierHash, sourceHash, action }),
+        await failureDelayMs({ identifierHash, sourceHash, action }, attemptId),
       )
       if (outstanding > 0) {
-        await recordAttempt({ identifierHash, sourceHash, action, succeeded: false })
         throw tooManyAttempts(outstanding, 'verification attempts')
       }
 
@@ -107,7 +110,6 @@ export const verifyRoutes = async (app: FastifyInstance): Promise<void> => {
       // already used, and the caller cannot tell which.
       const consumed = await consumeVerification(token)
       if (!consumed) {
-        await recordAttempt({ identifierHash, sourceHash, action, succeeded: false })
         throw linkExpired()
       }
 
@@ -115,7 +117,7 @@ export const verifyRoutes = async (app: FastifyInstance): Promise<void> => {
 
       // A link that worked ends the streak, so a mail client that prefetched the link and then
       // the person who clicked it are not left throttled by their own success.
-      await recordAttempt({ identifierHash, sourceHash, action, succeeded: true })
+      await settleAttempt(attemptId, true)
 
       return reply.status(204).send()
     },
@@ -165,9 +167,10 @@ export const verifyRoutes = async (app: FastifyInstance): Promise<void> => {
         sourceHash: hashAttemptValue(request.ip),
         action: 'reset_request' as const,
       }
-      const outstanding = await serveDelay(await failureDelayMs(key))
-      // Counted on every request — a resend sends mail whether or not the account needed one.
-      await recordRequest(key)
+      // 010 T017 — recorded before it is judged (FR-804), excluded from its own count (FR-805),
+      // and never settled: a resend sends mail whether or not the account needed one.
+      const attemptId = await beginAttempt(key)
+      const outstanding = await serveDelay(await failureDelayMs(key, attemptId))
 
       // The delay-only mode clamps to what is servable, so a remainder cannot occur. Asserted
       // rather than turned into a status: a `429` here would contradict the schema above, and

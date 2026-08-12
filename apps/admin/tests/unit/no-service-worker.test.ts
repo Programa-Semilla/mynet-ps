@@ -5,7 +5,7 @@ import { fileURLToPath, URL } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 /**
- * T013 (011) — **the administrative product is not installable and has no offline behaviour**
+ * T013 (013) — **the administrative product is not installable and has no offline behaviour**
  * (FR-923, research R1).
  *
  * ═════════════════════════════════════════════════════════════════════════════════════════════

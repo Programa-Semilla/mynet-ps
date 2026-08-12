@@ -7,7 +7,7 @@ import { getDb } from '../../db/client.js'
 import { notFound } from '../../errors.js'
 
 /**
- * T140, T141 (011) — `POST /admin/operators/:operatorId/deactivation` (FR-908, FR-909).
+ * T140, T141 (013) — `POST /admin/operators/:operatorId/deactivation` (FR-908, FR-909).
  *
  * ═════════════════════════════════════════════════════════════════════════════════════════════
  * **DEACTIVATION, NOT DELETION — AND THE ROUTE IS NAMED FOR WHAT IT DOES.**

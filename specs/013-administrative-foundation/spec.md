@@ -1,6 +1,6 @@
 # Feature Specification: Administrative Foundation — the Second Actor, the Admin Site, and the Report Queue
 
-**Feature**: 011
+**Feature**: 013
 **Created**: 2026-08-11
 **Status**: Draft
 **Constitution**: v4.1.0 (standing decisions 31–39)
@@ -13,7 +13,7 @@
 
 The delivery roadmap decomposes the **attendee** product, and that decomposition is complete: 001–010
 are shipped and every destination `requirements.md` names answers its question. This feature opens a
-second programme — 011, 012, 013 — which the roadmap does not cover and is not extended to cover.
+second programme — 013, 014, 015 — which the roadmap does not cover and is not extended to cover.
 
 It is also the first feature in this project built on a **reversed prohibition** rather than a filled
 omission. Constitution **v4.0.0** retracted Principle III's *"the attendee is the only actor in
@@ -23,7 +23,7 @@ requirements FR-132, FR-134, FR-191, FR-311 and — for the administrative produ
 
 ### What forced the reversal, and why it matters to this feature's shape
 
-The reversal was not sought for its own sake, and 011's priorities follow directly from what forced
+The reversal was not sought for its own sake, and 013's priorities follow directly from what forced
 it. The product had accumulated three obligations it had no actor to discharge:
 
 - **Register entry 19** (open since 2026-08-07) — nobody moderates an uploaded avatar, and the
@@ -63,34 +63,34 @@ question**. The line is drawn there for a reason rather than for size:
 - A reported **message** needs no enforcement here, because the protective act already happened:
   reporting blocks in the same action (decision 23). An operator reading a message report is
   adjudicating after the fact, not interrupting harm.
-- **Suspending or removing an attendee** is attendee management and belongs to **013**.
+- **Suspending or removing an attendee** is attendee management and belongs to **015**.
 - **Avatar moderation** is register entry 19, whose *standard* is undecided. Building the action
   before the standard would decide the standard by inference.
 
 ### Why the conference-organizer tier ships with no capability of its own
 
-A conference organizer promoted in 011 can sign in and see their assigned conferences, and that is
-all: authoring is 012, registration management is 013, and the report queue is platform-tier only.
+A conference organizer promoted in 013 can sign in and see their assigned conferences, and that is
+all: authoring is 014, registration management is 015, and the report queue is platform-tier only.
 The tier is therefore delivered **empty on purpose**, and the reasoning is worth stating because it
 is the first thing a reviewer will question.
 
-The two-tier boundary is the load-bearing claim of v4.0.0, and 012 is built directly on top of it —
+The two-tier boundary is the load-bearing claim of v4.0.0, and 014 is built directly on top of it —
 every authoring action is scoped by "conferences this organizer is assigned". Building the boundary
 inside the feature that first *uses* it would mean the first test of the tier separation is also the
 first test of a large write surface, with no way to tell which one failed. Delivering it here makes
-the boundary independently testable (US4), and makes 012's scoping an inherited guarantee rather
+the boundary independently testable (US4), and makes 014's scoping an inherited guarantee rather
 than a new one.
 
 It also is not truly empty from the platform tier's side: **promotion and demotion are real
-capabilities exercised in this feature**, and FR-926's conference surface is what 012 extends rather
+capabilities exercised in this feature**, and FR-926's conference surface is what 014 extends rather
 than replaces.
 
 ### What this feature does not do
 
 - No conference content authoring — no create, edit or delete of events, sessions, tracks, rooms or
-  speakers. That is **012**, and the guards forbidding it stay in force until then.
+  speakers. That is **014**, and the guards forbidding it stay in force until then.
 - No join-code creation, rotation or revocation, no registration list, no attendee suspension. That
-  is **013**, and FR-311's guard stays in force.
+  is **015**, and FR-311's guard stays in force.
 - No change to MyNet whatsoever. Not one route, screen, navigation entry or rendering branch.
 - No avatar moderation, no automated classification, no appeal process.
 - No notification of any kind. The trigger set stays at a received message and nothing else.
@@ -444,7 +444,7 @@ assignment is gone and the conference reports as unassigned. Repeat with account
   at report time is the protective act, and message removal is not in this feature.
 - **FR-954**: No avatar moderation action may exist. Register entry 19's standard is undecided, and
   building the action would decide it by inference.
-- **FR-955**: No attendee suspension, removal, or restriction action may exist. That is 013.
+- **FR-955**: No attendee suspension, removal, or restriction action may exist. That is 015.
 
 #### Organizer lifecycle
 
@@ -466,9 +466,9 @@ the absence ends.
 - **FR-972**: MyNet MUST gain no report-reading surface. FR-548 survives for the attendee product.
 - **FR-973**: No administrative tier may read or edit any attendee's profile.
 - **FR-974**: No conference content write path may exist in this feature. FR-132, FR-134 and FR-191
-  remain in force until 012.
+  remain in force until 014.
 - **FR-975**: No join-code creation, rotation or revocation surface may exist. FR-311 remains in
-  force until 013.
+  force until 015.
 - **FR-976**: The five code-level guards that enforced the reversed prohibition MUST each be amended
   **deliberately and narrowly**, each stating what is now permitted and to whom. None may be
   weakened to the point of checking nothing:
@@ -624,7 +624,7 @@ the absence ends.
   from the other end.
 - **Removing a question is the only enforcement action in this feature**, for the reasons in the
   scope note: a question is publicly exposed and removal is the only act that stops it; a message
-  report's protective act already happened at report time; attendee suspension is 013; avatar
+  report's protective act already happened at report time; attendee suspension is 015; avatar
   moderation is entry 19.
 - **The report queue shows reports from both 007 and 009 in one list.** `abuse_reports` is one
   cross-event table and conduct is conduct; splitting the queue by origin would be a presentation

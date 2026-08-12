@@ -4,7 +4,7 @@ import { assertVerifiedOperator, type PlatformScope } from '../../admin/scope.js
 import { getDb } from '../client.js'
 
 /**
- * T105 (011) — **removing a reported question** (FR-950–FR-953, research R7).
+ * T105 (013) — **removing a reported question** (FR-950–FR-953, research R7).
  *
  * ═════════════════════════════════════════════════════════════════════════════════════════════
  * **THE ONLY ENFORCEMENT ACTION IN THIS FEATURE, AND THE ONLY ONE ANY ADMINISTRATIVE TIER HAS.**

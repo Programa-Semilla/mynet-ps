@@ -270,7 +270,7 @@ describe('every route is bound to the authenticated attendee (SC-307)', () => {
     const eventScoped = routes
       .filter((route) => /:eventId/.test(route.url))
       // ─────────────────────────────────────────────────────────────────────────────────────
-      // T028 (011) — **administrative routes are excluded, and the reason is that this probe
+      // T028 (013) — **administrative routes are excluded, and the reason is that this probe
       // asserts the wrong thing about them rather than that they are exempt from isolation.**
       //
       // The probe signs in as an *attendee* and expects 404 from every event-scoped route. An

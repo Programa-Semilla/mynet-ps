@@ -20,7 +20,7 @@ import { abuseReports } from '../../src/db/schema/reports.js'
 import { ADA, attendees, GRACE, setupTestApp, teardown } from './helpers.js'
 
 /**
- * T049, T101 (011) — **the two properties no layer but a real database can test.**
+ * T049, T101 (013) — **the two properties no layer but a real database can test.**
  *
  * ═════════════════════════════════════════════════════════════════════════════════════════════
  * Both are races, and both are the kind that pass a hundred sequential runs before failing once

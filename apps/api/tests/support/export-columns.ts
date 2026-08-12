@@ -166,7 +166,7 @@ export const EXPORTED_COLUMNS: Record<string, ExportTarget> = {
   'abuse_reports.question_ids': { section: 'reports', field: 'questionIds' },
 
   // ═════════════════════════════════════════════════════════════════════════════════════════
-  // T026 (011) — **organizer assignments, and they are the ONLY thing this feature exports**
+  // T026 (013) — **organizer assignments, and they are the ONLY thing this feature exports**
   // (FR-981).
   //
   // Of the five tables 011 adds, exactly one holds attendee data: an assignment is a fact about

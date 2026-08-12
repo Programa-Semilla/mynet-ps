@@ -1,4 +1,4 @@
-# Deep Review Findings — 011 Administrative Foundation
+# Deep Review Findings — 013 Administrative Foundation
 
 **Date:** 2026-08-11 · **Branch:** `spec/011-administrative-product`
 **Rounds:** 1 · **Gate Outcome:** PASS with deferrals (see Remaining) · **Invocation:** manual
@@ -254,7 +254,7 @@ Two further corrections to the review's reasoning:
 | 8 | No route-level `admin_sign_in` throttle test | **Fixed.** `admin-sign-in-throttle.test.ts`. Mutation-verified: deleting the `recordAttempt` call turns it red. |
 | 9 | `admin-audit-completeness` vacuous fallback | **Fixed.** Route→module derivation is now by URL literal with **no fallback**; an unmatched route is itself a failure. |
 | 10 | No horizontal-overflow test for admin | **Fixed.** `responsive.spec.ts` sweeps all four destinations at all thirteen `SCROLL_WIDTHS`. `ADMIN_DESTINATIONS` moved to `support/destinations.ts`, making the "declared once" claim true. |
-| 11 | 011's sweeps have no behavioural test | **Fixed**, and it found something — see below. |
+| 11 | 013's sweeps have no behavioural test | **Fixed**, and it found something — see below. |
 
 ### What finding 11 turned up
 
@@ -305,7 +305,7 @@ review gate, kept because the reasoning for each deferral is what the decision r
    `organizer_assignments.assigned_by`. This repeats the repo's known unclaimed defect. The hourly
    `pruneDeactivatedOperators` anti-join scans the fastest-growing new table. **The fix requires
    either regenerating `0009` (which the migration README warns against doing casually, and which
-   is only safe because `0009` has not been applied anywhere) or shipping `0010`** — and 011
+   is only safe because `0009` has not been applied anywhere) or shipping `0010`** — and 013
    reserves `0009` alone.
 7. **`0009` sets no `lock_timeout`** before adding foreign keys referencing `attendees`, `events`
    and `abuse_reports`. Same migration decision; mitigated in practice because `deploy.sh` enters
@@ -315,7 +315,7 @@ review gate, kept because the reasoning for each deferral is what the decision r
 
 8. **No route-level throttle test for `admin_sign_in`** — deleting the `recordAttempt` call would
    leave every test green. The project has this pattern twice already
-   (`message-send-throttle.test.ts`, `reset-throttle.test.ts`); 011 is the first delay-only action
+   (`message-send-throttle.test.ts`, `reset-throttle.test.ts`); 013 is the first delay-only action
    to ship without it.
 9. **`admin-audit-completeness.test.ts`'s route→module fallback defeats its own derivation** — a
    route whose path segment matches no filename is checked against *every* module and passes
@@ -324,7 +324,7 @@ review gate, kept because the reasoning for each deferral is what the decision r
 10. **No horizontal-overflow test for the administrative destinations** — the repo's
     `horizontalOverflow` helper covers every attendee surface and no admin one. Axe reports nothing
     for a page that scrolls sideways.
-11. **The retention sweeps 011 added have no behavioural test** beyond the one added here.
+11. **The retention sweeps 013 added have no behavioural test** beyond the one added here.
 
 ### Minor and Notable (24)
 

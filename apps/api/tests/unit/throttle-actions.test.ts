@@ -154,7 +154,7 @@ describe('throttle actions', () => {
 
   it('lets administrative sign-in delay but never deny (FR-916)', () => {
     // ─────────────────────────────────────────────────────────────────────────────────────
-    // T040 (011). `reset_request`'s argument, arriving a second time: the action is
+    // T040 (012). `reset_request`'s argument, arriving a second time: the action is
     // **unauthenticated and keyed on a submitted address**, so anybody can drive the counter
     // for an address they do not own — and the address they would choose is the platform
     // operator's, who is the only principal that can read the report queue or promote anybody.
@@ -182,7 +182,31 @@ describe('throttle actions', () => {
     expect(THRESHOLDS.sign_in.mayDeny).toBe(true)
   })
 
-  it('keeps the delay-only set to exactly the three actions that earned it', () => {
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════════════════
+   * **010 AND 012 EACH EXTENDED THIS LIST, WHICH IS THE MAINTENANCE PATH THE CASE PRESCRIBES.**
+   *
+   * The comment below says: do not add your action to make this pass — say which argument
+   * applies to it, in its own `THRESHOLDS` entry, and then add it here. That is what happened.
+   * `directory_read` and `thread_read` are delay-only under a **third** argument, distinct from
+   * both of the originals:
+   *
+   *   * `reset_request` — keyed on a *victim's* address, so the denial IS the attack (FR-331).
+   *   * `message_send` — a refused message at the moment a conference contact mattered is a
+   *     failure the attendee cannot act on (FR-511a).
+   *   * **The two reads** — they are the product's central journeys, and a refusal is
+   *     indistinguishable from the product being broken: Discover never arrives, or a
+   *     conversation appears to stop updating. What they bound is bulk collection, which is
+   *     bounded perfectly well by cost (FR-802, FR-803).
+   *   * `admin_sign_in` — **the only one that repeats an existing argument rather than adding
+   *     a fourth.** It is `reset_request`'s exactly: unauthenticated, keyed on a submitted
+   *     address, so the denial falls on the operator being attacked (FR-916).
+   *
+   * The assertion still pins an exact set, so it is extended rather than weakened: a sixth
+   * delay-only entry fails exactly as the fourth did.
+   * ═══════════════════════════════════════════════════════════════════════════════════════
+   */
+  it('keeps the delay-only set to exactly the five actions that earned it', () => {
     // ─────────────────────────────────────────────────────────────────────────────────────
     // The inverse of the assertions above, and the one that fails when a **future** feature
     // adds an action and copies the wrong neighbour's flag. Delay-only is the exceptional
@@ -197,13 +221,14 @@ describe('throttle actions', () => {
 
     expect(
       delayOnly,
-      'The set of delay-only throttle actions has changed. `reset_request` (FR-331, keyed on a ' +
-        "victim's address), `message_send` (FR-511a, a refused message at a conference is a " +
-        'failure nobody can act on) and `admin_sign_in` (FR-916, unauthenticated and keyed on a ' +
-        'submitted address, so a denial locks out the operator rather than the attacker) are ' +
-        'the three that have earned it. Anything else here is ' +
-        'either a new requirement that needs recording, or a flag copied from the wrong ' +
-        'neighbour.',
-    ).toEqual(['admin_sign_in', 'message_send', 'reset_request'])
+      'The set of delay-only throttle actions has changed. Five have earned it: `reset_request` ' +
+        "(FR-331, keyed on a victim's address, so the denial is the attack), `message_send` " +
+        '(FR-511a, a refused message at a conference is a failure nobody can act on), ' +
+        '`directory_read` / `thread_read` (FR-802, FR-803 — a refusal on either is ' +
+        'indistinguishable from the product being broken), and `admin_sign_in` (FR-916, ' +
+        "reset_request's argument again — a denial locks out the operator rather than the " +
+        'attacker). Anything else here is either a new requirement that needs recording, or a ' +
+        'flag copied from the wrong neighbour.',
+    ).toEqual(['admin_sign_in', 'directory_read', 'message_send', 'reset_request', 'thread_read'])
   })
 })

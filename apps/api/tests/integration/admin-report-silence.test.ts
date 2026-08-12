@@ -25,7 +25,7 @@ import {
 } from './helpers.js'
 
 /**
- * T080, T081 (011) — **the reporter is told nothing, and the operator mail is unchanged**
+ * T080, T081 (013) — **the reporter is told nothing, and the operator mail is unchanged**
  * (FR-946, FR-947).
  *
  * ═════════════════════════════════════════════════════════════════════════════════════════════

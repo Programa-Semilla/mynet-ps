@@ -186,7 +186,7 @@ describe('009 — the absences that are requirements', () => {
    * the matter out of the product to a human.
    *
    * ═══════════════════════════════════════════════════════════════════════════════════════════
-   * **T103 (011) — THE MODERATION HALF MOVED TO ITS OWN ASSERTION BELOW, AND FINDING OUT WHY
+   * **T103 (013) — THE MODERATION HALF MOVED TO ITS OWN ASSERTION BELOW, AND FINDING OUT WHY
    * REQUIRED FIXING A HOLE FIRST.**
    *
    * 011 adds exactly one moderation route — `DELETE /admin/questions/:questionId` — and the
@@ -224,7 +224,7 @@ describe('009 — the absences that are requirements', () => {
 
   /**
    * ═══════════════════════════════════════════════════════════════════════════════════════════
-   * **T103 (011) — EXACTLY ONE MODERATION ROUTE, NARROWED BY PATH** (FR-950, FR-953, FR-976).
+   * **T103 (013) — EXACTLY ONE MODERATION ROUTE, NARROWED BY PATH** (FR-950, FR-953, FR-976).
    *
    * Matched by **shape rather than by name**: any route that writes to a question. That catches
    * `DELETE /admin/questions/:id`, and it would equally catch `DELETE /questions/:id/remove`,

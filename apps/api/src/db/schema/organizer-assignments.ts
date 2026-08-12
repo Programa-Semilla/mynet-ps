@@ -6,7 +6,7 @@ import { events } from './events.js'
 import { operators } from './operators.js'
 
 /**
- * T019 (011) — **authority over one conference, held by one attendee** (FR-930–FR-939,
+ * T019 (013) — **authority over one conference, held by one attendee** (FR-930–FR-939,
  * data-model.md).
  *
  * ═════════════════════════════════════════════════════════════════════════════════════════════

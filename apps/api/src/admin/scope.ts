@@ -1,7 +1,7 @@
 import { notFound } from '../errors.js'
 
 /**
- * T029 (011) — **the fourth branded scope, and the first that is a two-level refinement**
+ * T029 (013) — **the fourth branded scope, and the first that is a two-level refinement**
  * (FR-905, FR-906, contracts).
  *
  * ═════════════════════════════════════════════════════════════════════════════════════════════

@@ -7,7 +7,7 @@ import { useAdminSession } from '../session.js'
 import { ReportDetail } from './ReportDetail.js'
 
 /**
- * T093, T097 (011) — the abuse-report queue (FR-940, FR-943, FR-946).
+ * T093, T097 (013) — the abuse-report queue (FR-940, FR-943, FR-946).
  *
  * ═════════════════════════════════════════════════════════════════════════════════════════════
  * **THE SURFACE THAT MAKES A PROMISE TRUE. SINCE 007 SHIPPED, THE REPORTING DIALOG HAS TOLD

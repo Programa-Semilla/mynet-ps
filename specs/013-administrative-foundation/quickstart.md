@@ -1,4 +1,4 @@
-# Quickstart: 011 Administrative Foundation
+# Quickstart: 013 Administrative Foundation
 
 **Phase 1 output.** Runnable validation that the feature works end to end.
 
@@ -227,7 +227,7 @@ pnpm test:a11y     # NOT `test:accessibility` — that script does not exist
 ```
 
 `pnpm test:a11y` now runs **both** `accessibility.spec.ts` and `admin-accessibility.spec.ts`. It
-ran only the first until 011 added the second, which would have left the administrative scan
+ran only the first until 013 added the second, which would have left the administrative scan
 outside the named accessibility gate while still passing under `test:e2e`.
 
 Specifically confirm these **fail loudly if the feature is wrong**, rather than passing by omission:

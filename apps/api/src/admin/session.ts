@@ -12,7 +12,7 @@ import {
 } from './cookie.js'
 
 /**
- * T037 (011) — establishing, resolving and revoking administrative sessions (FR-911, FR-919,
+ * T037 (013) — establishing, resolving and revoking administrative sessions (FR-911, FR-919,
  * FR-919a, FR-919b, research R8).
  *
  * ═════════════════════════════════════════════════════════════════════════════════════════════

@@ -1,5 +1,5 @@
 /**
- * T065, T091, T108, T126 (011) — the administrative repository interfaces (Principle V).
+ * T065, T091, T108, T126 (013) — the administrative repository interfaces (Principle V).
  *
  * ═════════════════════════════════════════════════════════════════════════════════════════════
  * **THESE LIVE IN `@mynet/data` LIKE EVERY OTHER REPOSITORY, AND ARE DELIBERATELY ABSENT FROM
@@ -16,7 +16,7 @@
  * and what `apps/web/tests/unit/admin-absences.test.ts` exists to catch.
  *
  * They are composed instead in `apps/admin/src/app/services.ts`, that product's own composition
- * root. `specs/011-administrative-foundation/deviations.md` D2 records the decision in full.
+ * root. `specs/013-administrative-foundation/deviations.md` D2 records the decision in full.
  *
  * The two products therefore share repository *interfaces* and share nothing else.
  * ═════════════════════════════════════════════════════════════════════════════════════════════

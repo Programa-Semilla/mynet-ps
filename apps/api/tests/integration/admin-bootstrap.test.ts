@@ -13,7 +13,7 @@ import { organizerAssignments } from '../../src/db/schema/organizer-assignments.
 import { clearThrottle, setupTestApp, teardown } from './helpers.js'
 
 /**
- * T051, T058 (011) — **the bootstrap, and the three things it must refuse** (FR-990–FR-993,
+ * T051, T058 (013) — **the bootstrap, and the three things it must refuse** (FR-990–FR-993,
  * SC-912).
  *
  * ═════════════════════════════════════════════════════════════════════════════════════════════

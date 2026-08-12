@@ -5,7 +5,7 @@ import { fileURLToPath, URL } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 /**
- * T149, T150 (011) — **the guards this feature was NOT licensed to touch** (FR-974, FR-975,
+ * T149, T150 (013) — **the guards this feature was NOT licensed to touch** (FR-974, FR-975,
  * FR-976, FR-935, SC-908, SC-910).
  *
  * ═════════════════════════════════════════════════════════════════════════════════════════════

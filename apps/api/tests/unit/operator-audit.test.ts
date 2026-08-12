@@ -5,7 +5,7 @@ import { buildApp } from '../../src/app.js'
 import { requireOperator, requirePlatformOperator } from '../../src/admin/require-operator.js'
 
 /**
- * T011 (011) — the administrative route audit (FR-905, FR-906, contracts, research R5).
+ * T011 (013) — the administrative route audit (FR-905, FR-906, contracts, research R5).
  *
  * ═════════════════════════════════════════════════════════════════════════════════════════════
  * **THIS IS THE FOURTH ROUTE AUDIT, AND IT EXISTS FOR THE THIRD TIME FOR THE SAME REASON.**

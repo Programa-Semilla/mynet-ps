@@ -5,7 +5,7 @@ import { classify, describe } from '../errors.js'
 import { useAdminSession } from '../session.js'
 
 /**
- * T067 (011) — administrative sign-in (FR-914, FR-915, FR-917, FR-922).
+ * T067 (013) — administrative sign-in (FR-914, FR-915, FR-917, FR-922).
  *
  * ═════════════════════════════════════════════════════════════════════════════════════════════
  * **ONE MESSAGE FOR EVERY FAILURE, AND THE INTERFACE MUST NOT TRY TO BE HELPFUL ABOUT IT.**

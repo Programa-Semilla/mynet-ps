@@ -11,7 +11,7 @@ import { events, registrations } from '../schema/events.js'
 import { organizerAssignments } from '../schema/organizer-assignments.js'
 
 /**
- * T121 (011) — conferences, their organizers, and the derived `unassigned` state (FR-926,
+ * T121 (013) — conferences, their organizers, and the derived `unassigned` state (FR-926,
  * FR-930–FR-936).
  *
  * ═════════════════════════════════════════════════════════════════════════════════════════════

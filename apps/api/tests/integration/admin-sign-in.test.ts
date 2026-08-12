@@ -23,7 +23,7 @@ import {
 } from './helpers.js'
 
 /**
- * T048, T050 (011) — administrative sign-in, its four indistinguishable refusals, and both
+ * T048, T050 (013) — administrative sign-in, its four indistinguishable refusals, and both
  * session bounds (FR-914–FR-919b, SC-901).
  *
  * ═════════════════════════════════════════════════════════════════════════════════════════════

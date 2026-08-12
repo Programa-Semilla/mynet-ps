@@ -257,7 +257,7 @@ export type AccountExport = {
 
   /**
    * ═══════════════════════════════════════════════════════════════════════════════════════
-   * T026 (011) — **conferences this attendee has been given authority over** (FR-981).
+   * T026 (013) — **conferences this attendee has been given authority over** (FR-981).
    *
    * The only thing 011 adds to this document, out of five new tables. An assignment is a fact
    * about the attendee who holds it — that somebody granted them authority over a named
@@ -552,7 +552,7 @@ export const assembleExport = async (
       ORDER BY v.voted_at, v.question_id
     `),
     // ─────────────────────────────────────────────────────────────────────────────────────
-    // T026 (011) — conferences this attendee has been given authority over (FR-981).
+    // T026 (013) — conferences this attendee has been given authority over (FR-981).
     //
     // **Revoked rows are included** — a revoked assignment is history, and omitting it would
     // make the document say the attendee never held the authority. `ORDER BY assigned_at`
@@ -706,7 +706,7 @@ export const assembleExport = async (
       sessionTitle: row.title,
       votedAt: iso(row.voted_at) as string,
     })),
-    // T026 (011) — FR-981. Includes revoked assignments; see the interface for why.
+    // T026 (013) — FR-981. Includes revoked assignments; see the interface for why.
     organizerAssignments: organizerAssignments.map((row) => ({
       assignmentId: row.id,
       eventId: row.event_id,
@@ -735,7 +735,7 @@ export const assembleExport = async (
         'not included. Each of them would let somebody use your account.',
       "Reports made about you by other people are not included. They are those people's " +
         'records, and nothing in MyNet can read them.',
-      // T026 (011) — FR-982. Stated for the same reason every line above is: an attendee who
+      // T026 (013) — FR-982. Stated for the same reason every line above is: an attendee who
       // has never been an organizer and an attendee whose administrative record was withheld
       // must be able to tell the difference.
       'Administrative records about you are not included. If you have been given authority ' +
@@ -811,7 +811,7 @@ export const deleteAccount = async (
   `)
 
   // ═════════════════════════════════════════════════════════════════════════════════════════
-  // **T137, T138 (011) — THE DELETE IS NOW A TRANSACTION, BECAUSE TWO ADMINISTRATIVE
+  // **T137, T138 (013) — THE DELETE IS NOW A TRANSACTION, BECAUSE TWO ADMINISTRATIVE
   // OBLIGATIONS MUST NOT BE ABLE TO COMMIT APART FROM IT.**
   //
   // This was three independent statements, which was correct while every one of them was either
@@ -979,7 +979,7 @@ export const withdrawFromConference = async (unverified: EventScope): Promise<vo
     `)
 
     // ═════════════════════════════════════════════════════════════════════════════════════════
-    // **T139 (011) — LEAVING A CONFERENCE TAKES THE AUTHORITY OVER IT** (FR-961, decision 39).
+    // **T139 (013) — LEAVING A CONFERENCE TAKES THE AUTHORITY OVER IT** (FR-961, decision 39).
     //
     // The same trap 008 recorded immediately above, arriving through a third door — and the
     // reasoning is close enough that it is worth being explicit about the difference.

@@ -1,6 +1,6 @@
 import { createHmac } from 'node:crypto'
 
-import { and, desc, eq, gte, sql } from 'drizzle-orm'
+import { and, desc, eq, lt, sql } from 'drizzle-orm'
 
 import { loadConfig } from '../config.js'
 import { getDb } from '../db/client.js'
@@ -51,8 +51,28 @@ import { signInAttempts, type ThrottleAction } from '../db/schema/sign-in-attemp
  * ═════════════════════════════════════════════════════════════════════════════════════════
  */
 
-/** Rolling window over which failures are counted. */
-const WINDOW_MS = 60 * 60 * 1000
+/**
+ * Rolling window over which failures are counted.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ * **T022 (010) — A POSTGRESQL INTERVAL, NOT A JAVASCRIPT DURATION** (FR-811).
+ *
+ * This was `const WINDOW_MS = 60 * 60 * 1000`, subtracted from `Date.now()` in Node and sent to
+ * the database as a parameter. The rows it bounds are stamped by **PostgreSQL** — `occurred_at`
+ * defaults to `now()` — so that was two machines' opinions about the present, in two containers,
+ * with nothing keeping their clocks together.
+ *
+ * Drift is silent in both directions and weakens the bound in both: a container clock ahead of
+ * the database narrows the window and discards rows the throttle should be counting; behind it,
+ * `outstandingDelay` measures a longer wait than actually elapsed and subtracts a delay that was
+ * never served.
+ *
+ * Expressed here so the window is evaluated by the machine that stamped the rows.
+ * `tests/unit/throttle-clock.test.ts` asserts that no wall clock but the database's is consulted
+ * anywhere in this file.
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ */
+const WINDOW = sql`interval '1 hour'`
 
 /**
  * How many attempt rows one count reads.
@@ -72,8 +92,28 @@ const WINDOW_MS = 60 * 60 * 1000
  * `tests/unit/throttle-actions.test.ts` now asserts the invariant, so the next entry above this
  * line fails the build instead of quietly not binding.
  * ═════════════════════════════════════════════════════════════════════════════════════════
+ *
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ * **T019 (010) — RAISED AGAIN, FROM 1,000, AND THIS TIME THE BOUND WAS ACTUALLY BINDING.**
+ *
+ * 010's two read actions are the largest allowances in the table by an order of magnitude, and
+ * they have to be: the message-thread poll runs every three seconds, so an hour of ordinary use
+ * is ~1,200 requests. An allowance under that would delay every attendee having a normal
+ * conversation. `thread_read.source` at 6,000 is the largest, so the scan bound follows it.
+ *
+ * **The cost is real and is stated rather than absorbed.** Every count now reads up to 6,500 rows
+ * instead of 1,000, twice per throttled request, on a two-vCPU machine that also runs PostgreSQL.
+ * Both index definitions lead with `action`, so this is an index-range scan rather than a table
+ * scan — but at a busy venue the source key for `thread_read` genuinely holds thousands of rows
+ * an hour, and this is the one action where the worst case is the ordinary case.
+ *
+ * **The end-state is not a bigger number.** `countFailures` materialises rows and counts them in
+ * JavaScript, which is why a bound is needed at all; a windowed `count(*)` in SQL would be exact
+ * and cheap and would delete this constant. Research R5 records that rewrite as the better
+ * end-state and declines it in the same change that first deploys the product.
+ * ─────────────────────────────────────────────────────────────────────────────────────────
  */
-export const ATTEMPT_SCAN_LIMIT = 1_000
+export const ATTEMPT_SCAN_LIMIT = 6_500
 
 /**
  * Identifier thresholds for sign-in. Escalation starts after 3 consecutive failures and grows
@@ -89,6 +129,26 @@ const IDENTIFIER_MAX_DELAY_MS = 6 * 60 * 1000
  */
 export const SOURCE_FREE_ATTEMPTS = 30
 const SOURCE_MAX_DELAY_MS = 60 * 1000
+
+/**
+ * T019 (010) — the ceiling for the two **read** actions (FR-802, FR-803, research R7).
+ *
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ * **FIVE SECONDS RATHER THAN SIX MINUTES, AND THIS IS THE LOAD-BEARING CHOICE IN THE WHOLE
+ * ADDITION.**
+ *
+ * Every pre-existing action escalates toward `IDENTIFIER_MAX_DELAY_MS`. Those are writes and
+ * sign-in attempts: holding one open is a cost paid by a guesser, and six minutes is a price
+ * worth charging them.
+ *
+ * A six-minute delay on a **read** is not a slowdown, it is a freeze. The directory never
+ * arrives; the thread stops updating; the attendee sees a product that has hung, and no part of
+ * the interface can tell them otherwise because nothing failed. Five seconds degrades a poll to a
+ * slower poll — which is the only shape a bound that "may delay but never deny" can honestly
+ * take. A refusal the attendee cannot distinguish from a hang is a refusal.
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ */
+export const READ_MAX_DELAY_MS = 5_000
 
 interface DimensionThreshold {
   readonly freeAttempts: number
@@ -433,11 +493,17 @@ export const THRESHOLDS: Record<ThrottleAction, ActionThreshold> = {
   },
 
   /**
-   * T040 (011) — administrative sign-in (FR-916, research R4).
+   * T040 (012) — administrative sign-in (FR-916, research R4).
    *
    * ═════════════════════════════════════════════════════════════════════════════════════════
-   * **`mayDeny: false` — THE SECOND ENTRY IN THIS TABLE TO SAY SO, AND THE FIRST TO REACH IT BY
-   * `reset_request`'S OWN ARGUMENT RATHER THAN A DIFFERENT ONE.**
+   * **`mayDeny: false`, REACHED BY `reset_request`'S OWN ARGUMENT RATHER THAN A DIFFERENT ONE.**
+   *
+   * Four entries in this table may never deny and **each gets there a different way**, which is
+   * why every one of them argues it rather than citing a neighbour. `reset_request` because it is
+   * keyed on a victim's address; `message_send` because a refused message when a conference
+   * contact mattered is a failure the attendee cannot act on; `directory_read` and `thread_read`
+   * because refusing them refuses the product's central journey. This entry is the **first to
+   * repeat an existing argument**, and it repeats `reset_request`'s exactly.
    *
    * The rule this table runs on is *who a denial falls on*. Every `mayDeny: true` action above
    * is authenticated and keyed on the acting attendee's own identity, so a refusal can only
@@ -469,7 +535,109 @@ export const THRESHOLDS: Record<ThrottleAction, ActionThreshold> = {
     source: { freeAttempts: 60, ceilingMs: SOURCE_MAX_DELAY_MS },
     mayDeny: false,
   },
+
+  /**
+   * T019 (010) — **the attendee directory listing** (FR-801, FR-802, research R7).
+   *
+   * ═══════════════════════════════════════════════════════════════════════════════════════
+   * **THE FIRST READ IN THIS TABLE, AND THE THIRD ENTRY THAT MAY NEVER DENY — FOR A THIRD
+   * DISTINCT REASON.**
+   *
+   * `reset_request` cannot deny because it is keyed on a **victim's** address, so the denial is
+   * the attack. `message_send` cannot deny because a refused message at the moment a conference
+   * contact mattered is a failure the attendee cannot act on. Neither argument is this one.
+   *
+   * This may not deny because **it is the product's central journey**: a refusal here refuses
+   * Discover to somebody standing in a venue trying to find the person they were told to meet.
+   * The harm being bounded is bulk collection of an attendee list, and bulk collection is bounded
+   * perfectly well by making it expensive — an automated reader paying five seconds a page is
+   * paying a price a browsing human never notices.
+   * ═══════════════════════════════════════════════════════════════════════════════════════
+   *
+   * **120 an hour** is a heavy human session and roughly a tenth of what a harvester wants.
+   * Paging a 1,000-attendee conference at a hundred rows a request costs about ten requests, plus
+   * one for every search or filter change — a person exploring hard spends a few dozen.
+   *
+   * The source allowance is ten times that, as every entry above it is, because a conference
+   * venue puts hundreds of legitimate attendees behind one public address.
+   */
+  directory_read: {
+    identifier: { freeAttempts: 120, ceilingMs: READ_MAX_DELAY_MS },
+    source: { freeAttempts: 1_200, ceilingMs: READ_MAX_DELAY_MS },
+    mayDeny: false,
+  },
+
+  /**
+   * T019 (010) — **a page of message history** (FR-803, research R7).
+   *
+   * ─────────────────────────────────────────────────────────────────────────────────────────
+   * **THE LARGEST ALLOWANCE IN THIS TABLE, AND IT HAS TO BE.**
+   *
+   * This is the one read a client issues **without anybody acting**: `useConversation` polls
+   * every three seconds while a thread is open and the tab is visible. An hour of one ordinary
+   * conversation is therefore ~1,200 requests. **An allowance below that would delay every
+   * attendee having a normal exchange** — the bound would be a product defect wearing a
+   * defence's clothes. 1,500 clears legitimate use with room, and still bounds a client that has
+   * removed its own interval.
+   *
+   * `mayDeny: false` matters more here than anywhere else in the table, and not only for the
+   * reason `directory_read` gives. The client's poll backs off exponentially **on failure**, so a
+   * single 429 would not refuse one read — it would push the client into a backoff that makes the
+   * conversation appear to have stopped, long after the throttle had cleared.
+   * ─────────────────────────────────────────────────────────────────────────────────────────
+   *
+   * ═════════════════════════════════════════════════════════════════════════════════════════
+   * **THE SOURCE DIMENSION IS THE WEAK POINT OF THIS ENTRY, AND IT IS RECORDED RATHER THAN
+   * DISCOVERED LATER.**
+   *
+   * A venue puts every attendee behind one address. Twenty people with a thread open is 24,000
+   * requests an hour from one source — four times this allowance — so at a well-attended
+   * conference the **source** counter saturates and every poll takes the full five seconds, for
+   * attendees doing nothing wrong. The thread still works and nothing is refused, which is why
+   * this is a degradation rather than a defect; but it is a degradation UAT will never surface,
+   * because UAT has a handful of users.
+   *
+   * Raising it is not free either: the source allowance is what bounds a script polling from one
+   * machine, and `ATTEMPT_SCAN_LIMIT` has to stay above whatever it becomes. Left at the
+   * specification's number deliberately, and flagged for the reviewer rather than quietly tuned.
+   * ═════════════════════════════════════════════════════════════════════════════════════════
+   */
+  thread_read: {
+    identifier: { freeAttempts: 1_500, ceilingMs: READ_MAX_DELAY_MS },
+    source: { freeAttempts: 6_000, ceilingMs: READ_MAX_DELAY_MS },
+    mayDeny: false,
+  },
 }
+
+/**
+ * T019 (010) — **the routes that carry a read bound, enumerated in one place** (FR-803a).
+ *
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ * **"AN ENUMERATION THAT A NEW POLL CAN SILENTLY SIT OUTSIDE IS NOT A BOUND."**
+ *
+ * That is FR-803a verbatim, and it is why this list exists beside the threshold table rather
+ * than living implicitly in whichever handlers happen to call the throttle. A list on its own
+ * would be correct on the day it was written and wrong the first time somebody added a poll —
+ * and nothing about adding a poll makes anybody open this file.
+ *
+ * `tests/unit/throttle-route-audit.test.ts` is what closes that. It walks the real route table
+ * and requires **every authenticated GET route** to be either in this list or in an explicit
+ * exemption list with a written reason. A new read route fails the build until somebody decides
+ * which it is — the same fail-by-existence discipline `deletion-coverage` and `export-coverage`
+ * apply to tables.
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ *
+ * Adding an entry here is half the work: the action also needs a `THRESHOLDS` entry, and the
+ * route has to actually call the throttle. The audit checks all three.
+ */
+export const THROTTLED_READ_ROUTES: readonly {
+  readonly action: ThrottleAction
+  readonly method: string
+  readonly path: string
+}[] = [
+  { action: 'directory_read', method: 'GET', path: '/events/:eventId/attendees' },
+  { action: 'thread_read', method: 'GET', path: '/conversations/:conversationId/messages' },
+]
 
 export interface AttemptKey {
   readonly identifierHash: string
@@ -491,48 +659,120 @@ export const hashAttemptValue = (value: string): string =>
     .update(value.trim().toLowerCase(), 'utf8')
     .digest('hex')
 
+/** The row one request is judged against. Opaque to callers; ordering is its only meaning. */
+export type AttemptId = bigint
+
 /**
- * Records an attempt. **Never receives the submitted credential** — there is no parameter for
- * one, which is how FR-031c is guaranteed rather than remembered.
+ * T017 (010) — **records this request BEFORE it is judged, and returns the row it wrote**
+ * (FR-804, FR-805, research R5).
+ *
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ * **THIS ORDERING IS THE WHOLE OF FR-804, AND IT REPLACES `settleAttempt`/`beginAttempt`.**
+ *
+ * The old shape was count → sleep → record. Requests arriving together all read the same
+ * pre-burst count, all found themselves inside the allowance, and all passed — because not one of
+ * them had been written down when the others looked. The bound held against a caller who waited
+ * for each answer and not at all against one who did not, which is the only caller it existed
+ * for. A hundred concurrent requests against a three-attempt allowance were a hundred free
+ * attempts.
+ *
+ * Writing first makes an in-flight request a **committed row with `succeeded = false`**, so every
+ * request behind it counts it. No lock, no serialisation, one extra statement — R5 rejected the
+ * alternatives explicitly: folding count and insert into a single statement rewrites the query
+ * four features rest on, and an advisory lock per key serialises a hot path on two vCPUs.
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ *
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ * **EVERY REQUEST IS RECORDED, INCLUDING ONES THAT SUCCEED — WHICH IS WHY THIS IS NOT NAMED
+ * `recordFailure`.**
+ *
+ * `succeeded` has a specific meaning to `countFailures`: `false` extends the identifier streak,
+ * `true` ends it. The row starts `false` because at the moment it is written **nothing is yet
+ * known** about how the request will turn out, and a request whose outcome is unknown must count
+ * — otherwise the allowance is spent by anybody willing not to wait for the answer.
+ *
+ * Actions whose success should end the streak call `settleAttempt` afterwards. Actions whose cost
+ * is paid on every request regardless — `export`, `avatar_upload`, verification resend, and every
+ * per-actor cap added since 007 — simply do not, which is the same policy `beginAttempt` used to
+ * carry as a name. Spelling it as "begin, and optionally settle" rather than as a boolean is the
+ * point: somebody "fixing" a literal cannot silently make three limits unreachable.
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ *
+ * **Never receives the submitted credential** — there is no parameter for one, which is how
+ * FR-031c is guaranteed rather than remembered.
  */
-export const recordAttempt = async ({
+export const beginAttempt = async ({
   identifierHash,
   sourceHash,
   action,
-  succeeded,
-}: ActionKey & { succeeded: boolean }): Promise<void> => {
-  await getDb().insert(signInAttempts).values({ identifierHash, sourceHash, action, succeeded })
+}: ActionKey): Promise<AttemptId> => {
+  const [row] = await getDb()
+    .insert(signInAttempts)
+    .values({ identifierHash, sourceHash, action, succeeded: false })
+    .returning({ id: signInAttempts.id })
+
+  // `RETURNING` on a single-row insert cannot come back empty; the assertion is here because the
+  // id is what every judgement below is ordered against, and a silent `undefined` would make the
+  // exclusion boundary vanish rather than fail.
+  if (!row) throw new Error('Could not record a throttle attempt.')
+  return row.id
 }
 
 /**
- * 004 review — **for the actions whose cost is paid on every request, not only on failure.**
+ * T017 (010) — settles the outcome of a row `beginAttempt` created.
  *
  * ─────────────────────────────────────────────────────────────────────────────────────────
- * `succeeded` has a specific meaning to `countFailures`: `false` extends the identifier streak,
- * `true` ends it. Three call sites pass a bare `false` on their **success** path, which reads
- * as a copy-paste bug and is not one — for `export`, `avatar_upload` and verification resend the
- * server does the expensive work whether or not the caller is pleased with the result, so every
- * request has to count or the limit does not bind at all.
+ * **CALLED ONLY ON SUCCESS, AND ONLY BY ACTIONS WHOSE SUCCESS ENDS A STREAK.**
  *
- * Spelling that as `recordRequest` rather than `succeeded: false` is the point. Somebody
- * "fixing" the literal to `true` would make those three limits unreachable — the streak would
- * reset on every success — and no test would fail. A named function states the policy where the
- * boolean could only misstate a fact.
+ * A failure needs no call at all: the row already says `succeeded = false`, which is what makes
+ * the failure path one statement rather than two and what keeps a crashed handler counting
+ * against the caller rather than for them.
  *
- * These actions therefore escalate toward their ceiling under sustained use and eventually
- * answer 429 with retry-after guidance. That is a delay with a stated wait, never a permanent
- * refusal: the next window clears it, and for `export` in particular a personal-data right is
- * deferred by minutes and never denied.
+ * Without this, the rework would be a silent lockout. Every request writes `false` first, so an
+ * action that never settled would count its own successes as failures and escalate against
+ * attendees doing nothing wrong — the identifier dimension is a streak precisely so that somebody
+ * who mistypes three times and then gets in does not carry those failures forward.
+ *
+ * **The window between the two writes is deliberate and is the burst bound working.** A concurrent
+ * request that reads this row before it settles counts it as a failure. That is the conservative
+ * direction: it can only ever slow the caller down, never admit one it should have delayed. A
+ * process that dies in that window leaves one spurious failure behind, which the two-hour sweep
+ * clears (FR-382).
  * ─────────────────────────────────────────────────────────────────────────────────────────
  */
-export const recordRequest = async (key: ActionKey): Promise<void> => {
-  await recordAttempt({ ...key, succeeded: false })
+export const settleAttempt = async (id: AttemptId, succeeded: boolean): Promise<void> => {
+  // A no-op for the failure case rather than a redundant `UPDATE … SET succeeded = false`, so the
+  // failure path costs exactly one statement.
+  if (!succeeded) return
+  await getDb().update(signInAttempts).set({ succeeded }).where(eq(signInAttempts.id, id))
 }
 
 interface FailureStreak {
   readonly count: number
-  /** When the most recent failure happened. Undefined when there is no streak. */
-  readonly lastFailureAt: Date | undefined
+  /**
+   * T022 (010) — **how long ago the most recent failure happened, in milliseconds, as measured
+   * by the database** (FR-811). Undefined when there is no streak.
+   *
+   * ═══════════════════════════════════════════════════════════════════════════════════════
+   * **AN ELAPSED DURATION RATHER THAN AN INSTANT, AND THAT IS THE FIX RATHER THAN A DETAIL.**
+   *
+   * This was `lastFailureAt: Date`, subtracted from `Date.now()` in `outstandingDelay`. That
+   * subtraction — the one thing standing between a delay and a lockout — compared a **PostgreSQL**
+   * timestamp against **Node's** clock, in two containers with nothing keeping them together.
+   *
+   * The first attempt at fixing it carried the database's `now()` alongside the row and
+   * subtracted the two in JavaScript. That was still wrong in a way worth recording: `sql<Date>`
+   * is an assertion to the type checker and not a conversion, so `now()` arrived as a **string**
+   * and `.getTime()` threw on every throttled request. Twenty-four integration tests caught it
+   * immediately — every one of them by way of a 500 rather than a wrong delay, which is the
+   * loud failure mode and the lucky one.
+   *
+   * Asking the database for the *difference* removes both problems at once: there is one clock
+   * because only one machine ever reads a clock, and there is no date to parse because the value
+   * that crosses the boundary is a number.
+   * ═══════════════════════════════════════════════════════════════════════════════════════
+   */
+  readonly lastFailureAgeMs: number | undefined
 }
 
 /**
@@ -557,39 +797,76 @@ const countFailures = async (
   value: string,
   action: ThrottleAction,
   { resetOnSuccess }: { resetOnSuccess: boolean },
+  before: AttemptId | undefined,
 ): Promise<FailureStreak> => {
-  const since = new Date(Date.now() - WINDOW_MS)
-
   const rows = await getDb()
-    .select({ succeeded: signInAttempts.succeeded, occurredAt: signInAttempts.occurredAt })
+    .select({
+      succeeded: signInAttempts.succeeded,
+      // T022 (010) — the age of this row in milliseconds, computed by the machine that stamped
+      // it (FR-811). `::float8` rather than the numeric `extract` returns, because postgres.js
+      // hands `numeric` back as a **string** to preserve precision — the same class of mistake
+      // that made `sql<Date>\`now()\`` throw, and the reason this is cast rather than trusted.
+      ageMs: sql<number>`(extract(epoch from (now() - ${signInAttempts.occurredAt})) * 1000)::float8`,
+    })
     .from(signInAttempts)
     .where(
       and(
         eq(signInAttempts.action, action),
         eq(column, value),
-        gte(signInAttempts.occurredAt, since),
+        sql`${signInAttempts.occurredAt} >= now() - ${WINDOW}`,
+        // ─────────────────────────────────────────────────────────────────────────────────
+        // **THE EXCLUSION THAT KEEPS FR-805 TRUE, AND IT IS THE SUBTLEST LINE IN THE FILE.**
+        //
+        // T017 moved the write ahead of the judgement. Counting every row would therefore
+        // include the caller's own, shifting every allowance one attempt earlier — an
+        // off-by-one applied to all sixteen actions at once, invisible in review, and exactly
+        // what FR-805 forbids ("MUST NOT alter the observable allowance of any existing
+        // action").
+        //
+        // So a request judges itself against the arrivals **strictly ahead of it**. Ordering by
+        // the sequence rather than the timestamp is deliberate: concurrent inserts routinely
+        // share a `now()`, and a timestamp comparison would count a sibling as a predecessor or
+        // not depending on microseconds.
+        //
+        // `sign-in.ts` passes nothing, and that is not an oversight — it has recorded before
+        // evaluating since 001, so counting its own row is the behaviour FR-307a requires to be
+        // unchanged. See the call in that file.
+        // ─────────────────────────────────────────────────────────────────────────────────
+        before === undefined ? undefined : lt(signInAttempts.id, before),
       ),
     )
-    .orderBy(desc(signInAttempts.occurredAt))
+    // `id` breaks ties: `occurred_at` alone is not a total order once requests arrive together,
+    // and the identifier dimension stops at the first success it meets while scanning backwards.
+    .orderBy(desc(signInAttempts.occurredAt), desc(signInAttempts.id))
     .limit(ATTEMPT_SCAN_LIMIT)
 
   let count = 0
-  let lastFailureAt: Date | undefined
+  let lastFailureAgeMs: number | undefined
 
   for (const row of rows) {
     if (row.succeeded) {
       if (resetOnSuccess) break
       continue
     }
-    lastFailureAt ??= row.occurredAt
+    // Rows arrive newest first, so the first failure met is the most recent one.
+    lastFailureAgeMs ??= row.ageMs
     count += 1
   }
 
-  return { count, lastFailureAt }
+  return { count, lastFailureAgeMs }
 }
 
-/** Exponential escalation, clamped. The clamp is what keeps FR-031b true. */
-const delayFor = (failures: number, freeAttempts: number, ceilingMs: number): number => {
+/**
+ * Exponential escalation, clamped. The clamp is what keeps FR-031b true.
+ *
+ * **Exported for `tests/unit/throttle-thresholds.test.ts` and for nothing else** (010 T019).
+ * SC-808 asks for a *progressive* delay, and progression is a property of this curve rather than
+ * of any one action. It cannot be observed through `failureDelayMs` for a delay-only action,
+ * because that clamps its result to what is servable — which is the mechanism that makes a
+ * denial unrepresentable, and which the integration harness sets to 20ms so the suite does not
+ * spend minutes asleep. Asserting the curve directly is what is left, and it is the honest place.
+ */
+export const delayFor = (failures: number, freeAttempts: number, ceilingMs: number): number => {
   const excess = failures - freeAttempts
   if (excess <= 0) return 0
   return Math.min(2 ** (excess - 1) * 1000, ceilingMs)
@@ -619,10 +896,12 @@ const outstandingDelay = (
   { freeAttempts, ceilingMs }: DimensionThreshold,
 ): number => {
   const required = delayFor(streak.count, freeAttempts, ceilingMs)
-  if (required === 0 || !streak.lastFailureAt) return 0
+  if (required === 0 || streak.lastFailureAgeMs === undefined) return 0
 
-  const waited = Date.now() - streak.lastFailureAt.getTime()
-  return Math.max(0, required - waited)
+  // T022 (010) — the wait is measured by PostgreSQL, which is also what stamped the row (FR-811).
+  // Subtracting a Node timestamp here made this depend on the drift between two containers, and
+  // drift in the forgiving direction quietly subtracted a delay that was never served.
+  return Math.max(0, required - streak.lastFailureAgeMs)
 }
 
 /**
@@ -650,16 +929,28 @@ const outstandingDelay = (
  * address is still protected, and a single hostile identifier is still throttled on an
  * otherwise quiet network.
  */
-export const failureDelayMs = async ({
-  identifierHash,
-  sourceHash,
-  action,
-}: ActionKey): Promise<number> => {
+export const failureDelayMs = async (
+  { identifierHash, sourceHash, action }: ActionKey,
+  /**
+   * T017 (010) — the row this request wrote, from `beginAttempt`.
+   *
+   * Rows strictly older than it are counted; its own is not. **Omitting it counts everything,
+   * including the caller's own row** — which is `sign-in.ts`'s behaviour since 001 and must stay
+   * that way (FR-307a, FR-805). Every other call site passes it. See `countFailures`.
+   */
+  before?: AttemptId,
+): Promise<number> => {
   const thresholds = THRESHOLDS[action]
 
   const [identifier, source] = await Promise.all([
-    countFailures(signInAttempts.identifierHash, identifierHash, action, { resetOnSuccess: true }),
-    countFailures(signInAttempts.sourceHash, sourceHash, action, { resetOnSuccess: false }),
+    countFailures(
+      signInAttempts.identifierHash,
+      identifierHash,
+      action,
+      { resetOnSuccess: true },
+      before,
+    ),
+    countFailures(signInAttempts.sourceHash, sourceHash, action, { resetOnSuccess: false }, before),
   ])
 
   const delayMs = Math.max(

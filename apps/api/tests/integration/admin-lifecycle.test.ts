@@ -22,7 +22,7 @@ import {
 } from './helpers.js'
 
 /**
- * T132–T136 (011) — **authority never outlives the access it depends on** (FR-960, FR-961,
+ * T132–T136 (013) — **authority never outlives the access it depends on** (FR-960, FR-961,
  * FR-962, FR-997a, FR-997b, decision 39, SC-905, SC-906).
  *
  * ═════════════════════════════════════════════════════════════════════════════════════════════

@@ -1,4 +1,4 @@
-# Code Review: 011 — Administrative Foundation
+# Code Review: 013 — Administrative Foundation
 
 **Spec**: [spec.md](./spec.md) · **Date**: 2026-08-11 · **Reviewer**: `speckit.spex-gates.review-code`
 **Constitution**: v4.1.0, standing decisions 31–39
@@ -118,10 +118,10 @@ None outstanding.
       walk is where it belongs. Recorded rather than papered over.
 
 ### Not closed by this feature, and must not be read as closed
-- **Register entries 19 and 21** — 011 creates the *capability* to moderate and to read reports; it
+- **Register entries 19 and 21** — 013 creates the *capability* to moderate and to read reports; it
   does not decide who does so, against what standard, or with what appeal. A capability is not a
   policy.
-- **Register entry 4** — desktop and tablet layouts remain unvalidated, and 011 adds a whole second
+- **Register entry 4** — desktop and tablet layouts remain unvalidated, and 013 adds a whole second
   product to that debt.
 
 ## Conclusion

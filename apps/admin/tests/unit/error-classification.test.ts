@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 import { classify, describe as describeFailure, type AdminFailure } from '../../src/app/errors.js'
 
 /**
- * T083 (011) — **all seven refusal outcomes must be different from each other** (contracts).
+ * T083 (013) — **all seven refusal outcomes must be different from each other** (contracts).
  *
  * ═════════════════════════════════════════════════════════════════════════════════════════════
  * **THIS IS THE PROPERTY 008's DEFECT DESTROYED, AND THE ONE THAT WOULD HAVE CAUGHT IT.**

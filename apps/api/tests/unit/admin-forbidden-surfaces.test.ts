@@ -8,7 +8,7 @@ import { beforeAll, describe, expect, it } from 'vitest'
 import { buildApp } from '../../src/app.js'
 
 /**
- * T015 (011) — **six absences with no other guard** (FR-902, FR-903, FR-954, FR-955, FR-973,
+ * T015 (013) — **six absences with no other guard** (FR-902, FR-903, FR-954, FR-955, FR-973,
  * FR-999).
  *
  * ═════════════════════════════════════════════════════════════════════════════════════════════

@@ -1,6 +1,6 @@
 # Tasks: Administrative Foundation — the Second Actor, the Admin Site, and the Report Queue
 
-**Feature**: 011 · **Branch**: `spec/011-administrative-product` · **Migration**: `0009`
+**Feature**: 013 · **Branch**: `spec/011-administrative-product` · **Migration**: `0009`
 **Spec**: [spec.md](./spec.md) · **Plan**: [plan.md](./plan.md) · **Constitution**: v4.1.0
 
 ## Format: `[ID] [P?] [Story] Description`
@@ -266,7 +266,7 @@ so no task has to go looking for them.
 
 ## Phase 6: User Story 4 — A platform operator promotes an attendee, and the tier boundary is real (Priority: P1)
 
-**Goal**: the two-tier boundary exists and is enforced, which is what 012 will build on.
+**Goal**: the two-tier boundary exists and is enforced, which is what 014 will build on.
 
 **Independent test**: promote for one of two conferences; sign in as that person; confirm they see one conference, not the other, and no platform surface.
 
@@ -297,7 +297,7 @@ so no task has to go looking for them.
 - [X] T130 [P] [US4] Three layouts and an accessibility pass for `apps/admin/src/app/conferences/`
 - [X] T131 [US4] Regenerate and commit `contracts/openapi.json` for the conference routes
 
-**Checkpoint**: the boundary 012 depends on is real and independently tested.
+**Checkpoint**: the boundary 014 depends on is real and independently tested.
 
 ---
 
@@ -342,7 +342,7 @@ so no task has to go looking for them.
 - [X] T150 [P] Confirm the notification trigger audit in `apps/api/tests/unit/` is **unedited** and still passes (FR-935, SC-910)
 - [X] T151 [P] Narrow `apps/api/tests/unit/no-report-read-surface.test.ts` to `apps/web` and the attendee API surface (FR-972)
 - [~] T152 Run the full attendee test suite and record that it passes **without modification**, listing exactly which guard files this feature amended and why (SC-908)
-- [X] T153 [P] Record the sign-in-to-queue path timing in `specs/011-administrative-foundation/quickstart.md` as a measured value, so SC-900's 30-second criterion has a method rather than an assertion **Median 373 ms** over five runs (349–381 ms), with the method written down: fresh context, already-replaced credential, clock from `goto` to the first report row. Roughly 1% of SC-900's budget — the value is as a baseline for the next reading, and it is deliberately **not** a gate.
+- [X] T153 [P] Record the sign-in-to-queue path timing in `specs/013-administrative-foundation/quickstart.md` as a measured value, so SC-900's 30-second criterion has a method rather than an assertion **Median 373 ms** over five runs (349–381 ms), with the method written down: fresh context, already-replaced credential, clock from `goto` to the first report row. Roughly 1% of SC-900's budget — the value is as a baseline for the next reading, and it is deliberately **not** a gate.
 - [X] T154 [P] Update `deploy/vm/README.md` — the admin host, its A record, the bootstrap command, and the second certificate Also **fixed the deployment gap this task exposed**: see `deviations.md` D7. The Caddyfile served `/srv/admin` and nothing built, synced or mounted it.
 - [X] T155 [P] Update `CLAUDE.md`'s repository-layout section with `apps/admin/`
 - [X] T156 [P] Add the admin site to `deploy/vm/OPERATIONS-LOG.md`'s restore procedure Done as **three executable checks** in `verify-backup-local.sh` rather than prose — `ON DELETE NO ACTION` survived, the partial unique index survived with its predicate, and it still constrains — plus a run recorded in `OPERATIONS-LOG.md`.
@@ -365,7 +365,7 @@ Added after `review-findings.md` was written. The nine deferred Important findin
 - [X] T168 **Close the `admin_sign_in` throttle gap** `admin-sign-in-throttle.test.ts` — counted under its own action, never 429, and the correct credential still admitted after the allowance. Mutation-verified: deleting `recordAttempt` turns it red, which the review said nothing would.
 - [X] T169 **Fix `admin-audit-completeness.test.ts`'s vacuous fallback** Route→module derivation is now by URL literal with **no fallback**; a route matching no module, or more than one, is itself a failure. `DELETE /admin/questions/:questionId` was the route the old path-segment guess walked past.
 - [X] T170 **Horizontal-overflow coverage for the administrative destinations** (FR-020) `responsive.spec.ts` sweeps all four at all thirteen `SCROLL_WIDTHS`. `ADMIN_DESTINATIONS` moved from a spec file into `support/destinations.ts`, which makes the "declared once" claim true rather than aspirational. Axe reports nothing about a page that scrolls sideways, which is why the accessibility suite walking the same addresses missed it.
-- [X] T171 **Behavioural tests for 011's retention sweeps** `pruneAuditEntries` (both conjuncts, separately) and `pruneDeactivatedOperators` (the positive case, which had only the does-not-raise case). **It found a discrepancy**: the audit window is measured from `occurred_at` while two comments claim it runs from pseudonymisation. Recorded as `deviations.md` D11 rather than fixed, because the fix is a `pseudonymised_at` column and therefore a decision about the retention rule.
+- [X] T171 **Behavioural tests for 013's retention sweeps** `pruneAuditEntries` (both conjuncts, separately) and `pruneDeactivatedOperators` (the positive case, which had only the does-not-raise case). **It found a discrepancy**: the audit window is measured from `occurred_at` while two comments claim it runs from pseudonymisation. Recorded as `deviations.md` D11 rather than fixed, because the fix is a `pseudonymised_at` column and therefore a decision about the retention rule.
 
 ---
 

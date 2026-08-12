@@ -122,7 +122,7 @@ const NOT_ATTENDEE_DATA: Record<string, string> = {
 
   /**
    * ═══════════════════════════════════════════════════════════════════════════════════════════
-   * **T025 (011) — TWO OF THIS FEATURE'S FIVE TABLES ARE NOT ATTENDEE DATA, AND SAYING WHY IS
+   * **T025 (013) — TWO OF THIS FEATURE'S FIVE TABLES ARE NOT ATTENDEE DATA, AND SAYING WHY IS
    * HARDER HERE THAN ANYWHERE ABOVE, BECAUSE BOTH CONCERN PEOPLE.**
    *
    * Every other entry in this category is *conference content*: a session, a room, a slot. The
@@ -205,7 +205,7 @@ interface TableFacts {
   readonly cascadesFromAttendees: boolean
   readonly referencesAttendees: boolean
   /**
-   * T025 (011) — every table this one cascades **from**, whatever that table is.
+   * T025 (013) — every table this one cascades **from**, whatever that table is.
    *
    * Recorded so transitive reachability can be **computed** rather than declared. See
    * `reachedByCascade` below for why that distinction matters.
@@ -215,7 +215,7 @@ interface TableFacts {
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════════════════════
- * **T025 (011) — CASCADE COVERAGE IS A REACHABILITY QUESTION, NOT A ONE-HOP ONE.**
+ * **T025 (013) — CASCADE COVERAGE IS A REACHABILITY QUESTION, NOT A ONE-HOP ONE.**
  *
  * This guard used to ask "does this table cascade directly from `attendees`". That was true of
  * every table for four features, and 011 produced the first counter-example: `report_resolutions`
@@ -321,7 +321,7 @@ describe('deletion coverage (T014, FR-370)', () => {
     const unclassified = tables
       .filter((table) => table.name !== ROOT_TABLE)
       .filter((table) => !table.cascadesFromAttendees)
-      // T025 (011) — and reached by no *chain* of cascades either. See `reachedByCascade`.
+      // T025 (013) — and reached by no *chain* of cascades either. See `reachedByCascade`.
       .filter((table) => !reachedByCascade(table.name, byName))
       .filter((table) => !sweptTables.has(table.name))
       .filter((table) => !(table.name in EXPLICITLY_DELETED))
@@ -345,7 +345,7 @@ describe('deletion coverage (T014, FR-370)', () => {
   })
 
   /**
-   * T025 (011) — **the transitive walk is asserted, not assumed.**
+   * T025 (013) — **the transitive walk is asserted, not assumed.**
    *
    * `reachedByCascade` is the newest and least obvious mechanism in this file, and the failure
    * mode it introduces is the one every audit in this codebase has had to guard against: a

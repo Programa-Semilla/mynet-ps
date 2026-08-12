@@ -7,7 +7,7 @@ import { normaliseEmail } from '../db/queries/attendees.js'
 import { operators } from '../db/schema/operators.js'
 
 /**
- * T056, T058 (011) — **giving a seeded platform operator a usable credential, once**
+ * T056, T058 (013) — **giving a seeded platform operator a usable credential, once**
  * (FR-991, FR-992, FR-993, research R10).
  *
  *     pnpm admin:bootstrap

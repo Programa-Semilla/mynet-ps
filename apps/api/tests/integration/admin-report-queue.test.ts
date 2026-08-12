@@ -21,7 +21,7 @@ import { sessions } from '../../src/db/schema/catalog.js'
 import { ADA, attendees, clearThrottle, GRACE, setupTestApp, teardown } from './helpers.js'
 
 /**
- * T075, T076, T077 (011) — what the report queue returns, and what it must not (FR-940, FR-941,
+ * T075, T076, T077 (013) — what the report queue returns, and what it must not (FR-940, FR-941,
  * FR-942, FR-943, SC-902).
  *
  * ═════════════════════════════════════════════════════════════════════════════════════════════

@@ -137,7 +137,7 @@
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════════════════════
-# T042, T043 (011) — **the administrative site, on its own subdomain** (FR-910, decision 37,
+# T042, T043 (013) — **the administrative site, on its own subdomain** (FR-910, decision 37,
 # research R2).
 #
 # `admin.{$APP_DOMAIN}` needs **its own A record**, pointing at this same VM. Caddy obtains a

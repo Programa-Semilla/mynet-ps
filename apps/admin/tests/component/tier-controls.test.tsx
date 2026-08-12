@@ -8,7 +8,7 @@ import { AdminSessionProvider } from '../../src/app/session.js'
 import { conference, identity, stubServices } from '../support/services.js'
 
 /**
- * T120 (011) — **a conference organizer is rendered NO control for a capability they do not
+ * T120 (013) — **a conference organizer is rendered NO control for a capability they do not
  * hold** (FR-925).
  *
  * ═════════════════════════════════════════════════════════════════════════════════════════════

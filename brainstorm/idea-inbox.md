@@ -56,18 +56,6 @@ An entry is removed once a brainstorm document has been written from it.
 > `select 1` is the shape; an interim measure is to connect once at boot so a broken deploy fails
 > rather than starts.
 
-### throttle-clock-provenance
-
-- **Source**: deep-review
-- **Date**: 2026-08-05
-- **Reference**: spec/production-foundation
-- **Summary**: The throttle mixes two clocks — attempt rows are stamped by the database's `now()`,
-  while the window and the served delay are computed from the API process's clock.
-
-> Not a bug with NTP-synced hosts, but the delay calculation rests on the two timestamps being
-> comparable and nothing in the code establishes that. Either stamp from the application clock at
-> insert time, or move the whole computation into SQL.
-
 ### substitutability-proven-without-the-application
 
 - **Source**: deep-review
@@ -120,15 +108,6 @@ An entry is removed once a brainstorm document has been written from it.
 
 > Either condition changing alone would break the cached files with confusing 404s rather than a message naming the cause. The coupling is implicit and worth making explicit before the suite grows.
 
-### verification-proves-reachability-not-ownership
-
-- **Source**: deep-review
-- **Date**: 2026-08-07
-- **Reference**: spec/004-attendee-identity-and-profile
-- **Summary**: Signing up with an address you do not own, then having the victim click the link, verifies the *attacker's* account — while FR-303's disclosure has told the victim the address is already taken, so they cannot register it themselves.
-
-> FR-325a and SC-304a rest the whole defence of this on verification, and the code implements verification exactly as specified — the residual is in the threat model rather than the implementation. The mitigation is copy the product does not have: `MailService` takes only `to` and `link`, so nothing in the message can warn a recipient that clicking confirms an account they did not create, and there is no path for a non-owner to contest an address. Intersects register entry 19 (nobody moderates the product) and is cheapest to settle before the first publicly reachable preview.
-
 ### platform-registry-mirroring-cost
 
 - **Source**: deep-review
@@ -174,24 +153,6 @@ An entry is removed once a brainstorm document has been written from it.
 
 > Informational rather than a defect: the real guarantees — visible dialog, Escape dismissal, focus restoration to the opener — are correctly proved in a browser by the e2e accessibility and journey specs, and `tests/setup.ts` documents at length why the jsdom shim must not be trusted for modality. Worth revisiting because 005's session-panel component tests asserted the shim's `data-modal` marker to distinguish `showModal` from `show`, and 004's dialog — the more consequential one, since it guards account deletion — does not.
 
-### directory-listing-throttle
-
-- **Source**: deep-review
-- **Date**: 2026-08-07
-- **Reference**: feat/006-discover-and-deployment-platform
-- **Summary**: The directory listing carries no rate limit, so anyone who self-signs-up and enters a world-readable join code can harvest a whole conference at 100 rows per request.
-
-> FR-404 deliberately concedes that a listing discloses the discoverable-and-verified set — but what it concedes to a human browsing is not what it concedes to a machine collecting 1,000 names, employers, roles, headlines, interests and faces in ten cheap keyset-paged requests. The join route already carries its own per-action counter, so the mechanism exists.
-
-### backups-share-a-failure-domain
-
-- **Source**: deep-review
-- **Date**: 2026-08-07
-- **Reference**: feat/006-discover-and-deployment-platform
-- **Summary**: Every backup artifact stays on the same VM and disk as the live database, so the most likely event a daily backup is kept for destroys the database and all seven artifacts together.
-
-> Standing decision 17 made backups a governance obligation precisely because no vendor is doing it. The schedule and the written retention period are discharged; the purpose is only partly. Closing it means an off-host copy after the verification gate and before pruning, with local pruning conditional on a confirmed remote copy.
-
 ### unbounded-directory-accumulation
 
 - **Source**: deep-review
@@ -219,24 +180,6 @@ An entry is removed once a brainstorm document has been written from it.
 
 > Pre-existing 001/004 infrastructure that this feature made hot rather than a defect it introduced, which is why it was not fixed in 007's review loop. On a burstable Standard_B2s with a loopback PostgreSQL sharing two vCPUs, each write is also a dead tuple on a narrow hot table plus a WAL record. The shape that preserves the semantics is a refresh threshold — write only when the session is materially stale, several minutes inside the idle window — which drops the rate by two orders of magnitude and changes nothing an attendee can observe. Changing session-expiry behaviour is an owner decision.
 
-### read-path-unthrottled
-
-- **Source**: deep-review
-- **Date**: 2026-08-08
-- **Reference**: feat/007-messages-and-notification-delivery
-- **Summary**: The poll interval is entirely client-controlled and the server bounds nothing. The throttle is wired to the two write routes only; the message-page read has no throttle, no cache header and no minimum interval.
-
-> Spec open question 6 left "what the poll costs on a phone at a venue" open. The client-side half was answered — it stops when the tab is hidden and when no thread is open — and the server-side half was not. In a product with public self sign-up, one modified client can consume the box's read capacity, and a future feature could shorten the interval without anyone seeing the server-side cost. Either add a `read`-class throttle action configured `mayDeny: false` and keyed on the attendee, or record explicitly that read frequency is deliberately unbounded so the next feature inherits it as a choice.
-
-### vapid-config-duplication
-
-- **Source**: deep-review
-- **Date**: 2026-08-08
-- **Reference**: feat/007-messages-and-notification-delivery
-- **Summary**: Two of the four server-side `push` config members exist only to police each other. `PUSH_VAPID_SUBJECT` is read by nothing, and the API's `PUSH_VAPID_PUBLIC_KEY` is a second copy of a value the client reads from its own `VITE_` variable.
-
-> Not a defect while the sink adapter is the only implementation — reserving the VAPID triple is a reasonable hedge for register entry 20. Worth settling when the real adapter lands: confirm it reads all three, and decide whether the API should *serve* the public key to the client rather than having it duplicated across two environment variables that nothing checks agree. Two sources for one key is the drift this codebase refuses elsewhere.
-
 ### proposer-cannot-withdraw-a-proposal
 
 - **Source**: deep-review
@@ -254,15 +197,6 @@ An entry is removed once a brainstorm document has been written from it.
 - **Summary**: `CardRepository.getHeld` and `listShared`, and the routes behind them, have no product consumer. `GET /cards/held/:attendeeId` is the only route `requireHeldCard` guards — so a third branded scope, a third route audit and a WeakSet exist to protect one route nothing calls.
 
 > Arguably the right call: the branded scope is what makes adding a card-named route later safe by default, and the argument for a third module rather than a widened second is sound. Worth making it a recorded decision rather than an accident of building the full interface before its surfaces. Two questions attach to it. Should `listShared` get a surface? FR-618 makes a card irrevocable, and an attendee currently cannot see what they have irrevocably given away — a "cards you have given" view is the natural counterpart to that honesty argument. And should `getHeld` exist at all if the contacts list is the only entry point?
-
-### unverified-accounts-can-share-a-card
-
-- **Source**: deep-review
-- **Date**: 2026-08-10
-- **Reference**: feat/008-network-and-appointments
-- **Summary**: `shareCard` requires the **recipient** to be discoverable and verified, but places no verification requirement on the **sharer** — whose profile the row makes permanently readable.
-
-> The project invariant is that "verification gates exactly one thing: discoverability, so any profile that can be read already carries a verified address". Card resolution deliberately omits the verification condition (FR-613), which is correct *if* a card could only have been created by a verified attendee — and nothing establishes that. An account created with an address its holder does not control can join by code, share its card, and install a live-resolving profile bearing a chosen name and face into a verified attendee's Network, irrevocably (FR-618). Note this would be a check on the **actor at write time**, so it does not conflict with FR-612/FR-613, which govern read-time resolution. Decide whether the invariant is meant to hold here.
 
 ### proposing-requires-no-relationship
 
@@ -317,15 +251,6 @@ An entry is removed once a brainstorm document has been written from it.
 - **Summary**: `useSessionQuestions` returns a fresh object each render and it is passed whole into every row, so any vote re-renders every row and `React.memo` on a row could never hit.
 
 > Invisible at test sizes; shows up as upvote lag on a mid-range phone at a keynote, which is exactly the scenario the feature is for. Passing only the two stable callbacks each row uses would make memoisation possible without touching FR-780's key-stability reasoning.
-
-### throttle-read-then-write-is-not-atomic
-
-- **Source**: deep-review
-- **Date**: 2026-08-10
-- **Reference**: spec/009-session-qa
-- **Summary**: The throttle reads the counter, sleeps, then records — so a burst of concurrent requests all observe the same pre-burst count and all pass before any is recorded. It bounds a sustained rate, not a burst.
-
-> Pre-existing and shared by every throttled route since 001, not introduced by 009. It matters marginally more for `question_ask`, which publishes free text to a whole conference with an allowance of ten. Fixing it means changing the shared mechanism — record before counting, or fold both into one statement — so it belongs to whoever revisits `auth/throttle.ts` next.
 
 ### withdrawal-confirmation-has-no-pending-state
 

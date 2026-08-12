@@ -7,7 +7,7 @@ import { getDb } from '../../db/client.js'
 import { notFound, reportAlreadyResolved } from '../../errors.js'
 
 /**
- * T086–T090 (011) — the abuse-report queue (FR-940–FR-947, decision 38).
+ * T086–T090 (013) — the abuse-report queue (FR-940–FR-947, decision 38).
  *
  * ═════════════════════════════════════════════════════════════════════════════════════════════
  * **THIS IS THE FEATURE THAT MAKES AN EXISTING PROMISE TRUE, AND IT IS WHY MODERATION SHIPS IN

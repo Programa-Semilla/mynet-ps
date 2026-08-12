@@ -229,7 +229,7 @@ export const buildApp = async (options: BuildAppOptions = {}): Promise<FastifyIn
   await app.register(cardAccess)
 
   // ─────────────────────────────────────────────────────────────────────────────────────────
-  // 5a-quater. Administrative access (011). Decorates the instance with `requireOperator` and
+  // 5a-quater. Administrative access (013). Decorates the instance with `requireOperator` and
   //     `requirePlatformOperator`, which produce the `OperatorScope` and `PlatformScope` every
   //     administrative route demands (FR-905, FR-906).
   //

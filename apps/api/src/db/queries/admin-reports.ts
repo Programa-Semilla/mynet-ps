@@ -10,7 +10,7 @@ import { reportResolutions } from '../schema/report-resolutions.js'
 import { abuseReports } from '../schema/reports.js'
 
 /**
- * T085 (011) — **reading the abuse-report queue** (FR-940–FR-946, decision 38).
+ * T085 (013) — **reading the abuse-report queue** (FR-940–FR-946, decision 38).
  *
  * ═════════════════════════════════════════════════════════════════════════════════════════════
  * **THIS MODULE IS THE THIRD RECORDED EXCEPTION TO "PRIVATE CONTENT STAYS PRIVATE", AND IT IS

@@ -64,6 +64,23 @@ PY
       cp "${SCRIPT_DIR}/maintenance/index.html" "$RENDERED"
     fi
 
+    # ─────────────────────────────────────────────────────────────────────────────────────────
+    # **CREATE THE DIRECTORY FIRST, BECAUSE ON A FIRST DEPLOY NOTHING HAS BEEN SYNCED YET.**
+    #
+    # `deploy.sh` enters maintenance at step [1b/6] and rsyncs the repository at [3/6] — correct
+    # ordering, since the point is to put the environment behind a 503 *before* changing anything
+    # underneath it. On every deploy after the first, `${COMPOSE_DIR}/maintenance/` exists because
+    # a previous rsync created it.
+    #
+    # On the very first deploy it does not, and `scp` fails with "No such file or directory". The
+    # deploy then aborts having done nothing except print that the environment may still be in
+    # maintenance — which it is not, because the flag is raised on the line after the one that
+    # failed. Found on this project's first real deploy, which is the only run that could find it.
+    #
+    # `mkdir -p` rather than reordering the deploy: the maintenance page must go up before the
+    # rsync, and this is the whole of what it needs.
+    # ─────────────────────────────────────────────────────────────────────────────────────────
+    ssh "$REMOTE" "mkdir -p '${COMPOSE_DIR}/maintenance'"
     scp -q "$RENDERED" "${REMOTE}:${PAGE}"
     ssh "$REMOTE" "touch '${FLAG}'"
     echo "Maintenance ON for ${MYNET_ENV}. Visitors get 503 with a Retry-After."

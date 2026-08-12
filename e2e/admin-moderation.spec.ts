@@ -5,7 +5,7 @@ import { ADMIN_ORIGIN } from './support/env.js'
 import { seedQuestionReport, signInAsOperator } from './support/operators.js'
 
 /**
- * T104 (011) — **a removed question is gone for every attendee at that conference** (FR-950,
+ * T104 (013) — **a removed question is gone for every attendee at that conference** (FR-950,
  * FR-951, FR-952, SC-903).
  *
  * ═════════════════════════════════════════════════════════════════════════════════════════════

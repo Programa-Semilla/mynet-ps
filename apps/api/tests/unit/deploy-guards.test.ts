@@ -176,6 +176,122 @@ describe('mynet::require_data_separation (FR-485)', () => {
 })
 
 /**
+ * T007 (010) — **the required-value preflight, verified the only way that means anything**
+ * (FR-836, SC-817).
+ *
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ * **SC-817 ASKS FOR A REFUSAL THAT NAMES *THAT* VALUE — SO THE TEST BLANKS EACH ONE IN TURN.**
+ *
+ * A single case blanking one value would pass against a guard that hardcoded that one name, and
+ * against a guard that printed the whole env file and happened to contain it. Driving every
+ * required key through the same assertion is what makes the property "the message names the
+ * missing value" rather than "the message mentions a value".
+ *
+ * This is register entry 17 as an executable check. That entry records two authentication
+ * secrets absent from the deployment workflow, invisible because `db-branch` failed first —
+ * a failure that named something else, several steps from the actual problem.
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ */
+describe('mynet::require_env_values (FR-836, SC-817)', () => {
+  const REQUIRED = [
+    'RESOURCE_GROUP',
+    'VM_NAME',
+    'LOCATION',
+    'VM_SIZE',
+    'ADMIN_USER',
+    'DATABASE_HOST',
+    'DATABASE_NAME',
+  ] as const
+
+  it.each(REQUIRED)('refuses with a message naming %s when it is blank', (key) => {
+    const dir = buildFixture({ ...DISTINCT.uat, [key]: '' }, DISTINCT.prod)
+    try {
+      const result = loadEnv(dir, 'uat')
+
+      expect(result.status, `a blank ${key} was accepted`).not.toBe(0)
+      expect(
+        result.stderr,
+        `the refusal for a blank ${key} does not name ${key}. SC-817 asks for a message naming ` +
+          'the missing value — a refusal naming something else is the failure mode register ' +
+          'entry 17 records.',
+      ).toContain(key)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  /**
+   * Reporting only the first missing value turns one five-minute fix into a round trip per blank
+   * line, and tells an operator nothing about how much further there is to go.
+   */
+  it('reports EVERY missing value at once, not just the first', () => {
+    const dir = buildFixture({ ...DISTINCT.uat, VM_NAME: '', DATABASE_NAME: '' }, DISTINCT.prod)
+    try {
+      const result = loadEnv(dir, 'uat')
+      expect(result.status).not.toBe(0)
+      expect(result.stderr).toContain('VM_NAME')
+      expect(result.stderr).toContain('DATABASE_NAME')
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════════════════
+   * **THE ORDERING ASSERTION, AND IT IS THE ONE WORTH HAVING.**
+   *
+   * `require_data_separation` compares UAT's `DATABASE_NAME` against production's. With both
+   * blank it compares `''` to `''`, finds them equal, and refuses with a message about *real
+   * attendee data* — for an environment that has simply not been filled in. An operator reading
+   * that message goes looking for a data leak that does not exist.
+   *
+   * So the preflight must run first, and this is what pins the order.
+   * ═══════════════════════════════════════════════════════════════════════════════════════
+   */
+  it('runs BEFORE the data-separation guard, so a blank file is not reported as a data leak', () => {
+    const dir = buildFixture(
+      { ...DISTINCT.uat, DATABASE_NAME: '' },
+      { ...DISTINCT.prod, DATABASE_NAME: '' },
+    )
+    try {
+      const result = loadEnv(dir, 'uat')
+
+      expect(result.status).not.toBe(0)
+      expect(result.stderr).toContain('DATABASE_NAME')
+      expect(
+        result.stderr,
+        'An unfilled env file was reported as UAT pointing at production data. The blank values ' +
+          'compared equal, which is a fact about emptiness rather than about attendee data.',
+      ).not.toMatch(/production's DATABASE NAME/i)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('accepts the fully-populated fixture, so the guard is not simply always refusing', () => {
+    // The case that fails when somebody adds a key to REQUIRED that the env files do not carry.
+    // Builds its own fixture rather than reusing `work`: that one is removed by the previous
+    // block's `afterAll`, which runs before this block starts.
+    const dir = buildFixture(DISTINCT.uat, DISTINCT.prod)
+    try {
+      expect(loadEnv(dir, 'uat').status).toBe(0)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  /**
+   * The real committed files, not a fixture. A preflight that passes against a fixture and fails
+   * against `envs/uat.env` would be discovered at provisioning time — which is exactly the
+   * "fails later, at a point that names something else" this requirement exists to prevent.
+   */
+  it('passes against the real committed env files', () => {
+    expect(loadEnv(VM_DIR, 'uat').status).toBe(0)
+    expect(loadEnv(VM_DIR, 'prod').status).toBe(0)
+  })
+})
+
+/**
  * The defect that motivated the shell gate, pinned so it cannot return.
  *
  * `maintenance.sh on` ended with `[[ -n "$UNTIL_TEXT" ]] && echo …` as the last statement of the

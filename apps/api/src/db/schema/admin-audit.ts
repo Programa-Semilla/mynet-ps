@@ -4,7 +4,7 @@ import { check, index, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-cor
 import { operators } from './operators.js'
 
 /**
- * T021 (011) — **the append-only record of administrative acts** (FR-994–FR-999, research R6).
+ * T021 (013) — **the append-only record of administrative acts** (FR-994–FR-999, research R6).
  *
  * ═════════════════════════════════════════════════════════════════════════════════════════════
  * **`subject_attendee_id` IS A PLAIN NULLABLE COLUMN WITH NO FOREIGN KEY, AND THAT IS THE MOST

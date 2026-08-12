@@ -3,14 +3,178 @@
 #
 # Usage:  ./provision-vm.sh <uat|prod>
 #
-# Cost target (~fixed per month, per environment): Standard_B2s ~$30-38 + 64GB StandardSSD ~$5 +
-# static IP ~$4. Fixed cost with no per-request metering is why the owner chose this pattern over
-# a managed database (research D9) — the trade is recorded in plan.md's Complexity Tracking.
+# Cost target (~fixed per month, per environment): Standard_B2s ~$30-38 + 64GB StandardSSD ~$5
+# + static IP ~$4. Fixed cost with no per-request metering is why the owner chose this pattern
+# over a managed database (research D9) — the trade is recorded in plan.md's Complexity Tracking.
+#
+# The size is read from envs/<env>.env and preflighted below (FR-822) rather than assumed here.
 set -euo pipefail
 
 source "$(cd "$(dirname "$0")" && pwd)/_common.sh"
 mynet::load_env "${1:-}"
 mynet::require_az
+
+# ═══════════════════════════════════════════════════════════════════════════════════════════════
+# T008 (010) — **the machine-size preflight** (FR-822).
+#
+# Without it, an unavailable or restricted size fails inside `az vm create`, several steps and one
+# resource group later, as `SkuNotAvailable` — an error that names neither the region nor a
+# remedy, at a point where a resource group has already been created. This asks the question
+# first, and answers it in a sentence somebody can act on.
+#
+# ───────────────────────────────────────────────────────────────────────────────────────────────
+# **`az rest` rather than `az vm list-skus`, and the reason is 18x.** The CLI command pages the
+# whole SKU catalogue and filters client-side, taking ~70 seconds even with `--size`; the
+# underlying REST endpoint accepts a server-side `$filter` on location and answers in under four.
+# A preflight nobody is willing to wait for is a preflight somebody comments out.
+#
+# **`restrictions` is the field that matters, not presence.** A size under a capacity-growth
+# restriction is *listed* — it simply cannot be created — so checking that the name appears would
+# report success on exactly the case this exists to catch. That is why the query asks for both.
+# ───────────────────────────────────────────────────────────────────────────────────────────────
+# ═══════════════════════════════════════════════════════════════════════════════════════════════
+mynet::require_vm_size() {
+  local api="2021-07-01" sku
+  echo "== Preflight: is ${VM_SIZE} available in ${LOCATION}? =="
+
+  sku="$(az rest --method get \
+    --url "https://management.azure.com/subscriptions/${SUBSCRIPTION}/providers/Microsoft.Compute/skus?api-version=${api}&\$filter=location%20eq%20'${LOCATION}'" \
+    --query "value[?name=='${VM_SIZE}' && resourceType=='virtualMachines'] | [0]" -o json 2>/dev/null)"
+
+  if [[ -z "$sku" || "$sku" == "null" ]]; then
+    cat >&2 <<EOF
+
+ERROR: machine size ${VM_SIZE} does not exist in ${LOCATION}.
+
+  size:   ${VM_SIZE}     (deploy/vm/envs/${MYNET_ENV}.env, VM_SIZE)
+  region: ${LOCATION}    (deploy/vm/envs/${MYNET_ENV}.env, LOCATION)
+
+Nothing has been created. FR-822 requires this to fail here rather than inside \`az vm create\`
+as a SkuNotAvailable naming neither the region nor a fix.
+
+See what this subscription can actually create in that region:
+  az vm list-skus --subscription ${SUBSCRIPTION} -l ${LOCATION} --size Standard_B --all -o table
+EOF
+    return 1
+  fi
+
+  # An empty array is the pass. Anything in it is a reason the size cannot be created here, and
+  # the reason is worth printing verbatim — "NotAvailableForSubscription" and a zone restriction
+  # have completely different fixes.
+  local restrictions
+  restrictions="$(printf '%s' "$sku" | python3 -c 'import json,sys; print(json.dumps(json.load(sys.stdin).get("restrictions", [])))')"
+
+  if [[ "$restrictions" != "[]" ]]; then
+    cat >&2 <<EOF
+
+ERROR: machine size ${VM_SIZE} is RESTRICTED in ${LOCATION} for this subscription.
+
+  size:         ${VM_SIZE}
+  region:       ${LOCATION}
+  subscription: ${SUBSCRIPTION}
+  restrictions: ${restrictions}
+
+Nothing has been created. A restricted size is listed by Azure but cannot be created, so this
+would otherwise have failed several steps later with a resource group already in place.
+
+Fixes, in the order worth trying:
+  1. Choose another size in deploy/vm/envs/${MYNET_ENV}.env (VM_SIZE). Two vCPU and 4 GiB is the
+     operating envelope this stack was sized for.
+  2. Choose another region (LOCATION) — but note both environments are meant to sit in one
+     region, and moving one is a decision rather than a workaround.
+  3. Request a quota increase, if the restriction names a quota rather than capacity.
+EOF
+    return 1
+  fi
+
+  echo "   ${VM_SIZE} is available in ${LOCATION} with no restrictions."
+
+  # ═════════════════════════════════════════════════════════════════════════════════════════════
+  # **AND THE QUOTA, WHICH IS A COMPLETELY SEPARATE QUESTION FROM AVAILABILITY.**
+  #
+  # This half was added after the check above passed and `az vm create` would still have failed.
+  # `Standard_B2als_v2` reports `restrictions: []` in `centralus` — it is genuinely available —
+  # while the subscription's quota for its family, `standardBasv2Family`, is **0 of 0**. Azure
+  # models these as different things: *can this SKU be created here at all* and *is this
+  # subscription allowed any of it*. A preflight that asks only the first reports success and
+  # then watches the deployment fail on the second.
+  #
+  # That is exactly the failure FR-822 exists to prevent — an error naming neither the size, the
+  # region, nor a remedy, several steps in with a resource group already created. The first
+  # version of this preflight had the same blind spot as the thing it was written to replace.
+  #
+  # Two limits, because either can bind: the SKU's own family, and the region-wide `cores` total
+  # that every family draws from.
+  # ═════════════════════════════════════════════════════════════════════════════════════════════
+  local family vcpus
+  read -r family vcpus <<<"$(printf '%s' "$sku" | python3 -c '
+import json, sys
+sku = json.load(sys.stdin)
+caps = {c["name"]: c["value"] for c in sku.get("capabilities", [])}
+print(sku.get("family", ""), caps.get("vCPUs", "0"))
+')"
+
+  echo "== Preflight: does this subscription have quota for ${vcpus} ${family} vCPUs? =="
+
+  local usage shortfall
+  usage="$(az vm list-usage --subscription "${SUBSCRIPTION}" -l "${LOCATION}" -o json 2>/dev/null)"
+
+  # Reports EVERY insufficient limit rather than the first, for the reason
+  # `mynet::require_env_values` does: one round trip per problem is one round trip too many when
+  # the fix for each is a separate request that takes its own time to be granted.
+  shortfall="$(printf '%s' "$usage" | FAMILY="$family" VCPUS="$vcpus" python3 -c '
+import json, os, sys
+
+family, needed = os.environ["FAMILY"], int(os.environ["VCPUS"])
+wanted = {family: "the size'"'"'s own family", "cores": "the region-wide total"}
+problems = []
+
+for entry in json.load(sys.stdin):
+    key = entry["name"]["value"]
+    if key not in wanted:
+        continue
+    label = entry["localName"]
+    used, limit = int(entry["currentValue"]), int(entry["limit"])
+    free = limit - used
+    if free < needed:
+        problems.append(
+            "  " + label + ": " + str(used) + " used of " + str(limit)
+            + " - " + str(free) + " free, " + str(needed) + " needed"
+            + " (" + wanted[key] + ")"
+        )
+
+print("\n".join(problems))
+')"
+
+  if [[ -n "$shortfall" ]]; then
+    cat >&2 <<EOF
+
+ERROR: ${VM_SIZE} is available in ${LOCATION}, but this subscription has no quota for it.
+
+${shortfall}
+
+  size:         ${VM_SIZE}  (${vcpus} vCPUs, family ${family})
+  region:       ${LOCATION}
+  subscription: ${SUBSCRIPTION}
+
+Nothing has been created. Availability and quota are different questions and this size passes the
+first — so without this check the run would have failed inside \`az vm create\`, after the
+resource group existed, with an error naming neither the family nor the limit.
+
+Fixes:
+  1. Request a quota increase for that family in that region. In the portal:
+     Subscriptions -> ${SUBSCRIPTION} -> Usage + quotas -> filter by ${LOCATION}.
+     Small increases are often granted automatically within minutes.
+  2. Or choose a size whose family already has room:
+     az vm list-usage --subscription ${SUBSCRIPTION} -l ${LOCATION} -o table
+EOF
+    return 1
+  fi
+
+  echo "   quota is sufficient (${vcpus} vCPUs in ${family})."
+}
+
+mynet::require_vm_size
 
 DISK_GB="${OS_DISK_GB:-64}"
 
@@ -52,9 +216,9 @@ if bad:
     sys.exit(1)
 PY
 
-az group create -n "$RESOURCE_GROUP" -l "$LOCATION" -o none
+mynet::az group create -n "$RESOURCE_GROUP" -l "$LOCATION" -o none
 
-az vm create \
+mynet::az vm create \
   -g "$RESOURCE_GROUP" -n "$VM_NAME" -l "$LOCATION" \
   --image Ubuntu2404 \
   --size "$VM_SIZE" \
@@ -70,19 +234,35 @@ az vm create \
 # `az vm create` makes an NSG named "${VM_NAME}NSG". Web is opened to the world; SSH only to the
 # operator's current address.
 #
-# **THE WEB RULE IS AN OPEN QUESTION, NOT A DECISION** (register entries 14 and 19, tasks T005).
-# UAT will carry realistically-shaped attendee data on a permanent public address, and FR-485
-# bounds the harm without addressing the exposure. If the owner settles on restricted access, the
-# change is this rule's `--source-address-prefixes` and nothing else.
+# ─────────────────────────────────────────────────────────────────────────────────────────────
+# **THE WEB RULE IS NOW A DECISION, AND IT IS "OPEN TO THE WORLD"** (010, FR-829).
+#
+# This comment used to say the opposite — that restricting it was an open question (register
+# entry 14), and that the change would be this rule's `--source-address-prefixes`. **Register
+# entry 14 was closed by constitution v3.4.0 (standing decision 30), in the direction of leaving
+# it open**, and FR-829 now forbids putting any credential, allowlist or other access restriction
+# in front of UAT.
+#
+# The reasoning is worth carrying, because "lock it down" will keep sounding like the careful
+# option: an allowlist and basic auth were both considered and **rejected as safer-looking but
+# worse.** Each disables the validation this environment exists for — service-worker
+# registration, Web Push, a physical-device test on cellular — to buy secrecy over data that does
+# not need it. **001's FR-067 is satisfied by the DATA rather than by the door**: UAT carries
+# seeded content and accounts created against UAT, and nothing that must be kept from a stranger
+# is ever present.
+#
+# `apps/api/tests/unit/deployment-config.test.ts` asserts the absence, so adding a restriction
+# "temporarily" fails the build rather than quietly breaching a requirement.
+# ─────────────────────────────────────────────────────────────────────────────────────────────
 #
 # **The database is NOT in this list and must never be.** PostgreSQL binds to 127.0.0.1 in
 # docker-compose.yml (FR-486), so there is nothing here to open — which is the point: the
 # protection is the bind address, not a firewall rule somebody could widen.
 # ═════════════════════════════════════════════════════════════════════════════════════════════
-az network nsg rule create -g "$RESOURCE_GROUP" --nsg-name "${VM_NAME}NSG" -n allow-web \
+mynet::az network nsg rule create -g "$RESOURCE_GROUP" --nsg-name "${VM_NAME}NSG" -n allow-web \
   --priority 1000 --direction Inbound --access Allow --protocol Tcp \
   --destination-port-ranges 80 443 >/dev/null
-az network nsg rule create -g "$RESOURCE_GROUP" --nsg-name "${VM_NAME}NSG" -n allow-ssh \
+mynet::az network nsg rule create -g "$RESOURCE_GROUP" --nsg-name "${VM_NAME}NSG" -n allow-ssh \
   --priority 1100 --direction Inbound --access Allow --protocol Tcp \
   --source-address-prefixes "${MYIP}/32" --destination-port-ranges 22 >/dev/null
 

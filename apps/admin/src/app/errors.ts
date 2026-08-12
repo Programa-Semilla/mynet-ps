@@ -1,7 +1,7 @@
 import { RequestRefusedError } from '@mynet/data'
 
 /**
- * T083 (011) — **classify on `error.code`, never on the class** (contracts, 008's defect).
+ * T083 (013) — **classify on `error.code`, never on the class** (contracts, 008's defect).
  *
  * ═════════════════════════════════════════════════════════════════════════════════════════════
  * **`ApiError extends RequestRefusedError` AND *EVERY* NON-2xx THROWS `ApiError`.**

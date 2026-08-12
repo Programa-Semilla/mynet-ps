@@ -2,7 +2,7 @@
 
 **Branch**: `spec/011-administrative-product` | **Date**: 2026-08-11 | **Spec**: [spec.md](./spec.md)
 **Constitution**: v4.1.0 (standing decisions 31–39)
-**Input**: Feature specification from `specs/011-administrative-foundation/spec.md`
+**Input**: Feature specification from `specs/013-administrative-foundation/spec.md`
 
 ## Summary
 
@@ -66,7 +66,7 @@ and 21; **escalates** entry 4. Reserved migration `0009`.
 ### Documentation (this feature)
 
 ```text
-specs/011-administrative-foundation/
+specs/013-administrative-foundation/
 ├── spec.md                      # 80 FRs, 13 SCs, 5 clarifications
 ├── plan.md                      # this file
 ├── research.md                  # R1–R10
@@ -126,7 +126,7 @@ Ordered so that the riskiest structural claim is proven before anything large de
 | **2. Coverage guards** | `deletion-coverage` / `export-coverage` allow-list entries with written rules; narrow `qa-absences` **by path**; narrow `no-report-read-surface` to `apps/web` | These **fail by existing** the moment phase 1's tables land. Doing them here keeps the build green and forces the retention rules to be written rather than deferred |
 | **3. Identity and session** | `operators`, `operator_sessions`, sign-in with one uniqueness domain, forced credential replacement, idle + absolute bounds, `admin_sign_in` throttle | Proves the topology and the indistinguishable refusal before any surface exists to protect |
 | **4. Admin client shell** | `apps/admin` scaffold, sign-in, tier indicator, three layouts, shared tokens and brand | First point a human can look at it — and layout is what no gate examines |
-| **5. Promotion and conferences** | `organizer_assignments`, conference list, unassigned derivation, promote/demote, seed clearing, **re-seed failure test** | The tier boundary becomes real and independently testable, which is what 012 builds on |
+| **5. Promotion and conferences** | `organizer_assignments`, conference list, unassigned derivation, promote/demote, seed clearing, **re-seed failure test** | The tier boundary becomes real and independently testable, which is what 014 builds on |
 | **6. Audit trail** | `admin_audit_entries`, append-only repository, pseudonymisation in `deleteAccount`, retention sweep | Must exist before the queue, because reading report content **writes an entry** (FR-995) |
 | **7. Report queue** | List, detail with content and reason, `contentAvailable: false`, resolution with unique-constraint concurrency, question removal with `FOR UPDATE` | The obligation that forced the amendment |
 | **8. Lifecycle wiring** | Assignment revocation in `deleteAccount` and in withdrawal, both in-transaction | Two writes into files 004 and 008 own — deliberately last, and deliberately small |

@@ -8,7 +8,7 @@ import {
 import { SESSION_COOKIE, sessionCookieOptions } from '../../src/auth/cookie.js'
 
 /**
- * T039 (011) — **the administrative cookie is host-only, and the absence of `Domain` is the
+ * T039 (013) — **the administrative cookie is host-only, and the absence of `Domain` is the
  * requirement** (FR-911, FR-912, FR-913, decision 37).
  *
  * ═════════════════════════════════════════════════════════════════════════════════════════════

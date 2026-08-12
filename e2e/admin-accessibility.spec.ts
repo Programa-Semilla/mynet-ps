@@ -7,7 +7,7 @@ import { ADMIN_ORIGIN } from './support/env.js'
 import { seedQuestionReport, signInAsOperator } from './support/operators.js'
 
 /**
- * T147 (011) — **automated accessibility scanning for the administrative product** (FR-922,
+ * T147 (013) — **automated accessibility scanning for the administrative product** (FR-922,
  * SC-909).
  *
  * ═════════════════════════════════════════════════════════════════════════════════════════════

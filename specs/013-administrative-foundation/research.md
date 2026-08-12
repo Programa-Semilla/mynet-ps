@@ -1,4 +1,4 @@
-# Research: 011 Administrative Foundation
+# Research: 013 Administrative Foundation
 
 **Phase 0 output.** Each entry is a decision, why it was taken, and what else was weighed. Nothing
 here is a requirement — requirements are in `spec.md`. Where a decision contradicts an existing
@@ -129,7 +129,7 @@ the existing audit walks straight past them. 007 met this with `ConversationScop
 audit; 008 met it with `CardScope` and a third. 009 did **not** need one, because a question always
 belongs to a session and therefore to exactly one event.
 
-011 is not 009's case. Most administrative routes are genuinely conference-less, and the ones that
+013 is not 009's case. Most administrative routes are genuinely conference-less, and the ones that
 are not — an organizer acting on an assigned conference — need a predicate the event scope cannot
 express: *this caller holds an assignment for this conference*, which is directional in the same way
 `requireHeldCard` is.
@@ -250,7 +250,7 @@ about.
 **The two long-parked inbox entries land here.** `security-response-headers` (no CSP,
 `X-Content-Type-Options`, `Referrer-Policy` or HSTS on either client) and `session-topology-and-csrf`
 have been filed since 2026-08-05 as "cheapest to settle before the first environment is opened".
-011 settles the topology half by decision (R2). The headers half is **not** in this feature's scope
+013 settles the topology half by decision (R2). The headers half is **not** in this feature's scope
 and must not be silently absorbed: adding a CSP to the admin block alone would leave MyNet without
 one and make the inbox entry read as closed.
 

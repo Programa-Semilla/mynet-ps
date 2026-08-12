@@ -5,7 +5,7 @@ import { attendees } from './attendees.js'
 import { operators } from './operators.js'
 
 /**
- * T018 (011) — **an administrative session, deliberately NOT `auth_sessions`** (FR-911, FR-912,
+ * T018 (013) — **an administrative session, deliberately NOT `auth_sessions`** (FR-911, FR-912,
  * FR-919a, FR-919b, research R3).
  *
  * ═════════════════════════════════════════════════════════════════════════════════════════════

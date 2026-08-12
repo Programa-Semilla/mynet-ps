@@ -5,7 +5,7 @@ import { ADMIN_PRODUCT_NAME } from '../branding.js'
 import { useAdminSession } from '../session.js'
 
 /**
- * T045, T070–T073 (011) — the administrative shell (FR-922, FR-924, FR-925).
+ * T045, T070–T073 (013) — the administrative shell (FR-922, FR-924, FR-925).
  *
  * ═════════════════════════════════════════════════════════════════════════════════════════════
  * **THREE LAYOUTS, AND THE MIDDLE ONE IS THE RISK THIS FEATURE ESCALATES MORE THAN ANY BEFORE

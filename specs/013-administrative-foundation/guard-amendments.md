@@ -1,4 +1,4 @@
-# Guard amendments — 011 (T152, SC-908, FR-974–FR-976)
+# Guard amendments — 013 (T152, SC-908, FR-974–FR-976)
 
 **Every existing test this feature touched, why, and what it still catches.** FR-976 says the five
 named guards are amended *deliberately and narrowly* and **never weakened to the point of checking
@@ -116,10 +116,10 @@ requires a resolution to keep naming the operator who made it.
 
 ---
 
-## One 007 test 011 amended, and it is a harness race rather than a guard
+## One 007 test 013 amended, and it is a harness race rather than a guard
 
 **`e2e/messages-journey.spec.ts` — "opening a thread and leaving without sending leaves no trace
-(FR-503a)".** Not a guard, and 011 changes nothing it asserts. It was counting Grace's
+(FR-503a)".** Not a guard, and 013 changes nothing it asserts. It was counting Grace's
 conversations with a **one-shot `count()` taken as soon as the "Messages" heading appeared** — but
 the heading renders immediately and the list renders when its request settles, so the read landed
 before the list existed. It failed exactly that way in this feature's full run, with a screenshot
@@ -130,7 +130,7 @@ read, and use the retrying `toHaveCount(before)` rather than a one-shot `count()
 **The claim is untouched** — a wrongly-created conversation still fails it, because the count
 settles on `before + 1` and never reaches `before`.
 
-**Why it surfaced now, stated rather than guessed**: the race is latent and pre-existing, and 011
+**Why it surfaced now, stated rather than guessed**: the race is latent and pre-existing, and 013
 changed the timing and the accumulated database state around it — the e2e suite seeds once per run,
 and this feature both removed a mid-run re-seed the admin helper used to perform and added specs
 that write reports and blocks before this file runs. The fix is in the assertion because that is

@@ -55,23 +55,39 @@ never sent.
 
 ## 2. First-time provisioning
 
-**Blocked on two owner decisions**, both recorded as open in the specification:
+**UAT was provisioned on 2026-08-11 and is live.** What follows is the procedure that actually
+produced it, corrected against what went wrong — see `OPERATIONS-LOG.md` for the run itself.
+Production is not provisioned and this feature deliberately did not touch it (FR-894).
 
-- **no domain is registered** — Caddy cannot obtain a certificate without a resolving A record
-  (FR-479), so nothing can serve HTTPS and nobody can sign in;
-- **no Azure subscription is named** — `envs/*.env` leave `SUBSCRIPTION` blank.
+### Prerequisites — every one of them, because SC-814 asks for no step that exists only in a head
 
-Once both exist:
+| You need                                  | Why                                                                    | If you do not have it                                                                                                            |
+| ----------------------------------------- | ---------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `az` CLI, logged in                       | provisioning and the subscription guard                                | `az login`                                                                                                                       |
+| Access to subscription `d428f98f-…`       | it is pinned by id in `envs/uat.env`                                   | you get a refusal naming the id; ask the subscription owner                                                                      |
+| **Quota** for the VM family in the region | availability and quota are different questions                         | the preflight refuses and names the family and the limit                                                                         |
+| An SSH key pair                           | `az vm create --generate-ssh-keys` reuses `~/.ssh/id_rsa` or makes one | nothing — it is created for you                                                                                                  |
+| Control of the DNS zone                   | Caddy needs a resolving A record before it can get a certificate       | **this is the blocking one.** `programasemilla.com` is served by GoDaddy, not Azure DNS, so no script here can create the record |
+| SMTP credentials                          | **the API will not boot without them**                                 | see the warning below                                                                                                            |
+| `docker`, `rsync`, `python3` locally      | the image build, the sync, the cloud-init ASCII check                  | install them                                                                                                                     |
+
+### The order, and it matters
 
 ```bash
 az login
-./provision-vm.sh uat          # prints the VM's public IP
-# point BOTH A records at it, then:
-ssh azureuser@<ip>
-cd ~/app/deploy/vm && cp .env.example .env && nano .env
+az account set --subscription d428f98f-a3c4-49c3-ae24-06ec3de08477
+
+./provision-vm.sh uat          # preflights size AND quota, then prints the VM's public IP
 ```
 
-**Two A records, both to the same VM** (011):
+**Now create the DNS A records** pointing at that IP, and wait until they resolve:
+
+```bash
+dig +short A mynet-dev.programasemilla.com          # must return the VM's IP before continuing
+dig +short A admin.mynet-dev.programasemilla.com    # 012 — the administrative host
+```
+
+**Two records, both to the same VM** (012):
 
 | Record           | Serves                      |
 | ---------------- | --------------------------- |
@@ -82,7 +98,38 @@ Caddy obtains a **separate certificate for each host** and cannot obtain either 
 resolves it. A missing `admin` record is the quiet failure here: MyNet comes up perfectly, every
 check in section 4 passes, and only the administrative host is dead — so check it explicitly.
 
-Then from your machine:
+Then create the `.env` **on the VM**, so no secret passes through your terminal or shell history:
+
+```bash
+ssh azureuser@<ip>
+cd ~/app/deploy/vm && cp .env.example .env && nano .env
+chmod 600 .env
+```
+
+> ### ⚠️ Generate `POSTGRES_PASSWORD` with a URL-SAFE alphabet
+>
+> `docker-compose.yml` **substitutes** it into `DATABASE_URL`, and Compose does substitution, not
+> escaping. A `/` from `openssl rand -base64` ends the userinfo and starts the path; `+`, `@`, `:`
+> and `#` each break it differently. The driver then throws `ERR_INVALID_URL` **with the entire
+> connection string, password included, in the error message**.
+>
+> ```bash
+> openssl rand -base64 48 | tr '+/' '-_' | tr -d '=\n'    # or: openssl rand -hex 32
+> ```
+>
+> This is not hypothetical — it is what failed the third attempt at the first real deploy.
+
+> ### ⚠️ `MAIL_SMTP_URL` is not optional. The API will not start without it.
+>
+> `SinkMailService` throws under `NODE_ENV=production` because it writes verification and reset
+> links to the log, and **a reset link is the account**. The compose file sets production. So a
+> deployment with no SMTP URL fails at boot rather than silently leaking credentials — which is
+> the refusal working, not a defect to route around.
+>
+> Percent-encode the username: Mailgun's is `postmaster@your-domain`, and a raw `@` in the
+> userinfo breaks the URL exactly as the password characters above do.
+
+Finally, from your machine:
 
 ```bash
 ./deploy.sh uat --migrate
@@ -98,7 +145,54 @@ application.
 pepper is mixed into every stored password hash — sharing it would make a UAT disclosure a
 production one.
 
-### Giving a platform operator their first credential (011)
+### Seeding — once, and read the warning first
+
+```bash
+ssh azureuser@<ip> 'cd ~/app/deploy/vm && \
+  docker compose run --rm -T -e SEED_TARGET_DATABASE=mynet_uat api node dist/db/seed/index.js'
+```
+
+The `SEED_TARGET_DATABASE` opt-in is required and is not ceremony: the guard keys on the
+**resolved database name**, not on `NODE_ENV`, because an SSH tunnel makes a production database
+look local and `NODE_ENV` is a statement about a process rather than about what it is pointed at.
+
+> ### ⚠️ RE-SEEDING DESTROYS EVERY ACCOUNT CREATED AGAINST THIS ENVIRONMENT
+>
+> Including a reviewer's, an hour before a review. The seed **clears whole domains** — attendees
+> and everything cascading from them: profiles, registrations, saved sessions, notes, cards,
+> conversations, appointments, questions.
+>
+> This cannot be made additive without redesigning the seed, and nothing asks for that. 008
+> records why it clears the entire Network domain rather than only what it seeded: a surviving
+> card refuses `DELETE FROM events` and breaks the re-seed with an error naming neither table.
+>
+> **Seed once, at provisioning. Treat a second run as a decision, not a refresh.**
+
+> ### The seeded credentials are committed and world-readable, on purpose
+>
+> `ada@example.com` / `correct-horse-battery-staple`, and the others beside them, are in this
+> repository — which is public. That is fine **here and nowhere else**: UAT holds no real attendee
+> data by construction (constitution v3.4.0 decision 30), so there is nothing behind those logins
+> worth having. They must never be reused in any environment where that stops being true.
+
+### Every value in `.env` differs between environments
+
+Including `AUTH_PASSWORD_PEPPER`, which is mixed into every stored password hash — sharing it
+would make a UAT disclosure a production one. **Generate the pepper once and never rotate it**
+without a password-reset campaign for every account: every existing hash becomes unverifiable.
+
+### The VAPID pair: rotate only on compromise
+
+One pair per environment. **Rotation is a silent delivery outage** for every attendee until their
+browser re-registers, and nothing in the product can tell them it happened — they simply stop
+receiving notifications and have no reason to suspect anything (FR-852).
+
+The public half is compiled into the client bundle by `deploy.sh`, which reads it back out of the
+VM's own `.env` so there is exactly one copy of the pair. Since 010 the client and the API read
+the **same variable name**, `PUSH_VAPID_PUBLIC_KEY`; there is no second `VITE_`-prefixed copy to
+keep in step.
+
+### Giving a platform operator their first credential (013)
 
 **The seed creates operator identities with a null `password_hash`, so sign-in is impossible
 rather than defaulted** (FR-990, FR-991). This repository is public and the seed is committed,
@@ -191,6 +285,36 @@ completely correct in a browser and silently defeats every uptime check for the 
 
 ---
 
+## 4a. Web Push on iPhone — read this before reporting it broken
+
+**iOS will not deliver Web Push to a browser tab, and will not deliver it to Chrome at all.**
+Apple exposes push only to **Home Screen web apps**, from iOS 16.4 onwards, and every browser on
+iOS is WebKit underneath — so a third-party browser cannot receive it however it is configured.
+
+Someone testing on a phone will open the address in whatever browser they normally use, see no
+notification, and conclude the feature is broken. It is not, and neither is their phone.
+
+**The procedure that works:**
+
+1. Open the address **in Safari** — not Chrome, not Firefox.
+2. **Share → Add to Home Screen.**
+3. Launch MyNet **from the Home Screen icon**, not from Safari.
+4. The notification control now appears, and the permission prompt with it.
+
+Step 2 produces a real installed web app rather than a bookmark because the manifest declares
+`display: standalone`, which is the condition Apple requires. `vite.config.ts` sets it.
+
+**The product already handles this correctly and silently.** In a browser that cannot deliver,
+`PushManager` is absent from `window`, so `NotificationService.isSupported()` is false and the
+attendee is never offered a prompt that could not lead anywhere — the same complete-outcome
+behaviour FR-552 requires for somebody who declines. There is nothing to fix; there is only this
+to know.
+
+**Verified 2026-08-11**: delivery works on desktop Chrome against the deployed environment. The
+iPhone half is 011's physical-device test.
+
+---
+
 ## 4. Checking an environment
 
 ```bash
@@ -232,6 +356,21 @@ psql postgresql://mynet:<password>@localhost:15432/<database>
 ---
 
 ## 5. Backups, retention, and the restore
+
+> ### Status, 2026-08-11: **backups are NOT configured on UAT, by decision**
+>
+> The owner's call, and a defensible one: UAT carries seeded data only, and `db:seed` recreates it
+> in seconds. Backing up a database whose entire contents are regenerable from this repository
+> buys close to nothing.
+>
+> **What that does not change.** Standing decision 17 requires a restore **actually performed**
+> before _production_ holds real attendee data. `OPERATIONS-LOG.md` still records only one
+> restore, against a throwaway container in 2026-08-07. **That obligation carries to production
+> and is not optional there.**
+>
+> The code is ready and unexercised: `backup.sh` copies each artifact off-host and refuses to
+> prune unless the copy is confirmed. It needs `BACKUP_REMOTE_CONTAINER` and
+> `BACKUP_REMOTE_CREDENTIAL`, and a storage account that does not yet exist.
 
 > **The constitution names three parts. Two are automated; the third is an act, and it is the one
 > that gets skipped.**

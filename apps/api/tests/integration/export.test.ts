@@ -213,7 +213,7 @@ describe('personal-data export', () => {
     })
 
     // ═══════════════════════════════════════════════════════════════════════════════════════
-    // T026 (011) — **an organizer assignment, and a REVOKED one, because both are exported.**
+    // T026 (013) — **an organizer assignment, and a REVOKED one, because both are exported.**
     //
     // FR-981 puts an assignment in the attendee's export: it is a fact about them, that somebody
     // granted them authority over a named conference on a date. A revoked one is included too,

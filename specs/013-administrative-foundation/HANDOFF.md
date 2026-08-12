@@ -1,7 +1,7 @@
-# 011 — implementation handoff
+# 013 — implementation handoff
 
 **Resumed and completed 2026-08-11.** Nothing is committed; the branch
-`spec/011-administrative-product` carries 011's spec commits and an uncommitted working tree.
+`spec/011-administrative-product` carries 013's spec commits and an uncommitted working tree.
 
 Everything a machine can check is done. **What remains is T158 and T159 — the by-hand
 `quickstart.md` walk — which need a person and a phone.**
@@ -133,7 +133,7 @@ so the guard was real and the new product sat outside it. Now `coral-600`, 5.04:
 ## Records to read before reviewing
 
 - **`deviations.md`** — D1–D9. D6–D9 are new and are where the findings above are written up.
-- **`guard-amendments.md`** — every existing test 011 touched, and why. Three of the five named
+- **`guard-amendments.md`** — every existing test 013 touched, and why. Three of the five named
   guards plus the notification-trigger audit are byte-unchanged.
 - **`quickstart.md`** — now carries the **measured** SC-900 timing (median 373 ms) with its method,
   and the corrected gate command (`pnpm test:a11y`, not `test:accessibility`).

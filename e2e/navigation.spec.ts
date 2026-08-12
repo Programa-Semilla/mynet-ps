@@ -302,6 +302,54 @@ test.describe('navigation', () => {
     // ─────────────────────────────────────────────────────────────────────────────────────
     expect(await page.content()).not.toContain('/src/')
   })
+
+  /**
+   * T078 (010) — **the UAT marker is ABSENT from a production build, not hidden in one**
+   * (FR-828, SC-818).
+   *
+   * ═══════════════════════════════════════════════════════════════════════════════════════
+   * **"MUST NOT APPEAR IN A PRODUCTION BUILD" IS A CLAIM ABOUT THE ARTIFACT, AND ONLY A REAL
+   * BUILD CAN ANSWER IT.**
+   *
+   * A component test can prove the marker renders nothing when its flag is off. It cannot prove
+   * the wording is not in the shipped JavaScript — and the difference is the whole requirement.
+   * A runtime hostname check would pass every component test while shipping "this is not the
+   * live MyNet" to production, one mistyped comparison away from displaying it.
+   *
+   * This suite runs against `vite preview`, so it inspects the bundle an attendee actually
+   * receives. `__UAT_MARKER__` is substituted as a literal `false` before minification (see
+   * `vite.config.ts`), so the element is dead code the bundler removes entirely.
+   * ═══════════════════════════════════════════════════════════════════════════════════════
+   */
+  test('the UAT environment marker is absent from a production build (SC-818)', async ({
+    page,
+  }) => {
+    await page.goto('/')
+
+    // Not in the DOM — the cheap half, and the one a hidden-but-present element would also pass.
+    await expect(page.getByText(/not the live MyNet/i)).toHaveCount(0)
+
+    // ─────────────────────────────────────────────────────────────────────────────────────
+    // And not in the JAVASCRIPT, which is the half that matters. Every module the page loads is
+    // fetched and searched for the marker's own wording. A build that shipped the element behind
+    // a runtime check would fail here while passing the assertion above.
+    // ─────────────────────────────────────────────────────────────────────────────────────
+    const scripts = await page
+      .locator('script[src]')
+      .evaluateAll((nodes) => nodes.map((node) => (node as HTMLScriptElement).src))
+
+    expect(scripts.length, 'no bundled scripts were found to inspect').toBeGreaterThan(0)
+
+    for (const src of scripts) {
+      const body = await (await page.request.get(src)).text()
+      expect(
+        body,
+        `${src} contains the UAT marker's wording. FR-828 requires the production bundle not to ` +
+          'CONTAIN the marker, rather than to contain it behind a check — the build-time literal ' +
+          'in vite.config.ts is what makes that true, and this is what notices if it stops being.',
+      ).not.toContain('not the live MyNet')
+    }
+  })
 })
 
 const escapeForRegExp = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')

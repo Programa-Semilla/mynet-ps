@@ -9,7 +9,7 @@ import { buildApp } from '../../src/app.js'
 import { ADMIN_AUDIT_ACTIONS } from '../../src/db/schema/admin-audit.js'
 
 /**
- * T148 (011) — **every administrative write appends an audit entry, and no navigation does**
+ * T148 (013) — **every administrative write appends an audit entry, and no navigation does**
  * (FR-994, FR-995, SC-911).
  *
  * ═════════════════════════════════════════════════════════════════════════════════════════════

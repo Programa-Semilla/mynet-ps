@@ -1,4 +1,4 @@
-# Implementation deviations — 011
+# Implementation deviations — 013
 
 Recorded during `/speckit-implement`. Each entry states what `tasks.md` asked for, why it was not
 done as written, and what was done instead. **A deviation is a decision; an undocumented departure

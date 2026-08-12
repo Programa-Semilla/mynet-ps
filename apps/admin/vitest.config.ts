@@ -5,7 +5,7 @@ import { defineConfig } from 'vitest/config'
 import { componentProject, unitProject } from '../../packages/config/vitest.base.js'
 
 /**
- * T004 (011) — a convenience entry point, **not a second source of truth**.
+ * T004 (013) — a convenience entry point, **not a second source of truth**.
  *
  * ─────────────────────────────────────────────────────────────────────────────────────────
  * The shared projects in `packages/config/vitest.base.ts` already name this app's directories,

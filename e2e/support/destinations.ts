@@ -64,7 +64,7 @@ export const SCROLL_WIDTHS: readonly number[] = [
 ]
 
 /**
- * The administrative destinations, as `AdminShell`'s rail declares them (011).
+ * The administrative destinations, as `AdminShell`'s rail declares them (013).
  *
  * ═════════════════════════════════════════════════════════════════════════════════════════════
  * **HERE, RATHER THAN IN A SPEC FILE, SO THE "DECLARED ONCE" CLAIM IS TRUE.**

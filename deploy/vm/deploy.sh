@@ -142,7 +142,11 @@ if [[ "$DO_BUILD" == "true" ]]; then
 
   # `VITE_API_BASE_URL=/api` (T066) — the only client-side configuration one origin needs. The
   # HTTP layer already defaults to a relative base, so this is configuration rather than code.
-  VITE_API_BASE_URL=/api VITE_PUSH_VAPID_PUBLIC_KEY="$VAPID_PUBLIC" \
+  # 010 T075 — FR-828. Set for UAT and unset for production, which is what keeps the marker out
+  # of a production bundle entirely rather than hidden inside one. `vite.config.ts` turns this
+  # into a build-time literal, so the element is dead code the bundler removes.
+  VITE_UAT_MARKER="$([[ "$MYNET_ENV" == "uat" ]] && echo true || echo false)" \
+  VITE_API_BASE_URL=/api PUSH_VAPID_PUBLIC_KEY="$VAPID_PUBLIC" \
     pnpm --filter @mynet/web build
 
   # ═══════════════════════════════════════════════════════════════════════════════════════════
@@ -190,7 +194,7 @@ rsync -az --delete \
 #   web          is the built client, pushed separately below — under --delete it would be
 #                removed a few seconds into every deploy, so Caddy would serve 404 for the
 #                document while the API was perfectly healthy.
-#   admin        the same, for the administrative client (011). It fails the same way and is
+#   admin        the same, for the administrative client (013). It fails the same way and is
 #                *less* likely to be noticed, because no attendee-facing check touches that host.
 #   ON           is created on the VM and never exists locally, so --delete would take the site
 #                OUT of maintenance during the exact window this exists to cover — while every

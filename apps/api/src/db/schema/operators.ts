@@ -3,7 +3,7 @@ import { boolean, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core'
 import { citext } from '../types.js'
 
 /**
- * T017 (011) — **a platform-operator identity: the product's second actor** (FR-900, FR-901,
+ * T017 (013) — **a platform-operator identity: the product's second actor** (FR-900, FR-901,
  * FR-908, FR-990, data-model.md).
  *
  * ═════════════════════════════════════════════════════════════════════════════════════════════

@@ -7,7 +7,7 @@ import { useAdminSession } from '../session.js'
 const MINIMUM_LENGTH = 12
 
 /**
- * T068 (011) — forced replacement of the bootstrapped credential (FR-992).
+ * T068 (013) — forced replacement of the bootstrapped credential (FR-992).
  *
  * ═════════════════════════════════════════════════════════════════════════════════════════════
  * **THE OPERATOR CANNOT LEAVE THIS SCREEN, AND THAT IS ENFORCED ON THE SERVER RATHER THAN HERE.**

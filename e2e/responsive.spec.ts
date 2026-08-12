@@ -300,7 +300,7 @@ test.describe('responsive layout', () => {
 
   /**
    * ═══════════════════════════════════════════════════════════════════════════════════════
-   * T146 (011) — **the administrative product's four dialogs, on the other origin.**
+   * T146 (013) — **the administrative product's four dialogs, on the other origin.**
    *
    * A separate test rather than more steps in the one above, because it needs a different
    * origin and a different principal — and because the defect this catches is per-dialog. 008

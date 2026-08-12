@@ -2,9 +2,9 @@ import { sql } from 'drizzle-orm'
 import type { FastifyInstance, FastifyRequest } from 'fastify'
 
 import {
+  beginAttempt,
   failureDelayMs,
   hashAttemptValue,
-  recordRequest,
   serveDelay,
   type ThrottleAction,
 } from '../auth/throttle.js'
@@ -156,8 +156,10 @@ const throttle = async (
     action,
   }
 
-  const outstanding = await serveDelay(await failureDelayMs(key))
-  await recordRequest(key)
+  // 010 T017 — recorded before it is judged (FR-804); the row is excluded from its own count so
+  // the allowance is unchanged (FR-805).
+  const attemptId = await beginAttempt(key)
+  const outstanding = await serveDelay(await failureDelayMs(key, attemptId))
 
   // `message_send` can never reach here: `failureDelayMs` clamps a delay-only action's result to
   // what `serveDelay` will actually sleep, so there is no remainder to refuse on. That clamp
@@ -518,6 +520,25 @@ export const conversationRoutes = async (app: FastifyInstance): Promise<void> =>
       },
     },
     async (request) => {
+      // ═══════════════════════════════════════════════════════════════════════════════════════
+      // T021 (010) — **the read bound, and this is the one route in the product a client
+      // requests without anybody acting** (FR-803, research R7).
+      //
+      // `useConversation` polls every three seconds while the thread is open and the tab is
+      // visible. Left unbounded, that frequency is entirely client-controlled: a modified client,
+      // or a script holding a session cookie, reads message content as fast as it likes.
+      //
+      // **`thread_read` may never deny, and it matters more here than anywhere else in the
+      // table.** The client's poll backs off exponentially *on failure*, so a single 429 would
+      // not refuse one read — it would push the client into a backoff that makes the conversation
+      // appear to have stopped updating, long after the throttle had cleared. `throttle` above
+      // cannot produce a refusal for a delay-only action, which is what makes that structural.
+      //
+      // Charged as its own action rather than folded into `message_send`: reading a long
+      // conversation must never consume the allowance for replying to it.
+      // ═══════════════════════════════════════════════════════════════════════════════════════
+      await throttle(request, 'thread_read', 'thread reads')
+
       try {
         const page = await listMessages(conversationScopeOf(request), request.query)
 

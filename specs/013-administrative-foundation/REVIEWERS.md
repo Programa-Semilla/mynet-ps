@@ -65,8 +65,8 @@ plus every read that discloses message content.
 - A platform operator needs to be bootstrapped into a fresh environment
 
 **Does not apply when**:
-- **Authoring conference content** — events, sessions, tracks, rooms, speakers. That is **012**, and the guards forbidding it stay in force
-- **Managing registrations or join codes**, or suspending an attendee. That is **013**
+- **Authoring conference content** — events, sessions, tracks, rooms, speakers. That is **014**, and the guards forbidding it stay in force
+- **Managing registrations or join codes**, or suspending an attendee. That is **015**
 - **Moderating an avatar** — register entry 19's *standard* is undecided, and building the action would decide it by inference
 - **Removing or editing a message** — reporting already blocked the sender at report time, so the protective act has happened
 - **Anything inside MyNet.** The attendee product gains nothing
@@ -136,7 +136,7 @@ must *not* have, because a platform operator is not registered for that conferen
 that guard correctly. It carries an explicit allow-list entry with the reason written down.
 
 **The conference-organizer tier ships with no capability of its own.** An organizer can sign in and
-see their conferences, and nothing else. This is deliberate — the boundary is 012's foundation and
+see their conferences, and nothing else. This is deliberate — the boundary is 014's foundation and
 must be independently testable before a large write surface depends on it — but it will look like an
 omission to anyone reading the PR without this note.
 
@@ -174,7 +174,7 @@ Neither may be read as closed by this shipping.
 - [ ] No unstated assumptions
 - [ ] **MyNet is unchanged** — the attendee suite passes without modification
 - [ ] **The five amended guards still fail** on their forbidden patterns; none weakened to check nothing
-- [ ] **`catalog-read-only.test.ts` and `join-grants-nothing.test.ts` are byte-unchanged** (012 and 013 own those)
+- [ ] **`catalog-read-only.test.ts` and `join-grants-nothing.test.ts` are byte-unchanged** (014 and 015 own those)
 - [ ] Every `/admin/*` route carries a guard, or an allow-list entry with a written reason
 - [ ] Deletion, export and retention are answered for all five new tables, not allow-listed away
 - [ ] Admin dialogs are **centred** — not merely functional

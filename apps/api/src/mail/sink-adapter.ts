@@ -1,5 +1,6 @@
 import { loadConfig } from '../config.js'
 import type { MailService } from './service.js'
+import { renderVerificationBody } from './verification-copy.js'
 
 /**
  * T019 (004) — the development and test implementation of `MailService` (FR-394).
@@ -51,7 +52,11 @@ export class SinkMailService implements MailService {
   }
 
   async sendVerification(to: string, link: string): Promise<void> {
-    this.#record('verification', to, link)
+    // T024 (010) — the same body the SMTP adapter sends, written to the log rather than
+    // delivered. Both adapters render from one function so the copy a developer reads locally is
+    // the copy a stranger receives in a deployed environment (FR-812a); a second version here
+    // would be the one that drifted, and it would drift in the direction nobody checks.
+    this.#record('verification', to, link, renderVerificationBody(link))
   }
 
   async sendPasswordReset(to: string, link: string): Promise<void> {
@@ -120,16 +125,20 @@ export class SinkMailService implements MailService {
     this.#sent.length = 0
   }
 
-  #record(kind: SentMessage['kind'], to: string, link: string): void {
+  #record(kind: SentMessage['kind'], to: string, link: string, body?: string): void {
     this.#sent.push({ kind, to, link, at: new Date() })
 
     // `console.warn` rather than the Fastify logger: this adapter is constructed at the
     // composition root and has no request to log against, and the message must be visible at
     // the default development log level — quickstart tells a reader to look for it here.
+    //
+    // The rendered body is printed when there is one, so that walking quickstart locally shows
+    // what a recipient would actually read rather than only the link they would click.
     console.warn(
       `\n── development mail sink ─────────────────────────────────────────────\n` +
         `   ${kind} for ${to}\n   ${link}\n` +
-        `   Nothing was sent. Register entry 18 — no mail provider is provisioned.\n` +
+        (body ? `\n${body}\n\n` : '') +
+        `   Nothing was sent. No MAIL_SMTP_URL is configured, so the sink is selected.\n` +
         `─────────────────────────────────────────────────────────────────────\n`,
     )
   }

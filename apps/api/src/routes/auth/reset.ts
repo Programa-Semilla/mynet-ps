@@ -5,11 +5,12 @@ import { hashPassword } from '../../auth/password.js'
 import { consumePasswordReset, issuePasswordReset } from '../../auth/password-reset.js'
 import { revokeAllSessions } from '../../auth/session.js'
 import {
+  beginAttempt,
   failureDelayMs,
   hashAttemptValue,
   padElapsedTo,
-  recordAttempt,
   serveDelay,
+  settleAttempt,
 } from '../../auth/throttle.js'
 import { hashToken } from '../../auth/token.js'
 import { loadConfig } from '../../config.js'
@@ -96,8 +97,11 @@ export const resetRoutes = async (app: FastifyInstance): Promise<void> => {
       // cost to an attacker is real — every request occupies a connection — and the cost to the
       // victim is a few seconds.
       // ─────────────────────────────────────────────────────────────────────────────────────
-      await serveDelay(await failureDelayMs(key))
-      await recordAttempt({ ...key, succeeded: false })
+      // 010 T017 — recorded before it is judged (FR-804), excluded from its own count (FR-805).
+      // Never settled: a reset request costs the server a token and an email whatever the
+      // outcome, and FR-327 forbids the outcome being observable at all.
+      const attemptId = await beginAttempt(key)
+      await serveDelay(await failureDelayMs(key, attemptId))
 
       // ─────────────────────────────────────────────────────────────────────────────────────
       // **An identical body is not an identical response — elapsed time is observable too**
@@ -213,11 +217,12 @@ export const resetRoutes = async (app: FastifyInstance): Promise<void> => {
       const sourceHash = hashAttemptValue(request.ip)
       const action = 'reset_submit' as const
 
+      // 010 T017 — recorded before it is judged (FR-804), excluded from its own count (FR-805).
+      const attemptId = await beginAttempt({ identifierHash, sourceHash, action })
       const outstanding = await serveDelay(
-        await failureDelayMs({ identifierHash, sourceHash, action }),
+        await failureDelayMs({ identifierHash, sourceHash, action }, attemptId),
       )
       if (outstanding > 0) {
-        await recordAttempt({ identifierHash, sourceHash, action, succeeded: false })
         throw tooManyAttempts(outstanding, 'password reset attempts')
       }
 
@@ -225,13 +230,12 @@ export const resetRoutes = async (app: FastifyInstance): Promise<void> => {
       // deleted finds no row — the cascade took it — and fails exactly as an expired link does.
       const consumed = await consumePasswordReset(token)
       if (!consumed) {
-        await recordAttempt({ identifierHash, sourceHash, action, succeeded: false })
         throw linkExpired()
       }
 
       // A link that worked ends the streak: the person is about to sign in with the new
       // password and must not meet a delay they earned by succeeding.
-      await recordAttempt({ identifierHash, sourceHash, action, succeeded: true })
+      await settleAttempt(attemptId, true)
 
       await replacePassword(consumed.attendeeId, await hashPassword(password))
 

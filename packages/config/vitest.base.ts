@@ -26,7 +26,7 @@ export const unitProject: UserWorkspaceConfig = {
       'packages/*/tests/**/*.test.ts',
       'apps/api/tests/unit/**/*.test.ts',
       'apps/web/tests/unit/**/*.test.ts',
-      // T004 (011) — the administrative client is a second application, and Principle VII binds
+      // T004 (013) — the administrative client is a second application, and Principle VII binds
       // it in full. Its guards are the reason this line matters more than it looks:
       // `no-service-worker.test.ts` and `no-platform-dependency.test.ts` assert FR-923's
       // absences, and an absence guard that the runner cannot see is not a guard.

@@ -10,7 +10,7 @@ import { buildApp } from '../../src/app.js'
  * T073 (007) — **nothing in MYNET may read a report** (FR-548, SC-508, and now FR-972).
  *
  * ═════════════════════════════════════════════════════════════════════════════════════════
- * **T151 (011) — THIS GUARD IS NARROWED TO THE ATTENDEE PRODUCT, AND THE NARROWING IS THE
+ * **T151 (013) — THIS GUARD IS NARROWED TO THE ATTENDEE PRODUCT, AND THE NARROWING IS THE
  * SINGLE MOST DELICATE CHANGE THIS FEATURE MAKES TO ANOTHER FEATURE'S TEST.**
  *
  * It used to say *nothing in this product may read a report*, on the reasoning that a
@@ -88,7 +88,7 @@ describe('no report can be read from inside this product (FR-548)', () => {
   it('EXPOSES NO ROUTE THAT READS A REPORT, BY ANY METHOD OR ADDRESS', () => {
     const readable = routes
       .filter((route) => /report/i.test(route.url))
-      // T151 (011) — the administrative queue is the one permitted reader (decision 38). Every
+      // T151 (013) — the administrative queue is the one permitted reader (decision 38). Every
       // attendee-facing address is still checked.
       .filter((route) => !ADMINISTRATIVE_ROUTE_PREFIX.test(route.url))
       .filter((route) => !methodsOf(route).every((method) => method === 'POST'))
@@ -104,7 +104,7 @@ describe('no report can be read from inside this product (FR-548)', () => {
 
   /**
    * ═══════════════════════════════════════════════════════════════════════════════════════════
-   * **T151 (011) — THIS ASSERTION IS INVERTED RATHER THAN DELETED, AND THAT IS THE POINT.**
+   * **T151 (013) — THIS ASSERTION IS INVERTED RATHER THAN DELETED, AND THAT IS THE POINT.**
    *
    * It used to say *no administrative address of any kind exists*, on the reasoning that the
    * failure mode was not "somebody adds `GET /reports`" but "somebody adds an administrative
@@ -164,7 +164,7 @@ describe('no report can be read from inside this product (FR-548)', () => {
     const directory = join(import.meta.dirname, '../../src/db/queries')
     const offending = readdirSync(directory)
       .filter((name) => name !== 'account.ts')
-      // T151 (011) — the administrative queue module, excluded by exact filename. It is the
+      // T151 (013) — the administrative queue module, excluded by exact filename. It is the
       // permitted reader under decision 38, and `queries/reports.ts` — 007's module — is still
       // checked and is still write-and-sweep only.
       .filter((name) => name !== ADMINISTRATIVE_QUERY_MODULE)
@@ -188,7 +188,7 @@ describe('no report can be read from inside this product (FR-548)', () => {
       )
 
     const offending = walk(join(import.meta.dirname, '../../src/routes'))
-      // T151 (011) — the administrative route group, excluded by directory. Every attendee
+      // T151 (013) — the administrative route group, excluded by directory. Every attendee
       // route file is still checked, which is where a report read would actually erode.
       .filter((file) => !file.split('/').includes(ADMINISTRATIVE_ROUTE_DIRECTORY))
       .filter((file) => /abuse_reports|abuseReports/.test(readFileSync(file, 'utf8')))

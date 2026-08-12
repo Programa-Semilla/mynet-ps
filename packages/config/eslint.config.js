@@ -175,7 +175,7 @@ export default tseslint.config(
   },
 
   /**
-   * T032 (011) — the same three selectors for `OperatorScope` and `PlatformScope` (FR-905,
+   * T032 (013) — the same three selectors for `OperatorScope` and `PlatformScope` (FR-905,
    * FR-906).
    *
    * ═════════════════════════════════════════════════════════════════════════════════════════
@@ -302,6 +302,13 @@ export default tseslint.config(
       // ─────────────────────────────────────────────────────────────────────────────────────
       'apps/api/src/notifications/**',
       'apps/api/tests/unit/web-push-adapter.test.ts',
+      // ─────────────────────────────────────────────────────────────────────────────────────
+      // 010 (T030) — the same exemption for the SMTP adapter, and it is in **this** block for
+      // the reason the note above records: ESLint flat config does not merge rule options, so a
+      // sibling block setting `no-restricted-imports` for these files would silently *replace*
+      // this one and disable both existing boundaries while appearing to add a third.
+      // ─────────────────────────────────────────────────────────────────────────────────────
+      'apps/api/src/mail/**',
       // The schema barrel re-exports every table by design, and the deletion-coverage guard
       // depends on it listing all of them — a table that could hide from the registry could
       // hide from the guard. Re-exporting is not consuming; the third pattern below is what
@@ -345,6 +352,40 @@ export default tseslint.config(
                 'direct bypasses the per-device timeout, the failure isolation, and the ' +
                 "gone-versus-failed mapping that decides whether somebody's device registration " +
                 'is discarded forever.',
+            },
+            {
+              /**
+               * 010 (T030) — the mail transport, confined to `apps/api/src/mail/` (FR-842).
+               *
+               * **The list is short because the decision made it short.** Research R3 chose SMTP
+               * over Mailgun's HTTP API precisely so that no vendor package enters the tree at
+               * all — there is no `mailgun.js` to restrict, and swapping providers is a change of
+               * URL. What is restricted is the *transport*, because a route that reached for it
+               * directly would bypass the port's three-methods-and-no-generic-send shape, which
+               * is what has kept engagement notifications out of scope since 004.
+               *
+               * The Mailgun names are listed anyway, and deliberately: if a later change adopts
+               * the HTTP API for bounce handling, it must land inside the mail module rather than
+               * wherever the bounce is convenient.
+               */
+              group: [
+                'nodemailer',
+                'nodemailer/**',
+                'mailgun.js',
+                'mailgun.js/**',
+                'form-data',
+                '@sendgrid/mail',
+                'postmark',
+                'resend',
+              ],
+              message:
+                'The mail transport is reachable only from apps/api/src/mail/, which is the one ' +
+                'place MailService is implemented (FR-842). Call `app.mail` instead. Going ' +
+                'direct bypasses the port, whose exactly-three-methods shape — two account ' +
+                'messages and an operator report, no generic `send` — is what keeps engagement ' +
+                'notifications out of scope. If this import is a NEW provider being adopted, add ' +
+                "it to this list in the same change: a boundary naming only yesterday's vendors " +
+                'is a boundary that passes while checking nothing.',
             },
             {
               group: ['**/schema/stored-objects.js', '**/schema/stored-objects.ts'],
@@ -411,7 +452,7 @@ export default tseslint.config(
   },
 
   /**
-   * T007 (011) — **the administrative client, held to the same rules as the attendee client.**
+   * T007 (013) — **the administrative client, held to the same rules as the attendee client.**
    *
    * ═══════════════════════════════════════════════════════════════════════════════════════════
    * A separate application is not a relaxed one. FR-922 binds Principle IV over the whole

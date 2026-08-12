@@ -7,7 +7,7 @@ import { AdminSessionProvider } from '../../src/app/session.js'
 import { conference, identity, stubServices } from '../support/services.js'
 
 /**
- * T119 (011) — the conference list, and its two deliberate states (FR-926, FR-936).
+ * T119 (013) — the conference list, and its two deliberate states (FR-926, FR-936).
  *
  * ═════════════════════════════════════════════════════════════════════════════════════════════
  * **`unassigned` MUST BE VISIBLE, AND DECISION 39 IS WHY.**

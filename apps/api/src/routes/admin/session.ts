@@ -7,14 +7,20 @@ import { findAdminCandidate } from '../../admin/identity.js'
 import { operatorScopeOf, requireOperator } from '../../admin/require-operator.js'
 import { revokeAdminSession, startAdminSession } from '../../admin/session.js'
 import { hashPassword, verifyPassword } from '../../auth/password.js'
-import { failureDelayMs, hashAttemptValue, recordAttempt, serveDelay } from '../../auth/throttle.js'
+import {
+  beginAttempt,
+  failureDelayMs,
+  hashAttemptValue,
+  serveDelay,
+  settleAttempt,
+} from '../../auth/throttle.js'
 import { getDb } from '../../db/client.js'
 import { normaliseEmail } from '../../db/queries/attendees.js'
 import { operators } from '../../db/schema/operators.js'
 import { invalidCredentials, notFound, tooManyAttempts } from '../../errors.js'
 
 /**
- * T060–T064 (011) — administrative sign-in, sign-out, and forced credential replacement
+ * T060–T064 (013) — administrative sign-in, sign-out, and forced credential replacement
  * (FR-914–FR-919, FR-992).
  *
  * ═════════════════════════════════════════════════════════════════════════════════════════════
@@ -120,12 +126,19 @@ export const adminSessionRoutes = async (app: FastifyInstance): Promise<void> =>
       }
 
       if (!candidate || !verified) {
-        await recordAttempt({
-          identifierHash,
-          sourceHash,
-          action: 'admin_sign_in',
-          succeeded: false,
-        })
+        // ═══════════════════════════════════════════════════════════════════════════════════
+        // **RECORDS FIRST, AND PASSES NO ATTEMPT IDENTIFIER TO `failureDelayMs` BELOW.**
+        //
+        // 010's rework split recording into `beginAttempt`/`settleAttempt`, and the two call
+        // shapes it left behind are not interchangeable. Every route that evaluates *before*
+        // recording hands `failureDelayMs` the row it just wrote, so the count excludes it and
+        // that route's allowance is unchanged. Attendee sign-in has recorded *first* since 001,
+        // so its count includes the caller's own row — and this route deliberately matches
+        // attendee sign-in rather than the majority, because `admin_sign_in`'s allowance was
+        // specified against that behaviour (FR-916). Excluding the caller's own row here would
+        // make the seventh consecutive failure free where it is currently delayed.
+        // ═══════════════════════════════════════════════════════════════════════════════════
+        await beginAttempt({ identifierHash, sourceHash, action: 'admin_sign_in' })
 
         const outstanding = await serveDelay(
           await failureDelayMs({ identifierHash, sourceHash, action: 'admin_sign_in' }),
@@ -138,7 +151,12 @@ export const adminSessionRoutes = async (app: FastifyInstance): Promise<void> =>
         throw invalidCredentials()
       }
 
-      await recordAttempt({ identifierHash, sourceHash, action: 'admin_sign_in', succeeded: true })
+      // Settled `true`, which is what ends the identifier streak so the next attempt from this
+      // address starts clean. A correct credential is never throttled.
+      await settleAttempt(
+        await beginAttempt({ identifierHash, sourceHash, action: 'admin_sign_in' }),
+        true,
+      )
 
       await startAdminSession(
         reply,

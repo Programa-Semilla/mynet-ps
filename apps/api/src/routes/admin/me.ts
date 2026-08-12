@@ -8,7 +8,7 @@ import { operators } from '../../db/schema/operators.js'
 import { notFound } from '../../errors.js'
 
 /**
- * T063 (011) — `GET /admin/me`: who is signed in, and at which tier (FR-900, FR-924).
+ * T063 (013) — `GET /admin/me`: who is signed in, and at which tier (FR-900, FR-924).
  *
  * ═════════════════════════════════════════════════════════════════════════════════════════════
  * **THE TIER IS RETURNED HERE AND NOWHERE ELSE, AND THAT IS DELIBERATE.**

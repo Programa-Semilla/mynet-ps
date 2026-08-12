@@ -98,7 +98,7 @@ const NOT_EXPORTED: Record<string, string> = {
 
   /**
    * ═════════════════════════════════════════════════════════════════════════════════════════
-   * **T026 (011) — FOUR OF THIS FEATURE'S FIVE TABLES, AND TWO OF THEM NAME ATTENDEES.**
+   * **T026 (013) — FOUR OF THIS FEATURE'S FIVE TABLES, AND TWO OF THEM NAME ATTENDEES.**
    *
    * The fifth, `organizer_assignments`, IS exported (FR-981) and is mapped in
    * `EXPORTED_COLUMNS` — an assignment is a fact about the attendee who holds it.
@@ -213,7 +213,7 @@ const NOT_EXPORTED_COLUMNS: Record<string, string> = {
     'what makes the scoping structural rather than a filter applied afterwards.',
   'question_votes.attendee_id': 'The requester, on every row of the votes section.',
 
-  // T026 (011). The requester, exactly as `registrations.attendee_id` above — the export is
+  // T026 (013). The requester, exactly as `registrations.attendee_id` above — the export is
   // keyed on one attendee, so this column is the same value on every row and is a WHERE clause
   // rather than a projection.
   'organizer_assignments.attendee_id':

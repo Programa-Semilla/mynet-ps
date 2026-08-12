@@ -4,7 +4,7 @@ import { getDb } from '../client.js'
 import { adminAuditEntries, type AdminAuditAction } from '../schema/admin-audit.js'
 
 /**
- * T034 (011) — **the audit trail: append and sweep, and nothing else** (FR-994–FR-999,
+ * T034 (013) — **the audit trail: append and sweep, and nothing else** (FR-994–FR-999,
  * research R6).
  *
  * ═════════════════════════════════════════════════════════════════════════════════════════════

@@ -1,4 +1,4 @@
-# Data Model: 011 Administrative Foundation
+# Data Model: 013 Administrative Foundation
 
 **Phase 1 output.** Migration **`0009`**. Five new tables, two altered.
 
@@ -213,10 +213,10 @@ No column changes. The `unassigned` state is derived (FR-936).
 | `deletion-coverage.test.ts` | Five new tables; three not reached by the attendee cascade | Allow-list entries stating **pseudonymise-plus-clock** (audit), **deactivate-plus-clock** (operators), and cascade-from-subject (sessions) |
 | `export-coverage.test.ts` | New columns collected about attendees | `organizer_assignments` enters the export (FR-981). Operator and audit records are **not** attendee data and are declared so |
 | `event-scope-audit.test.ts` | Administrative routes name no conference and it **reports success otherwise** | Unchanged — the gap is closed by a *fourth* audit, not by widening this one (R5) |
-| `catalog-read-only.test.ts` | Untouched by 011 | **Must stay failing-on-write.** 012 amends it, not this feature (FR-974) |
-| `join-grants-nothing.test.ts` | Untouched by 011 | **Must stay in force.** 013 amends it (FR-975) |
-| `qa-absences.test.ts` | 011 adds one moderation route | Narrow **by path** to permit removal under the administrative prefix only. **Do not weaken the pattern** — 009 recorded that as the natural, wrong repair |
-| `no-report-read-surface.test.ts` | 011 adds a read surface | Narrow to `apps/web` + attendee API. The absence survives where FR-972 requires it |
+| `catalog-read-only.test.ts` | Untouched by 013 | **Must stay failing-on-write.** 014 amends it, not this feature (FR-974) |
+| `join-grants-nothing.test.ts` | Untouched by 013 | **Must stay in force.** 015 amends it (FR-975) |
+| `qa-absences.test.ts` | 013 adds one moderation route | Narrow **by path** to permit removal under the administrative prefix only. **Do not weaken the pattern** — 009 recorded that as the natural, wrong repair |
+| `no-report-read-surface.test.ts` | 013 adds a read surface | Narrow to `apps/web` + attendee API. The absence survives where FR-972 requires it |
 | `repository-casts.test.ts` | New repositories | No new unchecked casts; `apps/admin` takes `@mynet/data` types directly |
 
 ---

@@ -55,7 +55,7 @@ database if you switched to a branch with a different migration history, seeds t
 issues an administrative credential, starts all three servers, and prints the URLs once they
 answer.
 
-**Three servers, because administration is a separate product** (011): MyNet on 5173, the
+**Three servers, because administration is a separate product** (013): MyNet on 5173, the
 administrative site on 5174, the API on 3000. Two ports locally stand in for the two hosts a
 deployment uses — `admin.<host>` and `<host>` — which is a _different origin_ in exactly the way
 that matters: its own storage, its own service-worker scope, and a cookie the browser will not

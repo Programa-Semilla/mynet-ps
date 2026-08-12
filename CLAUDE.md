@@ -25,7 +25,7 @@ question and settle it with the client.
 GroundZero/       # Initialization brief, requirements.md, approved prototype (reference only)
 apps/api/         # Fastify + Drizzle over PostgreSQL; versioned migrations
 apps/web/         # React + TypeScript PWA; shell, sign-in, five destinations
-apps/admin/       # 011 — the SEPARATE administrative website (admin.<host>). No PWA, no
+apps/admin/       # 013 — the SEPARATE administrative website (admin.<host>). No PWA, no
                   #   service worker, no @mynet/platform: it needs none of the seven device
                   #   capabilities, and its absences are structural rather than configured.
 packages/data/    # Repository interfaces + HTTP implementations + generated contract types
@@ -132,10 +132,12 @@ tablet layouts have had.
 
 **Nothing has been deployed yet, and that is not a gap in the code.** `deploy/vm/` is complete —
 two Azure VMs, Caddy with automatic TLS, a loopback-only PostgreSQL container, backups and a
-runbook — but two owner decisions gate the first deploy: **no domain is registered** (Caddy cannot
-obtain a certificate without a resolving A record) and **no Azure subscription is named**. The
-`deploy-uat` and `deploy-prod` jobs print what they are blocked on and exit 0 rather than failing
-every merge.
+runbook — and the two owner decisions that gated the first deploy are **now taken and ratified in
+v3.4.0**: UAT is `mynet-dev.programasemilla.com` and the subscription is
+`d428f98f-a3c4-49c3-ae24-06ec3de08477` (LinaSys-DevEnv, `centralus`). `deploy/vm/envs/uat.env`
+still carries `SUBSCRIPTION=` and `APP_DOMAIN=` blank — **filling them is phase 010's work**, and
+until then `deploy-uat` and `deploy-prod` keep printing what they are blocked on and exiting 0
+rather than failing every merge.
 
 An attendee creates their own account, joins a conference by code, and arrives at the conference
 happening now — greeted by name, told which day it is in the venue's timezone. Home shows what is
@@ -227,7 +229,16 @@ notification, and the bell stays forbidden.
 [#17](https://github.com/Programa-Semilla/mynet-ps/pull/17) — the implementation and constitution
 v3.3.0 in one PR, because the amendment gated the code, as 008's did. **With it the delivery
 roadmap is complete**: every feature 001–009 is delivered and every destination `requirements.md`
-names answers its question. What remains is 010, which adds no schema and no feature.
+names answers its question. What remains adds no schema and no feature.
+
+**The roadmap's 010 is split, by brainstorm #08 and constitution v3.4.0, because its two halves have
+different blockers.** **011 — UAT Deployment and Pre-Public Hardening** is shipped: six
+security-and-abuse findings that all get worse once a URL is public, then provision, DNS, TLS, a
+Mailgun adapter behind `MailService`, VAPID, seed, and an **exercised restore on the real host**.
+**012 — Launch Readiness and Production** carries the validation pass, the physical iPhone test, the
+three-width review, register entry 22 and production, and stays blocked on register entries 2 (brand
+mark) and 4 (client validation of desktop and tablet). Keeping them together would have held a
+working UAT hostage to a brand mark. 010's spec must state that it departs from the roadmap.
 
 **Planned as two PRs and delivered as one.** The split existed so a reviewer could read the safety
 half as a unit; both halves were complete and green, and holding the first open would have shipped
@@ -322,7 +333,7 @@ at all*; unit, component and integration were all green on it and only e2e caugh
 owner reported the scheduling dialog rendering in the **top-left corner**, which no behavioural
 test could see. Both are written up as invariants above.
 
-**011 (Administrative foundation, the second actor, and the report queue) is shipped**,
+**013 (Administrative foundation, the second actor, and the report queue) is shipped**,
 squash-merged to `develop` in [#20](https://github.com/Programa-Semilla/mynet-ps/pull/20) — the
 first feature with a second actor, and the first to ship a **second product**. It is the delivery
 of standing decisions 31–39, and the reversal was **forced rather than sought**: register entries
@@ -343,9 +354,9 @@ generated operator credential, so that walk is one command away rather than four
 
 **A deep review recorded 49 findings and deferred nine as needing decisions; those were then taken
 as an explicit decision round rather than carried into the merge** — eight fixed, one accepted.
-`specs/011-administrative-foundation/review-findings.md` records both passes.
+`specs/013-administrative-foundation/review-findings.md` records both passes.
 
-**Four of the nine were one defect, and it is the most transferable thing 011 produced: four
+**Four of the nine were one defect, and it is the most transferable thing 013 produced: four
 functions whose emphatic headers described call relationships that did not exist.**
 `appendAuditEntry` said *"every write path"* passed a transaction and **none did**;
 `assertVerifiedOperator` said it was called at the query layer and was called nowhere;
@@ -639,7 +650,7 @@ refactor.
   the prose explaining the absence — matching raw text fails on a correct implementation, and the
   natural repair is to weaken the pattern until it checks nothing.
 
-**Administration (011)**
+**Administration (013)**
 
 - **A second product, not a second surface.** `apps/admin/` is its own Vite application on its own
   origin. The cheaper option — a second entry point inside `apps/web` with the PWA plugin
@@ -660,7 +671,7 @@ refactor.
   **typecheck** rather than the test run.
 - **The minting functions are exported, and a sole-importer test is what replaces a private
   constructor.** The other three scopes hold their class and guard in one file, so `new` is simply
-  unavailable elsewhere; 011 splits them across two files and pays for it with one reviewable test.
+  unavailable elsewhere; 013 splits them across two files and pays for it with one reviewable test.
   That test scans `src/` **only** — a test fabricating a scope proves nothing about what a request
   can reach.
 - **The report queue is the third recorded Principle VIII exception**, and every bound is visible
@@ -844,7 +855,55 @@ code**:
     has** — Messages, Discover, cards and profile all refuse without purging, and have since they
     shipped. The underlying gap is real, product-wide and older than 009: **a cached conference
     can outlive a withdrawn registration by up to 24 hours.** It is **register entry 22**, against
-    010, rather than 009's to fix alone.
+    010 — **now 011**, since v3.4.0 split the phase — rather than 009's to fix alone.
+
+**2026-08-10** (ratified in constitution v3.4.0) — **the first amendment that gates a deployment
+rather than a feature.** Nothing here changes what the product does; it changes where it runs, who
+may reach it, and who holds the keys. Taken in brainstorm #08. With these, **no register entry
+blocks phase 010**:
+
+30. **UAT is `mynet-dev.programasemilla.com`, openly reachable, carrying seeded data only.** No
+    credential, no allowlist, no network boundary — **FR-067 is satisfied by the data rather than
+    by the door**, because nothing that must be kept from a stranger is ever present. Basic auth
+    and an IP allowlist were considered and **rejected as safer-looking but worse**: each disables
+    the validation the environment exists for (service-worker registration and push; a
+    physical-device test on cellular) to buy secrecy over data that does not need it. *Closes
+    register entry 14.*
+31. **Production is `mynetcr.com`, provisionally** — not registered, not final, and it **must not
+    be committed to `prod.env`** until it is, because a blank value is what makes the deploy jobs'
+    refusal honest. A consequence travels with it and is now an invariant: **UAT and production
+    must remain separate registrable domains**, which makes a UAT session cookie structurally
+    incapable of reaching production. That is stronger than any configuration, arrived by accident
+    of naming, and is written down so nobody "tidies" UAT onto a production subdomain.
+32. **The Azure subscription is `d428f98f-a3c4-49c3-ae24-06ec3de08477` (LinaSys-DevEnv),
+    `centralus`, both environments.** Scripts pin every call to it **by id** — a name is mutable,
+    and an inherited default silently provisions into the wrong place. One subscription does not
+    weaken the isolation rule: each environment still has its own host, database, secrets and
+    address. *Annotates register entry 11, which was resolved in v3.0.0 having named no
+    subscription.*
+33. **The transactional email provider is Mailgun.** *Closes register entry 18.* `MailService`
+    stays a vendor-free port with the adapter chosen **by configuration in every environment
+    identically**, following the shape 007 proved for `PushService`, and the SDK stays confined to
+    `apps/api/src/mail/` by the same lint boundary as storage and push. **Real mail is not optional
+    for a usable environment**: verification gates discoverability, so with only the sink adapter
+    every attendee is invisible to every other one.
+34. **VAPID custody: one pair per environment, a GitHub Actions environment secret injected into
+    the VM's `.env` by `deploy.sh`, rotated only on compromise.** *Closes register entry 20 —
+    and its other half is **withdrawn as never having existed**.* There is no push provider: Web
+    Push signs with the project's own pair and posts to whatever endpoint the browser issued. The
+    entry had been worded as "the push provider" since v3.1.0, phrased by analogy to entry 18 which
+    does have a vendor. Rotation is forbidden except on compromise because it is a **silent
+    delivery outage** for every attendee until their browser re-registers, and nothing in the
+    product could tell them.
+35. **Abuse reports go to `apps@programasemilla.com`.** *Closes register entry 21.* **The address
+    closes the entry and does not discharge the obligation** — it was filed as something the owner
+    personally holds, and naming a mailbox does not make somebody read it.
+
+**Escalated at the same time and deliberately not resolved**: register entry 19 — nobody moderates
+uploaded avatar images. Decision 30 makes a permanent, openly reachable environment with public
+sign-up and image upload a **present fact** rather than a prospect. Decision 35 narrows it by
+supplying the operator mailbox that 007's report-to-an-operator path always needed, so the nearest
+available answer now exists; whether avatars use it is undecided.
 
 **Sharpened at the same time, without reversing anything**: standing decision 16 now says
 explicitly that there is **one visibility decision per attendee** and that no feature may give an
@@ -917,9 +976,11 @@ prohibition in this document, and the first to introduce a second actor**:
     disclose is register entry 24 and is NOT decided** — the operator-mail floor (identifiers and a
     timestamp, never message text, never the reason) holds until it is. A queue showing reported
     message text would need a **third** recorded exception under Principle VIII.
-36. **Delivery is three features behind one amendment** — 011 (administrative foundation and the
-    report queue), 012 (conference content authoring), 013 (registration and attendee management).
-    **011 reserves migration `0009`.** One amendment rather than three, because the second actor is a
+36. **Delivery is three features behind one amendment** — 013 (administrative foundation and the
+    report queue), 014 (conference content authoring), 015 (registration and attendee management).
+    *Numbered 011–013 when the amendment was ratified; the UAT deployment work took 011 from a
+    parallel branch, so the programme shifted rather than renumbering a phase already on `develop`.*
+    **013 reserves migration `0009`.** One amendment rather than three, because the second actor is a
     single decision and splitting it would let it drift. **Moderation ships first, not authoring**,
     though authoring is what prompted the work: it is the smallest subsystem, so it proves the new
     architecture where being wrong costs least, and reports are already arriving from 007 and 009
@@ -932,7 +993,7 @@ asserts no write path and no import path at any privilege), `catalog-read-only.t
 and `no-report-read-surface.test.ts` (FR-548, which survives for MyNet).
 
 **2026-08-11** (ratified in constitution **v4.1.0**) — **closes all three entries v4.0.0 opened, in
-the same session. Feature 011 is unblocked:**
+the same session. The administrative programme is unblocked:**
 
 37. **The administrative site is a subdomain, and its operator holds a separate session.**
     `admin.<host>`, with `/api/*` reverse-proxied under it so its calls stay same-origin, and a
@@ -1085,43 +1146,40 @@ is a working summary. Each names what it blocks, because *when* to ask matters a
 
 ### Require a client decision
 
-**No open question blocks any feature. 011 is shipped; 012 is next and is unblocked.** *As of
-2026-08-12.* v4.0.0 opened a second programme (011, 012, 013) and with it entries 24, 25 and 26;
-**v4.1.0 closed all three in the same session**, so the blockers existed for one exchange rather
-than one release. Everything below blocks **deployment** or **release**, not code.
+**No open question blocks any feature.** v3.2.0 closed the connection model, card-exchange semantics
+and Q&A attribution; **v3.3.0** closed public Q&A visibility and withdrew FR-756a; **v3.4.0** closed
+the oldest entry of all, the brand mark; **v3.5.0** closed four more — the UAT address, the mail
+provider, VAPID custody and the operator address; and **v4.0.0/v4.1.0** opened entries 24, 25 and 26
+and closed all three in the same session. **009, 010, 011 and 013 are shipped, and the attendee
+delivery roadmap is complete.** Everything below blocks **release**, not code.
 
-The closing sequence is worth keeping, because it is the argument for opening entries you cannot yet
-answer: those three produced a **third privacy exception**, a **CSRF-adjacent topology decision**,
-and a **deletion rule touching decision 12**. None is a spec detail, and all three would have been
-settled by inference inside a feature specification had they not been opened deliberately.
+**Two programmes are now in flight and their numbering interleaves, which is worth stating once
+rather than re-deriving.** The attendee roadmap ends at **012 — Launch Readiness & Production**,
+still queued. The administrative programme runs **013, 014, 015** and began while 011 was in a
+parallel branch; 013 took the next free number rather than the next number in its own sequence,
+because parallel branches cannot see each other's reservations. The constitution records the same
+lesson about version numbers three times over.
 
-Also closed: v3.2.0 settled the connection model, card-exchange semantics and Q&A attribution;
-**v3.3.0** public Q&A visibility and the withdrawal of FR-756a; **v3.4.0** the oldest entry of all,
-the brand mark.
+The closing sequence for 24, 25 and 26 is worth keeping, because it is the argument for opening
+entries you cannot yet answer: those three produced a **third privacy exception**, a
+**CSRF-adjacent topology decision**, and a **deletion rule touching decision 12**. None is a spec
+detail, and all three would have been settled by inference inside a feature specification had they
+not been opened deliberately.
 
 - ~~**Register entries 24, 25 and 26**~~ — **RESOLVED 2026-08-11 in v4.1.0** as standing decisions
-  38, 39 and 37 respectively. See the decisions above; they are now binding text rather than
-  questions.
+  38, 39 and 37 respectively. They are now binding text rather than questions.
 
-- **Register entries 19 and 21 are ADDRESSED but NOT closed — by v4.0.0, v4.1.0, or 011 shipping.**
-  011 built the first actor capable of moderating an avatar and of reading a report queue, and
-  v4.1.0 decided what that operator may *see* — but **a capability is not a policy**. Who moderates, against what
-  standard, on whose complaint, with what appeal, and whether a removed avatar is replaced or
-  blanked are all undecided (19); and somebody still has to *be* that operator, which remains an
-  obligation the owner personally holds (21). Neither may be read as closed by 011 shipping.
-  **These two are the oldest live entries in the register**, and they are the reason the
-  administration exclusion was reversed at all.
-
-- **Register entry 22 — a cached conference can outlive a withdrawn registration by up to 24
-  hours.** Conceded by 009 when FR-756a was withdrawn, and **product-wide rather than 009's**: no
-  undecorated repository — Messages, Discover, cards, profile or Q&A — purges on refusal. It was
-  filed against 010, which did not answer it: 010 adds no repository and no cached read, so the
-  single answer that covers all of them is still owed. **011 did not answer it either** — the
-  administrative client caches nothing at all.
+- **Register entries 19 and 21 are ADDRESSED but NOT closed — by v4.0.0, v4.1.0, or 013 shipping.**
+  013 built the first actor capable of moderating an avatar and of reading a report queue, and
+  v4.1.0 decided what that operator may *see* — but **a capability is not a policy**. Who moderates,
+  against what standard, on whose complaint, with what appeal, and whether a removed avatar is
+  replaced or blanked are all undecided (19); and somebody still has to *be* that operator, which
+  v3.5.0's address does not appoint (21). **These two are the oldest live entries in the register**,
+  and they are the reason the administration exclusion was reversed at all.
 
 - **Whether the audit trail's retention clock should start at pseudonymisation, as two comments
-  already claim it does.** Opened by 011 (`deviations.md` D11) and found only by writing the
-  sweep's first behavioural test. `maintenance.ts` declares *"365 days after pseudonymisation"* and
+  already claim it does.** Opened by 013 (`deviations.md` D11) and found only by writing the sweep's
+  first behavioural test. `maintenance.ts` declares *"365 days after pseudonymisation"* and
   `admin-audit.ts` says the clock "starts then"; the predicate measures `occurred_at`, so an entry
   written 400 days ago and pseudonymised *yesterday* — because that is when somebody exercised
   erasure — is swept on the next hourly pass rather than a year later. **The accountability record
@@ -1130,10 +1188,19 @@ the brand mark.
   `retention-sweep.test.ts` pins the shipped behaviour and says in its own message that it encodes
   current rather than desired behaviour. **Blocks nothing.**
 
+- **Register entry 22 — a cached conference can outlive a withdrawn registration by up to 24
+  hours.** Conceded by 009 when FR-756a was withdrawn, and **product-wide rather than 009's**: no
+  undecorated repository — Messages, Discover, cards, profile or Q&A — purges on refusal. Filed
+  against the phase that became 011, which did not answer it: 011 adds no repository and no cached
+  read, so the single answer that covers all of them is still owed. **013 did not answer it
+  either** — the administrative client caches nothing at all. **Blocks 012.**
 - **Desktop and tablet layouts are unvalidated.** The approved prototype is mobile-only — a fixed
   390×844 frame. Every desktop layout built before this is answered is unreviewed design, so the
   cost compounds with each feature. **008 turned this from a risk into an observed defect**: the
   first dialog a human looked at was rendering in the top-left corner, having passed every gate.
+  **Blocks 011, not 010** — and it has never been *answerable*, because reviewing a layout needs a
+  running product at a real screen width. 010's UAT is what makes it a question somebody can be
+  asked, which is a reason to sequence 010 first rather than to keep waiting.
 - **Whether a question's payload should carry `authorId`** — raised at 009's deep-review gate.
   It makes Q&A the **first surface handing a co-attendee the identifier of somebody who has turned
   discoverability off**, and `GET /blocks` then resolves that identifier to a live display name
@@ -1148,52 +1215,53 @@ the brand mark.
   somebody's card is the stronger predicate — they handed it to you. Recorded rather than resolved
   because changing it contradicts a written assumption, and that is the owner's call. **Blocks
   nothing**: the product behaves as specified today.
-- ~~**Real brand mark and application icons.**~~ **ANSWERED 2026-08-10, ratified in v3.3.0, and
+- ~~**Real brand mark and application icons.**~~ **ANSWERED 2026-08-10, ratified in v3.4.0, and
   now BUILT** — the owner supplied a brand board, closing the oldest entry in the register, and 010
   carried it into the product. Every icon on disk is derived from that board; the amber-banded
   placeholder and the script that drew it are deleted. What remains is a person looking at it on a
-  phone (quickstart scenarios 5–9).
-- **Whether `navy-800` and `coral-500` adopt the brand's values** (`#0d1942`, `#fe6551`) — new
-  register entry 22, opened by the same amendment. Measured from the board, brand and tokens
-  disagree on both; cream agrees. Adopting them makes the board the single source of truth for
-  colour and removes the visible seam between the icon plate and the token-derived `theme_color` on
-  the splash screen — but `navy-800` is the primary surface and `coral-500` is both the accent and
-  the focus ring, so it repaints the whole product and every contrast ratio must be re-verified.
-  **Blocks nothing**; 010 is explicitly forbidden from resolving it.
-- **v3.1.0 is ratified and Phase 7 of 007 is delivered.** It resolved register entry 10 in part
-  (delivery in, bell still out), added `VisibilityService` to Principle V, and made the reporting
-  disposal path binding. **Two values it deliberately left open are below.** Neither blocks
-  implementation — only delivery in a deployed environment, and `deploy/vm/.env.example` documents
-  both with what a blank value costs.
-- **VAPID key custody** — register entry 20. **The entry is worded as "the push provider", and that
-  half turned out not to exist**: Web Push signs with your own key pair and posts to whatever
-  endpoint the browser issued, with no account, SDK or third party involved. The constitution's
-  wording is unchanged and should probably be amended. What remains genuinely open is custody: who
-  holds the private key, where it lives per environment, and what happens on rotation — since
-  rotating it silently stops delivery for every attendee until their browser re-registers.
-- **The operator address abuse reports are sent to** — register entry 21. Not a vendor question but
-  an obligation the owner personally holds: the reporting dialog says a person will read it, and
-  that sentence is only true once somebody does. Until then a report still blocks and still records,
-  and the skipped dispatch is logged rather than dropped.
+  phone.
+- **Whether `navy-800` and `coral-500` adopt the brand's values** (`#0d1942`, `#fe6551`) — register
+  entry **23**, opened by v3.4.0. Measured from the board, brand and tokens disagree on both; cream
+  agrees. Adopting them makes the board the single source of truth for colour and removes the
+  visible seam between the icon plate and the token-derived `theme_color` on the splash screen — but
+  `navy-800` is the primary surface and `coral-500` is both the accent and the focus ring, so it
+  repaints the whole product and every contrast ratio must be re-verified. **Blocks nothing**, and
+  011 was explicitly forbidden from resolving it.
+- ~~**VAPID key custody**~~ — **CLOSED in v3.5.0** (standing decision 34), along with the "push
+  provider" half of register entry 20, which was **withdrawn as never having existed**: Web Push
+  signs with the project's own key pair and posts to whatever endpoint the browser issued, so there
+  was never an account, an SDK or a third party to choose.
+- ~~**The operator address abuse reports are sent to**~~ — **CLOSED in v3.5.0** (decision 35):
+  `apps@programasemilla.com`. The obligation behind it is not closed and cannot be by naming an
+  address — somebody has to read that inbox for the dialog's promise to stay true.
 - **Whether `requirements.md` is amended** or its divergence from the constitution simply recorded.
 - **What "PS" denotes** in `mynet-ps`.
 
 ### Require an owner or planning decision
 
-- **No domain is registered and no Azure subscription is named**, so nothing has been deployed.
-  Caddy cannot obtain a certificate without a resolving A record. `deploy-uat` and `deploy-prod`
-  exist and are wired, but **print what they are blocked on and exit 0** rather than failing every
-  merge. `deploy/vm/OPERATIONS-LOG.md` records the restore that *has* been exercised — locally,
-  against a throwaway container — and the half that cannot yet be. **Blocks production readiness.**
-- **UAT access control.** UAT is publicly reachable, permanent, and carries realistically-shaped
-  attendee data. The data-separation half is settled and binding (FR-067: the tooling must *refuse*
-  to point UAT at production data, not merely be configured not to). Who may reach it is not.
-- **Authentication ownership** — self-implemented versus a delegated provider.
-- **The transactional email provider.** v2.3.0 settled that account mail is sent, not by whom.
-  Brings one external dependency and one secret.
+- ~~**No domain is registered and no Azure subscription is named**~~ — **CLOSED in v3.4.0**
+  (decisions 30–32). UAT is `mynet-dev.programasemilla.com`; production is `mynetcr.com`
+  provisionally and **stays out of `prod.env` until registered**, because a blank value is what
+  keeps the deploy jobs' refusal honest. Subscription `d428f98f-a3c4-49c3-ae24-06ec3de08477`
+  (LinaSys-DevEnv), `centralus`. `deploy/vm/envs/uat.env` still has `SUBSCRIPTION` and `APP_DOMAIN`
+  blank — **filling them is phase 010's work**, and this amendment is what licenses it.
+  `deploy/vm/OPERATIONS-LOG.md` records the restore exercised locally against a throwaway
+  container; 010 does it on the real host.
+- ~~**UAT access control**~~ — **CLOSED in v3.4.0** (decision 30): openly reachable, **seeded data
+  only**. FR-067 is satisfied by the data rather than by the door. The data-separation half was
+  already binding and is unchanged — the tooling must *refuse* to point UAT at production data, not
+  merely be configured not to.
+- **Authentication ownership** — self-implemented versus a delegated provider. Worth noting what
+  "open" means here: it *is* self-implemented and has shipped since 004; the question is whether
+  that is settled or an unratified default. Blocks nothing.
+- ~~**The transactional email provider**~~ — **CLOSED in v3.4.0** (decision 33): Mailgun.
 - **Nobody moderates uploaded avatar images.** Public self sign-up plus image upload, in a product
   with no administrative actor by construction — and the organizer exclusion forecloses the usual
-  answer. Cheapest to settle before the first publicly reachable environment.
+  answer. **v3.4.0 escalated it without resolving it**: decision 30 makes an openly reachable
+  environment with public sign-up a present fact, so this is no longer hypothetical. Decision 35
+  narrows it — the operator mailbox that 007's report path always needed now exists, so the nearest
+  available answer is available; whether avatars use it is undecided. Bounded meanwhile by UAT
+  carrying **seeded data only** and by the URL being unpublished.
 - **Server-side branch protection is unconfigured** — a configuration task, not a limitation. The
   protection endpoints return **404 (no rule set)**, and protection is free on public repositories.
   Enforcement is meanwhile client-side and bypassable, which is material now that real attendee

@@ -77,13 +77,13 @@ export type ErrorCode =
    */
   | 'own_question'
   /**
-   * FR-992 (011) — the administrative credential set by the bootstrap has not been replaced.
+   * FR-992 (013) — the administrative credential set by the bootstrap has not been replaced.
    *
    * One of only two 011 refusals that explain themselves. See `credentialNotReplaced` below.
    */
   | 'credential_not_replaced'
   /**
-   * FR-945 (011) — another operator has already resolved this report.
+   * FR-945 (013) — another operator has already resolved this report.
    *
    * Produced from a **unique-constraint violation**, not from a read-then-write check. See
    * `reportAlreadyResolved` below and `schema/report-resolutions.ts`.
@@ -304,7 +304,7 @@ export const questionHasVotes = (): AppError =>
  * with their own 400.
  */
 /**
- * FR-992 (011) — the operator has not yet replaced the credential that was set for them.
+ * FR-992 (013) — the operator has not yet replaced the credential that was set for them.
  *
  * ═════════════════════════════════════════════════════════════════════════════════════════
  * **ONE OF ONLY TWO REFUSALS IN 011 THAT EXPLAIN THEMSELVES**, and it passes the test every
@@ -327,7 +327,7 @@ export const credentialNotReplaced = (): AppError =>
   )
 
 /**
- * FR-945 (011) — a report another operator has already resolved.
+ * FR-945 (013) — a report another operator has already resolved.
  *
  * Explained, for the same reason as `credentialNotReplaced`: it is a fact about the reader's own
  * work — somebody has already dealt with this — and it discloses nothing about any attendee. The

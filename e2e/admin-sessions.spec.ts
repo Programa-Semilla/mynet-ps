@@ -5,7 +5,7 @@ import { ADMIN_ORIGIN, WEB_ORIGIN } from './support/env.js'
 import { OPERATOR_PASSWORD, SEED_OPERATOR_EMAIL, signInAsOperator } from './support/operators.js'
 
 /**
- * T053 (011) — **two independent sessions, in a real browser, in both directions** (FR-912,
+ * T053 (013) — **two independent sessions, in a real browser, in both directions** (FR-912,
  * SC-901, decision 37).
  *
  * ═════════════════════════════════════════════════════════════════════════════════════════════

@@ -375,7 +375,7 @@ export const buildAssets = async () => {
     [`${web}/brand/mark-navy.png`, await resampled(alpha, MARK_NAVY, IN_APP_MARK_HEIGHT)],
 
     /**
-     * T006 (011) — the administrative site's assets (FR-921).
+     * T006 (013) — the administrative site's assets (FR-921).
      *
      * ═══════════════════════════════════════════════════════════════════════════════════════
      * **The same one pipeline, and the omissions are the requirement.**

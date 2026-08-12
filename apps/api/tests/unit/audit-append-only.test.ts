@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import * as auditModule from '../../src/db/queries/admin-audit.js'
 
 /**
- * T035 (011) — **append-only, asserted by name-shape over the module's exports** (FR-996).
+ * T035 (013) — **append-only, asserted by name-shape over the module's exports** (FR-996).
  *
  * ═════════════════════════════════════════════════════════════════════════════════════════════
  * **THE MECHANISM IS THAT THE FUNCTION DOES NOT EXIST, AND THIS IS WHAT NOTICES WHEN ONE DOES.**

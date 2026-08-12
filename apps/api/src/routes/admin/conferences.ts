@@ -16,7 +16,7 @@ import { getDb } from '../../db/client.js'
 import { notFound } from '../../errors.js'
 
 /**
- * T122–T124 (011) — conferences and the tier boundary (FR-926, FR-930–FR-936).
+ * T122–T124 (013) — conferences and the tier boundary (FR-926, FR-930–FR-936).
  *
  * ═════════════════════════════════════════════════════════════════════════════════════════════
  * **`POST /admin/conferences/:eventId/organizers` IS THE ONE PATH IN THIS PRODUCT WHERE TWO

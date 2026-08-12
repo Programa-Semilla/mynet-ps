@@ -9,7 +9,7 @@ import { AdminSessionProvider } from '../../src/app/session.js'
 import { identity, stubServices } from '../support/services.js'
 
 /**
- * T052 (011) — the administrative sign-in screen: loading, failure, and disabled submit
+ * T052 (013) — the administrative sign-in screen: loading, failure, and disabled submit
  * (FR-915, FR-917, FR-922).
  *
  * ═════════════════════════════════════════════════════════════════════════════════════════════

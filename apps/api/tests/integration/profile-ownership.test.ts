@@ -117,7 +117,7 @@ describe('a profile is editable by its owner and by nobody else (FR-335)', () =>
       .filter((route) => /:attendeeId|\{attendeeId\}|:userId|:personId/.test(route.url))
       .filter((route) => methodsOf(route).some((method) => method !== 'GET' && method !== 'HEAD'))
       // ─────────────────────────────────────────────────────────────────────────────────────
-      // T028 (011) — **the administrative demotion route names an attendee in a write, and that
+      // T028 (013) — **the administrative demotion route names an attendee in a write, and that
       // is exactly the power constitution v4.0.0 admitted.**
       //
       // FR-335's purpose is that **no attendee may edit another attendee**, and it is entirely

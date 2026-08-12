@@ -535,7 +535,7 @@ describe('attendee data isolation', () => {
       const probe = await buildApp({
         onRoute: (route) => {
           // ───────────────────────────────────────────────────────────────────────────────────
-          // T028 (011) — administrative routes are excluded from this inventory.
+          // T028 (013) — administrative routes are excluded from this inventory.
           //
           // `EVENT_ROUTES` below drives each declared route with an **attendee's** cookie and
           // requires the same 404 for "another attendee's conference" as for one that does not

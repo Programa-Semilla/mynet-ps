@@ -5,7 +5,7 @@ import { useAdminSession } from '../session.js'
 import { AdminDialog } from '../shell/AdminDialog.js'
 
 /**
- * T095, T096 (011) — recording what was done about a report (FR-943, FR-944, FR-945).
+ * T095, T096 (013) — recording what was done about a report (FR-943, FR-944, FR-945).
  *
  * ═════════════════════════════════════════════════════════════════════════════════════════════
  * **TWO OUTCOMES AND DELIBERATELY NO THIRD.** There is no `escalated` and no `pending`: a status

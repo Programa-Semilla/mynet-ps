@@ -5,7 +5,7 @@ import { useAdminSession } from '../session.js'
 import { AdminDialog } from '../shell/AdminDialog.js'
 
 /**
- * T110 (011) — confirming the removal of a reported question (FR-950–FR-953).
+ * T110 (013) — confirming the removal of a reported question (FR-950–FR-953).
  *
  * ═════════════════════════════════════════════════════════════════════════════════════════════
  * **THIS IS A NESTED DIALOG, AND THAT IS THE ENTIRE REASON IT NEEDS ITS OWN NOTE.**

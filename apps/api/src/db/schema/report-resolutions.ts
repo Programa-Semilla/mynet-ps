@@ -5,7 +5,7 @@ import { operators } from './operators.js'
 import { abuseReports } from './reports.js'
 
 /**
- * T020 (011) — **what an operator did about a report** (FR-943, FR-944, FR-945, data-model.md).
+ * T020 (013) — **what an operator did about a report** (FR-943, FR-944, FR-945, data-model.md).
  *
  * ═════════════════════════════════════════════════════════════════════════════════════════════
  * **`report_id` IS UNIQUE, AND THAT CONSTRAINT *IS* FR-945'S CONCURRENCY GUARANTEE.**

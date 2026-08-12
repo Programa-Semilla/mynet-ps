@@ -7,7 +7,7 @@ import { AdminSessionProvider } from '../../src/app/session.js'
 import { identity, reportDetail, stubServices } from '../support/services.js'
 
 /**
- * T084 (011) — **`contentAvailable: false` renders as a STATE, not a failure** (FR-941, SC-902).
+ * T084 (013) — **`contentAvailable: false` renders as a STATE, not a failure** (FR-941, SC-902).
  *
  * ═════════════════════════════════════════════════════════════════════════════════════════════
  * Reported message and question ids are stored as plain arrays rather than foreign keys

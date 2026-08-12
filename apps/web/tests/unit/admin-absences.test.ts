@@ -5,7 +5,7 @@ import { fileURLToPath, URL } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 /**
- * T012 (011) — **MyNet gains nothing, and this is where that stops being a promise** (FR-970,
+ * T012 (013) — **MyNet gains nothing, and this is where that stops being a promise** (FR-970,
  * FR-971, FR-972, FR-973, SC-907).
  *
  * ═════════════════════════════════════════════════════════════════════════════════════════════

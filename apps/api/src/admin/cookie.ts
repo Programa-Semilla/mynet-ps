@@ -3,7 +3,7 @@ import type { CookieSerializeOptions } from '@fastify/cookie'
 import { loadConfig } from '../config.js'
 
 /**
- * T038 (011) — the administrative session cookie (FR-911, FR-912, FR-913, decision 37).
+ * T038 (013) — the administrative session cookie (FR-911, FR-912, FR-913, decision 37).
  *
  * ═════════════════════════════════════════════════════════════════════════════════════════════
  * **THIS COOKIE SETS NO `Domain` ATTRIBUTE, AND THAT SINGLE OMISSION IS WHAT MAKES THE TWO

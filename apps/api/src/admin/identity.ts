@@ -7,7 +7,7 @@ import { operators } from '../db/schema/operators.js'
 import { organizerAssignments } from '../db/schema/organizer-assignments.js'
 
 /**
- * T059 (011) — **resolving an address to an administrative principal, as ONE lookup** (FR-914,
+ * T059 (013) — **resolving an address to an administrative principal, as ONE lookup** (FR-914,
  * FR-915, FR-918, research R4).
  *
  * ═════════════════════════════════════════════════════════════════════════════════════════════

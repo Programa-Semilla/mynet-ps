@@ -8,7 +8,7 @@ import { getDb } from '../../db/client.js'
 import { notFound } from '../../errors.js'
 
 /**
- * T106, T107 (011) — `DELETE /admin/questions/:questionId` (FR-950–FR-953).
+ * T106, T107 (013) — `DELETE /admin/questions/:questionId` (FR-950–FR-953).
  *
  * ═════════════════════════════════════════════════════════════════════════════════════════════
  * **THE PRODUCT'S ONLY UNMODERATED MANY-TO-MANY SURFACE GETS A MODERATOR, AND THE ROUTE IS

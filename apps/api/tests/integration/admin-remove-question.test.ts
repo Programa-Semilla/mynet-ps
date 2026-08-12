@@ -15,7 +15,7 @@ import { abuseReports } from '../../src/db/schema/reports.js'
 import { ADA, attendees, clearThrottle, GRACE, setupTestApp, teardown } from './helpers.js'
 
 /**
- * T100, T102 (011) — removing a reported question (FR-950–FR-953).
+ * T100, T102 (013) — removing a reported question (FR-950–FR-953).
  *
  * ═════════════════════════════════════════════════════════════════════════════════════════════
  * **THREE CLAIMS THAT COULD EACH HOLD WHILE ANOTHER FAILED, SO EACH IS DRIVEN SEPARATELY.**
