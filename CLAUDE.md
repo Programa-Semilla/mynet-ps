@@ -322,11 +322,51 @@ at all*; unit, component and integration were all green on it and only e2e caugh
 owner reported the scheduling dialog rendering in the **top-left corner**, which no behavioural
 test could see. Both are written up as invariants above.
 
-**Migrations claimed so far run to `0008`** (`0008_session_qa.sql`; 010 added no schema). **Feature
-011 reserves `0009`.** The journal lists `0003` before `0004` while carrying a
+**011 (Administrative foundation, the second actor, and the report queue) is shipped**,
+squash-merged to `develop` in [#20](https://github.com/Programa-Semilla/mynet-ps/pull/20) — the
+first feature with a second actor, and the first to ship a **second product**. It is the delivery
+of standing decisions 31–39, and the reversal was **forced rather than sought**: register entries
+19 and 21 had both been traced in writing to the administration exclusion, and 009 recorded that a
+public Q&A surface "needs a moderator, and a moderator is an organizer". An exclusion whose cost is
+an unkeepable safety promise must be paid for or reversed.
+
+`apps/admin/` is a separate website on `admin.<host>`, against the same API and database. **MyNet
+gained no admin surface, no privileged view and no role-dependent rendering**, and that is asserted
+as an absence rather than claimed. A platform operator is seeded with **no credential**; a
+conference organizer is a promoted attendee whose attendee experience is unchanged in every
+observable way.
+
+**Its by-hand validation is outstanding, and it is the only thing outstanding.** T158 and T159 —
+the eleven `quickstart.md` scenarios — join the same unwalked scenarios from 007, 008 and 009.
+`pnpm start` now brings up the API, MyNet **and** the administrative site together and prints a
+generated operator credential, so that walk is one command away rather than four.
+
+**A deep review recorded 49 findings and deferred nine as needing decisions; those were then taken
+as an explicit decision round rather than carried into the merge** — eight fixed, one accepted.
+`specs/011-administrative-foundation/review-findings.md` records both passes.
+
+**Four of the nine were one defect, and it is the most transferable thing 011 produced: four
+functions whose emphatic headers described call relationships that did not exist.**
+`appendAuditEntry` said *"every write path"* passed a transaction and **none did**;
+`assertVerifiedOperator` said it was called at the query layer and was called nowhere;
+`addressTakenByOtherPrincipal` said it ran inside the caller's transaction and was called only by
+tests; three helpers named callers that were inlined copies. In a codebase whose discipline is that
+the comment is the record, a header is a claim that needs a guard like any other — and **three of
+the four already had the executor parameter**, so what looked like design work was wiring.
+
+**Migrations claimed so far run to `0009`** (`0009_administrative_foundation.sql`; 010 added no
+schema). **012 reserves `0010`.** The journal lists `0003` before `0004` while carrying a
 later timestamp — `apps/api/migrations/meta/README.md` explains why both halves are load-bearing and
 what a regenerating feature must not "fix". Anyone regenerating must move that README aside first,
 because `drizzle-kit generate` JSON-parses every file in `meta/`.
+
+**`0009` was regenerated once, deliberately, and that is only safe before a migration has been
+applied anywhere.** Two foreign keys had no covering index. Because `0009` had reached no database,
+the file could be rebuilt rather than followed by an `0010`; the diff is two `CREATE INDEX` lines
+and a later `when`. **`lock_timeout` went into `migrate.ts`, not the SQL** — a hand edit to a
+generated file is erased by the next regeneration, and putting it on a dedicated migration
+connection covers *every* migration, including `0003`, whose missing timeout was a recorded
+unclaimed defect from 004's review.
 
 ## Architectural invariants
 
@@ -598,6 +638,70 @@ refactor.
   record. **Both guards strip comments before matching**, because every pattern also appears in
   the prose explaining the absence — matching raw text fails on a correct implementation, and the
   natural repair is to weaken the pattern until it checks nothing.
+
+**Administration (011)**
+
+- **A second product, not a second surface.** `apps/admin/` is its own Vite application on its own
+  origin. The cheaper option — a second entry point inside `apps/web` with the PWA plugin
+  configured to exclude it — was rejected because **an exclusion is configuration a later change
+  can widen, while a separate application has nothing to exclude.** There is no manifest to omit an
+  entry from, no worker to scope away, and no precache glob that could pick these assets up.
+- **A subdomain, because it is the only topology that is both same-site and different-origin.**
+  `SameSite` is evaluated against the **registrable domain**, so `admin.<host>` keeps decision 19's
+  CSRF defence with no synchroniser token, while still getting its own storage, worker scope and
+  CSP. A path shares the origin and the attendee worker is registered at **root scope**, so it
+  would intercept administrative navigations; a separate registrable domain stops `SameSite=Lax`
+  being sent, which is the exact v3.0.0 failure where nobody could sign in.
+- **A fourth branded scope, and the tier is a TYPE-level refinement.** `VerifiedPlatformScope`
+  extends `VerifiedOperatorScope` and adds a **second private field**, which makes a platform scope
+  usable where an operator scope is wanted and not the reverse. A subclass adding nothing would be
+  assignable both ways with every test still green, and the thing that gets through is a conference
+  organizer reading the report queue. Asserted with `@ts-expect-error`, so it fails the
+  **typecheck** rather than the test run.
+- **The minting functions are exported, and a sole-importer test is what replaces a private
+  constructor.** The other three scopes hold their class and guard in one file, so `new` is simply
+  unavailable elsewhere; 011 splits them across two files and pays for it with one reviewable test.
+  That test scans `src/` **only** — a test fabricating a scope proves nothing about what a request
+  can reach.
+- **The report queue is the third recorded Principle VIII exception**, and every bound is visible
+  in the query: platform tier only, only what was reported, only in the queue, and the reporter is
+  still told nothing. **`content unavailable` is a first-class state, not an error** — reported ids
+  are a plain array rather than a foreign key precisely because the content is usually gone before
+  anybody looks.
+- **Reading one report writes an audit entry; reading the queue does not.** The list carries no
+  content, so an operator scrolling has disclosed nothing, and a trail recording it would be a
+  record of *scrolling* rather than of disclosure.
+- **An administrative act and the entry accounting for it commit in one transaction** (FR-994).
+  This was the headline post-review fix: `appendAuditEntry` had taken an executor from the start
+  and no caller passed one, so a failing entry left the act committed and unrecorded. Guarded
+  twice — a source assertion that every call passes the transaction, and a behavioural test that
+  fails the insert and asserts the act is gone.
+- **`removeQuestion`'s `FOR UPDATE` lock must be given a TRANSACTION, and the type cannot say so.**
+  Handed the pool, each statement autocommits, the lock is released by the `SELECT` itself, and the
+  vote it exists to serialise slips in before the `DELETE` — invisibly, because the question is
+  still removed and what breaks is an attendee's upvote 500ing later.
+- **FR-918 is the one uniqueness rule in the product enforced by application code.**
+  `attendees.email` and `operators.email` are two unique indexes on two tables and no constraint
+  spans them, so it is checked inside the caller's transaction on **both** create paths — and the
+  refusal is the *same* 409 an attendee-held address gives, or sign-up becomes an oracle for which
+  addresses hold administrative accounts. **FR-915 depends on it**: administrative sign-in resolves
+  an address with a single lookup and no branch.
+- **The bootstrap never resets a password an operator chose**, expressed as
+  `WHERE credential_is_initial = true` rather than a prior read. An idempotent upsert would be a
+  credential reset triggered by an environment variable that stays on the host forever. This is
+  what makes `pnpm start` safe to run repeatedly while issuing a credential.
+- **The seed creates operator identities with NO credential**, and that is the requirement: this
+  repository is public, so a committed administrative password is a *published* credential for the
+  tier that reads the report queue.
+- **An organizer's authority cannot outlive their access.** Deleting an account revokes every
+  assignment in the same transaction; withdrawing from a conference revokes that one. A conference
+  left with no organizer enters an explicit derived **`unassigned`** state rather than silently
+  reverting to the platform tier — a tidier invariant that would hide the event nobody is prompted
+  to act on.
+- **Absences with tests**: no admin surface, privileged view or role-dependent rendering in MyNet
+  (FR-970–FR-984); no route that suspends, removes or restricts an *attendee* — an operator acts on
+  content and on authority, never on a person; no profile edit at any tier; and no read path over
+  the audit trail (FR-999).
 
 **Deployment**
 
@@ -981,10 +1085,10 @@ is a working summary. Each names what it blocks, because *when* to ask matters a
 
 ### Require a client decision
 
-**No open question blocks any feature, including 011.** *As of 2026-08-11.* v4.0.0 opened a second
-programme (011, 012, 013) and with it entries 24, 25 and 26; **v4.1.0 closed all three in the same
-session**, so the blockers existed for one exchange rather than one release. Everything below blocks
-**deployment** or **release**, not code.
+**No open question blocks any feature. 011 is shipped; 012 is next and is unblocked.** *As of
+2026-08-12.* v4.0.0 opened a second programme (011, 012, 013) and with it entries 24, 25 and 26;
+**v4.1.0 closed all three in the same session**, so the blockers existed for one exchange rather
+than one release. Everything below blocks **deployment** or **release**, not code.
 
 The closing sequence is worth keeping, because it is the argument for opening entries you cannot yet
 answer: those three produced a **third privacy exception**, a **CSRF-adjacent topology decision**,
@@ -999,9 +1103,9 @@ the brand mark.
   38, 39 and 37 respectively. See the decisions above; they are now binding text rather than
   questions.
 
-- **Register entries 19 and 21 are ADDRESSED but NOT closed — by v4.0.0 or v4.1.0.** 011 creates the
-  first actor capable of moderating an avatar and of reading a report queue, and v4.1.0 decided what
-  that operator may *see* — but **a capability is not a policy**. Who moderates, against what
+- **Register entries 19 and 21 are ADDRESSED but NOT closed — by v4.0.0, v4.1.0, or 011 shipping.**
+  011 built the first actor capable of moderating an avatar and of reading a report queue, and
+  v4.1.0 decided what that operator may *see* — but **a capability is not a policy**. Who moderates, against what
   standard, on whose complaint, with what appeal, and whether a removed avatar is replaced or
   blanked are all undecided (19); and somebody still has to *be* that operator, which remains an
   obligation the owner personally holds (21). Neither may be read as closed by 011 shipping.
@@ -1012,7 +1116,19 @@ the brand mark.
   hours.** Conceded by 009 when FR-756a was withdrawn, and **product-wide rather than 009's**: no
   undecorated repository — Messages, Discover, cards, profile or Q&A — purges on refusal. It was
   filed against 010, which did not answer it: 010 adds no repository and no cached read, so the
-  single answer that covers all of them is still owed.
+  single answer that covers all of them is still owed. **011 did not answer it either** — the
+  administrative client caches nothing at all.
+
+- **Whether the audit trail's retention clock should start at pseudonymisation, as two comments
+  already claim it does.** Opened by 011 (`deviations.md` D11) and found only by writing the
+  sweep's first behavioural test. `maintenance.ts` declares *"365 days after pseudonymisation"* and
+  `admin-audit.ts` says the clock "starts then"; the predicate measures `occurred_at`, so an entry
+  written 400 days ago and pseudonymised *yesterday* — because that is when somebody exercised
+  erasure — is swept on the next hourly pass rather than a year later. **The accountability record
+  for a recent erasure disappears immediately.** Fixing it needs a `pseudonymised_at` column and
+  therefore a migration, which makes it a decision about the retention rule rather than a repair.
+  `retention-sweep.test.ts` pins the shipped behaviour and says in its own message that it encodes
+  current rather than desired behaviour. **Blocks nothing.**
 
 - **Desktop and tablet layouts are unvalidated.** The approved prototype is mobile-only — a fixed
   390×844 frame. Every desktop layout built before this is answered is unreviewed design, so the
