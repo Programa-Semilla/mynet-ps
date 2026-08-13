@@ -36,11 +36,16 @@ site), `packages/platform` (device capabilities), `scripts/` (asset derivation a
 
 ## Phase 2: Foundational (Blocking Prerequisites)
 
-**No user story starts before this phase completes.** Two items only — this feature inherits almost
-everything.
+**There are none, and that is the finding rather than an omission.**
 
-- [ ] T003 Add a transaction-capable executor parameter to the card query layer in `apps/api/src/db/queries/cards.ts`, following the shape `apps/api/src/db/queries/admin-audit.ts` established — callers pass their transaction; the pool is the default only where there is genuinely none
-- [ ] T004 [P] Extend `apps/web/src/ui/` with a `PasswordField` module boundary (file created empty in this phase; behaviour arrives in US3) so US3's two products have a named home before either is written
+An earlier draft placed two tasks here — a transaction-capable executor for the card query layer, and
+a module boundary for the password field. **Neither is foundational**: the first serves US4 alone and
+the second US3 alone, so parking them here gated all six stories on prerequisites four of them do not
+need, which contradicts the independent-shippability the phase structure exists to provide. They now
+live in the phases that need them, as **T003** and **T004** respectively.
+
+This feature inherits every mechanism it uses — the transaction shape from 013, the poll shape from
+007, the derived-asset discipline from 010 — so there is genuinely nothing shared to build first.
 
 ---
 
@@ -81,7 +86,17 @@ seconds without navigating.
 
 ### Implementation for User Story 2
 
-- [ ] T015 [US2] Extract the poll shape from `apps/web/src/app/messages/useConversation.ts` into a reusable hook, or reimplement it deliberately — visible-only, jittered, backing off to a ceiling, three-failure threshold. **Copy the reasoning, not only the code**: each of those four properties is argued in that file's header
+- [ ] T015 [US2] Extract the poll shape from `apps/web/src/app/messages/useConversation.ts` into a reusable hook at `apps/web/src/app/messages/usePoll.ts` — visible-only, jittered, backing off to a ceiling, three-failure threshold. **Copy the reasoning, not only the code**: each of those four properties is argued in that file's header.
+
+  **Interface — T016 and T017 consume this and cannot see this task:**
+  ```ts
+  usePoll(options: {
+    intervalMs: number          // 10_000 for the list; 3_000 for the thread
+    enabled: boolean            // false pauses; FR-1054 passes list visibility here
+    onTick: () => Promise<void> // throws to signal failure; drives the backoff
+  }): { failures: number; stale: boolean }
+  ```
+  `stale` becomes true at the three-failure threshold and drives T018's notice.
 - [ ] T016 [US2] Refresh the conversation list in `apps/web/src/app/messages/Messages.tsx` at **10 seconds**, replacing the mount-only effect (FR-1007)
 - [ ] T017 [US2] Add the on-screen pause condition in `Messages.tsx`, expressed as a condition on **list visibility** rather than on layout band, so a future layout change cannot silently re-enable a poll against a list nobody can see (FR-1054)
 - [ ] T018 [US2] Add the repeated-failure notice to `apps/web/src/app/messages/MessagesEmptyStates.tsx`, distinguished from the existing offline state (FR-1010)
@@ -98,12 +113,13 @@ submission before any request.
 
 ### Tests for User Story 3
 
-- [ ] T020 [P] [US3] Component test in `apps/web/tests/component/password-field.test.tsx` — reveal toggles, state is **not** remembered across remount, the control announces action and state, and it is keyboard operable (FR-1014, FR-1015, FR-1016)
-- [ ] T021 [P] [US3] Component test in `apps/web/tests/component/password-confirm.test.tsx` — mismatch **disables submit** and describes the mismatch, associated with its field for assistive technology; **no request is made** (FR-1018)
+- [ ] T020 [P] [US3] Component test in `apps/web/tests/component/password-field.test.tsx` — reveal toggles, state is **not** remembered across remount, the control announces action and state, and it is **operable by keyboard alone** (FR-1014, FR-1015, FR-1016, SC-1004)
+- [ ] T021 [P] [US3] Component test in `apps/web/tests/component/password-confirm.test.tsx` — mismatch **disables submit** and describes the mismatch, associated with its field for assistive technology; **no request is made** (FR-1018, SC-1005)
 - [ ] T022 [P] [US3] Component test in `apps/admin/tests/component/password-field.test.tsx` — **the same assertions as T020**, run against the administrative implementation. This file is what prevents divergence, since no shared code enforces it (FR-1049, FR-1050)
 
 ### Implementation for User Story 3
 
+- [ ] T004 [US3] Create the `PasswordField` module boundary at `apps/web/src/ui/PasswordField.tsx` before T023 fills it, so both products have a named home to mirror. *(Moved out of Foundational — it serves this story alone.)*
 - [ ] T023 [P] [US3] Implement the reveal control in `apps/web/src/ui/PasswordField.tsx` — a per-field toggle whose revealed state is never persisted (FR-1014, FR-1015, FR-1016)
 - [ ] T024 [P] [US3] Implement the equivalent in `apps/admin/src/app/ui/PasswordField.tsx`, with a header stating **why it is a deliberate duplicate**: `apps/admin` depends on `@mynet/data` and `@mynet/config` only, and a shared UI package would give the administrative site its first dependency on shared presentation
 - [ ] T025 [US3] Adopt the field in `apps/web/src/app/auth/SignUp.tsx` and add the confirmation field with disabled-submit mismatch handling (FR-1017, FR-1018)
@@ -126,16 +142,22 @@ submission before any request.
 ### Tests for User Story 4
 
 - [ ] T031 [P] [US4] Integration test in `apps/api/tests/integration/cards.test.ts` — one share yields **both** records; the recipient acts not at all; a repeat share creates no duplicate and leaves the original instant intact (FR-1021, FR-1023, FR-1025)
-- [ ] T032 [P] [US4] Integration test in `apps/api/tests/integration/cards-atomicity.test.ts` — **induce a failure on the second insert** and assert neither record exists. Contacts are mutual or absent, never one-sided (FR-1022, SC-1007). This is the shape 013 used to prove an act and its audit entry commit together, and a passing happy path cannot demonstrate it
+- [ ] T032 [P] [US4] Integration test in `apps/api/tests/integration/cards-atomicity.test.ts` — **force the second insert to fail, then assert neither record exists** (FR-1022, SC-1007). Contacts are mutual or absent, never one-sided.
+
+  **The injection mechanism must be named, not improvised.** Use a real database constraint rather than a mock, so the test exercises the transaction and not a double: inside the test's own transaction, add a deferred constraint or a `BEFORE INSERT` trigger on `shared_cards` that raises when the second row is written, or drive the failure by removing the recipient's `events` row so the second insert's foreign key fails. **Mocking the query layer proves nothing about the transaction**, which is the entire subject of this test. This is the shape 013 used to prove an administrative act and its audit entry commit together, and a passing happy path cannot demonstrate it
+- [ ] T033a [P] [US4] Integration test in `apps/api/tests/integration/cards.test.ts` — **both** records carry the **same** `event_id` as the originating share, and **neither is scoped by it**: after the exchange, both cards still resolve when the reader switches to another conference and when either attendee is no longer registered for the original one (FR-1024). Standing decision 7 forbids assuming either scoping rule, so this is asserted rather than inherited
 - [ ] T033 [P] [US4] Integration test in `apps/api/tests/integration/cards-guard.test.ts` — the exchange is refused where the recipient is undiscoverable, unverified, or not registered, and **all five refusals are indistinguishable from each other** (FR-1053, FR-1028). Assert the outcomes differ from *each other* only where a reason is deliberately given
 - [ ] T034 [P] [US4] Integration test extending `apps/api/tests/integration/blocks.test.ts` — a block severs both directions; lifting it restores both **with no write** (FR-1026)
 - [ ] T035 [P] [US4] Integration test asserting card resolution is **unchanged**: no discoverability condition, no verification condition, no registration join (FR-1027). These three absences look like forgotten `WHERE` clauses and are the feature
 - [ ] T036 [P] [US4] Extend `apps/api/tests/unit/` notification-trigger audit coverage to assert the card exchange dispatches nothing (FR-1029)
 - [ ] T037 [P] [US4] E2E test in `e2e/network.spec.ts` — two browser profiles: A shares, B never acts, both see each other in Network (SC-1006)
+- [ ] T037a [P] [US4] Absence test in `apps/web/tests/unit/card-surfaces-absences.test.ts` — **no Home card for contacts exists or is added** (FR-1030). Derive the expectation from `apps/web/src/app/home/registry.ts`'s exported card list so a newly registered contacts card **fails by existing**, the technique the deletion and export coverage tests use. **Strip comments before matching**, because the phrase appears in the prose explaining the absence
 
 ### Implementation for User Story 4
 
+- [ ] T003 [US4] Add a transaction-capable executor parameter to the card query layer in `apps/api/src/db/queries/cards.ts`, following the shape `apps/api/src/db/queries/admin-audit.ts` established — callers pass their transaction; the pool is the default only where there is genuinely none. **Do this before T038**, which needs the parameter to exist. *(Moved out of Foundational — it serves this story alone.)*
 - [ ] T038 [US4] Restructure `shareCard` in `apps/api/src/db/queries/cards.ts` onto `getDb().transaction()`, evaluating the guard **once** and writing both rows inside it (FR-1021, FR-1022, FR-1053). Evaluating the guard per-insert would let the two rows disagree about whether the exchange was permitted
+- [ ] T039a [US4] Confirm FR-1030's positive half in `apps/web/src/app/network/` — the recipient's new contact is reachable in the Network destination with no further action, and no notification surface mentions it (FR-1030)
 - [ ] T039 [US4] Keep the outcome read back from `shared_cards` rather than `attendees` — `ON CONFLICT DO NOTHING` erases "already shared" from "not reachable", and asking whether the *card* exists answers it without asking whether the *attendee* does (FR-1028)
 - [ ] T040 [US4] Record in `apps/api/src/db/queries/cards.ts`'s header **why the guard is load-bearing**: C1 licenses mutual exchange because a card resolves only what its owner already published, and against a non-discoverable recipient that ground does not exist. Relaxing it needs an amendment (FR-1053)
 - [ ] T041 [US4] Redefine `GET /cards/shared` as **"people who hold your card"** in `apps/api/src/routes/cards.ts`, its docblock, and the generated contract. Query, rows and guard unchanged (FR-1051)
@@ -160,7 +182,7 @@ submission before any request.
 ### Tests for User Story 5
 
 - [ ] T046 [P] [US5] Substitution test in `packages/platform/tests/substitution.test.ts` extended for the eighth capability, so it is **declared rather than added quietly** — the mechanism that forced `VisibilityService` to be declared
-- [ ] T047 [P] [US5] Component test in `apps/web/tests/component/install-guidance.test.tsx` — guidance renders for an uninstalled mobile device and **not** for desktop or an installed instance (FR-1031)
+- [ ] T047 [P] [US5] Component test in `apps/web/tests/component/install-guidance.test.tsx` — guidance renders for an uninstalled mobile device and **not** for desktop or an installed instance (FR-1031, SC-1008)
 - [ ] T048 [P] [US5] Component test in `apps/web/tests/component/install-guidance-platforms.test.tsx` asserting the platform halves are asymmetric — a real control where the platform offers one, written steps and **no dead control** where it does not (FR-1033, FR-1034)
 - [ ] T049 [P] [US5] Component test in `apps/web/tests/component/install-guidance-dismissal.test.tsx` — dismissal is remembered per device (FR-1035), guidance never requests notification permission (FR-1036), and never blocks or delays sign-in (FR-1037)
 - [ ] T050 [P] [US5] Unit test asserting `NotificationPrompt.tsx` remains the **only** caller of `requestPermission` in the client — 007's assertion, which this feature must not break (FR-1036)
@@ -200,7 +222,7 @@ submission before any request.
 
 ## Phase 9: Polish & Cross-Cutting Concerns
 
-- [ ] T065 [P] Run `pnpm verify` — all ten correctness gates plus the brand audit after the build
+- [ ] T065 [P] Run `pnpm verify` — all ten correctness gates plus the brand audit after the build, and confirm the audit **fails** when an asset is upscaled outside the single recorded exception (SC-1011)
 - [ ] T066 [P] Confirm the Feature Declarations table in `spec.md` still describes what was built, especially the **Administrative counterpart** row, which is this feature's first use of it
 - [ ] T067 Walk `quickstart.md` scenarios 1–7 by hand, two browser profiles
 - [ ] T068 **Walk `specs/016-app-fixes-and-install-icon/quickstart.md` scenario 8 on a physical phone** — install, judge the icon's legibility, and repeat the composer test with a real keyboard (SC-1001, SC-1009). **No gate substitutes for this**, and this feature exists because a person found what the gates could not
