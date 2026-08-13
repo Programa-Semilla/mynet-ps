@@ -31,7 +31,7 @@
 
 ## Validation notes
 
-**Iteration 1 found four issues; all four were fixed before this checklist was marked complete.**
+**Iteration 1 found four issues (all fixed). The `review-spec` gate then found seven more — five Important, two Minor — and all seven were fixed.**
 
 1. **Implementation detail leaked into three requirements.** Early drafts of FR-1001, FR-1005 and
    FR-1007 named the element type, the CSS property that causes the defect, and the polling
@@ -69,3 +69,27 @@ is route behaviour, which is a planning input.
 
 - Items marked incomplete require spec updates before `/speckit-clarify` or `/speckit-plan`
 - All items pass as of 2026-08-12
+
+## review-spec gate, 2026-08-12
+
+Seven findings, all fixed. **Four of the five Important ones share a root cause worth naming: mutual
+exchange alters the meaning of things 008 built, and the first draft described the new behaviour
+without describing what it invalidated.** That is the failure mode to watch for in 017, which
+rebuilds a shipped feature rather than adding one.
+
+- **I1** — `GET /cards/shared` silently changes meaning and has no consumer, so nothing would catch
+  it. Now FR-1051.
+- **I2** — the export's own docblock justifies disclosure by citing v3.2.0 N2, which C1 reverses;
+  behaviour and the record of why must change together. Now FR-1052.
+- **I3** — FR-1030 named a Home surface for contacts that does not exist. Home's eight cards were
+  checked one by one. Rewritten with the real answer and its accepted cost.
+- **I4** — FR-1024 read as "omit the conference", contradicting a `notNull` column and the spec's
+  own Assumptions. Reworded to separate *recording* from *scoping by*.
+- **I5** — the open question named discoverability but the live check is discoverable **and**
+  verified. Verification now named, with why it does not conflict with FR-1027.
+- **M1, M2** — the pool-autocommit restructure and the fault injection, recorded under Dependencies.
+
+**Verified as already correct**, against the schema and queries rather than against the spec's own
+claims: no implementation leakage across all 50 original requirements; deletion and export coverage
+(both foreign keys cascade, export runs one query per direction); and the unique constraint, which is
+directional by construction and accommodates a reciprocal row with no change.

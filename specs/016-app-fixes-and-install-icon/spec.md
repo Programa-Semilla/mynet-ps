@@ -293,8 +293,10 @@ judged by any automated gate — it needs a person looking at a physical home sc
 - **FR-1022**: Both records MUST be written in one transaction, or neither.
 - **FR-1023**: The recipient MUST NOT be asked, and MUST NOT be required to act for the exchange to
   complete. There is no pending state.
-- **FR-1024**: Both records MUST be cross-event, carrying no scoping to the conference at which the
-  exchange happened, consistent with the rule established when cards shipped.
+- **FR-1024**: Both records MUST record the conference at which the exchange happened as a
+  **historical fact**, and neither MUST be **scoped by** it. Cross-event means a card resolves after
+  either attendee leaves that conference or switches to another — not that the conference goes
+  unrecorded. Both records carry the same conference, since both arise from one act at one place.
 - **FR-1025**: Sharing where a relationship already exists in one or both directions MUST complete
   without creating a duplicate and without failing.
 - **FR-1026**: A block MUST continue to sever card resolution in both directions, and lifting a block
@@ -306,8 +308,24 @@ judged by any automated gate — it needs a person looking at a physical home sc
   produces, disclosing nothing about whether a given account exists.
 - **FR-1029**: The exchange MUST NOT dispatch a notification. The trigger set remains a received
   message and nothing else.
-- **FR-1030**: The recipient MUST be able to discover the new contact through existing surfaces
-  — the Network destination and Home — without a new alerting mechanism.
+- **FR-1030**: The recipient MUST be able to discover the new contact in the **Network destination**,
+  which is the only surface that lists contacts. **There is no Home card for contacts and this
+  feature MUST NOT add one**, and no notification is dispatched (FR-1029) — so a card acquired
+  through somebody else's act is found on the recipient's next visit to Network and not before.
+  That is an accepted consequence of C1 rather than an oversight, and it is recorded as an open
+  question below rather than silently absorbed.
+- **FR-1051**: The existing "cards you have shared" read path MUST have its meaning restated. It
+  reads the sharer direction and has been documented since 008 as *cards you have given away*; under
+  mutual exchange it returns rows the reader never gave. The feature MUST either redefine it as
+  *people who hold your card*, or withdraw it — and MUST NOT leave it carrying its old description.
+  **It has no consumer, so nothing else will catch this**: it is the route 008's review recorded as
+  existing without a caller.
+- **FR-1052**: Every comment, docblock and header that explains card behaviour by citing the
+  one-directional rule MUST be rewritten to cite what is now true. This explicitly includes the
+  export's own reasoning, which justifies disclosure by "the standing consent constitution v3.2.0
+  (N2) established" — a clause C1 reverses. **The behaviour and the record of why MUST change in the
+  same commit**: this project's discipline is that the comment is the record, and a header describing
+  a rule that no longer exists is the defect class 013's review named its most transferable finding.
 
 **Install guidance (US5)**
 
@@ -435,6 +453,22 @@ judged by any automated gate — it needs a person looking at a physical home sc
 - **A physical mobile device and a person**, for SC-1001 and SC-1009. Neither is satisfiable by CI,
   and both are acceptance criteria rather than optional review.
 
+### Known constraints planning will meet
+
+Surfaced by the specification review and recorded so they are met early rather than late. Neither
+changes a requirement.
+
+- **FR-1022's atomicity requires restructuring how the share is issued.** The card share currently
+  runs its statements against the connection pool, where **each statement autocommits** — so
+  "both records or neither" cannot be satisfied by adding a second statement beside the first. This
+  is the same trap recorded for the Q&A withdrawal lock in 013, where a statement handed the pool
+  released its lock immediately and the type system could not say so. The requirement stands as
+  written; the cost is that it is a restructure rather than an addition.
+- **SC-1007 implies fault injection.** "No partial exchange is observable across repeated attempts
+  including induced failures" cannot be demonstrated by a passing happy path — it needs a test that
+  makes the second write fail and asserts the first is gone. That is the shape 013 used to prove an
+  administrative act and its audit entry commit together.
+
 ## Out of Scope
 
 Each is named because it is adjacent enough to be assumed in, and each has a reason.
@@ -456,14 +490,27 @@ Each is named because it is adjacent enough to be assumed in, and each has a rea
 
 ## Open Questions
 
-- **Must the recipient be discoverable for a mutual exchange to complete?** Sharing checks
-  discoverability today; card *resolution* deliberately does not. A first acquisition is neither case,
-  and constitution v5.0.0 requires this feature to decide and declare it rather than inherit either
-  answer. **This is the one open question that must close before implementation**, because it changes
-  the route's behaviour rather than its presentation. The two candidate answers: require it, matching
-  the current share check and preserving "you cannot acquire a card from someone who has chosen to be
-  invisible"; or do not, matching resolution and treating co-attendance plus the sharer's deliberate
-  act as sufficient.
+- **Must the recipient be discoverable — and verified — for a mutual exchange to complete?** Sharing
+  today requires the recipient to be **both** discoverable **and** to hold a verified address, plus
+  both parties registered for the conference. Card *resolution* deliberately checks neither. A first
+  acquisition is neither case, and constitution v5.0.0 requires this feature to decide and declare it
+  rather than inherit either answer. **This is the one open question that must close before
+  implementation**, because it changes the route's behaviour rather than its presentation.
+
+  **Naming verification explicitly matters, because FR-1027 will otherwise look self-contradictory.**
+  A share-time condition and a resolution-time prohibition are different things: verification gates
+  discoverability and nothing else, so checking it *when deciding whether somebody can be reached* is
+  consistent with never checking it *when resolving a card already held*. A reader who meets only the
+  word "discoverability" here will think the two clauses conflict.
+
+  The two candidate answers: require both, matching the current share check and preserving "you
+  cannot acquire a card from someone who has chosen to be invisible"; or require neither, matching
+  resolution and treating co-attendance plus the sharer's deliberate act as sufficient.
+- **Is "found on your next visit to Network" enough** for a card acquired by somebody else's act?
+  Under one-directional sharing the recipient's contacts only ever grew by their own reciprocation,
+  so there was nothing to announce. Mutual exchange makes acquisition passive, and FR-1029 forbids a
+  notification while FR-1030 records that no Home surface exists. Not blocking — the behaviour is
+  fully specified — but it is the question C1 creates and nobody has yet asked.
 - **The list refresh interval, as a number**, justified against request load on a two-vCPU host with
   a conference hall of clients. Not blocking: any value in a sane range satisfies SC-1002.
 - **Whether the list refresh pauses while a thread is open.** The thread already polls the open
