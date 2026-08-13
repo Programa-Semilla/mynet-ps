@@ -3,6 +3,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 
 import {
   buildAuthoringFixture,
+  clearAuthoringFixture,
   organizerSession,
   sessionBody,
   type AuthoringFixture,
@@ -43,6 +44,9 @@ describe('authoring the programme (T026, FR-1001, SC-1001)', () => {
   })
 
   afterAll(async () => {
+    // Nothing cascades to `events`, so a fixture conference left behind blocks the NEXT file's
+    // `seed()` — and the symptom lands there rather than here. See `clearAuthoringFixture`.
+    await clearAuthoringFixture()
     await teardown(app)
   })
 

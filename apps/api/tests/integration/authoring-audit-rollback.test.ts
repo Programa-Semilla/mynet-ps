@@ -8,6 +8,7 @@ import { sessions, tracks } from '../../src/db/schema/catalog.js'
 import { events } from '../../src/db/schema/events.js'
 import {
   buildAuthoringFixture,
+  clearAuthoringFixture,
   organizerSession,
   sessionBody,
   type AuthoringFixture,
@@ -47,6 +48,9 @@ describe('an act and its audit entry commit together (T024, FR-1037, SC-1010)', 
   })
 
   afterAll(async () => {
+    // Nothing cascades to `events`, so a fixture conference left behind blocks the NEXT file's
+    // `seed()` — and the symptom lands there rather than here. See `clearAuthoringFixture`.
+    await clearAuthoringFixture()
     await teardown(app)
   })
 

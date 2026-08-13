@@ -5,6 +5,7 @@ import { getDb } from '../../src/db/client.js'
 import { organizerAssignments } from '../../src/db/schema/organizer-assignments.js'
 import {
   buildAuthoringFixture,
+  clearAuthoringFixture,
   organizerSession,
   platformSession,
   sessionBody,
@@ -39,6 +40,9 @@ describe('authority over a conference (T012, FR-1035, FR-1036)', () => {
   })
 
   afterAll(async () => {
+    // Nothing cascades to `events`, so a fixture conference left behind blocks the NEXT file's
+    // `seed()` — and the symptom lands there rather than here. See `clearAuthoringFixture`.
+    await clearAuthoringFixture()
     await teardown(app)
   })
 

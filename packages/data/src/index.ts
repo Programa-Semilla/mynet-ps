@@ -114,9 +114,17 @@ export {
 // be an administrative surface inside MyNet (decision 33, FR-970).
 // ═══════════════════════════════════════════════════════════════════════════════════════════
 export type {
+  AdminCatalogRepository,
   AdminConference,
   AdminConferenceRepository,
+  AdminEngagementCounts,
   AdminIdentity,
+  AdminProgramme,
+  AdminRoom,
+  AdminSession,
+  AdminSessionInput,
+  AdminSpeaker,
+  AdminTrack,
   AdminReportDetail,
   AdminReportRepository,
   AdminReportSummary,

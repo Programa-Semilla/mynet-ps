@@ -133,7 +133,9 @@ describe('a registration confers scope, never trust (FR-316, FR-317b)', () => {
 
     expect(response.statusCode).toBe(200)
     expect(
-      (response.json() as { sessionIds: string[] }).sessionIds,
+      (response.json() as { sessions: { sessionId: string }[] }).sessions.map(
+        (entry) => entry.sessionId,
+      ),
       "A brand-new attendee sees their own empty agenda, not the conference's.",
     ).toEqual([])
   })

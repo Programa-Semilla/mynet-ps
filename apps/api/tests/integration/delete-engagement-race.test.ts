@@ -7,6 +7,7 @@ import { savedSessions } from '../../src/db/schema/agenda.js'
 import { sessions } from '../../src/db/schema/catalog.js'
 import {
   buildAuthoringFixture,
+  clearAuthoringFixture,
   organizerSession,
   sessionBody,
   type AuthoringFixture,
@@ -62,6 +63,9 @@ describe('the delete/engagement race (T044, FR-1019a)', () => {
   })
 
   afterAll(async () => {
+    // Nothing cascades to `events`, so a fixture conference left behind blocks the NEXT file's
+    // `seed()` — and the symptom lands there rather than here. See `clearAuthoringFixture`.
+    await clearAuthoringFixture()
     await teardown(app)
   })
 

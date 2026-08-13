@@ -9,6 +9,7 @@ import { getDb } from '../../src/db/client.js'
 import { adminAuditEntries } from '../../src/db/schema/admin-audit.js'
 import {
   buildAuthoringFixture,
+  clearAuthoringFixture,
   organizerSession,
   sessionBody,
   type AuthoringFixture,
@@ -43,6 +44,9 @@ describe('what an authoring audit entry records (T025, FR-1038)', () => {
   })
 
   afterAll(async () => {
+    // Nothing cascades to `events`, so a fixture conference left behind blocks the NEXT file's
+    // `seed()` — and the symptom lands there rather than here. See `clearAuthoringFixture`.
+    await clearAuthoringFixture()
     await teardown(app)
   })
 

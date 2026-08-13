@@ -11,6 +11,7 @@ import { events, registrations } from '../../src/db/schema/events.js'
 import { operators } from '../../src/db/schema/operators.js'
 import { organizerAssignments } from '../../src/db/schema/organizer-assignments.js'
 import { questionVotes, sessionQuestions } from '../../src/db/schema/questions.js'
+import { reportResolutions } from '../../src/db/schema/report-resolutions.js'
 import { attendees } from './helpers.js'
 
 /**
@@ -65,44 +66,9 @@ export interface AuthoringFixture {
  * this feature would meet it.
  */
 export const buildAuthoringFixture = async (organizerEmail: string): Promise<AuthoringFixture> => {
+  await clearAuthoringFixture()
+
   const db = getDb()
-
-  await db.delete(questionVotes)
-  await db.delete(sessionQuestions)
-  await db.delete(sessionNotes)
-  await db.delete(savedSessions)
-  await db.delete(adminAuditEntries)
-  await db.delete(organizerAssignments)
-  await db.delete(operators)
-
-  // ─────────────────────────────────────────────────────────────────────────────────────────
-  // **The conferences this fixture built on a previous run, removed by hand.**
-  //
-  // Nothing cascades to `events` — `sessions`, `tracks`, `rooms`, `speakers` and `registrations`
-  // all reference it with `NO ACTION`, which is 002's and 008's deliberate choice — so a fixture
-  // that only re-seeds accumulates conferences until the join code collides. That collision is
-  // the constraint working: it is exactly what stops two conferences sharing a code and joining
-  // resolving to whichever row the planner returned first.
-  //
-  // Scoped to this fixture's own codes so a re-seed of the three seeded conferences is not
-  // affected, and ordered by foreign key backwards.
-  // ─────────────────────────────────────────────────────────────────────────────────────────
-  await db.execute(sql`
-    WITH mine AS (SELECT id FROM events WHERE join_code LIKE 'FIXTURE%')
-    DELETE FROM sessions WHERE event_id IN (SELECT id FROM mine)
-  `)
-  await db.execute(sql`
-    WITH mine AS (SELECT id FROM events WHERE join_code LIKE 'FIXTURE%')
-    DELETE FROM registrations WHERE event_id IN (SELECT id FROM mine)
-  `)
-  for (const table of ['tracks', 'rooms', 'speakers']) {
-    await db.execute(sql`
-      DELETE FROM ${sql.raw(table)}
-      WHERE event_id IN (SELECT id FROM events WHERE join_code LIKE 'FIXTURE%')
-    `)
-  }
-  await db.execute(sql`DELETE FROM events WHERE join_code LIKE 'FIXTURE%'`)
-
   const [operator] = await db
     .insert(operators)
     .values({
@@ -137,6 +103,69 @@ export const buildAuthoringFixture = async (organizerEmail: string): Promise<Aut
   await db.insert(registrations).values({ attendeeId: organizerId, eventId: assigned.eventId })
 
   return { operatorId: operator.id, organizerId, assigned, unassigned }
+}
+
+/**
+ * ═════════════════════════════════════════════════════════════════════════════════════════════
+ * **CALLED BEFORE EVERY BUILD *AND* IN EACH SUITE'S `afterAll`, AND THE SECOND CALL IS THE ONE
+ * THAT MATTERS.**
+ *
+ * Nothing cascades to `events`: `sessions`, `registrations`, `tracks`, `rooms` and `speakers` all
+ * reference it with `NO ACTION`, which is 002's and 008's deliberate choice. So a fixture
+ * conference left behind at the end of a file **blocks `DELETE FROM events` in the next file's
+ * `seed()`** — and `seed()` clears `attendees` first, so the symptom is a later suite failing with
+ * `Cannot read properties of undefined (reading 'id')` while looking for a seeded attendee that a
+ * half-applied seed removed.
+ *
+ * That is exactly the trap 008 recorded for `shared_cards` and the constitution predicted this
+ * feature would meet: *"The next feature with a non-cascading reference to seeded content will
+ * meet this."* The failure appears in a file that has nothing to do with authoring, which is why
+ * cleaning up afterwards is a requirement rather than tidiness.
+ * ═════════════════════════════════════════════════════════════════════════════════════════════
+ */
+export const clearAuthoringFixture = async (): Promise<void> => {
+  const db = getDb()
+
+  await db.delete(questionVotes)
+  await db.delete(sessionQuestions)
+  await db.delete(sessionNotes)
+  await db.delete(savedSessions)
+  await db.delete(adminAuditEntries)
+  await db.delete(organizerAssignments)
+  // A report resolution names the operator who wrote it, `NO ACTION` — 013's rule that an
+  // operator is deactivated rather than deleted, so records naming them keep resolving (FR-909).
+  // A neighbouring suite's resolutions therefore block `DELETE FROM operators` here, which is the
+  // constraint working rather than an obstacle.
+  await db.delete(reportResolutions)
+  await db.delete(operators)
+
+  // ─────────────────────────────────────────────────────────────────────────────────────────
+  // **The conferences this fixture built on a previous run, removed by hand.**
+  //
+  // Nothing cascades to `events` — `sessions`, `tracks`, `rooms`, `speakers` and `registrations`
+  // all reference it with `NO ACTION`, which is 002's and 008's deliberate choice — so a fixture
+  // that only re-seeds accumulates conferences until the join code collides. That collision is
+  // the constraint working: it is exactly what stops two conferences sharing a code and joining
+  // resolving to whichever row the planner returned first.
+  //
+  // Scoped to this fixture's own codes so a re-seed of the three seeded conferences is not
+  // affected, and ordered by foreign key backwards.
+  // ─────────────────────────────────────────────────────────────────────────────────────────
+  await db.execute(sql`
+    WITH mine AS (SELECT id FROM events WHERE join_code LIKE 'FIXTURE%')
+    DELETE FROM sessions WHERE event_id IN (SELECT id FROM mine)
+  `)
+  await db.execute(sql`
+    WITH mine AS (SELECT id FROM events WHERE join_code LIKE 'FIXTURE%')
+    DELETE FROM registrations WHERE event_id IN (SELECT id FROM mine)
+  `)
+  for (const table of ['tracks', 'rooms', 'speakers']) {
+    await db.execute(sql`
+      DELETE FROM ${sql.raw(table)}
+      WHERE event_id IN (SELECT id FROM events WHERE join_code LIKE 'FIXTURE%')
+    `)
+  }
+  await db.execute(sql`DELETE FROM events WHERE join_code LIKE 'FIXTURE%'`)
 }
 
 let codeCounter = 0

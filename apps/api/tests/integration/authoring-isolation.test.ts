@@ -6,6 +6,7 @@ import { getDb } from '../../src/db/client.js'
 import { sessions, sessionSpeakers } from '../../src/db/schema/catalog.js'
 import {
   buildAuthoringFixture,
+  clearAuthoringFixture,
   organizerSession,
   sessionBody,
   type AuthoringFixture,
@@ -39,6 +40,9 @@ describe('conference isolation in authoring (T028, FR-1005)', () => {
   })
 
   afterAll(async () => {
+    // Nothing cascades to `events`, so a fixture conference left behind blocks the NEXT file's
+    // `seed()` — and the symptom lands there rather than here. See `clearAuthoringFixture`.
+    await clearAuthoringFixture()
     await teardown(app)
   })
 

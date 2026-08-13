@@ -7,6 +7,7 @@ import { savedSessions, sessionNotes } from '../../src/db/schema/agenda.js'
 import { questionVotes, sessionQuestions } from '../../src/db/schema/questions.js'
 import {
   buildAuthoringFixture,
+  clearAuthoringFixture,
   organizerSession,
   sessionBody,
   type AuthoringFixture,
@@ -55,6 +56,9 @@ describe('cancellation preserves attendee state (T043, FR-1021, SC-1003)', () =>
   })
 
   afterAll(async () => {
+    // Nothing cascades to `events`, so a fixture conference left behind blocks the NEXT file's
+    // `seed()` — and the symptom lands there rather than here. See `clearAuthoringFixture`.
+    await clearAuthoringFixture()
     await teardown(app)
   })
 

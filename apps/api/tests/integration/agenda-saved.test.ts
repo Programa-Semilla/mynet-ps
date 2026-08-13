@@ -24,6 +24,17 @@ import {
  * 404 — are properties of the route, the query and the schema **together**. A mocked database
  * would agree with whatever the test expected.
  */
+/**
+ * T074 (014) — the saved-session identifiers out of the agenda payload.
+ *
+ * The read returned `{ sessionIds: string[] }` until 014 and now returns
+ * `{ sessions: { sessionId, changedSinceViewed }[] }`: the marker travels on the existing payload
+ * rather than on a read of its own, because a `listChangedSessions` would be a read whose subject
+ * is *things that happened* — the surface FR-1031 forbids (research R7).
+ */
+const savedIdsOf = (body: unknown): string[] =>
+  (body as { sessions: { sessionId: string }[] }).sessions.map((entry) => entry.sessionId)
+
 describe('saved sessions', () => {
   let app: FastifyInstance
   let adaCookie: string
@@ -97,7 +108,7 @@ describe('saved sessions', () => {
     const response = await saved(summitId, adaCookie)
 
     expect(response.statusCode).toBe(200)
-    expect(response.json()).toEqual({ sessionIds: [] })
+    expect(response.json()).toEqual({ sessions: [] })
   })
 
   it('saves a session and reads it back as an identifier (FR-184, FR-188)', async () => {
@@ -105,7 +116,9 @@ describe('saved sessions', () => {
     if (!first) throw new Error('The seeded summit programme is empty.')
 
     expect((await save(summitId, first, adaCookie)).statusCode).toBe(204)
-    expect((await saved(summitId, adaCookie)).json()).toEqual({ sessionIds: [first] })
+    expect((await saved(summitId, adaCookie)).json()).toEqual({
+      sessions: [{ sessionId: first, changedSinceViewed: false }],
+    })
   })
 
   it('SAVING TWICE CREATES ONE ROW, not two (FR-187)', async () => {
@@ -144,9 +157,7 @@ describe('saved sessions', () => {
 
     await save(summitId, target, adaCookie)
     expect((await unsave(summitId, target, adaCookie)).statusCode).toBe(204)
-    expect(
-      ((await saved(summitId, adaCookie)).json() as { sessionIds: string[] }).sessionIds,
-    ).not.toContain(target)
+    expect(savedIdsOf((await saved(summitId, adaCookie)).json())).not.toContain(target)
   })
 
   it('keeps each conference its own set (FR-185, US1 scenario 5)', async () => {
@@ -159,10 +170,8 @@ describe('saved sessions', () => {
 
     await save(horizonsId, horizonsTarget, adaCookie)
 
-    const summitSaved = ((await saved(summitId, adaCookie)).json() as { sessionIds: string[] })
-      .sessionIds
-    const horizonsSaved = ((await saved(horizonsId, adaCookie)).json() as { sessionIds: string[] })
-      .sessionIds
+    const summitSaved = savedIdsOf((await saved(summitId, adaCookie)).json())
+    const horizonsSaved = savedIdsOf((await saved(horizonsId, adaCookie)).json())
 
     expect(horizonsSaved).toContain(horizonsTarget)
     expect(
