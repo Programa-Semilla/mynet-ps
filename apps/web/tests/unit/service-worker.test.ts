@@ -90,13 +90,43 @@ describe('the service worker keeps what the generated one did (FR-051)', () => {
 
   it('opens the application ON the conversation, focusing an existing window (FR-554)', () => {
     expect(code).toContain("self.addEventListener('notificationclick'")
-    expect(code).toContain('/messages/${conversationId}')
+    // 014 — the identifier moved into `data`, which now carries two shapes. The address is still
+    // built here from an identifier rather than sent as a URL: the client owns its own addressing
+    // scheme, and a server emitting `/messages/<id>` would be a second place it is decided.
+    expect(code).toContain('/messages/${data.conversationId}')
     // Focus-and-navigate before openWindow: tapping a notification with the app already open
     // must not produce a second copy of it.
     expect(code).toContain('client.focus()')
     expect(code).toContain('client.navigate(target)')
     expect(code).toContain('openWindow(target)')
     expect(code.indexOf('client.focus()')).toBeLessThan(code.indexOf('openWindow(target)'))
+  })
+
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════════════════════
+   * **T073 (014) — A COALESCED NOTIFICATION OPENS AGENDA, NEVER A LIST OF CHANGES** (FR-1034b).
+   *
+   * The obvious destination for "4 of your saved sessions changed" is a screen listing the four.
+   * **That screen is the surface FR-1031 forbids** — an in-app aggregate over things that
+   * happened, which is the notification centre v3.1.0's exclusion exists to prevent. So the count
+   * lives in the notification body, which is a single interruption, and activating it lands on
+   * Agenda where the changed rows carry their individual markers.
+   * ═══════════════════════════════════════════════════════════════════════════════════════════
+   */
+  it('opens the SESSION for one change and AGENDA for several (FR-1029, FR-1034b)', () => {
+    expect(code).toContain('/agenda/${data.sessionId}')
+    expect(code).toContain("'/agenda'")
+
+    // And no address that could be a list of changes. A route named for them would be the
+    // notification centre arriving through the service worker.
+    for (const forbidden of ['/changes', '/updates', '/activity', '/notifications']) {
+      expect(
+        code,
+        `The service worker can open ${forbidden}. Activating a coalesced notification must land ` +
+          'on Agenda, where the changed rows carry their own markers — never on a list of ' +
+          'changes, which is the surface FR-1031 forbids (FR-1034b).',
+      ).not.toContain(forbidden)
+    }
   })
 
   it('caches no API response — 007 caches nothing at all (FR-563)', () => {

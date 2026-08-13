@@ -1032,12 +1032,18 @@ const notifySavers = async (
 /**
  * The two payload shapes, and which one an attendee gets (FR-1029, FR-1034, FR-1034b).
  *
+ * **Exported for `tests/unit/coalesced-payload.test.ts` and for nothing else.** The coalesced
+ * branch is unreachable through any route 014 registers — there is no bulk edit, and the two
+ * conference-level acts that could touch many sessions are both refused while sessions exist — so
+ * the only honest way to assert the shape somebody's phone will show is to call the function that
+ * builds it. `THRESHOLDS` in `auth/throttle.ts` carries the same note for the same reason.
+ *
  * One changed session names it, and activating it opens that session. Several name a **count**
  * and no session, and activating it opens Agenda — never a list of changes, which is the surface
  * FR-1031 forbids. The count is the only aggregate over changes this feature produces and is
  * permitted **only** here (FR-1034a).
  */
-const payloadFor = (
+export const payloadFor = (
   act: SessionAct,
   sessionIds: readonly string[],
   eventId: string,

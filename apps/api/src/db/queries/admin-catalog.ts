@@ -794,6 +794,29 @@ export const stampMaterialChange = async (
     .update(sessions)
     .set({ logisticsChangedAt: new Date(), lastChangeActId: actId })
     .where(and(eq(sessions.id, id), eq(sessions.eventId, scope.eventId)))
+
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // **THE ACTING ORGANIZER'S OWN ROW IS MARKED VIEWED IN THE SAME TRANSACTION, AND FR-1028a IS
+  // WHY — THE NOTIFICATION HALF ALONE IS NOT THE REQUIREMENT.**
+  //
+  // `attendeesToNotify` already excludes the acting principal, so an organizer who saved the
+  // session they just cancelled receives no push. But `logistics_changed_at` is a property of the
+  // **session**, not of a reader, so without this their own Agenda row would still carry a
+  // "Changed" marker — and they would have been deliberately not interrupted and then told
+  // anyway, by a surface they cannot dismiss.
+  //
+  // The marker and the notification must agree. Stamping `viewed_at` is the honest way to say it:
+  // they have seen this change, because they made it.
+  //
+  // A platform operator has no `attendees` row (FR-901), so there is nothing to stamp and the
+  // guard below is the whole of that case.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  if (scope.attendeeId !== null) {
+    await tx
+      .update(savedSessions)
+      .set({ viewedAt: new Date() })
+      .where(and(eq(savedSessions.sessionId, id), eq(savedSessions.attendeeId, scope.attendeeId)))
+  }
 }
 
 // ───────────────────────────────────────────────────────────────────────────────────────────────

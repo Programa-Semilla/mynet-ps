@@ -123,7 +123,7 @@ T074). No new repository member is added — that is the point of R7.
 
 - [X] T019 [P] Amend `apps/api/src/db/seed/catalog.ts`'s header — "no write path and no import path at any privilege" is now false. State what is permitted and to whom
 - [X] T020 [P] Amend `apps/api/tests/unit/notification-triggers.test.ts`: add `routes/admin/catalog.ts` to `DISPATCH_CALLERS`, and **record in the file why it is not under `notifications/`** — that directory is excluded from the scan, so a trigger placed there passes the gate written to catch it (R3)
-- [ ] T021 [P] Confirm `join-grants-nothing.test.ts` and `qa-absences.test.ts` need **no** change, and record that conclusion in `deviations.md` rather than leaving it silent
+- [X] T021 [P] Confirm `join-grants-nothing.test.ts` and `qa-absences.test.ts` need **no** change, and record that conclusion in `deviations.md` rather than leaving it silent
 - [X] T022 Add `conference_create`, `session_write`, `session_cancel`, `session_delete`, `catalog_write` to `apps/api/tests/unit/throttle-actions.test.ts` and `throttle-thresholds.test.ts`, giving real thresholds to the first and third (FR-1039)
 
 ### Accountability — the defect 013 shipped once already
@@ -167,13 +167,13 @@ destroys attendee state — the reason this story is an increment rather than a 
 - [X] T033 [US1] Create `apps/api/src/routes/admin/catalog.ts` with `GET /admin/conferences/:eventId/programme` and the **create and update** routes from `contracts/authoring.md` — **not the session `DELETE`**, which T051 adds once its guard exists. Every route behind `requireConferenceAuthority`, naming its conference in the path
 - [X] T034 [US1] Register the routes in `apps/api/src/routes/admin/index.ts` — one line, per the append-only rule
 - [X] T035 [P] [US1] Restrict track colour to the existing tokens in the API (FR-1004); reject anything else with a 400 naming the permitted set
-- [ ] T036 [P] [US1] Add `apps/admin/src/app/conferences/ProgrammeEditor.tsx` — the programme for one conference, with loading, empty and failure states
-- [ ] T037 [P] [US1] Add `apps/admin/src/app/conferences/SessionForm.tsx` with client-side validation mirroring the server's, and the server's explanation surfaced on refusal
-- [ ] T038 [P] [US1] Add `apps/admin/src/app/conferences/CatalogForms.tsx` for tracks, rooms and speakers — **track colour is a token picker, never a free colour input**
-- [ ] T039 [US1] Wire the programme editor into the admin shell's navigation from `ConferenceList.tsx`
+- [X] T036 [P] [US1] Add `apps/admin/src/app/conferences/ProgrammeEditor.tsx` — the programme for one conference, with loading, empty and failure states
+- [X] T037 [P] [US1] Add `apps/admin/src/app/conferences/SessionForm.tsx` with client-side validation mirroring the server's, and the server's explanation surfaced on refusal
+- [X] T038 [P] [US1] Add `apps/admin/src/app/conferences/CatalogForms.tsx` for tracks, rooms and speakers — **track colour is a token picker, never a free colour input**
+- [X] T039 [US1] Wire the programme editor into the admin shell's navigation from `ConferenceList.tsx`
 - [ ] T040 [P] [US1] Add `apps/admin/tests/component/programme-editor.test.tsx` — empty, loading and failure states, and the token-only colour control
 - [X] T041 [US1] Same-room overlap **warns and does not refuse** (FR-1016): server returns the warning, client confirms
-- [ ] T042 [P] [US1] Add `apps/api/tests/unit/profile-uneditable.test.ts` — no administrative route edits a profile, and **no route leads from a speaker record to one** (FR-1006), comments stripped before matching
+- [X] T042 [P] [US1] Add `apps/api/tests/unit/profile-uneditable.test.ts` — no administrative route edits a profile, and **no route leads from a speaker record to one** (FR-1006), comments stripped before matching
 
 **Checkpoint**: an organizer can build a programme. **Not releasable alone** — see the warning above.
 
@@ -189,24 +189,24 @@ it; confirm every record survives and the session reads as cancelled rather than
 
 ### Tests for User Story 2
 
-- [ ] T043 [P] [US2] Add `apps/api/tests/integration/cancel-preserves-state.test.ts` — after cancellation, all four engagement records survive and are readable by their authors (FR-1021, SC-1003)
-- [ ] T044 [US2] Add `apps/api/tests/integration/delete-engagement-race.test.ts` — **the FR-1019a race**, against a real `postgres:17`: hold the delete transaction, attempt a concurrent save, assert the save blocks and no committed row is destroyed. Model it on 009's FR-714 test. **Serial: it holds a transaction**
-- [ ] T045 [P] [US2] Add `apps/api/tests/integration/delete-refusal.test.ts` — deletion refused with 409 and a reason for each of the four engagement kinds independently (FR-1018, FR-1019)
-- [ ] T046 [P] [US2] Add `apps/api/tests/integration/date-range-orphan.test.ts` — shrinking the conference refuses and **names the sessions** (FR-1014); the timezone is frozen once a session exists (FR-1015)
+- [X] T043 [P] [US2] Add `apps/api/tests/integration/cancel-preserves-state.test.ts` — after cancellation, all four engagement records survive and are readable by their authors (FR-1021, SC-1003)
+- [X] T044 [US2] Add `apps/api/tests/integration/delete-engagement-race.test.ts` — **the FR-1019a race**, against a real `postgres:17`: hold the delete transaction, attempt a concurrent save, assert the save blocks and no committed row is destroyed. Model it on 009's FR-714 test. **Serial: it holds a transaction**
+- [X] T045 [P] [US2] Add `apps/api/tests/integration/delete-refusal.test.ts` — deletion refused with 409 and a reason for each of the four engagement kinds independently (FR-1018, FR-1019)
+- [X] T046 [P] [US2] Add `apps/api/tests/integration/date-range-orphan.test.ts` — shrinking the conference refuses and **names the sessions** (FR-1014); the timezone is frozen once a session exists (FR-1015)
 
 ### Implementation for User Story 2
 
-- [ ] T047 [US2] Implement `deleteSession` in `admin-catalog.ts`: `SELECT … FOR UPDATE` on the session row **inside** the deleting transaction, then `hasEngagement`, then the delete (R6, FR-1019a)
-- [ ] T048 [US2] Implement `cancelSession` and `reinstateSession` — set and clear `cancelled_at` as **stored state** (FR-1020); **reinstatement dispatches nothing** (FR-1024)
-- [ ] T049 [US2] Implement `engagementCountsFor` — **counts only, no identity, no content** (FR-1025)
-- [ ] T050 [US2] Implement `patchConference` with the orphan check and the timezone freeze
-- [ ] T051 [US2] Add the cancel, reinstate, conference-`PATCH` **and session `DELETE`** routes to `routes/admin/catalog.ts` — the `DELETE` deliberately held back from T033 until its guard existed
-- [ ] T052 [P] [US2] Add `apps/admin/src/app/conferences/CancelDialog.tsx` — a native `<dialog>` with `showModal()`, **centred by the base rule in `theme/tokens.css` and not by a local `m-auto`**, Escape-dismissible, focus restored to the opener after closing
-- [ ] T053 [P] [US2] Present a cancelled session in MyNet's Agenda row and session detail panel (FR-1022)
-- [ ] T054 [US2] Teach `nextSession()` in `apps/web/src/app/sessions.ts` to skip cancelled sessions — **one change point**, serving both `UpNext` and `NextSavedSession` (R8, FR-1022a)
-- [ ] T055 [P] [US2] Confirm `RestOfDay` still lists cancelled sessions, marked — it renders the full list and must not inherit the skip
-- [ ] T056 [P] [US2] Let an attendee remove a cancelled session from their saved list (FR-1023)
-- [ ] T057 [P] [US2] Close the Q&A composer on a cancelled session; existing questions stay readable
+- [X] T047 [US2] Implement `deleteSession` in `admin-catalog.ts`: `SELECT … FOR UPDATE` on the session row **inside** the deleting transaction, then `hasEngagement`, then the delete (R6, FR-1019a)
+- [X] T048 [US2] Implement `cancelSession` and `reinstateSession` — set and clear `cancelled_at` as **stored state** (FR-1020); **reinstatement dispatches nothing** (FR-1024)
+- [X] T049 [US2] Implement `engagementCountsFor` — **counts only, no identity, no content** (FR-1025)
+- [X] T050 [US2] Implement `patchConference` with the orphan check and the timezone freeze
+- [X] T051 [US2] Add the cancel, reinstate, conference-`PATCH` **and session `DELETE`** routes to `routes/admin/catalog.ts` — the `DELETE` deliberately held back from T033 until its guard existed
+- [X] T052 [P] [US2] Add `apps/admin/src/app/conferences/CancelDialog.tsx` — a native `<dialog>` with `showModal()`, **centred by the base rule in `theme/tokens.css` and not by a local `m-auto`**, Escape-dismissible, focus restored to the opener after closing
+- [X] T053 [P] [US2] Present a cancelled session in MyNet's Agenda row and session detail panel (FR-1022)
+- [X] T054 [US2] Teach `nextSession()` in `apps/web/src/app/sessions.ts` to skip cancelled sessions — **one change point**, serving both `UpNext` and `NextSavedSession` (R8, FR-1022a)
+- [X] T055 [P] [US2] Confirm `RestOfDay` still lists cancelled sessions, marked — it renders the full list and must not inherit the skip
+- [X] T056 [P] [US2] Let an attendee remove a cancelled session from their saved list (FR-1023)
+- [X] T057 [P] [US2] Close the Q&A composer on a cancelled session; existing questions stay readable
 - [ ] T058 [P] [US2] Add `apps/web/tests/component/cancelled-session.test.tsx` — Agenda, panel and the Up-next skip (SC-1002)
 - [ ] T059 [P] [US2] Add `apps/api/tests/unit/no-attendee-state-disclosure.test.ts` — no administrative route reads a note, a message, or the identity of anyone who saved, questioned or voted (FR-1042)
 
@@ -223,10 +223,10 @@ that activating it opens the session, and that the row carries a marker until vi
 
 ### Tests for User Story 3
 
-- [ ] T060 [P] [US3] Add `apps/api/tests/integration/material-change-dispatch.test.ts` — cancellation, start-time and room changes each dispatch (FR-1026); **title, summary, track and speaker changes dispatch nothing** (FR-1027, SC-1006)
-- [ ] T061 [P] [US3] Add `apps/api/tests/integration/dispatch-coalescing.test.ts` — one act changing four of one attendee's saved sessions produces **exactly one** notification carrying the count (FR-1034, FR-1034a, SC-1012)
-- [ ] T062 [US3] Add to that same file: two separate acts produce **two** notifications, never one (FR-1028b). **Serial — same file as T061**
-- [ ] T063 [P] [US3] Add `apps/api/tests/integration/dispatch-excludes-actor.test.ts` — an organizer who saved the session they are changing is not notified (FR-1028a)
+- [X] T060 [P] [US3] Add `apps/api/tests/integration/material-change-dispatch.test.ts` — cancellation, start-time and room changes each dispatch (FR-1026); **title, summary, track and speaker changes dispatch nothing** (FR-1027, SC-1006)
+- [X] T061 [P] [US3] Add `apps/api/tests/integration/dispatch-coalescing.test.ts` — one act changing four of one attendee's saved sessions produces **exactly one** notification carrying the count (FR-1034, FR-1034a, SC-1012)
+- [X] T062 [US3] Add to that same file: two separate acts produce **two** notifications, never one (FR-1028b). **Serial — same file as T061**
+- [X] T063 [P] [US3] Add `apps/api/tests/integration/dispatch-excludes-actor.test.ts` — an organizer who saved the session they are changing is not notified (FR-1028a)
 - [ ] T064 [P] [US3] Add `apps/api/tests/integration/dispatch-no-savers.test.ts` — a material change to a session **nobody saved** dispatches nothing (FR-1028). This is the boundary of the fan-out
 - [ ] T065 [P] [US3] Add `apps/api/tests/integration/dispatch-failure-isolation.test.ts` — a failing push leaves the act and its audit entry committed (007's precedent)
 - [ ] T066 [P] [US3] Add `apps/web/tests/unit/authoring-absences.test.tsx` and `apps/api/tests/unit/authoring-absences.test.ts` — no bell, no notification centre, **no aggregate count and no change list in either client** (FR-1031, SC-1009), comments stripped before matching
@@ -234,15 +234,15 @@ that activating it opens the session, and that the row carries a marker until vi
 
 ### Implementation for User Story 3
 
-- [ ] T068 [US3] Implement `materialChangeOf` in `session-changes.ts` — returns which of cancelled/time/room applies, or `null`. **This function is the scope of the second trigger**; its header must say so
-- [ ] T069 [US3] Set `logistics_changed_at` and `last_change_act_id` on a material change, inside the act's transaction
-- [ ] T070 [US3] Implement `attendeesToNotify` — sessions changed by this act → attendees who saved any of them, **excluding the acting principal** (R4)
-- [ ] T071 [US3] Dispatch from `routes/admin/catalog.ts` **after the transaction commits**, bounded by `dispatchPush`'s existing timeout, with failure logged and swallowed (R3)
-- [ ] T072 [US3] Build the single and coalesced payloads per `contracts/authoring.md` (FR-1029)
-- [ ] T073 [US3] Handle activation in `apps/web/src/sw.ts` — single opens the session, **coalesced opens Agenda and never a list of changes** (FR-1034b)
-- [ ] T074 [US3] Compute the marker in the agenda read as `logistics_changed_at > viewed_at`, **on the existing payload** — no new repository member, no new cached read (R7, FR-1030)
-- [ ] T075 [US3] Update `viewed_at` when the attendee opens the session; declare the write in the caching decorator's composition root, since a write purges the conference prefix
-- [ ] T076 [P] [US3] Render the marker on the Agenda row and Home, **as text and not by colour alone**
+- [X] T068 [US3] Implement `materialChangeOf` in `session-changes.ts` — returns which of cancelled/time/room applies, or `null`. **This function is the scope of the second trigger**; its header must say so
+- [X] T069 [US3] Set `logistics_changed_at` and `last_change_act_id` on a material change, inside the act's transaction
+- [X] T070 [US3] Implement `attendeesToNotify` — sessions changed by this act → attendees who saved any of them, **excluding the acting principal** (R4)
+- [X] T071 [US3] Dispatch from `routes/admin/catalog.ts` **after the transaction commits**, bounded by `dispatchPush`'s existing timeout, with failure logged and swallowed (R3)
+- [X] T072 [US3] Build the single and coalesced payloads per `contracts/authoring.md` (FR-1029)
+- [X] T073 [US3] Handle activation in `apps/web/src/sw.ts` — single opens the session, **coalesced opens Agenda and never a list of changes** (FR-1034b)
+- [X] T074 [US3] Compute the marker in the agenda read as `logistics_changed_at > viewed_at`, **on the existing payload** — no new repository member, no new cached read (R7, FR-1030)
+- [X] T075 [US3] Update `viewed_at` when the attendee opens the session; declare the write in the caching decorator's composition root, since a write purges the conference prefix
+- [X] T076 [P] [US3] Render the marker on the Agenda row and Home, **as text and not by colour alone**
 - [ ] T077 [P] [US3] Add `apps/web/tests/unit/marker-not-cached.test.ts` — no repository member is added and `substitution.test.ts` is untouched; **no eighth device capability**
 - [ ] T078 [US3] Add a timing assertion to `e2e/authoring.spec.ts` (T095) — a material change reaches a subscribed attendee **within one minute** (SC-1004). Measured against the sink adapter, so it needs no real push service
 
@@ -266,11 +266,11 @@ code registers an attendee, confirm no reach over any other conference.
 
 ### Implementation for User Story 4
 
-- [ ] T083 [US4] Implement `createConference` in `admin-catalog.ts` — conference, join code, organizer assignment and audit entry in one transaction
-- [ ] T084 [US4] Mint the join code with the same generator the seed uses; retry on the unique violation rather than pre-checking
-- [ ] T085 [US4] Add `POST /admin/conferences` behind `requireOperator` — **not** `requireConferenceAuthority`, because there is no conference yet
-- [ ] T086 [P] [US4] Add `apps/admin/src/app/conferences/CreateConferenceDialog.tsx`, centred by the base rule, Escape-dismissible, focus restored
-- [ ] T087 [P] [US4] Show the join code after creation so the organizer can distribute it
+- [X] T083 [US4] Implement `createConference` in `admin-catalog.ts` — conference, join code, organizer assignment and audit entry in one transaction
+- [X] T084 [US4] Mint the join code with the same generator the seed uses; retry on the unique violation rather than pre-checking
+- [X] T085 [US4] Add `POST /admin/conferences` behind `requireOperator` — **not** `requireConferenceAuthority`, because there is no conference yet
+- [X] T086 [P] [US4] Add `apps/admin/src/app/conferences/CreateConferenceDialog.tsx`, centred by the base rule, Escape-dismissible, focus restored
+- [X] T087 [P] [US4] Show the join code after creation so the organizer can distribute it
 - [ ] T088 [P] [US4] Add `apps/admin/tests/component/create-conference.test.tsx` — validation, failure state, and the code displayed on success
 
 **Checkpoint**: all four stories complete.

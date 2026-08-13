@@ -10,6 +10,7 @@ import { rooms, sessions, sessionSpeakers, speakers, tracks } from '../../src/db
 import { events, registrations } from '../../src/db/schema/events.js'
 import { operators } from '../../src/db/schema/operators.js'
 import { organizerAssignments } from '../../src/db/schema/organizer-assignments.js'
+import { pushSubscriptions } from '../../src/db/schema/push-subscriptions.js'
 import { questionVotes, sessionQuestions } from '../../src/db/schema/questions.js'
 import { reportResolutions } from '../../src/db/schema/report-resolutions.js'
 import { attendees } from './helpers.js'
@@ -130,6 +131,11 @@ export const clearAuthoringFixture = async (): Promise<void> => {
   await db.delete(sessionQuestions)
   await db.delete(sessionNotes)
   await db.delete(savedSessions)
+  // Push subscriptions accumulate across a suite because `anEndpoint` mints a fresh one per call
+  // — deliberately, so a re-registration test is testing a real second device. A dispatch
+  // assertion counting deliveries therefore has to start from a known-empty set, or it counts
+  // every phone a previous test in the same file registered.
+  await db.delete(pushSubscriptions)
   await db.delete(adminAuditEntries)
   await db.delete(organizerAssignments)
   // A report resolution names the operator who wrote it, `NO ACTION` — 013's rule that an
