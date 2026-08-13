@@ -181,6 +181,14 @@ test.describe('administrative sessions', () => {
     await page.keyboard.type(OPERATOR_PASSWORD)
     await page.keyboard.press('Tab')
 
+    // 016 — the reveal control sits between the password field and the submit, and reaching it
+    // here is the requirement rather than an obstacle in the way of one: SC-1004 asks that every
+    // password field in **both** products can be revealed and re-masked using the keyboard alone,
+    // which is only true if the control is tabbable. FR-1049 requires this screen to behave
+    // exactly as MyNet's does, and `apps/web/tests/sign-in.test.tsx` walks the same extra stop.
+    await expect(page.getByRole('button', { name: /show password/i })).toBeFocused()
+    await page.keyboard.press('Tab')
+
     const submit = page.getByRole('button', { name: /^sign in$/i })
     await expect(
       submit,

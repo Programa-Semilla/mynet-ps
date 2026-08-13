@@ -3154,8 +3154,12 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Share your card with another attendee
-         * @description One-directional (FR-602): this gives the recipient YOUR card and gives you nothing. You hold theirs when they share back. `attendeeId` names the RECIPIENT, never the caller. Answers **201** when it created the exchange and **200** when one already existed, with the original `sharedAt` unchanged — a repeat must not refresh the timestamp, or re-sharing becomes a way to signal somebody repeatedly (FR-604). The conference recorded is the caller's active one, and it is a historical fact rather than a scoping predicate.
+         * Exchange cards with another attendee
+         * @description **Mutual (FR-1021): one act, and both parties hold the other's card.** The recipient is not asked and need do nothing — there is no pending state and no acceptance step. Both records are written in one transaction or neither is (FR-1022), so contacts are mutual or absent and never one-sided.
+         *
+         *     **This reverses FR-602, which said the sharer gained nothing**, and the reversal is ratified rather than inferred: constitution v5.0.0 (C1) retracts v3.2.0 (N2). The exchange completes only where the recipient is discoverable, verified and registered for the conference (FR-1053) — that condition is what keeps C1's licence true, not a convention inherited from the previous model.
+         *
+         *     `attendeeId` names the OTHER attendee, never the caller. Answers **201** when it created the exchange and **200** when one already existed, with the original `sharedAt` unchanged — a repeat must not refresh the timestamp, or re-sharing becomes a way to signal somebody repeatedly (FR-1025). The conference recorded is the caller's active one, carried on both records as a historical fact rather than a scoping predicate (FR-1024). No notification is dispatched (FR-1029).
          */
         post: {
             parameters: {
@@ -3359,8 +3363,10 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Cards the attendee has given away
-         * @description Read-only. **There is no `DELETE` here and there will not be one** (FR-618): a card cannot be recalled, because you cannot un-give what somebody already holds. Deliberately thinner than the held list — sharing your card does not entitle you to the recipient's profile, which is what "one-directional" means in practice.
+         * People who hold your card
+         * @description Read-only. **There is no `DELETE` here and there will not be one** (FR-618): a card cannot be recalled, because you cannot un-give what somebody already holds. Deliberately thinner than the held list — it answers *who holds my card*, not *what may I read about them*, and the held list is where the second question is answered.
+         *
+         *     **Renamed in 016, and the query is unchanged** (FR-1051). Since constitution v5.0.0 (C1) an exchange is mutual, so these rows are no longer only the ones the reader consciously gave away — half of them arise from somebody else sharing first. "Cards you have given away" stopped being true of the same rows; the rows themselves did not move.
          */
         get: {
             parameters: {

@@ -3,12 +3,18 @@
  *
  * ═════════════════════════════════════════════════════════════════════════════════════════
  * **PROPOSED, THEN ACCEPTED OR DECLINED — AND THE ASYMMETRY WITH CARDS IS DELIBERATE**
- * (constitution v3.2.0, N2).
+ * (constitution v3.2.0, N2; v5.0.0 C1).
  *
- * A card is one-directional and needs no answer. An appointment **claims a slot of somebody
- * else's time**, which a message and a card do not, so it is proposed rather than created. That
- * single sentence is why this interface has `accept` and `decline` and `cards.ts` has nothing of
- * the kind.
+ * A card needs no answer — since C1 it is a **mutual exchange completed by one act**, with the
+ * other party neither asked nor able to decline (FR-1021, FR-1023). An appointment **claims a
+ * slot of somebody else's time**, which a message and a card do not, so it is proposed rather
+ * than created. That single sentence is why this interface has `accept` and `decline` and
+ * `cards.ts` has nothing of the kind.
+ *
+ * **The contrast survived C1; only its other half moved.** This paragraph used to open *"a card
+ * is one-directional and needs no answer"*, and C1 retracts the first clause without touching the
+ * second — which is the point, because the asymmetry was never about direction. It is about
+ * whether an act consumes something the other person must be allowed to refuse.
  * ═════════════════════════════════════════════════════════════════════════════════════════
  *
  * ─────────────────────────────────────────────────────────────────────────────────────────

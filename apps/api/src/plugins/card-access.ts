@@ -139,12 +139,26 @@ export interface CardParams {
  *
  * `sharer_id = the named attendee AND recipient_id = the reader`, in that arrangement and no
  * other. Reversing the two columns would answer a different question — "have I shared with
- * them" — and would let somebody read the profile of a person who has never given them anything,
- * simply by having shared their own card first. Sharing gives; it does not take (FR-602), and
- * this is where that becomes enforceable rather than merely intended.
+ * them" — and would let somebody read the profile of a person whose card they do not hold,
+ * simply by having shared their own first.
  *
- * A symmetric `OR` would be worse still: it would make every share reciprocal by side effect,
- * silently reversing the one-directional model constitution v3.2.0 (N2) settled.
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ * **T042, FR-1052 (016) — THIS STAYS DIRECTIONAL EVEN THOUGH EXCHANGES ARE NOW MUTUAL, AND THE REASON
+ * CHANGED WITH v5.0.0 (C1).**
+ *
+ * It used to be justified as *"sharing gives; it does not take"* — FR-602, which C1 retracts.
+ * That sentence is no longer true and is no longer the argument.
+ *
+ * What holds instead: **the row is the authority, not the relationship.** `shareCard` writes both
+ * rows itself, in one transaction, under FR-1053's guard — so where an exchange happened, the
+ * reciprocal row exists and this predicate finds it without needing to be widened. A symmetric
+ * `OR` would grant a read from a *single* row, which is precisely the state that exists for every
+ * card written before 016 and for any pair whose second insert was never made. It would hand out
+ * a read the exchange never authorised, and it would do so silently.
+ *
+ * So mutual exchange makes the two formulations agree on well-formed data and disagree on exactly
+ * the data where being wrong matters.
+ * ─────────────────────────────────────────────────────────────────────────────────────────
  * ═════════════════════════════════════════════════════════════════════════════════════════
  *
  * ─────────────────────────────────────────────────────────────────────────────────────────

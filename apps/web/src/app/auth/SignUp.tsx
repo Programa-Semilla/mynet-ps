@@ -4,6 +4,7 @@ import { useId, useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router'
 
 import { useAuth } from '../../auth/useAuth.js'
+import { PasswordField } from '../../ui/PasswordField.js'
 import { BrandMark } from '../../shell/BrandMark.js'
 import { PRODUCT_NAME, PRODUCT_TAGLINE } from '../branding.js'
 
@@ -46,11 +47,14 @@ export const SignUp = () => {
   const nameId = useId()
   const passwordId = useId()
   const passwordHelpId = useId()
+  const confirmId = useId()
+  const confirmHelpId = useId()
   const errorId = useId()
 
   const [email, setEmail] = useState('')
   const [displayName, setDisplayName] = useState('')
   const [password, setPassword] = useState('')
+  const [confirmation, setConfirmation] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [failure, setFailure] = useState<string | null>(null)
 
@@ -58,7 +62,23 @@ export const SignUp = () => {
   const hasName = displayName.trim().length > 0
   const hasEmail = email.trim().length > 0
 
-  const canSubmit = hasEmail && hasName && passwordLongEnough && !submitting
+  /**
+   * T025 (016) — **the confirmation, and why sign-up is where it matters most** (FR-1017,
+   * FR-1018).
+   *
+   * A mistyped password here creates an account nobody can reach. The only recovery path is
+   * email, at a venue, possibly on a phone that cannot get to it — so the cheapest moment to
+   * catch the typo is before the account exists at all.
+   *
+   * **It never reaches the server** (FR-1019). There is no field for it in `signUp`, and
+   * `no-confirmation-field.test.ts` asserts no route would accept one. It exists to catch a
+   * typing error, not to be stored.
+   */
+  const matches = password === confirmation
+  /** Shown once there is something to compare, rather than greeting the first keystroke. */
+  const mismatch = confirmation.length > 0 && !matches
+
+  const canSubmit = hasEmail && hasName && passwordLongEnough && matches && !submitting
 
   /**
    * Why the confirmation is disabled, in words.
@@ -76,7 +96,9 @@ export const SignUp = () => {
           ? `Your password needs at least ${PASSWORD_MIN_LENGTH} characters. ${
               password.length > 0 ? `You have ${password.length}.` : ''
             }`.trim()
-          : null
+          : !matches
+            ? 'Both passwords must be the same before you can continue.'
+            : null
 
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -185,22 +207,67 @@ export const SignUp = () => {
             >
               Password
             </label>
-            <input
+            <PasswordField
               id={passwordId}
               name="password"
-              type="password"
               autoComplete="new-password"
               required
               // FR-304 — bound to the field, so the requirement is part of the field for a
               // screen reader rather than prose that happens to sit nearby.
-              aria-describedby={passwordHelpId}
+              describedBy={passwordHelpId}
               value={password}
-              onChange={(event) => setPassword(event.target.value)}
+              onChange={setPassword}
               className="w-full rounded-sm border border-border-subtle bg-surface-raised px-3 py-2 text-text-body"
             />
             <p id={passwordHelpId} className="mt-1 text-xs text-text-muted">
               At least {PASSWORD_MIN_LENGTH} characters. A short sentence you will remember beats a
               short password with symbols in it.
+            </p>
+          </div>
+
+          <div className="mb-5">
+            <label htmlFor={confirmId} className="mb-1 block text-sm font-medium text-text-primary">
+              Confirm password
+            </label>
+            {/*
+              ─────────────────────────────────────────────────────────────────────────────────
+              **NO `name`, and that is the point of the field rather than an omission**
+              (FR-1019, S2).
+
+              A `name` puts the value into the form's native serialization. This form declares no
+              `action` and no `method`, so any path that reaches a native submission navigates to
+              the *current* URL with `?password=…&confirmPassword=…` — into browser history, the
+              `Referer` header, and the reverse proxy's access log. `preventDefault()` is the
+              first statement of `onSubmit` today, so it is latent; a `name` on a field with no
+              server-side purpose is a second copy of a credential kept for nothing.
+
+              Password managers key on `autoComplete="new-password"`, not on `name`, so nothing
+              about autofill depends on it. `name="password"` stays on the real field above,
+              which is the one the request carries.
+              ─────────────────────────────────────────────────────────────────────────────────
+            */}
+            <PasswordField
+              id={confirmId}
+              autoComplete="new-password"
+              required
+              describedBy={confirmHelpId}
+              invalid={mismatch}
+              value={confirmation}
+              onChange={setConfirmation}
+              className="w-full rounded-sm border border-border-subtle bg-surface-raised px-3 py-2 text-text-body"
+            />
+            {/*
+              Bound to the field by `aria-describedby` rather than merely rendered beneath it: a
+              message a sighted reader connects by proximity is connected to nothing at all for
+              somebody using a screen reader (FR-1018).
+            */}
+            <p
+              id={confirmHelpId}
+              className={`mt-1 text-xs ${mismatch ? 'text-danger-700' : 'text-text-muted'}`}
+            >
+              {mismatch
+                ? 'Both passwords must be the same before you can continue.'
+                : 'Type it again, so a typo does not become an account you cannot reach.'}
             </p>
           </div>
 

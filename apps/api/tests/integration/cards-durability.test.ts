@@ -10,6 +10,7 @@ import { cookieHeader, resetDatabase, setupTestApp, teardown } from './helpers.j
 import {
   ADA,
   ADA_ONLY_EVENT,
+  ALAN,
   eventIdNamed,
   GRACE,
   GRACE_ONLY_EVENT,
@@ -276,12 +277,25 @@ describe('a held card outlives the conference it was shared at', () => {
    * calling `assertVerifiedCard` with a forged scope, which proves the runtime guard and says
    * nothing about what an enumeration attacker actually observes: the response.
    *
-   * Ada holds nothing from Grace at this point in the file (only Grace holds Ada's card), so this
-   * is the real "not held" case rather than a contrived one.
+   * ─────────────────────────────────────────────────────────────────────────────────────
+   * **T042 (016) — THE FIXTURE MOVED, THE GUARANTEE DID NOT.**
+   *
+   * This used to read a card from **Grace**, on the stated ground that *"Ada holds nothing from
+   * Grace at this point in the file (only Grace holds Ada's card)"*. Constitution v5.0.0 (C1)
+   * makes exchange mutual, so that premise is now false in one direction and the case answered
+   * 200 — a genuine held card, not a leak.
+   *
+   * Alan is the honest "not held" pair: he is unverified and takes part in no exchange, so no
+   * row exists in either direction. **The requirement is unchanged** — it is the fixture that
+   * had to move, and swapping it is what keeps the enumeration guarantee under test rather than
+   * quietly satisfied.
+   * ─────────────────────────────────────────────────────────────────────────────────────
    * ═══════════════════════════════════════════════════════════════════════════════════════
    */
   it('refuses a card not held identically to one that does not exist (FR-616, FR-642)', async () => {
-    const notHeld = await readHeld(app, ada, grace.id)
+    const alan = await signIn(app, ALAN)
+
+    const notHeld = await readHeld(app, ada, alan.id)
     const nonexistent = await readHeld(app, ada, '00000000-0000-4000-8000-000000000000')
     const malformed = await readHeld(app, ada, 'not-a-uuid')
 

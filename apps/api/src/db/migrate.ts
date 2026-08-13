@@ -44,10 +44,18 @@ const migrationsFolder = fileURLToPath(new URL('../../migrations', import.meta.u
  * from 004's review: it rewrites `events` under a volatile default and could not be fixed without
  * regenerating a snapshot the migration README warns against touching casually.
  *
- * **On its own connection, not the application pool.** A `lock_timeout` on ordinary request
- * traffic would turn contention into user-visible 500s, which is a different decision nobody has
- * made. `max: 1` because migrations are strictly sequential and the setting must hold for all of
- * them — a pooled connection that the driver replaces mid-run would silently lose it.
+ * **On its own connection, not the application pool.** `max: 1` because migrations are strictly
+ * sequential and the setting must hold for all of them — a pooled connection that the driver
+ * replaces mid-run would silently lose it.
+ *
+ * **That decision HAS since been made, differently, and the two are not in conflict** — this
+ * paragraph used to say a `lock_timeout` on request traffic "is a different decision nobody has
+ * made". 016's deep review made it: `db/client.ts` now sets a **shorter** `lock_timeout` plus a
+ * `statement_timeout` on the application pool, because the mutual card exchange holds one of ten
+ * pooled connections across five round trips, and an unbounded wait there exhausts the pool and
+ * stops **every** route rather than turning one contended request into a 500. Read the two headers
+ * together: different values, different reasons, and a different failure each prefers. A migration
+ * prefers to **abort loudly**; a request prefers to **fail one caller fast**.
  * ─────────────────────────────────────────────────────────────────────────────────────────────
  * ═══════════════════════════════════════════════════════════════════════════════════════════════
  */

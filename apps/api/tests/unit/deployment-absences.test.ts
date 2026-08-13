@@ -363,23 +363,53 @@ describe('no card backfill was introduced (FR-806a)', () => {
     const checks = cards.match(/email_verified_at/gi) ?? []
 
     // ───────────────────────────────────────────────────────────────────────────────────────
-    // **EXACTLY ONE, AND IT IS IN THE INSERT.**
+    // **EXACTLY ONE, AND IT IS ON THE SHARE PATH RATHER THAN THE RESOLUTION PATH.**
     //
     // Counting is the assertion. There is one legitimate verification check in this file — the
-    // RECIPIENT's, inside `shareCard`'s `WHERE EXISTS`, because you may only share with somebody
-    // you could have found. Every read path below it deliberately has none: no discoverability
-    // condition (FR-612), no verification condition (FR-613), no registration join (FR-614).
+    // RECIPIENT's, in the share-time guard, because you may only share with somebody you could
+    // have found. Every read path below it deliberately has none: no discoverability condition
+    // (FR-612), no verification condition (FR-613), no registration join (FR-614).
     //
     // A second occurrence means one of those absences has been "completed" by somebody who read
     // `listDirectory` first and saw this file as unfinished.
+    //
+    // ─────────────────────────────────────────────────────────────────────────────────────
+    // **T042 (016) — THE CHECK MOVED OUT OF THE INSERT, AND THE MOVE WAS THE POINT.**
+    //
+    // This used to require the occurrence to sit inside `INSERT INTO shared_cards`, because the
+    // guard was a `WHERE EXISTS` on that statement. FR-1022 made that shape wrong: mutual
+    // exchange writes two rows, and a guard expressed per-insert is **evaluated twice**, so a
+    // registration withdrawn between the two would write one row and not the other — exactly the
+    // half-written state the requirement forbids. It is now `exchangePermitted`, evaluated once
+    // and governing both.
+    //
+    // **The requirement is unchanged and this assertion is not weakened**: it still pins that
+    // the single check happens on the way *in* and never on the way *out*. It just names the
+    // guard instead of the statement the guard used to be part of.
+    // ─────────────────────────────────────────────────────────────────────────────────────
     // ───────────────────────────────────────────────────────────────────────────────────────
     expect(
       checks.length,
       'Card resolution now consults verification state. FR-807 forbids it: a held card resolves ' +
         'the sharer’s live profile under a standing consent that outlives both the conference ' +
         'and the discoverability toggle. The ONE permitted check is on the recipient, at share ' +
-        'time, in the INSERT.',
+        'time, in the guard.',
     ).toBe(1)
-    expect(cards.split('email_verified_at')[0]).toContain('INSERT INTO shared_cards')
+
+    const beforeCheck = cards.split('email_verified_at')[0] ?? ''
+    const afterCheck = cards.slice(beforeCheck.length)
+
+    expect(
+      beforeCheck,
+      'The one verification check is no longer inside the share-time guard. If it has moved ' +
+        'below, it is now on a resolution path, which FR-807 forbids.',
+    ).toContain('exchangePermitted')
+
+    expect(
+      afterCheck,
+      'The held-card projection must come AFTER the single verification check, so that the ' +
+        'check cannot be part of it. `heldCardSelect` is the shared projection every read uses, ' +
+        'and it must carry none of the directory’s three conditions.',
+    ).toContain('heldCardSelect')
   })
 })

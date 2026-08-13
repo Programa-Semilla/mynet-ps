@@ -382,6 +382,20 @@ judged by any automated gate — it needs a person looking at a physical home sc
   (N2) established" — a clause C1 reverses. **The behaviour and the record of why MUST change in the
   same commit**: this project's discipline is that the comment is the record, and a header describing
   a rule that no longer exists is the defect class 013's review named its most transferable finding.
+- **FR-1055**: Every **user-facing string** that describes card direction MUST state the exchange.
+  This explicitly includes the confirmation shown after sharing and the empty-contacts state, both of
+  which told the reader they held nothing and must wait for reciprocation.
+
+  **Added during this feature's deep review, and the reason it was needed is the finding.** FR-1052
+  was scoped to *"every comment, docblock and header"* — one word too narrow. The implementation
+  satisfied it exactly while the screen went on asserting the retracted one-directional model, and
+  **spec compliance scored 100% with the contradiction shipped**, because the requirement that would
+  have caught it did not reach product copy. Two green tests asserted the false sentence, so no gate
+  could catch it either: the suite was holding the retracted model in place.
+
+  A requirement whose subject is prose **cannot be verified by searching for its own number** — the
+  number appears wherever the work was done and nowhere it was missed. `card-model-record.test.ts` is
+  the guard that replaces that check.
 
 **Install guidance (US5)**
 
@@ -513,6 +527,17 @@ judged by any automated gate — it needs a person looking at a physical home sc
 
 - **Constitution v5.0.0** gates FR-1021–FR-1030 (C1), the administrative-counterpart row (C3), and
   FR-1038–FR-1048 (C4). Ratified 2026-08-12, before this specification.
+- **Constitution v5.1.0** gates FR-1031–FR-1037 (US5), and **this specification did not anticipate
+  it.** Phase 0 research found that install detection needs `matchMedia('(display-mode:
+  standalone)')` and a `beforeinstallprompt` listener, both of which
+  `mynet/no-direct-platform-access` refuses in feature code — so the capability had to go behind an
+  interface, and Principle V's enumerated list of seven had to become eight. The listing is the
+  ratification act, the precedent `VisibilityService` set in v3.1.0. MINOR: a section is materially
+  expanded, no prohibition is lifted and nothing delivered is retracted.
+
+  **Recorded here rather than quietly satisfied**, because it is the one dependency this
+  specification and its review gate both missed. It is also the shape Principle V is *for*: the
+  boundary surfaced a platform dependency that reading the requirements did not.
 - **`assets/brand/new-logo.png`**, supplied by the owner and tracked.
 - **A physical mobile device and a person**, for SC-1001 and SC-1009. Neither is satisfiable by CI,
   and both are acceptance criteria rather than optional review.

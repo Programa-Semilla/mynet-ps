@@ -119,6 +119,55 @@ describe('blocking, and deleting an account', () => {
 
   /**
    * ═══════════════════════════════════════════════════════════════════════════════════════
+   * T034 (016) — **one share, then a block, and BOTH sides go** (FR-1026).
+   *
+   * The case above still sets up with two shares, which it had to before 016 and which now
+   * **hides the thing worth checking**: whether a single act creates the pair of rows that a
+   * block then has to sever. Under mutual exchange it does, so this drives exactly one share.
+   *
+   * **Lifting the block restores both with no repair action**, which is the property that would
+   * break under the obvious wrong implementation. Blocking severs cards **read-side** — nothing
+   * is written and nothing is deleted — so an `unblock` is sufficient on its own. Had 016
+   * severed the reciprocal row by deleting it, this would need an undo path that does not exist,
+   * and the deliberate asymmetry with appointments (cancelled by a write, and staying cancelled)
+   * would have collapsed.
+   * ═══════════════════════════════════════════════════════════════════════════════════════
+   */
+  it('T034 — one exchange, blocked, severs both sides; lifting it restores both with no write (FR-1026)', async () => {
+    // A genuinely fresh pair. The case above leaves its rows behind — deliberately, because a
+    // block severs read-side and writes nothing — so without this the share below would be a
+    // repeat answering 200, and "one act creates both rows" would go unasserted.
+    await getDb().execute(sql`DELETE FROM shared_cards`)
+
+    await clearThrottle()
+    const shared = await shareCard(app, ada, grace.id)
+    expect(shared.statusCode).toBe(201)
+
+    // One act, both contacts — the state a block now has to deal with.
+    expect((await contactsFor(ada)).map((card) => card.attendeeId)).toEqual([grace.id])
+    expect((await contactsFor(grace)).map((card) => card.attendeeId)).toEqual([ada.id])
+
+    await block(app, ada, grace.id)
+
+    expect(await contactsFor(ada)).toEqual([])
+    expect(
+      await contactsFor(grace),
+      'Grace was given Ada’s card by Ada’s own act and never chose anything. A block must still ' +
+        'sever her side — the reciprocal row is an ordinary card and enjoys no exemption.',
+    ).toEqual([])
+
+    await unblock(app, ada, grace.id)
+
+    expect(
+      (await contactsFor(ada)).map((card) => card.attendeeId),
+      'Lifting the block must restore both cards with no repair action (FR-1026). If either row ' +
+        'had been deleted rather than filtered, this list would still be empty.',
+    ).toEqual([grace.id])
+    expect((await contactsFor(grace)).map((card) => card.attendeeId)).toEqual([ada.id])
+  })
+
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════════════════
    * T118, T119 — **lifting a block restores the contact and leaves the appointment cancelled**
    * (FR-637a).
    *

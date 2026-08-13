@@ -172,3 +172,40 @@ recommendation:
 against the concrete task list, as 007 and 008 both did. The natural seam is server (US4) against
 client (US1, US2, US3, US5, US6), and the argument against splitting is that US4 is four
 requirements of query change while the client half is the whole visible feature.
+
+## Install-asset weights (FR-1048)
+
+**T002 recorded the baseline before any asset changed; T064 records the result.** Kept here rather
+than in a build log because FR-1048 asks for a *durable* place, and the comparison is the point: an
+icon derived from a 114×133 source upscaled ~4× is expected to change weight, and a change nobody
+wrote down is indistinguishable from one nobody noticed.
+
+| Asset | Before (bytes) | After (bytes) | Change |
+|---|---|---|---|
+| `icons/icon-192.png` | 6,805 | 3,357 | −50.7% |
+| `icons/icon-512.png` | 31,884 | 12,189 | −61.8% |
+| `icons/icon-maskable-512.png` | 32,506 | 11,730 | −63.9% |
+| `apple-touch-icon.png` | 6,201 | 3,178 | −48.8% |
+| `favicon-16.png` | 514 | 811 | +57.8% |
+| `favicon-32.png` | 1,143 | 1,462 | +27.9% |
+| `favicon.ico` | 1,695 | 2,311 | +36.3% |
+| **Total install assets** | **80,748** | **35,038** | **−56.6%** |
+| **Precache** | 727.02 KiB, 23 entries | 736.99 KiB, **23 entries** | +9.97 KiB, ±0 entries |
+
+**Every install asset got smaller and every favicon got larger, and both directions are the same
+cause.** The old assets were a coral mark on a flat navy plate: large areas of one colour, which
+PNG's filters compress extremely well at 512px and which leave a 16px favicon almost featureless.
+The new mark is a gradient disc on white — at 512px the gradient costs far less than the navy field
+it replaced, and at 16px there is genuinely more detail to encode than a two-colour glyph had.
+
+**The precache grew by 9.97 KiB and its entry count did not move**, which is the number that
+matters here. FR-1047 keeps install icons and favicons **out** of the precache set —
+`includeManifestIcons: false` is what governs them, not `globIgnores`, because `vite-plugin-pwa`
+re-adds manifest icons after the glob runs. So an **unchanged entry count across an icon change is
+the evidence the exclusion survived**: had a single icon leaked in, the count would read 24 and the
+total would have moved by tens of kilobytes rather than by ten.
+
+The 9.97 KiB is this feature's client code — the composer bound, the poll and the pane observer,
+two password fields, and the install guidance — none of which is an install asset. The icons
+themselves became **45,710 bytes lighter** and not one byte of that reaches the precache, because
+they were never in it.

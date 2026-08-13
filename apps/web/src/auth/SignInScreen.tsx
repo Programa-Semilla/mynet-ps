@@ -5,6 +5,8 @@ import { Link } from 'react-router'
 
 import { PRODUCT_NAME, PRODUCT_TAGLINE } from '../app/branding.js'
 import { BrandMark } from '../shell/BrandMark.js'
+import { PasswordField } from '../ui/PasswordField.js'
+import { InstallGuidance } from './InstallGuidance.js'
 import { useAuth } from './useAuth.js'
 
 /**
@@ -133,16 +135,20 @@ export const SignInScreen = () => {
             >
               Password
             </label>
-            <input
+            {/*
+              T027 (016) — reveal only. Signing in **sets** no credential, so there is nothing to
+              confirm: a confirmation field here would ask the reader to type their existing
+              password twice to prove they remember it, which is what the field they are already
+              filling in does.
+            */}
+            <PasswordField
               id={passwordId}
               name="password"
-              type="password"
               autoComplete="current-password"
               required
               value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              aria-describedby={failure ? errorId : undefined}
-              aria-invalid={failure ? true : undefined}
+              onChange={setPassword}
+              {...(failure ? { describedBy: errorId, invalid: true } : {})}
               className="w-full rounded-sm border border-border-subtle bg-surface-raised px-3 py-2 text-text-body"
             />
           </div>
@@ -188,6 +194,19 @@ export const SignInScreen = () => {
             Forgot your password?
           </Link>
         </p>
+
+        {/*
+          T054 (016) — **below everything, and last in the reading order** (FR-1037).
+
+          The guidance must not block, obscure or delay signing in, and placement is how that is
+          guaranteed rather than promised: it is after the form, after both links, in normal flow
+          — not a modal, not an interstitial, and nothing to get past. Somebody who came here to
+          sign in reaches every control before they reach this.
+
+          It renders nothing at all on desktop, on an installed instance, or once dismissed
+          (FR-1031, FR-1035), so this costs the other cases an empty element rather than a gap.
+        */}
+        <InstallGuidance />
       </div>
     </main>
   )

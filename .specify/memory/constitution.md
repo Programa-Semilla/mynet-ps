@@ -1,5 +1,54 @@
 <!--
 SYNC IMPACT REPORT
+Version change: 5.0.0 → 5.1.0
+
+RATIFICATION STATUS: **RATIFIED 2026-08-12**, on the same standing this project has used four
+times before: an implementation surfaced a platform dependency, and Principle V's own text requires
+the interface to be introduced *in the same change that introduces the capability* while forbidding
+the enumeration that names them from going stale. Drafted by the implementing session for 016's
+US5, which does not start before this lands.
+
+Rationale: MINOR. **A section is materially expanded and nothing is retracted.** Principle V's
+device-capability list gains an eighth entry, `InstallService`, and the paragraph explaining why it
+had to be an interface rather than a lint exemption. No prohibition is lifted, no principle is
+removed or redefined, and **no work performed under 5.0.0 is invalidated** — which is the versioning
+policy's own test for MINOR against MAJOR.
+
+**3.1.0 is the precedent and it is exact.** That amendment added `VisibilityService` as the seventh
+device interface for the same reason in the same shape: a poll had to stop while the tab was hidden,
+the only way to ask was a browser API feature code may not call, and the alternatives were an
+interface or an exemption. It was MINOR, and it recorded that *"the listing is the ratification
+act"* — which is why this is an amendment at all rather than a line of code somebody adds quietly.
+
+What forced it: FR-1031 requires the sign-in screen to explain that installing is what enables
+notifications, **when and only when** the reader is on a mobile-class device that has not installed
+the application. Notification delivery on iOS is available only to an installed application, so an
+attendee on an uninstalled iPhone can grant permission and receive nothing. Detecting that state
+needs `matchMedia('(display-mode: standalone)')` and a `beforeinstallprompt` listener on `window`,
+and `mynet/no-direct-platform-access` refuses both in feature code — the rule's `DOM` set names
+`matchMedia` and `window` explicitly, added after it was found reporting zero violations because its
+detector was too narrow.
+
+Alternatives considered and rejected, from 016's research R2:
+  - **A lint exemption for one call site.** Rejected on the constitution's own reasoning for
+    `VisibilityService`: an exemption would trade a structural boundary for a poll interval, and the
+    same trade here buys an install banner.
+  - **Detect via the service worker.** A worker cannot report whether the page is running standalone.
+  - **Always show the guidance.** Contradicts FR-1031's "when, and only when", and nags an attendee
+    who has already installed.
+
+**Deliberately NOT decided here**: nothing about notification triggers moves. A received message
+remains the only thing that dispatches (3.1.0, and 016's FR-1029 restates it for the card exchange).
+The guidance explains a capability; it does not request permission, and FR-1036 keeps
+`NotificationPrompt.tsx` the only caller of `requestPermission` in the client.
+
+Templates and downstream artifacts requiring updates: none. No template names the capability list,
+and `packages/platform/tests/substitution.test.ts` derives its expectations from `DeviceServices`
+rather than from a restated list, so the eighth capability is covered by that test the moment it is
+declared.
+
+PRIOR REPORT (4.1.0 → 5.0.0), retained because it is the amendment that gates 016 and 017:
+
 Version change: 4.1.0 → 5.0.0
 
 RATIFICATION STATUS: **RATIFIED 2026-08-12 by the project owner.**
@@ -1268,9 +1317,10 @@ Application code MUST call project-owned interfaces, never external APIs directl
 two dimensions:
 
 **Device and browser capabilities** — `NotificationService`, `CalendarService`, `CameraService`,
-`ContactShareService`, `SecureStorage`, `ConnectivityService`, and `VisibilityService` (added 3.1.0;
-whether the attendee is actually looking at this tab). Initial implementations MAY be web-based or
-no-op stubs.
+`ContactShareService`, `SecureStorage`, `ConnectivityService`, `VisibilityService` (added 3.1.0;
+whether the attendee is actually looking at this tab), and `InstallService` (added 5.1.0; whether
+the application is running installed, and how it may be installed on this device). Initial
+implementations MAY be web-based or no-op stubs.
 
 `VisibilityService` is listed for a reason worth stating, because it is the first capability added
 by an implementation rather than by a product decision. A surface that polls MUST NOT poll a tab
@@ -1279,6 +1329,23 @@ nobody is looking at — a backgrounded tab has its timers throttled unpredictab
 is `document.visibilityState`, and this principle forbids feature code from asking it directly. The
 choice was therefore an interface or an exemption, and an exemption would have traded a structural
 boundary for a poll interval.
+
+`InstallService` is the **second** capability added by an implementation rather than by a product
+decision, and it is listed on `VisibilityService`'s precedent rather than by analogy to it — the
+listing is the ratification act, and leaving the enumeration stale is what this clause exists to
+prevent. Notification delivery on iOS is available **only** to an installed application, so an
+attendee on an uninstalled iPhone can grant permission and still receive nothing; telling them so
+requires knowing whether the application is installed. The only way to ask is
+`matchMedia('(display-mode: standalone)')` together with a `beforeinstallprompt` listener on
+`window`, and `mynet/no-direct-platform-access` refuses both in feature code. The choice was again
+an interface or an exemption, and the same answer follows: an exemption would trade a structural
+boundary for an install banner.
+
+**The interface MUST model both platform halves as first-class, not one as a failure of the
+other.** Chromium fires `beforeinstallprompt` and can present a real system prompt; iOS Safari
+fires nothing and exposes no install API to the page at all, so its half is instructional copy and
+cannot be anything else. An interface shaped only around the Chromium case would make the iOS path
+look like an error rather than a different platform, and would invite a control that cannot work.
 
 **Platform capabilities** — `StorageService`, for durable binary content that does not belong in the
 database (added 2.3.0 by D9, for avatar images). This is a *platform* capability rather than a device
@@ -3187,4 +3254,4 @@ so a gap in the source would silently render as the wrong number against a neigh
 stay consistent with this constitution and MUST NOT contain implementation plans, session tasks,
 progress updates, or invented requirements.
 
-**Version**: 5.0.0 | **Ratified**: 2026-08-04 | **Last Amended**: 2026-08-12
+**Version**: 5.1.0 | **Ratified**: 2026-08-04 | **Last Amended**: 2026-08-12

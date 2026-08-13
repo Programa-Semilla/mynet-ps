@@ -142,11 +142,18 @@ export const meetingSlots = pgTable(
  *
  * ─────────────────────────────────────────────────────────────────────────────────────────
  * **PROPOSED, THEN ACCEPTED OR DECLINED — AND THE ASYMMETRY WITH CARDS IS DELIBERATE**
- * (constitution v3.2.0, N2).
+ * (constitution v3.2.0 N2, and it **survives** v5.0.0 C1).
  *
- * A card is one-directional and needs no acceptance; an appointment **claims a slot of somebody
- * else's time**, which a message and a card do not. That is the whole reason this table has a
- * status column and `shared_cards` has none.
+ * A card needs no acceptance; an appointment **claims a slot of somebody else's time**, which a
+ * message and a card do not. That is the whole reason this table has a status column and
+ * `shared_cards` has none.
+ *
+ * **016 made card exchange mutual and did NOT make it acceptable-or-declinable**, which is worth
+ * stating because the two look adjacent. C1 removed the *directionality* of a card, not the
+ * absence of a pending state: a card still discloses only what its owner had already published to
+ * co-attendees, so there is nothing for the other party to consent to. An appointment consumes
+ * something they cannot get back. The asymmetry therefore rests on what is at stake rather than on
+ * how many rows an act writes, and mutual exchange leaves that untouched.
  * ─────────────────────────────────────────────────────────────────────────────────────────
  *
  * **Deletion**: both attendee references cascade (FR-652), so either party's departure removes

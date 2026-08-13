@@ -108,7 +108,7 @@ test.describe('navigation', () => {
     // /network must not render attendee data to somebody who has not signed in.
     for (const destination of DESTINATIONS) {
       await page.goto(destination.path)
-      await expect(page.getByLabel('Password')).toBeVisible()
+      await expect(page.getByLabel('Password', { exact: true })).toBeVisible()
       await expect(destinationHeading(page, destination.heading)).toHaveCount(0)
     }
   })

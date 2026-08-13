@@ -3,6 +3,7 @@ import { useState, type FormEvent } from 'react'
 import { ADMIN_PRODUCT_NAME } from '../branding.js'
 import { classify, describe } from '../errors.js'
 import { useAdminSession } from '../session.js'
+import { PasswordField } from '../ui/PasswordField.js'
 
 /**
  * T067 (013) — administrative sign-in (FR-914, FR-915, FR-917, FR-922).
@@ -85,14 +86,16 @@ export const SignIn = () => {
           <label htmlFor="admin-password" className="block text-sm font-medium text-text-primary">
             Password
           </label>
-          <input
-            id="admin-password"
-            type="password"
-            autoComplete="current-password"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            className="mt-1 mb-4 block min-h-11 w-full rounded-lg border border-border-strong px-3 text-text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-coral-500"
-          />
+          {/* T028 (016) — reveal only (FR-1049). Signing in sets no credential. */}
+          <div className="mt-1 mb-4">
+            <PasswordField
+              id="admin-password"
+              autoComplete="current-password"
+              value={password}
+              onChange={setPassword}
+              className="block min-h-11 w-full rounded-lg border border-border-strong px-3 text-text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-coral-500"
+            />
+          </div>
 
           {failure ? (
             // `role="alert"` so the refusal is announced rather than only rendered. It is the

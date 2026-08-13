@@ -218,6 +218,99 @@ export interface VisibilityService {
   subscribe(listener: (visible: boolean) => void): () => void
 }
 
+/**
+ * T051 (016) — **whether this application is installed, and how it could be** (FR-1031–FR-1034).
+ *
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ * **AN EIGHTH CAPABILITY, AND ITS ADDITION IS RATIFIED RATHER THAN PERFORMED QUIETLY.**
+ *
+ * Constitution **v5.1.0** adds it to Principle V's enumerated list, which is the act
+ * `VisibilityService` established in v3.1.0: *"the listing is the ratification act."* This is the
+ * **second** capability added by an implementation rather than by a product decision, and 016's
+ * US5 did not begin before the amendment landed.
+ *
+ * Why it had to be an interface: **notification delivery on iOS is available only to an installed
+ * application**, so an attendee on an uninstalled iPhone can grant permission and still receive
+ * nothing. Telling them so requires knowing whether the application is installed, and the only
+ * way to ask is `matchMedia('(display-mode: standalone)')` plus a `beforeinstallprompt` listener
+ * on `window`. `mynet/no-direct-platform-access` names both `matchMedia` and `window` in its DOM
+ * set, so feature code asking directly fails lint today. The choice was an interface or an
+ * exemption, and an exemption would have traded a structural boundary for an install banner.
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ *
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ * **THE TWO PLATFORM HALVES ARE ASYMMETRIC, AND THIS INTERFACE SAYS SO ON PURPOSE.**
+ *
+ * Chromium fires `beforeinstallprompt`, and the page may hold that event and present a **real
+ * system prompt** later. **iOS Safari fires nothing and exposes no install API to the page at
+ * all** — installing is a manual gesture through the share sheet, and no amount of scripting can
+ * offer it.
+ *
+ * An interface modelling only the Chromium shape — say a lone `promptToInstall()` returning a
+ * boolean — would make the iOS path look like a *failure* of the same operation rather than a
+ * different platform, and the natural implementation of that shape is a control that does nothing
+ * on the majority of the phones this product is used on. FR-1034 forbids exactly that: where the
+ * platform offers no mechanism, the guidance gives steps the reader performs and **must not
+ * present a control that cannot work**.
+ *
+ * So `promptToInstall` is `null` when there is nothing to invoke, and a caller has to handle that
+ * before it can render anything. The absence is in the type.
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ *
+ * **It is deliberately the same shape as `ConnectivityService` and `VisibilityService`** — a
+ * current value plus a subscription — because it is the same *kind* of thing: an ambient platform
+ * state the UI reacts to. `beforeinstallprompt` can arrive after first paint, and an installed
+ * check can change between sessions, so a caller that read once would be wrong at the moment it
+ * mattered. **Nothing about install state is stored** (data-model.md): it is asked at render
+ * time, because a recorded answer goes stale silently.
+ */
+export interface InstallState {
+  /**
+   * True when the application is running as an installed application.
+   *
+   * **Where a platform ANSWERS the query unhelpfully this is `false`**, so the guidance shows
+   * rather than hides. A redundant hint to somebody who has already installed is a smaller harm
+   * than an attendee who never learns that notifications require installing at all — the
+   * specification's stated assumption, and the same "an absence of requests is a failure nobody
+   * sees" reasoning `WebVisibilityService` records for its own default.
+   *
+   * **That rule governs a bad answer and not a missing `matchMedia`, and the distinction had to be
+   * written down because the code already behaved this way** (016 review finding A7). `mobile`
+   * defaults `false` in the same case and the guidance renders only when `mobile` is true, so the
+   * "show rather than hide" claim was never what the reader got: one default silently overrode the
+   * other. A platform with no `matchMedia` gets **no** guidance, deliberately — every browser that
+   * can install a web application has had it for a decade, iOS included, so its absence means a
+   * test harness or a prerender rather than a device somebody is holding. `WebInstallService`
+   * carries the full argument.
+   */
+  readonly installed: boolean
+  /**
+   * True on a mobile-class device.
+   *
+   * **By viewport and pointer characteristics rather than by parsing a user-agent string**, which
+   * is unreliable and changes without notice. FR-1031 renders the guidance only here: a desktop
+   * browser can install too, but it does not have the iOS notification limitation this exists to
+   * explain, and nagging a laptop about a home screen is noise.
+   *
+   * **`false` where nothing can be measured**, which agrees with `installed` above rather than
+   * quietly overriding it: claiming a mobile device on the strength of no measurement would put a
+   * home-screen notice in front of something that has no home screen.
+   */
+  readonly mobile: boolean
+  /**
+   * Invokes the platform's own install prompt, or **`null` where the platform offers none**.
+   *
+   * Resolves to whether the reader accepted. **A declined install is a complete outcome and not
+   * an error** (spec edge case): the reader was asked and said no, which is the mechanism working.
+   */
+  readonly promptToInstall: (() => Promise<boolean>) | null
+}
+
+export interface InstallService {
+  current(): InstallState
+  subscribe(listener: (state: InstallState) => void): () => void
+}
+
 export interface DeviceServices {
   readonly notifications: NotificationService
   readonly calendar: CalendarService
@@ -227,4 +320,6 @@ export interface DeviceServices {
   readonly connectivity: ConnectivityService
   // 007 — appended. See `VisibilityService` above for why a seventh capability exists.
   readonly visibility: VisibilityService
+  // 016 — appended likewise. See `InstallService` above; added to Principle V's list in v5.1.0.
+  readonly install: InstallService
 }

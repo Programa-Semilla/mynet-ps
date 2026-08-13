@@ -4,31 +4,46 @@ import { IdCard } from 'lucide-react'
 import { useState } from 'react'
 
 /**
- * T061, T062 (008) — sharing your card, from another attendee's profile (FR-601, FR-603).
+ * T061, T062 (008), T042 (016) — exchanging cards, from another attendee's profile
+ * (FR-601, FR-603, FR-1021, FR-1022, FR-1052).
  *
  * ═════════════════════════════════════════════════════════════════════════════════════════
- * **T062 — THE LABEL AND THE CONFIRMATION BOTH STATE *WHOSE CARD MOVES*, AND THIS IS THE MOST
- * MISREADABLE CONTROL IN THE FEATURE** (FR-603).
+ * **THIS SURFACE ASSERTED THE OPPOSITE UNTIL 016, AND IT IS RECORDED RATHER THAN QUIETLY
+ * CORRECTED** (constitution **v5.0.0 (C1)**, FR-1021, FR-1022).
  *
- * "Share card" on somebody else's profile reads, to a great many people, as *take* their card —
- * which is the exact opposite of what happens. Sharing is one-directional: it gives **your**
- * details to **them** and gives you nothing back (FR-602, constitution v3.2.0 N2). Somebody who
- * misreads it has handed their contact details to a stranger while believing they collected one.
+ * Until C1, sharing was one-directional: it gave your details away and gave you nothing, and
+ * both this header and the confirmation below stated that as present fact, citing FR-602 and
+ * v3.2.0 (N2). C1 **retracts** both. `shareCard` now writes **both rows in one transaction**
+ * (FR-1022), so the sentence this component used to end on — *"you will hold theirs when they
+ * share it with you"* — was false at the instant it was displayed, and it was displayed on the
+ * one surface whose stated purpose is to stop card direction being misread.
  *
- * That is not a recoverable mistake. **A card cannot be recalled** (FR-618) — there is no
- * revocation route and there will not be one — so the label is the only place this can be got
- * right. Hence:
+ * It is worth naming the failure, because it is not a typo. The server half of C1 shipped while
+ * this file was not in the diff at all, and **two green tests required the retracted wording**.
+ * Where the comment is the record, the record has to be re-read when the model moves — and
+ * `apps/web/tests/unit/card-model-record.test.ts` is the guard that now fails a build over it.
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ *
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ * **T062 — THE LABEL KEEPS ITS POSSESSIVE, AND THE REASON SURVIVED THE REVERSAL** (FR-603).
+ *
+ * "Share card" on somebody else's profile reads, to a great many people, as *take* their card.
+ * Under mutual exchange that reading is now **half** right, which is worse than being wrong: the
+ * half it hides is that **your own details go out in the same act**, and that is the half which
+ * cannot be undone. **A card cannot be recalled** (FR-618, FR-1026) — there is no revocation
+ * route and there will not be one — and the other party is never asked (FR-1023), so nobody
+ * downstream can repair a misreading either. Hence:
  *
  *   - the visible label says **"Share your card"**, with the possessive doing the work;
  *   - the accessible name says it in full — *"Share your card with <name>"* — because a screen
  *     reader user navigating by control hears the name out of context, where "Share your card"
  *     alone gives no clue who receives it;
- *   - the confirmation names **both parties and the direction**, and says plainly that the
- *     reader has not received anything.
+ *   - the confirmation names **both parties** and states the exchange **in both directions**, so
+ *     a reader who expected only to collect learns immediately that they also gave.
  *
  * `quickstart.md` scenario 1 step 2 asks a human to *read the label before activating it*, for
  * exactly this reason, and a component test asserts the accessible name names the sharer's card.
- * ═════════════════════════════════════════════════════════════════════════════════════════
+ * ─────────────────────────────────────────────────────────────────────────────────────────
  *
  * ─────────────────────────────────────────────────────────────────────────────────────────
  * **A confirmation state, not a transient toast** (FR-603, and the prototype's defect).
@@ -110,12 +125,17 @@ export const ShareCardAction = ({
         className="w-full rounded-sm border border-mint-500 bg-mint-100 px-4 py-3 text-sm text-mint-700"
       >
         {/*
-          Names both parties and the direction, and says outright that nothing came back. The
-          second sentence is the one that closes the misreading the label is fighting: a reader
-          who believed they had collected a card learns immediately that they have not.
+          Names both parties and states the exchange **in both directions** (FR-1021, FR-1022).
+
+          The second sentence used to say the reader had received nothing and would hold the other
+          card only once it was shared back. Constitution v5.0.0 (C1) retracts that, and by the
+          time this renders the reciprocal row is already committed — so the old wording told the
+          reader the exchange had not happened while their new contact was on the next screen.
+          It now closes the misreading from the other side: whoever expected only to collect is
+          told, in the same breath, that they gave.
         */}
-        Your card is now with {displayName}. They can see your profile in their Network. You will
-        hold theirs when they share it with you.
+        You and {displayName} have exchanged cards. You can each see the other&apos;s profile in
+        Network.
       </p>
     )
   }

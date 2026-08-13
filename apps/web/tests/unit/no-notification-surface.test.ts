@@ -122,11 +122,21 @@ describe('no notification surface exists in the product (FR-560)', () => {
     expect(components).toEqual(['app/messages/NotificationPrompt.tsx'])
   })
 
-  it('nothing outside that component requests permission or subscribes (FR-551)', () => {
+  it('nothing outside that component requests permission or subscribes (FR-551, FR-1036)', () => {
     // FR-551 is enforced by construction rather than by review: the explanation and the prompt
     // are the same component, so a second caller would be a prompt with no explanation in front
     // of it. `services.ts` is excluded — the composition root constructs the capability, which is
     // not the same as using it.
+    //
+    // ─────────────────────────────────────────────────────────────────────────────────────
+    // **T050 (016) — FR-1036 rides on this assertion, and 016 is its first real test.**
+    //
+    // `auth/InstallGuidance.tsx` is a surface whose entire subject is notifications, on a screen
+    // reached before anybody has signed in. Requesting permission there is the obvious next
+    // thought and the wrong one — it would ask a stranger for permission to send messages they
+    // cannot yet receive, with no explanation in front of it. The guidance explains a capability
+    // and asks for nothing, and this is what keeps that true as it changes.
+    // ─────────────────────────────────────────────────────────────────────────────────────
     const callers = sourcesUnder(SRC)
       .filter(({ name }) => name !== 'app/messages/NotificationPrompt.tsx')
       .filter(({ text }) => /\brequestPermission\s*\(|\.\s*subscribe\s*\(\s*\)/.test(codeOf(text)))

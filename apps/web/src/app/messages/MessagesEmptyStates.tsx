@@ -139,6 +139,41 @@ export const ThreadOffline = ({ onRetry }: { onRetry: () => void }) => (
   </div>
 )
 
+/**
+ * T018 (016) — **the list has stopped keeping up** (FR-1010).
+ *
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ * **A NOTICE, NOT A FAILURE STATE, AND NOT THE OFFLINE ONE EITHER.**
+ *
+ * Three states now share this pane and each asks something different of the reader:
+ *
+ *   - `MessagesOffline` — *you* are disconnected, and there is nothing to show because nothing
+ *     is stored on this device. The reader waits, or retries when they are back.
+ *   - `ConversationsFailed` — the list could not be loaded **at all**. The screen is empty and
+ *     the reader has to retry.
+ *   - this — the list **is on screen and is real**; it has simply stopped updating itself. The
+ *     reader loses nothing by ignoring it and needs to do nothing at all.
+ *
+ * FR-1010 requires the third to be distinguishable from the first, which is why the wording says
+ * what the reader can still rely on rather than what has gone wrong.
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ *
+ * **No retry control**, deliberately. `usePoll` backs off and recovers on its own the moment the
+ * service does, so a button would offer to do something already happening — and would make the
+ * reader responsible for a repair they cannot perform. `role="status"` rather than `alert`
+ * because it is a condition rather than something that just went wrong, and an assertive region
+ * would interrupt a screen reader mid-conversation.
+ */
+export const ConversationsStale = () => (
+  <div
+    role="status"
+    className="mb-4 rounded-md border border-warning-500 bg-warning-100 px-4 py-2 text-sm text-warning-700"
+  >
+    This list has stopped updating. Your conversations are still here, and it will catch up on its
+    own when the connection returns.
+  </div>
+)
+
 /** A fault on our side. Always offers a retry, because that is the honest next step (FR-059). */
 export const ConversationsFailed = ({ onRetry }: { onRetry: () => void }) => (
   <Failed
