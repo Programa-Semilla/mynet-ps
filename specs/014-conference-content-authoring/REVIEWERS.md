@@ -2,10 +2,11 @@
 
 **Generated**: 2026-08-12 | **Spec**: [spec.md](spec.md)
 
-> **Read this first.** This PR carries **constitution v4.2.0**, which was **drafted for this feature
-> and gates its first line of code** — the same arrangement 008, 009 and 013 each shipped under. If
-> you reject the amendment, you reject the feature. The amendment is two decisions, not one, and
-> they are in the Key Decisions section below.
+> **Read this first.** This PR carries **constitution v4.2.0**, drafted for this feature and
+> **ratified by the owner on 2026-08-12** before any code was written — the same arrangement 008,
+> 009 and 013 each shipped under. It is standing decisions **40–44**, and it is two decisions rather
+> than one: a second notification trigger, and an organizer's authority to create a conference.
+> Both are in Key Decisions below.
 
 ## Why This Change
 
@@ -165,7 +166,7 @@ foundation and the densest; Phase 5 is the part that needs the amendment most di
 
 ## Review Checklist
 
-- [ ] **v4.2.0 is acceptable as drafted** — both decisions, not just the notification one
+- [ ] **The code matches v4.2.0 as ratified** — both decisions, not just the notification one
 - [ ] The trigger set is exactly three cases, and a session *starting* still dispatches nothing
 - [ ] The dispatch caller is **not** under `notifications/` (T020)
 - [ ] Act and audit entry commit together, and the act rolls back when the entry fails (T023–T025)

@@ -1,7 +1,8 @@
 # Brainstorm: Conference content authoring (014)
 
 **Date:** 2026-08-12
-**Status:** active
+**Status:** spec-created — `specs/014-conference-content-authoring/`; amendment **v4.2.0 ratified
+2026-08-12** as standing decisions 40–44
 
 ## Problem Framing
 

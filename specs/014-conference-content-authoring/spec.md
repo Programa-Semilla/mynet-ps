@@ -4,16 +4,15 @@
 
 **Created**: 2026-08-12
 
-**Status**: Draft — **gated on constitution v4.2.0, which is DRAFTED AND NOT YET RATIFIED.**
+**Status**: Ready for implementation — **constitution v4.2.0 RATIFIED 2026-08-12.**
 
 **Input**: Brainstorm #10 (`brainstorm/10-conference-content-authoring.md`), decided 2026-08-12.
 Licensed in principle by constitution v4.0.0 standing decision 36, which names 014 as the second
 feature of the administrative programme.
 
-> **This specification MUST NOT be implemented until v4.2.0 is ratified.** The amendment gates the
-> first line of code, as v3.1.0 gated 007's Phase 7, v3.2.0 gated 008, v3.3.0 gated 009 and v4.0.0
-> gated 013. Five decisions in this spec — N1 through N5 — exist only in drafted text. If any is
-> reworded at ratification, the requirements citing it change with it.
+> **v4.2.0 was ratified on 2026-08-12, unchanged from the drafted text**, so every requirement citing
+> N1–N5 stands as written. The amendment gated the first line of code, as v3.1.0 gated 007's Phase 7,
+> v3.2.0 gated 008, v3.3.0 gated 009 and v4.0.0 gated 013. **Nothing now blocks implementation.**
 
 **Departure from the delivery roadmap** (Governance, "Delivery decomposition"): the roadmap's
 reserved-number table stops at the shipped attendee programme and does not cover this feature. 013

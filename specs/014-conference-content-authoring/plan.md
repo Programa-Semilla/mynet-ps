@@ -1,7 +1,7 @@
 # Implementation Plan: Conference Content Authoring
 
 **Branch**: `spec/014-conference-content-authoring` | **Date**: 2026-08-12 | **Spec**: [spec.md](./spec.md)
-**Constitution**: v4.2.0 (N1–N5) — **DRAFTED, NOT RATIFIED. It gates the first line of code.**
+**Constitution**: v4.2.0 (N1–N5) — **RATIFIED 2026-08-12, unchanged from the drafted text.**
 **Input**: Feature specification from `specs/014-conference-content-authoring/spec.md`
 
 ## Summary
@@ -69,7 +69,7 @@ refused. The attendee product gains no new cached read
 
 **No violation requiring justification.** Two risks are tracked below rather than waived.
 
-**Governance**: blocked **only** by v4.2.0's ratification. Resolves no register entry. **Escalates**
+**Governance**: **blocked by nothing.** Resolves no register entry. **Escalates**
 entry **4** (a substantial new administrative surface at desktop width) and entry **22** (the cached
 programme gains a second way to be wrong). Opens none beyond **27** and **28**, which v4.2.0 opens.
 Reserved migration **`0011`**.

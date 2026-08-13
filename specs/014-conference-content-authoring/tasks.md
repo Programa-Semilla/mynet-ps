@@ -1,11 +1,11 @@
 # Tasks: Conference Content Authoring
 
 **Feature**: 014 · **Branch**: `spec/014-conference-content-authoring` · **Migration**: `0011`
-**Spec**: [spec.md](./spec.md) · **Plan**: [plan.md](./plan.md) · **Constitution**: **v4.2.0 — DRAFTED, NOT RATIFIED**
+**Spec**: [spec.md](./spec.md) · **Plan**: [plan.md](./plan.md) · **Constitution**: **v4.2.0 — RATIFIED 2026-08-12**
 
-> **T001 is blocked until v4.2.0 is ratified.** The amendment gates the first line of code, as
-> v3.1.0 gated 007's Phase 7, v3.2.0 gated 008, v3.3.0 gated 009 and v4.0.0 gated 013. Five
-> requirements cite N1–N5 directly.
+> **T001 is unblocked.** v4.2.0 was ratified unchanged from the drafted text, so every requirement
+> citing N1–N5 stands as written. The amendment gated the first line of code, as v3.1.0 gated 007's
+> Phase 7, v3.2.0 gated 008, v3.3.0 gated 009 and v4.0.0 gated 013.
 
 ## Format: `[ID] [P?] [Story] Description`
 
@@ -82,7 +82,7 @@ T074). No new repository member is added — that is the point of R7.
 
 **Purpose**: schema and generated artifacts. Nothing here is feature behaviour.
 
-- [ ] T001 Move `apps/api/migrations/meta/README.md` aside before any generation — `drizzle-kit generate` JSON-parses every file in `meta/`, and that README explains why the journal lists `0003` before `0004`. Restore it after
+- [ ] T001 *(unblocked — v4.2.0 ratified)* Move `apps/api/migrations/meta/README.md` aside before any generation — `drizzle-kit generate` JSON-parses every file in `meta/`, and that README explains why the journal lists `0003` before `0004`. Restore it after
 - [ ] T002 Add `cancelledAt`, `logisticsChangedAt` and `lastChangeActId` to `sessions` in `apps/api/src/db/schema/catalog.ts`, each with a header stating it is conference content and why it is stored rather than derived
 - [ ] T003 [P] Add `viewedAt` (`NOT NULL DEFAULT now()`) to `savedSessions` in `apps/api/src/db/schema/agenda.ts`, with a header stating **why the default is the save instant** — there is no `created_at` to compare against
 - [ ] T004 Add `sessions_event_cancelled_idx` and `saved_sessions_session_id_idx` in the same schema files, with a comment on the second naming the fan-out query it serves and the sequential scan it prevents

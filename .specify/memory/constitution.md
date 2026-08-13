@@ -2,14 +2,19 @@
 SYNC IMPACT REPORT
 Version change: 4.1.0 → 4.2.0
 
-RATIFICATION STATUS: **DRAFTED 2026-08-12, pending the project owner's ratification.** Drafted at his
-request following brainstorm #10 (`brainstorm/10-conference-content-authoring.md`), which decided the
-shape of feature 014 — conference content authoring — the same day.
+RATIFICATION STATUS: **RATIFIED 2026-08-12 by the project owner**, on reading the drafted amendment
+together with the specification, plan and task list it gates. Drafted the same day at his request
+following brainstorm #10 (`brainstorm/10-conference-content-authoring.md`), which decided the shape
+of feature 014 — conference content authoring.
 
-It is drafted rather than ratified because this project does not let an amendment ratify itself.
-3.2.0 and 3.3.0 were each ratified by the owner at the gate of the feature they licensed, 3.4.0 by
-the act of supplying the asset it recorded, and 4.0.0 on reading the drafted text. **Feature 014 is
-blocked until this is ratified**, and its first line of code with it.
+It was drafted first and ratified second, because this project does not let an amendment ratify
+itself. 3.2.0 and 3.3.0 were each ratified by the owner at the gate of the feature they licensed,
+3.4.0 by the act of supplying the asset it recorded, and 4.0.0 on reading the drafted text.
+**Feature 014 is licensed from this point**, including its first line of code.
+
+**What ratification does NOT do**: entries 27 and 28 remain open, and neither blocks 014. Ratifying
+a second notification trigger did not decide whether an attendee may suppress its content, nor who
+answers for a speaker's personal data. Entries 19, 21, 4 and 22 are untouched.
 
 Rationale: MINOR. Notification scope is materially expanded — from one trigger to two — and one
 authority boundary is stated that 4.0.0 left implicit. No principle is removed or redefined, nothing
@@ -71,10 +76,11 @@ Register changes:
 
 Templates and dependent artifacts:
   - .specify/templates/spec-template.md, plan-template.md, tasks-template.md — ✅ no change required.
-  - CLAUDE.md — ⚠ pending ratification: standing decisions 40–44 and the two new entries.
+  - CLAUDE.md — ✅ updated on ratification: standing decisions 40–44, register entries 27 and 28.
   - brainstorm/00-overview.md, brainstorm/10-conference-content-authoring.md — ✅ current.
+  - specs/014-conference-content-authoring/{spec,plan,tasks}.md — ✅ ratification gate lifted.
 
-Deferred: none that block 014 once this is ratified.
+Deferred: none. Feature 014 has no blocking register entry.
 
 A NOTE ON WHAT THIS AMENDMENT COSTS, because the trade is not obvious: 3.1.0's trigger rule was
 written to be narrow **by construction** — "a feature that wants a second trigger MUST amend this

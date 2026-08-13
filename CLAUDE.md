@@ -5,7 +5,7 @@ Guidance for Claude Code (claude.ai/code) working in this repository.
 This file is the **working brief**: what the product is, what has been decided, and how work is
 done here. It is deliberately short. Depth lives elsewhere, and these are authoritative over it:
 
-1. **`.specify/memory/constitution.md` (v4.1.0)** — governance and the authoritative decision
+1. **`.specify/memory/constitution.md` (v4.2.0)** — governance and the authoritative decision
    register. Supersedes tool defaults, habit, and any conflicting statement in this file.
 2. **`docs/superpowers/specs/2026-08-06-mynet-delivery-roadmap-design.md`** — the decomposition of
    the remaining product into features, with dependency order, reserved migration numbers, and gate
@@ -366,7 +366,10 @@ the comment is the record, a header is a claim that needs a guard like any other
 the four already had the executor parameter**, so what looked like design work was wiring.
 
 **Migrations claimed so far run to `0009`** (`0009_administrative_foundation.sql`; 010 added no
-schema). **012 reserves `0010`.** The journal lists `0003` before `0004` while carrying a
+schema). **012 reserves `0010` and 014 reserves `0011`.** That is the **third** collision between
+parallel branches over a reservation, and the roadmap's reserved-number table still stops at the
+shipped attendee programme — it covers neither programme now in flight and must be extended rather
+than corrected. The journal lists `0003` before `0004` while carrying a
 later timestamp — `apps/api/migrations/meta/README.md` explains why both halves are load-bearing and
 what a regenerating feature must not "fix". Anyone regenerating must move that README aside first,
 because `drizzle-kit generate` JSON-parses every file in `meta/`.
@@ -1027,6 +1030,68 @@ the same session. The administrative programme is unblocked:**
     conference content is not attendee data. Reverting ownership silently to the platform tier was
     rejected — it is a tidier invariant that hides the event nobody is prompted to act on.
 
+**2026-08-12** (ratified in constitution **v4.2.0**) — **the amendment gating 014, and the first
+widening of the notification trigger set since v3.1.0 created it.** Two decisions, stated separately
+because either could have been inferred from the other and neither was:
+
+40. **A second notification trigger exists: a material change to a session the attendee has SAVED.**
+    Material means **exactly three things — the session is cancelled, its start time changes, or its
+    room changes.** The principle that generated the set is *a notification is raised when a change
+    affects **where or whether** the attendee must be somewhere*; a title, a summary or a change of
+    speaker is content, and content does not strand anybody in the wrong corridor. **The set is
+    enumerated rather than described on purpose**: v3.1.0's rule was narrow *by construction* — "a
+    feature that wants a second trigger MUST amend this block" — and 014 is the first feature to take
+    it up, so the rule worked exactly as designed. What widening costs is that "one trigger" could be
+    checked by reading one sentence and "two triggers, the second bounded by three named changes"
+    cannot. **A session *starting* is still forbidden**, and that distinction is load-bearing: the
+    first is a reminder an attendee could set themselves, the second is information only the product
+    holds. **The bell and the in-app notification centre remain forbidden**, unchanged.
+41. **The in-app marker is per-row state, never an inbox — and the prohibition governs surfaces
+    INSIDE the product.** A changed saved session is marked on its own row in Agenda and on Home.
+    One organizer act dispatches **one coalesced notification per attendee** whose body carries a
+    count, however many of their saved sessions it touched: a notification is a single interruption
+    by nature, and a dozen interruptions from one act is the product v3.1.0's exclusion existed to
+    prevent. So **a count is permitted in the payload and forbidden everywhere it could become
+    something to look at.** Two rules hold that line: activating such a notification MUST land on the
+    destination carrying the per-row markers, never on a list of changes; and **no view in either
+    product may present that count.** The moment a screen answers "how many things changed", this is
+    broken regardless of what the payload does.
+42. **A conference organizer may create a conference, and is assigned to what they create.** This is
+    the **only product-wide capability the tier holds**, and it is stated rather than inferred
+    because decision 32's *"authority reaches only the conferences they are assigned"* cannot
+    describe the act of creating one. Two bounds keep that clause true in substance: authority over a
+    conference they did **not** create still comes only from assignment by a platform operator, and
+    creating is **not a promotion path** — it grants no platform capability and no route to promote
+    anybody. **Nothing bounds how many conferences an organizer may create**, which is bounded by
+    trust rather than by a limit, since promotion is itself platform-tier only. Recorded as accepted,
+    not overlooked.
+43. **Conference content is live-edited. There is no draft/publish lifecycle**, and a feature MUST
+    NOT add one without an amendment. A conference is reachable only by its join code, so an
+    unfinished one is already private to whoever holds that code — a lifecycle would be a second gate
+    over a gate that exists, and a second state for every read path to consult. The consequence is
+    accepted rather than hidden: an organizer authors into a conference their attendees can already
+    see.
+44. **A session ANY attendee has engaged with may be CANCELLED and MUST NOT be deleted.** Engagement
+    means a saved session, a private note, a question, or a vote. Deletion stays available only while
+    nothing is attached; cancellation is **stored state**, not derived — unlike 008's `lapsed`,
+    because it is an organizer's act rather than a function of the clock. **This is a correction of a
+    live hazard rather than a preference**: `saved_sessions`, `session_notes`, `session_questions`
+    and `question_votes` each cascade from `sessions.id`, so before 014 one delete would have
+    destroyed other people's private writing with no confirmation and no record. **009's precedent
+    does not license it** — a withdrawn question takes everybody's votes because the *author*
+    exercised erasure over their own words, and that does not transfer to a third party erasing
+    somebody else's. The cascades are **not removed**; they stay correct for the case deletion is
+    still permitted, and the protection is the refusal plus a lock, not a change to the referential
+    rules.
+
+**Two register entries opened by v4.2.0, and neither blocks 014**: **27** — whether an attendee may
+suppress content in notifications, **promoted** from a deferral that had sat in prose since v3.1.0,
+because a saved-session push now puts a session title on a lock screen alongside message text and two
+amendments have accepted the same cost without deciding the mitigation; and **28** — speakers are
+personal data about people who are not attendees, which is not new, but v4.2.0 makes those rows
+**organizer-authored** rather than seeded, moving responsibility from a reviewed commit to a promoted
+attendee typing into a form.
+
 ## How work is done here
 
 ### Branching and change flow
@@ -1168,6 +1233,21 @@ not been opened deliberately.
 
 - ~~**Register entries 24, 25 and 26**~~ — **RESOLVED 2026-08-11 in v4.1.0** as standing decisions
   38, 39 and 37 respectively. They are now binding text rather than questions.
+
+- **Register entry 27 — whether an attendee may suppress content in notifications.** Opened by
+  v4.2.0, and **promoted** rather than new: it has sat in prose since v3.1.0 as "accepted rather than
+  solved". A saved-session notification carries a session title, so what somebody chose to attend is
+  now on their locked device alongside what somebody said to them. **Two amendments have accepted the
+  same cost without deciding the mitigation**, and the usual one — a per-attendee content preference
+  — has never been weighed. Numbered now because a consequence recorded twice in the same words is
+  one nobody acts on. **Blocks nothing.**
+
+- **Register entry 28 — speakers are personal data about people who are not attendees.** A speaker
+  row carries a real person's name, title and company, and has since 002. What v4.2.0 changes is that
+  the rows become **organizer-authored**, moving responsibility from a reviewed commit to a promoted
+  attendee typing into a form. Principle VIII has only ever considered attendees, and both coverage
+  tests derive from the schema, so the question they cannot ask is who answers for somebody who never
+  signed up. **Blocks nothing today; blocks any claim that Principle VIII's coverage is complete.**
 
 - **Register entries 19 and 21 are ADDRESSED but NOT closed — by v4.0.0, v4.1.0, or 013 shipping.**
   013 built the first actor capable of moderating an avatar and of reading a report queue, and

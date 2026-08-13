@@ -13,11 +13,12 @@ v4.0.0 opened. It opens a **second programme** of three features, delivered from
 011 was taken by the UAT work while the administrative branch was in flight.
 
 **013 has since shipped** ([#20](https://github.com/Programa-Semilla/mynet-ps/pull/20)), and **#10
-brainstormed 014 — conference content authoring**, the second feature of that programme. It needs
-its own amendment, **v4.2.0**, carrying two changes: a **second notification trigger** — the first
-since v3.1.0 bounded delivery to a received message and nothing else — and an explicit statement
-that a conference organizer may **create** a conference, which decision 32's "only conferences they
-are assigned" did not anticipate)
+brainstormed 014 — conference content authoring**, the second feature of that programme. Its
+amendment **v4.2.0 was ratified on 2026-08-12** as standing decisions 40–44, carrying two changes: a
+**second notification trigger** — the first since v3.1.0 bounded delivery to a received message and
+nothing else — and an explicit statement that a conference organizer may **create** a conference,
+which decision 32's "only conferences they are assigned" did not anticipate. It opens register
+entries 27 and 28 and closes none. **014 is specified, planned and unblocked**)
 
 The authoritative registers live elsewhere — open questions in `.specify/memory/constitution.md`,
 delivery sequence in `docs/superpowers/specs/2026-08-06-mynet-delivery-roadmap-design.md`. This file
@@ -39,7 +40,7 @@ win and this is stale.
 | 08 | 2026-08-10 | brand-mark-and-app-icons | **specified, then implemented**; register entry 2 ratified in constitution **v3.4.0** | `specs/010-brand-mark-and-app-icons/` |
 | 08 | 2026-08-10 | uat-deployment-and-hardening | **shipped (PR #19)**; five owner decisions ratified in constitution **v3.5.0** | `brainstorm/08-uat-deployment-and-hardening.md` |
 | 09 | 2026-08-11 | administrative-product | **decided, and ratified as constitution v4.0.0** the same day — standing decisions 31–36. Opened entries 24, 25, 26; **all three closed by v4.1.0** as decisions 37–39. Delivered as **012** | `brainstorm/09-administrative-product.md` |
-| 10 | 2026-08-12 | conference-content-authoring | **decided**, pending amendment **v4.2.0** — which gates the first line of code, as v3.1.0/v3.2.0/v3.3.0/v4.0.0 each did. Live editing from day one; **cancel replaces delete once attendees have engaged**; an in-app marker **and** a push for a changed saved session; both tiers create conferences. One PR, migration `0011` | `brainstorm/10-conference-content-authoring.md` |
+| 10 | 2026-08-12 | conference-content-authoring | **decided, and ratified as constitution v4.2.0** the same day — standing decisions 40–44; opens entries 27 and 28. Specified and planned: 51 FRs, 105 tasks. Live editing from day one; **cancel replaces delete once attendees have engaged**; an in-app marker **and** a push for a changed saved session; both tiers create conferences. One PR, migration `0011` | `brainstorm/10-conference-content-authoring.md` |
 
 Session 05 has no document of its own: 006 was specified without one, and the row records the
 session rather than a file. 009 likewise — it went straight to specification, and its row is
@@ -108,7 +109,7 @@ requires reversing a Principle III **prohibition** rather than filling an omissi
 | # | Phase | Status | Blocked by |
 |---|-------|--------|------------|
 | 013 | Administrative foundation — second actor, admin site, **abuse-report queue** | **shipped** — squash-merged to `develop`; amendments ratified as **v4.0.0** and **v4.1.0**. Migration `0009` | ~~24, 25, 26~~ — **all three closed by v4.1.0** |
-| 014 | Conference content authoring | **brainstormed** (#10) and decided; licensed by v4.0.0, but **gated on a new amendment v4.2.0** it opens itself. Live editing from day one, so #09's central question — what editing a live conference does to attendees who saved those sessions — is answered here rather than deferred. Migration `0011` | 013 ✓; v4.2.0 |
+| 014 | Conference content authoring | **specified and planned; unblocked.** Amendment **v4.2.0 ratified 2026-08-12** (decisions 40–44). Live editing from day one, so #09's central question — what editing a live conference does to attendees who saved those sessions — is answered here rather than deferred: **cancel replaces delete once anyone has engaged**. 51 FRs, 105 tasks, migration `0011` | 013 ✓; v4.2.0 ✓ |
 | 015 | Registration and attendee management | **brainstormed** (#09); licensed by v4.0.0 | 013 |
 
 **Numbered 011–013 when #09 ran, and delivered as 013–015.** The UAT deployment work took 011 from a
