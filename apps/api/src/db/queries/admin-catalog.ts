@@ -1155,8 +1155,11 @@ export const overlappingInRoom = async (
       and(
         eq(sessions.eventId, scope.eventId),
         eq(sessions.roomId, input.roomId),
-        sql`${sessions.startsAt} < ${new Date(input.endsAt)}`,
-        sql`${sessions.endsAt} > ${new Date(input.startsAt)}`,
+        // Bound as ISO strings with an explicit cast, for the reason `withinConferenceDays`
+        // records: a `Date` inside a `sql` fragment has no column to tell postgres.js how to
+        // encode it.
+        sql`${sessions.startsAt} < ${input.endsAt}::timestamptz`,
+        sql`${sessions.endsAt} > ${input.startsAt}::timestamptz`,
         sql`${sessions.cancelledAt} is null`,
         input.excludeSessionId ? ne(sessions.id, input.excludeSessionId) : undefined,
       ),
@@ -1251,11 +1254,21 @@ const withinConferenceDays = async (
   input: SessionInput,
   tx: Tx,
 ): Promise<boolean> => {
+  // ─────────────────────────────────────────────────────────────────────────────────────────
+  // **The instants are bound as ISO strings with an explicit `::timestamptz` cast, never as
+  // `Date` objects.** A raw `execute` hands parameters straight to postgres.js, which encodes a
+  // `Date` only where a column type tells it to — inside a raw statement there is no column, and
+  // it throws `The "string" argument must be of type string`. Drizzle's query builder does the
+  // conversion because it knows the column; this is the one place that knowledge is absent.
+  //
+  // The same class of mistake as 010's `sql<Date>\`now()\``, which was an assertion to the type
+  // checker rather than a conversion and arrived as a string.
+  // ─────────────────────────────────────────────────────────────────────────────────────────
   const rows = await tx.execute<{ inside: boolean }>(sql`
     SELECT (
-      (${new Date(input.startsAt)} AT TIME ZONE e.timezone)::date
+      (${input.startsAt}::timestamptz AT TIME ZONE e.timezone)::date
         BETWEEN e.starts_on AND e.ends_on
-      AND (${new Date(input.endsAt)} AT TIME ZONE e.timezone)::date
+      AND (${input.endsAt}::timestamptz AT TIME ZONE e.timezone)::date
         BETWEEN e.starts_on AND e.ends_on
     ) AS inside
     FROM ${events} e
