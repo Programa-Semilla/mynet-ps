@@ -108,6 +108,15 @@ action and the current state to a screen reader (FR-1016).
 ## Scenario 5 — Cards exchange mutually (US4, FR-1021–FR-1030, FR-1053, SC-1006)
 
 1. Profile A: open B's profile in Discover and share a card. **B does nothing.**
+
+**Expected — READ THE CONFIRMATION, do not just dismiss it** (FR-1055): it says
+*"You and {B} have exchanged cards. You can each see the other's profile in Network."*
+
+It must **not** say *"you will hold theirs when they share it with you"* or anything else implying
+nothing came back. That sentence shipped, contradicted the server on the one surface built to
+prevent exactly that misreading, and **two green tests required it** — which is why a human reading
+the words is a step here rather than an afterthought. No automated gate caught it.
+
 2. Profile A: open Network.
 
 **Expected**: B is in A's contacts.

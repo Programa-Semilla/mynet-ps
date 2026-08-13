@@ -1,6 +1,47 @@
 # Review Guide: App fixes, mutual card exchange, and the install icon
 
-**Generated**: 2026-08-12 | **Spec**: [spec.md](spec.md)
+**Generated**: 2026-08-12 | **Updated**: 2026-08-13 after the deep review | **Spec**: [spec.md](spec.md)
+
+## Read This First — the deep review changed the shape of the change
+
+**33 findings: 2 Critical, 15 Important, 16 Minor. All 33 fixed.** Full record in
+[review-findings.md](review-findings.md). If you read one thing before the diff, read this:
+
+**The feature was about to ship a screen telling attendees the card exchange had not happened.**
+`ShareCardAction` rendered *"You will hold theirs when they share it with you"* while the server
+wrote both rows — on the one surface whose own header says it exists to prevent a misreading of card
+direction. **Two green tests required that sentence**, and spec compliance scored **100%** over it.
+
+Three failures had to coincide, and each is worth a reviewer's attention because none is unique to
+this feature:
+
+1. **FR-1052 was scoped to "every comment, docblock and header"** — one word short of the screen.
+   The implementation satisfied it *exactly*. **FR-1055 now covers user-facing copy.**
+2. **The suite was enforcing the retracted model.** Both assertions were rewritten **and retitled** —
+   a stale title leaves the wrong claim in place even when the assertion is fixed.
+3. **A requirement whose subject is prose cannot be verified by searching for its own number.** The
+   number appears wherever the work was done and nowhere it was missed. That is why the citation
+   sweep scored it compliant.
+
+**Three files that were never in the original diff are now part of it** —
+`ShareCardAction.tsx`, `NetworkStates.tsx`, `AttendeeProfile.tsx`. The third mattered most: its
+justification for the scheduling control (*"they do not become your contact"*) was **false**, so the
+next reader could have deleted a working control on the strength of a comment.
+
+### Where to spend your review attention
+
+| Area | Why |
+|---|---|
+| `apps/web/tests/unit/card-model-record.test.ts` | The new guard. Scans **prose**, unlike every other absence test here, because prose is its subject. Keeps the pre-fix sentences as fixtures, so weakening a pattern **fails** rather than silently passing. |
+| `apps/api/src/db/client.ts` | New pool timeouts. 016's deadlock fix traded a fast `40P01` abort for an unbounded **wait**, and `shareCard` holds 1 of 10 connections across five round trips — ten stalled shares stopped **every** route. |
+| `scripts/generate-install-icons.mjs` | `INSTALL_ICONS` is now one inventory both readers project from, so a new output fails the upscale check **by existing**. Previously a hand-kept list of 6 measured a pipeline emitting 7. |
+| `apps/api/src/auth/throttle.ts` | The comment claimed the reciprocal row "harms nobody". Its subject is the **recipient**, and it confers a permanent live-resolving profile read. `freeAttempts` 10 → 5. |
+| `useDisplayed.ts` / `usePoll.ts` | `ResizeObserver` (not `IntersectionObserver` — its root is the viewport, the coupling FR-1054 forbids), and `POLL_SUPERSEDED` so a superseded read stops reporting success. |
+
+**One open question came out of it and is NOT closed**: a card acquired by mutual exchange outlives
+the discoverability toggle that licensed it. C1's ground holds for the *instant* of sharing, not the
+*duration*. Recorded in `CLAUDE.md`'s open questions; **promoting it to a numbered constitution
+register entry is an owner act**, and a throttle bounds a rate, not a right.
 
 ## Why This Change
 

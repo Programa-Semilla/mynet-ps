@@ -21,10 +21,13 @@ The lesson is the transferable part: **a requirement whose subject is prose cann
 grepping for its own number.** The number appears wherever the work was done and nowhere it was
 missed, so the check is brightest exactly where it is blindest.
 
-| | Result |
-|---|---|
-| Functional requirements | **53/54** — FR-1052 unmet |
-| Success criteria | **11/11** |
+| | Result at review time | After fixes |
+|---|---|---|
+| Functional requirements | **53/54** — FR-1052 unmet | **55/55** — FR-1052 met, FR-1055 added |
+| Success criteria | **11/11** | **11/11** |
+
+**The right-hand column is the current state**; the left is preserved because a review that quietly
+overwrites what it found stops being evidence of anything. FR-1055 raises the count to 55.
 
 **53 of the 54 FRs are cited in code.** The one that is not is **FR-1048** — *"the weight of every
 changed install asset MUST be recorded in a durable place"* — which is discharged in

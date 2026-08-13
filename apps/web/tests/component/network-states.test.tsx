@@ -168,6 +168,17 @@ describe('the contacts list', () => {
 
     expect(await screen.findByText(/your contacts will appear here/i)).toBeInTheDocument()
 
+    // ───────────────────────────────────────────────────────────────────────────────────────
+    // **FR-1055 — the body states the EXCHANGE, and used to instruct the reader to wait.**
+    //
+    // It read *"theirs will arrive here when they share back"*, describing a step C1 removed.
+    // `card-model-record.test.ts` catches a regression to that wording, but a source guard can
+    // only prove the old claim is absent — it cannot prove the right one is present. Both
+    // halves are needed, and the heading assertion above would have passed either way.
+    // ───────────────────────────────────────────────────────────────────────────────────────
+    expect(screen.getByText(/sharing a card is an exchange/i)).toBeInTheDocument()
+    expect(screen.queryByText(/share back|shares back/i)).not.toBeInTheDocument()
+
     // A contact exists only because somebody shared a card, and cards are shared from a profile
     // in Discover — so the empty state has exactly one next step and must offer it.
     expect(screen.getByRole('link', { name: /find people to meet/i })).toHaveAttribute(

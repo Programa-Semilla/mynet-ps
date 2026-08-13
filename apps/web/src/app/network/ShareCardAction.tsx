@@ -5,7 +5,7 @@ import { useState } from 'react'
 
 /**
  * T061, T062 (008), T042 (016) — exchanging cards, from another attendee's profile
- * (FR-601, FR-603, FR-1021, FR-1022, FR-1052).
+ * (FR-601, FR-603, FR-1021, FR-1022, FR-1052, FR-1055).
  *
  * ═════════════════════════════════════════════════════════════════════════════════════════
  * **THIS SURFACE ASSERTED THE OPPOSITE UNTIL 016, AND IT IS RECORDED RATHER THAN QUIETLY

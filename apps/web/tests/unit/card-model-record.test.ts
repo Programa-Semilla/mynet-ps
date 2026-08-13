@@ -5,7 +5,15 @@ import { describe, expect, it } from 'vitest'
 
 /**
  * T042 (016) — **no source file may describe card sharing as one-directional as current fact**
- * (FR-1021, FR-1022, FR-1052, constitution v5.0.0 C1).
+ * (FR-1021, FR-1022, FR-1052, **FR-1055**, constitution v5.0.0 C1).
+ *
+ * **It guards two requirements, and FR-1055 is the one that had no guard at all.** FR-1052 covers
+ * comments, docblocks and headers. **FR-1055 covers user-facing strings**, and it was added during
+ * this feature's deep review precisely because FR-1052 stopped one word short of the screen: the
+ * implementation satisfied FR-1052 exactly while the confirmation went on telling the sharer the
+ * exchange had not happened. This file scans **prose**, so it reaches both — the comment and the
+ * rendered sentence are the same kind of claim to it, which is the whole reason it does not strip
+ * comments the way every other absence test here does.
  *
  * ═════════════════════════════════════════════════════════════════════════════════════════
  * **THIS EXISTS BECAUSE THE PROSE SHIPPED WRONG WHILE EVERY GATE STAYED GREEN.**
@@ -221,7 +229,7 @@ const findings = (): string[] =>
     ),
   )
 
-describe('the one-directional card model is described nowhere as current fact (FR-1052)', () => {
+describe('the one-directional card model is described nowhere as current fact (FR-1052, FR-1055)', () => {
   it('finds the trees to scan — a gate that cannot fail is not a gate', () => {
     for (const { name, path } of TREES) {
       expect(sourceFiles(path).length, `${name} produced no sources to scan`).toBeGreaterThan(10)

@@ -145,7 +145,8 @@ export const NetworkFailed = ({
  * ═════════════════════════════════════════════════════════════════════════════════════════
  *
  * ─────────────────────────────────────────────────────────────────────────────────────────
- * **T042 (016) — THE SECOND SENTENCE USED TO ASK THE READER TO WAIT** (FR-1021, FR-1052).
+ * **T042 (016) — THE SECOND SENTENCE USED TO ASK THE READER TO WAIT** (FR-1021, FR-1052,
+ * FR-1055 — the requirement added because FR-1052 never reached user-facing copy).
  *
  * It read *"theirs will arrive here when they share back"*, which was the one-directional model
  * constitution **v5.0.0 (C1)** retracts. Under mutual exchange there is nothing to wait for:
