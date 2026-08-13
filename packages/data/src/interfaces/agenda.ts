@@ -43,6 +43,43 @@ export interface SessionNote {
 }
 
 /**
+ * T007 (014) — one saved session, and whether it has moved since the attendee last looked.
+ *
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ * **`changedSinceViewed` IS PER-ROW STATE ABOUT ONE SESSION, AND THAT IS THE WHOLE OF N2**
+ * (FR-1030, FR-1031, constitution v4.2.0).
+ *
+ * The server computes it as `sessions.logistics_changed_at > saved_sessions.viewed_at` — two
+ * timestamps and a comparison, with nothing stored per change. It travels on **this existing
+ * payload** rather than on a new read, which is what keeps 014 from declaring a new cached
+ * surface and meeting the `passThrough` trap 008 fell into (research R7).
+ *
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ * **WHY THIS SHAPE CANNOT BECOME THE NOTIFICATION CENTRE v3.1.0 FORBIDS.**
+ *
+ * There is no per-change record to list and no counter to sum. A "3 things changed" badge is
+ * not one small step away from this interface — it would need a query somebody has to write
+ * deliberately, against data that does not exist. That is the difference between a rule and a
+ * hope, and it is why the marker is a boolean **on the row it describes** rather than a
+ * collection somebody could render.
+ *
+ * **No surface in either product may present a count of these** (FR-1031, FR-1034a). The
+ * coalesced notification body carries one and is the single stated exception, because a
+ * notification is an interruption rather than a place to look.
+ * `apps/web/tests/unit/authoring-absences.test.tsx` asserts it.
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ */
+export interface SavedSession {
+  readonly sessionId: string
+  /**
+   * True while the session has materially changed — cancelled, start time, or room — since this
+   * attendee last viewed it (v4.2.0 N1). Cleared by `markViewed`, never by time passing.
+   */
+  readonly changedSinceViewed: boolean
+}
+
+/**
  * Which sessions the attendee intends to attend, for one conference.
  *
  * Durable server-side state surviving sign-out, a change of device, and a conference switch
@@ -50,16 +87,24 @@ export interface SessionNote {
  */
 export interface SavedSessionRepository {
   /**
-   * The saved session identifiers for this conference (FR-188).
+   * The saved sessions for this conference (FR-188), each with its marker state (FR-1030).
    *
    * **Identifiers, not whole sessions.** The programme is read separately and already carries
    * the session data; returning it again here would be a second source of truth that could
    * disagree with the first.
    *
+   * ─────────────────────────────────────────────────────────────────────────────────────────
+   * **T074 (014) — this returned `string[]` until 014, and the marker travels on it rather
+   * than on a method of its own.** That is deliberate: a `listChangedSessions` would be a read
+   * whose subject is *things that happened*, which is exactly the surface FR-1031 forbids —
+   * and once the read exists, rendering it is a small ask. The marker is a property **of a
+   * saved session**, so it belongs on the saved session.
+   * ─────────────────────────────────────────────────────────────────────────────────────────
+   *
    * An attendee who has saved nothing yields an **empty array**, not an error — a valid answer
    * the caller renders as an explicit empty state (FR-195).
    */
-  listSaved(eventId: string): Promise<string[]>
+  listSaved(eventId: string): Promise<SavedSession[]>
 
   /**
    * Save a session. **Idempotent** (FR-187) — saving twice does not create a second record,
@@ -67,8 +112,36 @@ export interface SavedSessionRepository {
    */
   save(eventId: string, sessionId: string): Promise<void>
 
-  /** Unsave a session. **Idempotent** — succeeds whether or not it was saved. */
+  /**
+   * Unsave a session. **Idempotent** — succeeds whether or not it was saved.
+   *
+   * T056 (014) — this is also how an attendee removes a **cancelled** session from their list
+   * (FR-1023). No separate path, and none is wanted: a cancelled session is an ordinary saved
+   * session that will not happen, and giving it its own removal verb would make the client ask
+   * which one to call.
+   */
   unsave(eventId: string, sessionId: string): Promise<void>
+
+  /**
+   * T075 (014) — records that the attendee has looked at this session, clearing its marker
+   * (FR-1030).
+   *
+   * ═════════════════════════════════════════════════════════════════════════════════════════
+   * **THE ONE MEMBER 014 ADDS TO ANY ATTENDEE-FACING REPOSITORY, AND IT IS A WRITE.**
+   *
+   * Research R7's claim is that the marker adds **no new read** — it travels on `listSaved`
+   * above. This is the other half: clearing it is an act the attendee performs, so it is a
+   * write, and it is declared as one at the composition root. A write purges the whole
+   * conference prefix from the offline cache, which is **correct rather than tolerated here**:
+   * the programme being purged is the one that just changed.
+   *
+   * Idempotent, and a no-op for a session the attendee has not saved — there is no row to
+   * stamp, and refusing would make opening a session in Agenda's "All" view an error.
+   *
+   * **Refused offline, never queued**, like every other write in this product.
+   * ═════════════════════════════════════════════════════════════════════════════════════════
+   */
+  markViewed(eventId: string, sessionId: string): Promise<void>
 }
 
 /**

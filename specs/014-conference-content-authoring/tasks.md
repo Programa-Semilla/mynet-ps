@@ -82,13 +82,13 @@ T074). No new repository member is added — that is the point of R7.
 
 **Purpose**: schema and generated artifacts. Nothing here is feature behaviour.
 
-- [ ] T001 *(unblocked — v4.2.0 ratified)* Move `apps/api/migrations/meta/README.md` aside before any generation — `drizzle-kit generate` JSON-parses every file in `meta/`, and that README explains why the journal lists `0003` before `0004`. Restore it after
-- [ ] T002 Add `cancelledAt`, `logisticsChangedAt` and `lastChangeActId` to `sessions` in `apps/api/src/db/schema/catalog.ts`, each with a header stating it is conference content and why it is stored rather than derived
-- [ ] T003 [P] Add `viewedAt` (`NOT NULL DEFAULT now()`) to `savedSessions` in `apps/api/src/db/schema/agenda.ts`, with a header stating **why the default is the save instant** — there is no `created_at` to compare against
-- [ ] T004 Add `sessions_event_cancelled_idx` and `saved_sessions_session_id_idx` in the same schema files, with a comment on the second naming the fan-out query it serves and the sequential scan it prevents
-- [ ] T005 Generate `apps/api/migrations/0011_conference_authoring.sql`, review the SQL by hand, and restore `meta/README.md`
-- [ ] T006 Run `pnpm db:migrate` against a scratch database and confirm `0011` applies cleanly on top of `0009`
-- [ ] T007 [P] Add `cancelled` and `changedSinceViewed` to the agenda payload types in `packages/data` so both clients compile against them before any route exists
+- [X] T001 *(unblocked — v4.2.0 ratified)* Move `apps/api/migrations/meta/README.md` aside before any generation — `drizzle-kit generate` JSON-parses every file in `meta/`, and that README explains why the journal lists `0003` before `0004`. Restore it after
+- [X] T002 Add `cancelledAt`, `logisticsChangedAt` and `lastChangeActId` to `sessions` in `apps/api/src/db/schema/catalog.ts`, each with a header stating it is conference content and why it is stored rather than derived
+- [X] T003 [P] Add `viewedAt` (`NOT NULL DEFAULT now()`) to `savedSessions` in `apps/api/src/db/schema/agenda.ts`, with a header stating **why the default is the save instant** — there is no `created_at` to compare against
+- [X] T004 Add `sessions_event_cancelled_idx` and `saved_sessions_session_id_idx` in the same schema files, with a comment on the second naming the fan-out query it serves and the sequential scan it prevents
+- [X] T005 Generate `apps/api/migrations/0011_conference_authoring.sql`, review the SQL by hand, and restore `meta/README.md`
+- [X] T006 Run `pnpm db:migrate` against a scratch database and confirm `0011` applies cleanly on top of `0009`
+- [X] T007 [P] Add `cancelled` and `changedSinceViewed` to the agenda payload types in `packages/data` so both clients compile against them before any route exists
 
 ---
 

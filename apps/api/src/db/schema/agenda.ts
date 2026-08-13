@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm'
-import { check, pgTable, primaryKey, text, timestamp, uuid } from 'drizzle-orm/pg-core'
+import { check, index, pgTable, primaryKey, text, timestamp, uuid } from 'drizzle-orm/pg-core'
 
 import { attendees } from './attendees.js'
 import { sessions } from './catalog.js'
@@ -67,6 +67,38 @@ export const savedSessions = pgTable(
       .references(() => sessions.id, { onDelete: 'cascade' }),
 
     savedAt: timestamp('saved_at', { withTimezone: true }).notNull().defaultNow(),
+
+    /**
+     * T003 (014) — **when this attendee last looked at this session** (FR-1030, R7).
+     *
+     * ═════════════════════════════════════════════════════════════════════════════════════
+     * **ATTENDEE DATA**, unlike the three columns 014 adds to `sessions`, which are conference
+     * content. It cascades from `attendees` and from `sessions` through the keys above — the
+     * column adds no new reachability problem — and it appears in the personal-data export
+     * alongside the saved session it belongs to. `export-coverage.test.ts` derives from the
+     * schema, so it fails by existing until declared.
+     *
+     * The second half of the marker predicate: a saved session is marked when
+     * `sessions.logistics_changed_at > viewed_at`. Updated when the attendee opens the
+     * session, which is what clears the marker.
+     *
+     * ─────────────────────────────────────────────────────────────────────────────────────
+     * **`NOT NULL DEFAULT now()` IS LOAD-BEARING AND IS NOT A CONVENIENCE.**
+     *
+     * This table is `(attendee_id, session_id)` plus `saved_at`, and the default makes the
+     * initial value **the save instant**. Without it — defaulting to null, or to the epoch —
+     * an attendee saving a session that moved last week would immediately see a marker for a
+     * change that predates their interest in it. The marker would be answering "has this ever
+     * changed" instead of "has this changed since I looked", which is a different and much
+     * less useful question.
+     *
+     * `saved_at` is not used for this. It could be, today, because the two are written
+     * together — but they diverge on the first view, and a predicate reading `saved_at` would
+     * then be a marker that never clears.
+     * ─────────────────────────────────────────────────────────────────────────────────────
+     * ═════════════════════════════════════════════════════════════════════════════════════
+     */
+    viewedAt: timestamp('viewed_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
     /**
@@ -76,12 +108,32 @@ export const savedSessions = pgTable(
      * by handler logic — so a double-tap on a slow connection is simply the same request
      * twice, and no code path exists that could produce a duplicate by forgetting to check.
      *
-     * It also serves the only read this feature makes of the table: "this attendee's saves,
-     * for this conference". **No secondary index on `session_id` is added** — no query here
-     * asks "who saved this session", and adding one would anticipate a feature nobody has
-     * specified while making every write pay for it.
+     * It also serves the only read 005 makes of the table: "this attendee's saves, for this
+     * conference".
      */
     primaryKey({ columns: [table.attendeeId, table.sessionId] }),
+
+    /**
+     * T004 (014) — **"who saved this session", which 005 said no query would ever ask.**
+     *
+     * ═════════════════════════════════════════════════════════════════════════════════════
+     * The comment above this index used to end: *"No secondary index on `session_id` is added
+     * — no query here asks 'who saved this session', and adding one would anticipate a feature
+     * nobody has specified while making every write pay for it."* That was right when it was
+     * written and 014 is the feature it was waiting for, so the sentence is replaced rather
+     * than left standing beside a contradiction.
+     *
+     * **This is the notification fan-out's access path, and it runs on every material change.**
+     * The primary key is `(attendee_id, session_id)`, which answers *what has this attendee
+     * saved* and cannot answer the reverse — so without this index, cancelling one session
+     * sequentially scans every saved session in the product, inside an organizer's request.
+     *
+     * The same shape as the two unclaimed defects from 004's review, where neither token table
+     * indexed `attendee_id` because **PostgreSQL creates no index for a foreign key**. This
+     * one is added with the query that needs it rather than discovered later.
+     * ═════════════════════════════════════════════════════════════════════════════════════
+     */
+    index('saved_sessions_session_id_idx').on(table.sessionId),
   ],
 )
 

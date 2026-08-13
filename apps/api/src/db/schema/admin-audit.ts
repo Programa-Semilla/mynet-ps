@@ -68,12 +68,53 @@ export const adminAuditEntries = pgTable(
     operatorId: uuid('operator_id').references(() => operators.id, { onDelete: 'set null' }),
 
     /**
-     * **Six actions, and the set is closed by a check constraint** (FR-994, FR-995).
+     * T002 (014) — **the acting principal when that principal is a conference ORGANIZER, who
+     * has no `operators` row at all** (FR-1037, FR-1038).
      *
-     * Five are writes. The sixth, `disclose_report_content`, is **the only read in the entire
-     * product that writes an audit entry** — because it is the only read the constitution needed
-     * an exception to permit (v4.1.0, decision 38, the third recorded Principle VIII exception).
-     * `GET /admin/reports` writes nothing, because the list carries no content.
+     * ═════════════════════════════════════════════════════════════════════════════════════════
+     * **THIS COLUMN EXISTS BECAUSE 013's TWO AUDITED ACTS WERE BOTH PLATFORM-TIER, AND 014's ARE
+     * NOT.**
+     *
+     * 013 audited promotion, demotion, report resolution, question removal, operator
+     * deactivation and content disclosure — every one of them platform-only, so `operator_id`
+     * was always non-null and the question never arose. 014 audits **authoring**, whose ordinary
+     * actor is a conference organizer: an attendee holding a live `organizer_assignments` row,
+     * with no `operators` row by design (see `schema/operators.ts` — that asymmetry is what
+     * makes FR-904 achievable).
+     *
+     * Without this column, FR-1037 would be unimplementable for the tier that does most of the
+     * authoring. Three alternatives were available and all are worse:
+     *
+     *   - **Write `operator_id = NULL` for organizer acts.** `appendAuditEntry`'s own header
+     *     already rules this out: *"an entry written with no operator would be an accountability
+     *     record accounting for nobody."*
+     *   - **Give organizers an `operators` row.** That is exactly the change `schema/operators.ts`
+     *     names as collapsing two tiers into one table with a flag.
+     *   - **Reuse `subject_attendee_id`.** It means *whom the act was done to*, and conflating
+     *     actor with subject would make the pseudonymisation rule below incoherent.
+     *
+     * **No foreign key, and the reason is `subject_attendee_id`'s exactly** — see the file
+     * header, which applies to this column word for word. It is **cleared on the actor's own
+     * erasure** by `pseudonymiseAuditEntriesFor`, which now clears both references in one
+     * statement: an organizer who deletes their account must not be reconstructible from the
+     * trail of what they authored.
+     *
+     * **No check constraint pinning "exactly one of the two".** It would be right on every write
+     * and wrong afterwards: `operator_id` is `ON DELETE SET NULL`, so an entry legitimately
+     * reaches a state with neither populated, and the constraint would block the operator sweep
+     * it was never meant to govern. The invariant is enforced where it can be — in
+     * `AuditEntryDraft`, whose union type makes an entry naming neither principal unwritable.
+     * ═════════════════════════════════════════════════════════════════════════════════════════
+     */
+    actorAttendeeId: uuid('actor_attendee_id'),
+
+    /**
+     * **Fourteen actions, and the set is closed by a check constraint** (FR-994, FR-995).
+     *
+     * Thirteen are writes. The one read, `disclose_report_content`, is **the only read in the
+     * entire product that writes an audit entry** — because it is the only read the constitution
+     * needed an exception to permit (v4.1.0, decision 38, the third recorded Principle VIII
+     * exception). `GET /admin/reports` writes nothing, because the list carries no content.
      *
      * A closed set rather than free text, so that `admin-audit-completeness.test.ts` can derive
      * its expectations from the route table and a new administrative write fails by existing.
@@ -100,7 +141,7 @@ export const adminAuditEntries = pgTable(
   (table) => [
     check(
       'admin_audit_entries_action_valid',
-      sql`${table.action} in ('promote', 'demote', 'resolve_report', 'remove_question', 'deactivate_operator', 'disclose_report_content')`,
+      sql`${table.action} in ('promote', 'demote', 'resolve_report', 'remove_question', 'deactivate_operator', 'disclose_report_content', 'create_conference', 'update_conference', 'write_catalog', 'delete_catalog', 'write_session', 'cancel_session', 'reinstate_session', 'delete_session')`,
     ),
 
     // The retention sweep's predicate, and the only ordering anybody would read this table by.
@@ -108,6 +149,11 @@ export const adminAuditEntries = pgTable(
     // Pseudonymisation is `WHERE subject_attendee_id = $1` inside a deletion transaction that is
     // already holding locks; without this it scans the whole table on every account deletion.
     index('admin_audit_entries_subject_attendee_idx').on(table.subjectAttendeeId),
+    // T004 (014) — pseudonymisation now clears two columns in one statement, and the retention
+    // sweep's predicate reads both. Same reasoning as the index above it: an account deletion
+    // holds locks while it runs, and an unindexed `WHERE actor_attendee_id = $1` would scan the
+    // fastest-growing table this product has.
+    index('admin_audit_entries_actor_attendee_idx').on(table.actorAttendeeId),
     // ─────────────────────────────────────────────────────────────────────────────────────────
     // **The covering index for `operator_id`'s foreign key.** Postgres creates one for a primary
     // key and for a unique constraint, and **none for a foreign key** — the repository already
@@ -136,7 +182,7 @@ export type NewAdminAuditEntry = typeof adminAuditEntries.$inferInsert
 
 /**
  * The closed action set, exported so the repository, the routes and the completeness test all
- * name the same six things. A seventh action must be added here, in the check constraint, and in
+ * name the same fourteen things. A fifteenth must be added here, in the check constraint, and in
  * a migration — three deliberate edits rather than one string typed at a call site.
  */
 export const ADMIN_AUDIT_ACTIONS = [
@@ -146,6 +192,31 @@ export const ADMIN_AUDIT_ACTIONS = [
   'remove_question',
   'deactivate_operator',
   'disclose_report_content',
+
+  // ───────────────────────────────────────────────────────────────────────────────────────────
+  // 014 — **authoring, and it is the first act category either tier may perform** (FR-1037,
+  // FR-1038). Everything above is platform-tier only; everything below is ordinarily performed
+  // by a conference organizer, which is why `actor_attendee_id` exists.
+  //
+  // Eight rather than one generic `author` action, for the reason the six above are six: the
+  // completeness test requires every declared action to be *used*, so a coarse action would let
+  // three genuinely different acts hide behind one name — and the trail exists to answer "who
+  // removed this, and when" about a specific thing.
+  //
+  // The split follows what each act does to attendee state rather than which HTTP verb produced
+  // it. `cancel_session` and `delete_session` are the two that matter and are deliberately not
+  // one entry: cancellation preserves every note, question and vote (FR-1021) while deletion is
+  // permitted only where none exists (FR-1018), so an entry that could not tell them apart would
+  // be unable to answer the only question anybody would ask of it.
+  // ───────────────────────────────────────────────────────────────────────────────────────────
+  'create_conference',
+  'update_conference',
+  'write_catalog',
+  'delete_catalog',
+  'write_session',
+  'cancel_session',
+  'reinstate_session',
+  'delete_session',
 ] as const
 
 export type AdminAuditAction = (typeof ADMIN_AUDIT_ACTIONS)[number]

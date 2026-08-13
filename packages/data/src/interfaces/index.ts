@@ -26,7 +26,12 @@ export type { CatalogRepository, Room, Session, Speaker, Track } from './catalog
 // read-only in perpetuity, and these are attendee state *about* its content (FR-191).
 // **Appended, never moved back into this barrel** (FR-235) — the per-domain split is what lets
 // 005 and 006 add interfaces in parallel without contending over these lines.
-export type { SavedSessionRepository, SessionNote, SessionNotesRepository } from './agenda.js'
+export type {
+  SavedSession,
+  SavedSessionRepository,
+  SessionNote,
+  SessionNotesRepository,
+} from './agenda.js'
 // 004 — becoming an attendee, recovering an account, and leaving. **Appended, never merged into
 // this barrel** (FR-180): the per-domain split is what lets 004 and 006 add interfaces without
 // contending over anything but these two lines.
