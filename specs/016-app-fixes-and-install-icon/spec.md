@@ -32,6 +32,21 @@ constitution v5.0.0, decisions C1 (mutual card exchange, reversing v3.2.0 N2) an
 administrative-counterpart declaration). The amendment gating the code is this project's established
 order, followed by v3.1.0/007, v3.2.0/008, v3.3.0/009 and v4.0.0/013.
 
+## Clarifications
+
+### Session 2026-08-12
+
+- Q: Does a mutual card exchange require the recipient to be discoverable and verified? → A: Yes —
+  require both, the existing share check unchanged.
+- Q: What happens to the consumer-less "cards you have shared" read path? → A: Redefine it as
+  "people who hold your card"; same query, no schema change.
+- Q: Does the conversation-list refresh pause while a thread is open? → A: Pause when the list is not
+  on screen — mobile yes, desktop and tablet no.
+- Q: What refresh interval should the conversation list use? → A: 10 seconds. SC-1002's bound moved
+  from 10s to 15s, because an interval of N cannot guarantee a bound of N.
+- Q: How is the composer's maximum height expressed? → A: As a proportion of the visible thread area,
+  one rule for every layout.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Send a message from a phone (Priority: P1)
@@ -244,9 +259,15 @@ judged by any automated gate — it needs a person looking at a physical home sc
 
 - **FR-1001**: The message composer MUST grow to fit its content up to a bounded maximum, and MUST
   NOT grow beyond it.
-- **FR-1002**: The bound MUST be expressed relative to the space available to the thread rather than
-  as a fixed height, so that it holds on the shortest supported viewport with an on-screen keyboard
-  raised.
+- **FR-1002**: The bound MUST be expressed as a **proportion of the visible thread area**, not as a
+  fixed height and not as a line count, so that it holds on the shortest supported viewport with an
+  on-screen keyboard raised. **One rule governs every layout**; no layout-specific value exists.
+
+  **This satisfies FR-1003 by construction rather than by a value somebody must keep true.** The send
+  control sits outside the proportion, so a composer bounded to a fraction of the visible area cannot
+  displace it however the viewport shrinks. A line count can: six lines on a tall phone is
+  comfortable and on a short viewport with a tall keyboard is the original defect returning under a
+  different name.
 - **FR-1003**: The send control MUST remain within the viewport and activatable at every composer
   height, at every supported width.
 - **FR-1004**: Beyond the bound, composer content MUST scroll within the composer.
@@ -258,7 +279,18 @@ judged by any automated gate — it needs a person looking at a physical home sc
 **Conversation list freshness (US2)**
 
 - **FR-1007**: The conversation list MUST refresh on an interval while the Messages destination is
-  open and the document is visible.
+  open, the document is visible, **and the list itself is on screen**.
+- **FR-1054**: Where the layout replaces the list with an open thread — the mobile band — refreshing
+  MUST pause for as long as the thread is displayed, and MUST resume when the reader returns to the
+  list. Where the layout shows both at once — desktop and tablet — refreshing MUST continue while a
+  thread is open.
+
+  **The condition is what is on screen, not which layout is active.** Stated that way because the
+  layout band is merely how the answer is currently determined, and a future layout change must not
+  silently re-enable a poll against a list nobody can see. The thread's own poll already covers the
+  open conversation, so on mobile the second poller buys nothing and costs a request every interval —
+  on a phone, at a venue, against a two-vCPU host where each authenticated request also writes a
+  session row.
 - **FR-1008**: Refreshing MUST stop while the document is hidden, and MUST refresh immediately on
   becoming visible rather than waiting for the next interval.
 - **FR-1009**: Consecutive refresh failures MUST increase the interval up to a ceiling, and MUST
@@ -314,12 +346,36 @@ judged by any automated gate — it needs a person looking at a physical home sc
   through somebody else's act is found on the recipient's next visit to Network and not before.
   That is an accepted consequence of C1 rather than an oversight, and it is recorded as an open
   question below rather than silently absorbed.
-- **FR-1051**: The existing "cards you have shared" read path MUST have its meaning restated. It
-  reads the sharer direction and has been documented since 008 as *cards you have given away*; under
-  mutual exchange it returns rows the reader never gave. The feature MUST either redefine it as
-  *people who hold your card*, or withdraw it — and MUST NOT leave it carrying its old description.
-  **It has no consumer, so nothing else will catch this**: it is the route 008's review recorded as
-  existing without a caller.
+- **FR-1053**: A mutual exchange MUST complete only where the recipient is **discoverable** and holds
+  a **verified address**, and both attendees are registered for the conference — the conditions
+  sharing already applies, unchanged. Where any condition fails, **neither** record is written.
+
+  **This is what keeps C1's licence true, and it is the reason rather than a convention.** The
+  amendment permits mutual exchange on the ground that a card resolves only what its owner already
+  published to co-attendees, so the exchange moves *when* those fields are seen and not *whether*.
+  Against a recipient who is **not** discoverable that ground does not exist: they published nothing,
+  and the exchange would disclose something discoverability had not already disclosed. The condition
+  is therefore load-bearing for the reversal itself, and removing it would require another amendment
+  rather than a change of mind.
+
+  **It does not contradict FR-1027.** A share-time condition and a resolution-time prohibition are
+  different questions: verification gates discoverability, so consulting it when deciding whether
+  somebody can be *reached* is consistent with never consulting it when resolving a card already
+  *held*.
+- **FR-1051**: The existing "cards you have shared" read path MUST be **redefined as *people who hold
+  your card***, in its route description, its docblock, and the generated contract. The query, the
+  rows it returns and its guard are **unchanged**; what changes is what it claims to mean. It has
+  been documented since 008 as *cards you have given away*, and under mutual exchange it returns rows
+  the reader never consciously gave.
+
+  **Withdrawal was considered and rejected**: the route has no consumer, so removing it would break
+  nothing, but it is also the only route its branded scope guard covers, and this project has twice
+  recorded that the guard is what makes adding a card-named route safe by default. Redefining costs a
+  description; withdrawing costs the guard's only exercise and the ability to answer "who holds my
+  card?" without rebuilding the route.
+
+  **Nothing else will catch this if it is missed**: with no consumer there is no test that would
+  fail, which is precisely why it is a requirement rather than a cleanup.
 - **FR-1052**: Every comment, docblock and header that explains card behaviour by citing the
   one-directional rule MUST be rewritten to cite what is now true. This explicitly includes the
   export's own reasoning, which justifies disclosure by "the standing consent constitution v3.2.0
@@ -385,9 +441,14 @@ judged by any automated gate — it needs a person looking at a physical home sc
   supported viewport with an on-screen keyboard raised, without scrolling the page and without losing
   sight of the send control.
 - **SC-1002**: A message sent by another attendee becomes visible in the reader's conversation list
-  within 10 seconds, without the reader navigating.
+  within **15 seconds**, without the reader navigating.
+
+  **The bound is deliberately larger than the interval and that is arithmetic, not slack.** A poll of
+  interval N has a worst case of N plus jitter plus the request itself, because a message can land
+  immediately after a tick. A 10-second interval under a 10-second bound would fail intermittently
+  and the failures would look like flakiness rather than like a criterion that was never satisfiable.
 - **SC-1003**: Unread indicators in the conversation list reflect server state within the same
-  interval, for every conversation rather than only recently created ones.
+  bound, for every conversation rather than only recently created ones.
 - **SC-1004**: Every password field across both products can be revealed and re-masked using the
   keyboard alone.
 - **SC-1005**: A mismatched password confirmation is caught before any network request is made, in
@@ -433,10 +494,13 @@ judged by any automated gate — it needs a person looking at a physical home sc
   attendee who never learns notifications require installation.
 - **The dismissal of install guidance** is remembered per device rather than per account, because it
   is a fact about the device, and because it must work before anybody has signed in.
-- **The composer bound** is expressed as a proportion of available height rather than a pixel figure,
-  which is what makes FR-1002 hold across viewports without a table of exceptions.
-- **The list refresh interval** need not match the thread's three seconds. A list is lower-stakes than
-  an open conversation, and the same request load applies to a two-vCPU host.
+- **The composer bound** is a proportion of the visible thread area rather than a pixel figure or a
+  line count, which is what makes FR-1002 hold across viewports without a table of exceptions. The
+  exact proportion is a planning decision; what is fixed here is that it is a proportion.
+- **The list refresh interval is 10 seconds**, against the thread's three. A list is lower-stakes than
+  an open conversation and the same request load applies to a two-vCPU host, so it runs at roughly a
+  third of the rate. It is jittered on the same reasoning the thread's poll records — so that a hall
+  full of clients does not re-converge on one instant after an outage.
 - **The reciprocal card record** records the same conference as the originating share, since it
   happened at the same moment and place. It is not re-derived from the recipient's own registrations.
 - **`new-logo.png` is used as supplied.** The owner has confirmed no higher-resolution source exists
@@ -490,31 +554,20 @@ Each is named because it is adjacent enough to be assumed in, and each has a rea
 
 ## Open Questions
 
-- **Must the recipient be discoverable — and verified — for a mutual exchange to complete?** Sharing
-  today requires the recipient to be **both** discoverable **and** to hold a verified address, plus
-  both parties registered for the conference. Card *resolution* deliberately checks neither. A first
-  acquisition is neither case, and constitution v5.0.0 requires this feature to decide and declare it
-  rather than inherit either answer. **This is the one open question that must close before
-  implementation**, because it changes the route's behaviour rather than its presentation.
-
-  **Naming verification explicitly matters, because FR-1027 will otherwise look self-contradictory.**
-  A share-time condition and a resolution-time prohibition are different things: verification gates
-  discoverability and nothing else, so checking it *when deciding whether somebody can be reached* is
-  consistent with never checking it *when resolving a card already held*. A reader who meets only the
-  word "discoverability" here will think the two clauses conflict.
-
-  The two candidate answers: require both, matching the current share check and preserving "you
-  cannot acquire a card from someone who has chosen to be invisible"; or require neither, matching
-  resolution and treating co-attendance plus the sharer's deliberate act as sufficient.
+- ~~**Must the recipient be discoverable — and verified — for a mutual exchange to complete?**~~
+  **ANSWERED 2026-08-12 in clarification: yes, both, unchanged from the existing share check.** Now
+  **FR-1053**, which also records why the condition is load-bearing for C1's licence rather than a
+  convention inherited from the previous model.
 - **Is "found on your next visit to Network" enough** for a card acquired by somebody else's act?
   Under one-directional sharing the recipient's contacts only ever grew by their own reciprocation,
   so there was nothing to announce. Mutual exchange makes acquisition passive, and FR-1029 forbids a
   notification while FR-1030 records that no Home surface exists. Not blocking — the behaviour is
   fully specified — but it is the question C1 creates and nobody has yet asked.
-- **The list refresh interval, as a number**, justified against request load on a two-vCPU host with
-  a conference hall of clients. Not blocking: any value in a sane range satisfies SC-1002.
-- **Whether the list refresh pauses while a thread is open.** The thread already polls the open
-  conversation, so on mobile — where opening a thread replaces the list — a second poller is
-  redundant. On desktop both panes are visible at once. Not blocking.
-- **Whether the composer bound differs between the two-pane desktop layout and mobile.** FR-1002's
-  relative expression may make one rule sufficient; if it does not, that is a finding for planning.
+- ~~**The list refresh interval, as a number.**~~ **ANSWERED 2026-08-12 in clarification: 10
+  seconds**, roughly a third of the thread's rate, paired with SC-1002's 15-second bound. Recorded in
+  Assumptions.
+- ~~**Whether the list refresh pauses while a thread is open.**~~ **ANSWERED 2026-08-12 in
+  clarification: it pauses when the list is not on screen.** Now **FR-1054**.
+- ~~**Whether the composer bound differs between the two-pane desktop layout and mobile.**~~
+  **ANSWERED 2026-08-12 in clarification: one rule, a proportion of the visible thread area.** Now
+  **FR-1002**.

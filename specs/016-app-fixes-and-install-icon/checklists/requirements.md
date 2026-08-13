@@ -93,3 +93,19 @@ rebuilds a shipped feature rather than adding one.
 claims: no implementation leakage across all 50 original requirements; deletion and export coverage
 (both foreign keys cascade, export runs one query per direction); and the unique constraint, which is
 directional by construction and accommodates a reciprocal row with no change.
+
+## clarify session, 2026-08-12
+
+Five questions asked and answered; checklist re-validated **16/16 → 16/16**, no regressions.
+
+Two answers changed more than they settled:
+
+- **FR-1053 turned an open question into a load-bearing one.** Requiring the recipient to be
+  discoverable and verified is not inherited convention — it is what keeps constitution C1's licence
+  true. C1 permits mutual exchange because "a card resolves only what its owner already published to
+  co-attendees"; against a non-discoverable recipient that ground does not exist. Removing the
+  condition would need another amendment, and the spec now says so.
+- **SC-1002 was arithmetically unsatisfiable and is now correct.** A 10-second poll cannot guarantee
+  a 10-second bound — worst case is the interval plus jitter plus the request. The bound moved to 15
+  seconds. Caught while integrating the answer rather than by the checklist, which is worth noting:
+  "success criteria are measurable" passed against a criterion that was measurable and impossible.
