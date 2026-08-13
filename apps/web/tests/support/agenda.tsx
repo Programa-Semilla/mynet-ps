@@ -51,6 +51,12 @@ export interface AgendaHarness {
   readonly sessions?: TestSession[]
   /** Session ids already saved when the screen loads. */
   readonly saved?: string[]
+  /**
+   * T076 (014) — session ids the attendee has saved and **not yet looked at since they changed**
+   * (FR-1030). A subset of `saved` in practice: the marker is per saved session, and there is no
+   * marker on a session nobody saved.
+   */
+  readonly changed?: string[]
   readonly overrides?: Partial<PlatformServices['repositories']>
   readonly devices?: Partial<PlatformServices['devices']>
   /**
@@ -69,20 +75,33 @@ export interface AgendaHarness {
  * and `unsave` actually change what `listSaved` returns, so a component that never re-reads
  * is caught rather than accommodated.
  */
-export const savedSessionsDouble = (initial: string[] = []) => {
+export const savedSessionsDouble = (
+  initial: string[] = [],
+  /**
+   * T076 (014) — the saved sessions this attendee has not yet looked at since they changed
+   * (FR-1030). Empty by default, so every existing test renders the rows it always did.
+   */
+  changed: string[] = [],
+) => {
   const set = new Set(initial)
-  const calls: Array<{ op: 'save' | 'unsave'; sessionId: string }> = []
+  const unviewed = new Set(changed)
+  const calls: Array<{ op: 'save' | 'unsave' | 'viewed'; sessionId: string }> = []
   let failWith: Error | null = null
 
   return {
     calls,
     set,
+    unviewed,
     /** Makes the next and every subsequent write fail, for the refusal paths. */
     failWrites: (error: Error | null) => {
       failWith = error
     },
     repository: {
-      listSaved: async () => [...set],
+      listSaved: async () =>
+        [...set].map((sessionId) => ({
+          sessionId,
+          changedSinceViewed: unviewed.has(sessionId),
+        })),
       save: async (_eventId: string, sessionId: string) => {
         if (failWith) throw failWith
         calls.push({ op: 'save', sessionId })
@@ -92,6 +111,18 @@ export const savedSessionsDouble = (initial: string[] = []) => {
         if (failWith) throw failWith
         calls.push({ op: 'unsave', sessionId })
         set.delete(sessionId)
+      },
+      /**
+       * Real enough to be caught: it actually clears the marker, so a component that renders a
+       * marker for a session the attendee has just opened fails rather than being accommodated.
+       *
+       * **Deliberately not affected by `failWrites`.** A failed `markViewed` is silent by design
+       * (`useSavedSessions`), so making it fail here would assert nothing — the tests that care
+       * about refusal wording are about `save` and `unsave`.
+       */
+      markViewed: async (_eventId: string, sessionId: string) => {
+        calls.push({ op: 'viewed', sessionId })
+        unviewed.delete(sessionId)
       },
     },
   }
@@ -114,12 +145,13 @@ export interface RenderedAgenda {
 export const renderAgenda = ({
   sessions = PROGRAMME,
   saved = [],
+  changed = [],
   overrides = {},
   devices = {},
   services: extraServices = {},
   at = '/agenda',
 }: AgendaHarness = {}): RenderedAgenda => {
-  const savedDouble = savedSessionsDouble(saved)
+  const savedDouble = savedSessionsDouble(saved, changed)
 
   const services = testServices(
     {

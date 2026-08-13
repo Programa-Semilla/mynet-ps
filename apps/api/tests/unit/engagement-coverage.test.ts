@@ -141,8 +141,10 @@ describe('engagement coverage (T017, FR-1018a)', () => {
 
     for (const [name, through] of Object.entries(ONE_HOP)) {
       const table = byName.get(name)
-      expect(table, `${name} is declared as one hop from a session but is not in the schema`)
-        .toBeDefined()
+      expect(
+        table,
+        `${name} is declared as one hop from a session but is not in the schema`,
+      ).toBeDefined()
 
       // The declared chain is checked rather than believed: `question_votes` → `session_questions`
       // → `sessions`, and `question_votes` → `attendees`. A schema change breaking either link
@@ -175,9 +177,10 @@ describe('engagement coverage (T017, FR-1018a)', () => {
     // The inverse failure: an entry naming a table that has been renamed or removed is a
     // predicate branch that can never fire, sitting in a function that reads as complete.
     for (const table of ENGAGEMENT_TABLES) {
-      expect(names.has(table), `${table} is in the engagement predicate but not in the schema`).toBe(
-        true,
-      )
+      expect(
+        names.has(table),
+        `${table} is in the engagement predicate but not in the schema`,
+      ).toBe(true)
     }
 
     for (const [name, reason] of Object.entries(NOT_ENGAGEMENT)) {

@@ -17,12 +17,21 @@ import { trackClassesFor } from '../../src/app/track-colors.js'
 
 const MADRID = 'Europe/Madrid' // UTC+2 in September
 
-const session = (id: string, startsAt: string, endsAt: string): Session => ({
+const session = (
+  id: string,
+  startsAt: string,
+  endsAt: string,
+  // T054, T055 (014) — a session that is happening, unless a test says otherwise. The two
+  // functions below disagree about cancelled sessions on purpose, and the parameter is what lets
+  // that asymmetry be asserted rather than described.
+  cancelled = false,
+): Session => ({
   id,
   title: `Session ${id}`,
   summary: null,
   startsAt,
   endsAt,
+  cancelled,
   track: { id: 't', name: 'Track', colorToken: 'track-design' },
   room: { id: 'r', name: 'Room' },
   speakers: [],

@@ -66,6 +66,15 @@ export interface AgendaOutletContext {
   readonly notes: ReadonlyMap<string, SessionNote>
   /** Returns focus to the control that opened the panel (FR-202). */
   readonly restoreFocusTo: (sessionId: string) => void
+  /**
+   * T075 (014) — records that the attendee has looked at this session, clearing its change
+   * marker (FR-1030).
+   *
+   * Handed down rather than reached for through a repository here, because the marker's state
+   * lives with the saved set in `useSavedSessions` — two readers of the same fact are two
+   * things that can disagree about it.
+   */
+  readonly markViewed: (sessionId: string) => void
 }
 
 export const SessionPanel = () => {
@@ -124,6 +133,30 @@ export const SessionPanel = () => {
     // background. `show` would render an overlay that a Tab could walk straight out of.
     dialog.showModal()
   })
+
+  /**
+   * T075 (014) — **opening this panel is what "the attendee has viewed the session" means**
+   * (FR-1030).
+   *
+   * ═══════════════════════════════════════════════════════════════════════════════════════════
+   * Not the row appearing in a list, and not the destination being open. The panel is where an
+   * attendee finds out **what** changed — the time, the room, the cancellation — so it is the
+   * only surface on which "they have seen it" is true.
+   *
+   * Keyed on `sessionId` so opening a second session marks that one and not the first, and
+   * `markViewed` is stable across renders, so this fires once per session opened rather than on
+   * every re-render of an open panel.
+   *
+   * A session the attendee has not saved has no row to stamp; the write is a no-op and is
+   * deliberately not conditional here — the panel does not know the saved set, and asking would
+   * be a second reader of a fact `useSavedSessions` already owns.
+   * ═══════════════════════════════════════════════════════════════════════════════════════════
+   */
+  const { markViewed } = context
+  useEffect(() => {
+    if (!sessionId) return
+    markViewed(sessionId)
+  }, [markViewed, sessionId])
 
   return (
     <dialog
@@ -277,6 +310,7 @@ const PanelBody = ({
         key={`questions-${session.id}`}
         eventId={context.eventId}
         sessionId={session.id}
+        cancelled={session.cancelled}
       />
     </>
   )

@@ -342,8 +342,6 @@ describe('the administrative audit trail is complete (FR-994, SC-911)', () => {
    * ═══════════════════════════════════════════════════════════════════════════════════════════
    */
   it('records nothing from a read, except the one disclosure (FR-995)', () => {
-    const sources = moduleSources()
-
     // Modules with **only** read routes must not mention the append at all. Read from the route
     // sources rather than the delegated ones: `me.ts` legitimately imports query modules that
     // audit on behalf of other routes, and the claim here is about this module's own handlers.

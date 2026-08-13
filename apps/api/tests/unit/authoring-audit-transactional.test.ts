@@ -38,9 +38,7 @@ import { describe, expect, it } from 'vitest'
  * ─────────────────────────────────────────────────────────────────────────────────────────────
  */
 
-const WRITE_LAYER = fileURLToPath(
-  new URL('../../src/db/queries/admin-catalog.ts', import.meta.url),
-)
+const WRITE_LAYER = fileURLToPath(new URL('../../src/db/queries/admin-catalog.ts', import.meta.url))
 
 /** 009's rule: every name below appears in the prose explaining it. */
 const code = (): string =>

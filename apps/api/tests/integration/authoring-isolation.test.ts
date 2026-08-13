@@ -48,7 +48,7 @@ describe('conference isolation in authoring (T028, FR-1005)', () => {
     cookie = await organizerSession(app, ADA, SEED_PASSWORD)
   })
 
-  const create = (payload: unknown) =>
+  const create = (payload: Record<string, unknown>) =>
     app.inject({
       method: 'POST',
       url: `/admin/conferences/${fixture.assigned.eventId}/sessions`,

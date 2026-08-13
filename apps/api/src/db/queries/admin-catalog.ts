@@ -836,11 +836,7 @@ export const patchConference = async (
 ): Promise<WriteResult<{ id: string }>> => {
   const scope = assertVerifiedConferenceAuthority(unverified)
 
-  const [current] = await tx
-    .select()
-    .from(events)
-    .where(eq(events.id, scope.eventId))
-    .limit(1)
+  const [current] = await tx.select().from(events).where(eq(events.id, scope.eventId)).limit(1)
 
   if (!current) return refused('not-found')
 

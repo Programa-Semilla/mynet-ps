@@ -124,7 +124,11 @@ describe('what an authoring audit entry records (T025, FR-1038)', () => {
     })
     const sessionId = created.json().id as string
 
-    await app.inject({ method: 'POST', url: at(`/sessions/${sessionId}/cancel`), headers: { cookie } })
+    await app.inject({
+      method: 'POST',
+      url: at(`/sessions/${sessionId}/cancel`),
+      headers: { cookie },
+    })
     await app.inject({
       method: 'POST',
       url: at(`/sessions/${sessionId}/reinstate`),
@@ -175,9 +179,7 @@ describe('what an authoring audit entry records (T025, FR-1038)', () => {
         .replace(/^\s*\/\/.*$/gm, ' ')
 
     it('exports no reader from the audit query layer', async () => {
-      const module: Record<string, unknown> = await import(
-        '../../src/db/queries/admin-audit.js'
-      )
+      const module: Record<string, unknown> = await import('../../src/db/queries/admin-audit.js')
 
       const readers = Object.keys(module).filter((name) =>
         /^(list|get|find|read|search|fetch)/i.test(name),

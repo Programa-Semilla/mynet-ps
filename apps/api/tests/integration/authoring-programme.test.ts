@@ -54,10 +54,10 @@ describe('authoring the programme (T026, FR-1001, SC-1001)', () => {
 
   const at = (rest: string): string => `/admin/conferences/${fixture.assigned.eventId}${rest}`
 
-  const post = (rest: string, payload: unknown) =>
+  const post = (rest: string, payload: Record<string, unknown>) =>
     app.inject({ method: 'POST', url: at(rest), headers: { cookie }, payload })
 
-  const patch = (rest: string, payload: unknown) =>
+  const patch = (rest: string, payload: Record<string, unknown>) =>
     app.inject({ method: 'PATCH', url: at(rest), headers: { cookie }, payload })
 
   const remove = (rest: string) =>
@@ -80,7 +80,10 @@ describe('authoring the programme (T026, FR-1001, SC-1001)', () => {
 
     expect((await programme()).tracks.map((t: { name: string }) => t.name)).toContain('Runtime')
 
-    const edited = await patch(`/tracks/${id}`, { name: 'Runtime & Tooling', colorToken: 'track-tech' })
+    const edited = await patch(`/tracks/${id}`, {
+      name: 'Runtime & Tooling',
+      colorToken: 'track-tech',
+    })
     expect(edited.statusCode).toBe(200)
     expect((await programme()).tracks.map((t: { name: string }) => t.name)).toContain(
       'Runtime & Tooling',
@@ -172,9 +175,7 @@ describe('authoring the programme (T026, FR-1001, SC-1001)', () => {
     expect(session.cancelled).toBe(false)
     expect(session.track.name).toBe('Assigned Conference Track')
     expect(session.room.name).toBe('Assigned Conference Room')
-    expect(session.speakers.map((speaker) => speaker.name)).toEqual([
-      'Assigned Conference Speaker',
-    ])
+    expect(session.speakers.map((speaker) => speaker.name)).toEqual(['Assigned Conference Speaker'])
   })
 
   it('edits a session and the attendee sees the edit', async () => {

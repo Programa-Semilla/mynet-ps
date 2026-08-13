@@ -141,6 +141,25 @@ export const createServices = (): PlatformServices => {
     { freshness },
   )
 
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════════════════════
+   * **T075 (014) — `markViewed` IS A WRITE, AND ITS PURGE IS CORRECT RATHER THAN TOLERATED.**
+   *
+   * The decorator classifies every method not named in `reads` as a write, and a write purges the
+   * whole conference prefix. 008 met that as a defect — `slots` is a *read* that must stay live,
+   * and omitting it silently wiped the cached programme every time the scheduling dialog opened,
+   * which is why `passThrough` exists.
+   *
+   * This is the opposite case, and it needs no declaration at all. `markViewed` genuinely is a
+   * write: it clears the marker on a saved session, so the cached `saved` entry is stale the
+   * instant it succeeds. **The programme it purges alongside is the one that just changed** —
+   * the attendee is opening a session precisely because it moved — so re-reading is what they
+   * want rather than a cost.
+   *
+   * `listSaved` stays the only cached read here. `passThrough` is deliberately empty: nothing in
+   * this repository is a read that must bypass the cache.
+   * ═══════════════════════════════════════════════════════════════════════════════════════════
+   */
   const savedSessions = cached(
     new HttpSavedSessionRepository(http),
     store,

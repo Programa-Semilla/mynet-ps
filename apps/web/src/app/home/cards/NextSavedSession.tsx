@@ -47,7 +47,10 @@ const NextSavedSessionCard = ({ event }: EventCardProps) => {
       savedSessions.listSaved(event.id),
     ])
 
-    const savedIds = new Set(saved)
+    // T074 (014) — the saved read now carries a marker per entry, so the identifiers are
+    // projected out here. This card renders **what is next**, never a marker: Home's marker
+    // belongs on the rows the attendee can act on, and a count anywhere is FR-1031's prohibition.
+    const savedIds = new Set(saved.map((entry) => entry.sessionId))
     return sessions.filter((session) => savedIds.has(session.id))
   }, [catalog, savedSessions, event.id])
 

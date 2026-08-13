@@ -155,7 +155,10 @@ describe('only the guard module may produce a conference authority', () => {
       'The table definition itself, which cannot read anything and is matched only because it ' +
         'declares the name every reader imports.',
     ],
-    ['db/seed/operators.ts', 'The fixture, which clears these rows so `DELETE FROM events` can proceed (FR-937).'],
+    [
+      'db/seed/operators.ts',
+      'The fixture, which clears these rows so `DELETE FROM events` can proceed (FR-937).',
+    ],
   ])
 
   it('is the only module that reads an organizer assignment to decide conference authority', () => {

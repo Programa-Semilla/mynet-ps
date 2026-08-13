@@ -75,7 +75,12 @@ const AWAITING_THE_READER: Appointment = {
 
 const healthy = {
   catalog: { listSessions: async () => PROGRAMME, listTracks: async () => [] },
-  savedSessions: { listSaved: async () => [], save: async () => {}, unsave: async () => {} },
+  savedSessions: {
+    listSaved: async () => [],
+    save: async () => {},
+    unsave: async () => {},
+    markViewed: async () => {},
+  },
 }
 
 const renderHome = (services: Parameters<typeof testServices>[0]) =>
@@ -233,6 +238,8 @@ describe('the appointment summary card', () => {
         },
         save: async () => {},
         unsave: async () => {},
+
+        markViewed: async () => {},
       },
       appointments: appointmentsDouble(async () => [CONFIRMED_EARLY]),
     })

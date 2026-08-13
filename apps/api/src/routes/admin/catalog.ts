@@ -38,7 +38,11 @@ import {
   type SessionInput,
   type WriteResult,
 } from '../../db/queries/admin-catalog.js'
-import { subscriptionsFor, discardSubscriptions, recordDelivery } from '../../db/queries/push-subscriptions.js'
+import {
+  subscriptionsFor,
+  discardSubscriptions,
+  recordDelivery,
+} from '../../db/queries/push-subscriptions.js'
 import { attendeesToNotify, type MaterialChange } from '../../db/queries/session-changes.js'
 import { AppError, notFound, tooManyAttempts } from '../../errors.js'
 import { dispatchToDevices, truncateForPush } from '../../notifications/dispatch.js'
@@ -95,6 +99,54 @@ import { dispatchToDevices, truncateForPush } from '../../notifications/dispatch
 const refusal = {
   type: 'object',
   properties: { code: { type: 'string' }, message: { type: 'string' } },
+} as const
+
+/**
+ * The two refusals that carry structured detail alongside their message.
+ *
+ * ═════════════════════════════════════════════════════════════════════════════════════════════
+ * **DECLARED IN THE SCHEMA, BECAUSE FASTIFY STRIPS WHAT A RESPONSE SCHEMA DOES NOT NAME.**
+ *
+ * `AppError.details` is merged into the body by `plugins/errors.ts`, and then serialised against
+ * whatever the route declared — so a 409 schema listing only `code` and `message` silently
+ * removes the counts an organizer needs to choose cancellation, and the session titles that make
+ * a date-range refusal actionable. The route would look correct, the integration test would read
+ * `undefined`, and the client would render a bare refusal.
+ *
+ * This is the same shape as `tooManyAttempts`, whose `retryAfterSeconds` is declared on every
+ * throttled route for exactly this reason.
+ * ═════════════════════════════════════════════════════════════════════════════════════════════
+ */
+const detailedRefusal = {
+  type: 'object',
+  properties: {
+    code: { type: 'string' },
+    message: { type: 'string' },
+    engagement: {
+      type: 'object',
+      description:
+        'Counts only, with nobody identified (FR-1025). Present when a deletion is refused ' +
+        'because attendees have engaged with the session — it is what turns "no" into "cancel ' +
+        'instead". No attendee identity accompanies it, at any tier (FR-1042).',
+      properties: {
+        saved: { type: 'integer' },
+        notes: { type: 'integer' },
+        questions: { type: 'integer' },
+        votes: { type: 'integer' },
+      },
+    },
+    sessions: {
+      type: 'array',
+      description:
+        "The sessions a date-range change would orphan, named (FR-1014). They are the caller's " +
+        'own content, and an organizer told only "no" would have to guess which of forty ' +
+        'sessions is in the way.',
+      items: {
+        type: 'object',
+        properties: { id: { type: 'string' }, title: { type: 'string' } },
+      },
+    },
+  },
 } as const
 
 const throttled = {
@@ -233,7 +285,11 @@ export const adminCatalogRoutes = async (app: FastifyInstance): Promise<void> =>
           'attendee is identified and no note, question or vote content is disclosed to any ' +
           'administrative tier (FR-1042).',
         params: eventParams,
-        response: { 200: { type: 'object', additionalProperties: true }, 401: refusal, 404: refusal },
+        response: {
+          200: { type: 'object', additionalProperties: true },
+          401: refusal,
+          404: refusal,
+        },
       },
     },
     async (request) => {
@@ -295,7 +351,12 @@ export const adminCatalogRoutes = async (app: FastifyInstance): Promise<void> =>
         summary: 'Add a track',
         params: eventParams,
         body: trackBody,
-        response: { 201: { type: 'object', additionalProperties: true }, 401: refusal, 404: refusal, ...throttled },
+        response: {
+          201: { type: 'object', additionalProperties: true },
+          401: refusal,
+          404: refusal,
+          ...throttled,
+        },
       },
     },
     async (request, reply) => {
@@ -328,7 +389,12 @@ export const adminCatalogRoutes = async (app: FastifyInstance): Promise<void> =>
         summary: 'Edit a track',
         params: eventAndId,
         body: trackBody,
-        response: { 200: { type: 'object', additionalProperties: true }, 401: refusal, 404: refusal, ...throttled },
+        response: {
+          200: { type: 'object', additionalProperties: true },
+          401: refusal,
+          404: refusal,
+          ...throttled,
+        },
       },
     },
     async (request) => {
@@ -382,7 +448,12 @@ export const adminCatalogRoutes = async (app: FastifyInstance): Promise<void> =>
         summary: 'Add a room',
         params: eventParams,
         body: nameBody,
-        response: { 201: { type: 'object', additionalProperties: true }, 401: refusal, 404: refusal, ...throttled },
+        response: {
+          201: { type: 'object', additionalProperties: true },
+          401: refusal,
+          404: refusal,
+          ...throttled,
+        },
       },
     },
     async (request, reply) => {
@@ -404,7 +475,12 @@ export const adminCatalogRoutes = async (app: FastifyInstance): Promise<void> =>
         summary: 'Edit a room',
         params: eventAndId,
         body: nameBody,
-        response: { 200: { type: 'object', additionalProperties: true }, 401: refusal, 404: refusal, ...throttled },
+        response: {
+          200: { type: 'object', additionalProperties: true },
+          401: refusal,
+          404: refusal,
+          ...throttled,
+        },
       },
     },
     async (request) => {
@@ -456,7 +532,12 @@ export const adminCatalogRoutes = async (app: FastifyInstance): Promise<void> =>
           'signed up, and 014 moves responsibility for it from a reviewed commit to a form.',
         params: eventParams,
         body: speakerBody,
-        response: { 201: { type: 'object', additionalProperties: true }, 401: refusal, 404: refusal, ...throttled },
+        response: {
+          201: { type: 'object', additionalProperties: true },
+          401: refusal,
+          404: refusal,
+          ...throttled,
+        },
       },
     },
     async (request, reply) => {
@@ -483,7 +564,12 @@ export const adminCatalogRoutes = async (app: FastifyInstance): Promise<void> =>
         summary: 'Edit a speaker',
         params: eventAndId,
         body: speakerBody,
-        response: { 200: { type: 'object', additionalProperties: true }, 401: refusal, 404: refusal, ...throttled },
+        response: {
+          200: { type: 'object', additionalProperties: true },
+          401: refusal,
+          404: refusal,
+          ...throttled,
+        },
       },
     },
     async (request) => {
@@ -673,7 +759,12 @@ export const adminCatalogRoutes = async (app: FastifyInstance): Promise<void> =>
           'exactly where it is (FR-1021). Reversible, and reinstating dispatches nothing ' +
           '(FR-1024).',
         params: eventAndId,
-        response: { 200: { type: 'object', additionalProperties: true }, 401: refusal, 404: refusal, ...throttled },
+        response: {
+          200: { type: 'object', additionalProperties: true },
+          401: refusal,
+          404: refusal,
+          ...throttled,
+        },
       },
     },
     async (request) => {
@@ -702,7 +793,12 @@ export const adminCatalogRoutes = async (app: FastifyInstance): Promise<void> =>
           'its reversal, and an attendee whose session comes back has lost nothing by not being ' +
           'told. No marker is set either — there is nothing they need to do.',
         params: eventAndId,
-        response: { 200: { type: 'object', additionalProperties: true }, 401: refusal, 404: refusal, ...throttled },
+        response: {
+          200: { type: 'object', additionalProperties: true },
+          401: refusal,
+          404: refusal,
+          ...throttled,
+        },
       },
     },
     async (request) => {
@@ -738,7 +834,13 @@ export const adminCatalogRoutes = async (app: FastifyInstance): Promise<void> =>
           'blocks rather than being destroyed (FR-1019a). Otherwise 409 with counts and an offer ' +
           'to cancel instead (FR-1019, FR-1025).',
         params: eventAndId,
-        response: { 204: { type: 'null' }, 401: refusal, 404: refusal, 409: refusal, ...throttled },
+        response: {
+          204: { type: 'null' },
+          401: refusal,
+          404: refusal,
+          409: detailedRefusal,
+          ...throttled,
+        },
       },
     },
     async (request, reply) => {
@@ -781,7 +883,13 @@ export const adminCatalogRoutes = async (app: FastifyInstance): Promise<void> =>
             timezone: { type: 'string', minLength: 1, maxLength: 80 },
           },
         },
-        response: { 200: { type: 'object', additionalProperties: true }, 401: refusal, 404: refusal, 409: refusal, ...throttled },
+        response: {
+          200: { type: 'object', additionalProperties: true },
+          401: refusal,
+          404: refusal,
+          409: detailedRefusal,
+          ...throttled,
+        },
       },
     },
     async (request) => {

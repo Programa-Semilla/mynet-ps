@@ -51,7 +51,7 @@ describe('session validation (T027, FR-1012, FR-1013)', () => {
     cookie = await organizerSession(app, ADA, SEED_PASSWORD)
   })
 
-  const create = (payload: unknown, eventId = fixture.assigned.eventId) =>
+  const create = (payload: Record<string, unknown>, eventId = fixture.assigned.eventId) =>
     app.inject({
       method: 'POST',
       url: `/admin/conferences/${eventId}/sessions`,

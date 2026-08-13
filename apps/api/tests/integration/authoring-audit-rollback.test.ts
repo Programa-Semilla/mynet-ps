@@ -100,7 +100,7 @@ describe('an act and its audit entry commit together (T024, FR-1037, SC-1010)', 
 
   const at = (rest: string): string => `/admin/conferences/${fixture.assigned.eventId}${rest}`
 
-  const post = (rest: string, payload?: unknown) =>
+  const post = (rest: string, payload: Record<string, unknown> = {}) =>
     app.inject({ method: 'POST', url: at(rest), headers: { cookie }, payload })
 
   it('leaves no track behind when the entry fails — a catalog write', async () => {

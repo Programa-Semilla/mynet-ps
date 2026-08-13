@@ -66,6 +66,8 @@ const renderSignIn = (overrides: Partial<PlatformServices> = {}) => {
         listSaved: async () => Promise.reject(new Error('not signed in')),
         save: async () => Promise.reject(new Error('not signed in')),
         unsave: async () => Promise.reject(new Error('not signed in')),
+
+        markViewed: async () => {},
       },
       sessionNotes: {
         listNotes: async () => Promise.reject(new Error('not signed in')),

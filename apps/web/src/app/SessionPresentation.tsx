@@ -50,6 +50,48 @@ export const SpeakerLine = ({ speakers }: { speakers: Session['speakers'] }) => 
 }
 
 /**
+ * T053 (014) — a cancelled session, said in **text** (FR-1022, Principle IV).
+ *
+ * ═════════════════════════════════════════════════════════════════════════════════════════════
+ * **NEVER BY COLOUR OR BY STRIKETHROUGH ALONE.**
+ *
+ * The obvious rendering is to grey the row and strike the title through. Both are invisible to a
+ * screen reader and the first is invisible in high contrast — and this is the one piece of
+ * information that, missed, sends somebody across a venue to an empty room. So it is a word,
+ * beside the track chip, where the row already carries text.
+ *
+ * The same reasoning `TrackChip` records for naming the track as well as colouring it: colour is
+ * the reinforcement, never the signal.
+ * ═════════════════════════════════════════════════════════════════════════════════════════════
+ */
+export const CancelledChip = () => (
+  <span className="inline-flex shrink-0 items-center rounded-sm bg-warning-100 px-2 py-0.5 text-xs font-medium text-warning-700">
+    Cancelled
+  </span>
+)
+
+/**
+ * T076 (014) — this saved session has changed since the attendee last looked (FR-1030).
+ *
+ * ─────────────────────────────────────────────────────────────────────────────────────────────
+ * **PER-ROW, IN TEXT, AND NEVER A COUNT** (FR-1031, constitution v4.2.0 N2).
+ *
+ * The marker's whole subject is *this one session*. There is no badge summing them, no list of
+ * changed rows, and no surface anywhere in either product whose subject is "things that
+ * happened" — the moment one exists, N2 is broken regardless of what the notification payload
+ * carries. `apps/web/tests/unit/authoring-absences.test.tsx` asserts that as an absence.
+ *
+ * Text rather than a dot, for the reason above it: a coloured dot is exactly the marker a screen
+ * reader cannot report, and "changed" is one word.
+ * ─────────────────────────────────────────────────────────────────────────────────────────────
+ */
+export const ChangedChip = () => (
+  <span className="inline-flex shrink-0 items-center rounded-sm bg-coral-100 px-2 py-0.5 text-xs font-medium text-coral-700">
+    Changed
+  </span>
+)
+
+/**
  * T024 (005) — whether this row can be saved, and what doing so would mean.
  *
  * Optional on `SessionRow`, and that optionality is deliberate rather than convenience: this
@@ -127,9 +169,16 @@ export const SessionRow = ({
   save,
   openHref,
   registerOpener,
+  changed = false,
 }: {
   session: Session
   timezone: string
+  /**
+   * T076 (014) — whether **this attendee** has yet looked at this session since it materially
+   * changed (FR-1030). Defaults to false, so the Home cards and the programme's "All" view —
+   * which know nothing about the attendee's saved set — render exactly the row they did before.
+   */
+  changed?: boolean
   /** Omitted by the Home cards, which stay exactly as 002 built them. */
   save?: SaveAffordance
   /**
@@ -169,6 +218,8 @@ export const SessionRow = ({
           )}
         </h3>
         <TrackChip track={session.track} />
+        {session.cancelled && <CancelledChip />}
+        {changed && !session.cancelled && <ChangedChip />}
       </div>
       <p className="text-sm text-text-muted">{session.room.name}</p>
       <SpeakerLine speakers={session.speakers} />
