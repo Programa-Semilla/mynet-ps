@@ -77,6 +77,9 @@ export const EXPORTED_COLUMNS: Record<string, ExportTarget> = {
 
   'saved_sessions.session_id': { section: 'savedSessions', field: 'sessionId' },
   'saved_sessions.saved_at': { section: 'savedSessions', field: 'savedAt' },
+  // T003 (014) — attendee data, unlike 014's three columns on `sessions`, which are conference
+  // content and are declared as such in `data-model.md`. It records something the attendee did.
+  'saved_sessions.viewed_at': { section: 'savedSessions', field: 'viewedAt' },
 
   'session_notes.session_id': { section: 'sessionNotes', field: 'sessionId' },
   'session_notes.body': { section: 'sessionNotes', field: 'body' },

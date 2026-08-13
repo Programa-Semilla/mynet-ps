@@ -1,4 +1,4 @@
-import { readFileSync, readdirSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath, URL } from 'node:url'
 
@@ -66,13 +66,62 @@ const WRITES_NOTHING = new Map<string, string>([
 /** The one **read** that writes an entry, and the only one (FR-995). */
 const AUDITED_READ = 'GET /admin/reports/:reportId'
 
-const source = (file: string): string =>
-  readFileSync(join(routesDir, file), 'utf8')
-    .replace(/\/\*[\s\S]*?\*\//g, ' ')
-    .replace(/^\s*\/\/.*$/gm, ' ')
+const stripComments = (text: string): string =>
+  text.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/^\s*\/\/.*$/gm, ' ')
 
-/** Every administrative route module, with comments stripped — 009's rule. */
+const source = (file: string): string => stripComments(readFileSync(join(routesDir, file), 'utf8'))
+
+/**
+ * ═════════════════════════════════════════════════════════════════════════════════════════════
+ * **T023 (014) — A ROUTE'S MODULE IS ITS OWN SOURCE **PLUS** THE QUERY MODULES IT DELEGATES TO,
+ * AND THE WIDENING IS FORCED BY AN ARCHITECTURE THAT IS BETTER RATHER THAN WORSE.**
+ *
+ * 013 wrote every audit entry **in the route handler**, so scanning route modules was the whole
+ * population. 014 writes them **in the query layer**, inside `admin-catalog.ts`, and that is a
+ * deliberate difference: FR-1037 requires the act and its entry to commit together, and the act
+ * happens in the query layer. Putting the entry beside it means a route **cannot forget** —
+ * which is the failure 013's review found, where `appendAuditEntry` took a transaction parameter
+ * that no caller passed.
+ *
+ * Scanning route modules alone would therefore report fifteen unaudited write routes that are in
+ * fact audited more reliably than 013's were. Two repairs were available and one is wrong:
+ *
+ *   - **Add them to `WRITES_NOTHING`.** That list means *this act records nothing on purpose*,
+ *     and using it for acts that do record would make the exemption list a lie — the failure
+ *     every allow-list in this codebase is written to notice.
+ *   - **Follow the delegation** — this. A route module's `db/queries/*.js` imports are read
+ *     alongside it, so "does this act record an entry" is asked of the code that performs the
+ *     act rather than of the file that receives the request.
+ *
+ * The transaction assertion below follows the same population, which is what keeps it meaningful:
+ * it is the query layer's calls that must pass the executor now.
+ * ═════════════════════════════════════════════════════════════════════════════════════════════
+ */
+const queriesDir = fileURLToPath(new URL('../../src/db/queries/', import.meta.url))
+
+const delegatedSource = (routeCode: string): string =>
+  [...routeCode.matchAll(/from '.*db\/queries\/([\w-]+)\.js'/g)]
+    .map((match) => `${match[1]}.ts`)
+    .filter((file) => existsSync(join(queriesDir, file)))
+    .map((file) => stripComments(readFileSync(join(queriesDir, file), 'utf8')))
+    .join('\n')
+
+/**
+ * Every administrative route module, with comments stripped — 009's rule — followed by the query
+ * modules it delegates to.
+ */
 const moduleSources = (): Map<string, string> =>
+  new Map(
+    readdirSync(routesDir)
+      .filter((file) => file.endsWith('.ts') && file !== 'index.ts')
+      .map((file) => {
+        const routeCode = source(file)
+        return [file, `${routeCode}\n${delegatedSource(routeCode)}`]
+      }),
+  )
+
+/** The route module alone, for the assertions that must not see delegated code. */
+const routeOnlySources = (): Map<string, string> =>
   new Map(
     readdirSync(routesDir)
       .filter((file) => file.endsWith('.ts') && file !== 'index.ts')
@@ -117,15 +166,43 @@ describe('the administrative audit trail is complete (FR-994, SC-911)', () => {
    * here**: a route matching no module, or more than one, is itself a failure.
    * ═══════════════════════════════════════════════════════════════════════════════════════════
    */
-  const moduleFor = (url: string, sources: Map<string, string>): string[] =>
-    [...sources].filter(([, code]) => code.includes(`'${url}'`)).map(([file]) => file)
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════════════════════
+   * **T085 (014) — KEYED ON THE METHOD AS WELL AS THE URL, BECAUSE ONE PATH IS NOW REGISTERED
+   * IN TWO MODULES.**
+   *
+   * `GET /admin/conferences` lists what an operator may act on and lives in `conferences.ts`.
+   * `POST /admin/conferences` creates one and lives in `catalog.ts` — the same address, two
+   * different acts, correctly in two different modules. A URL-only match reported both files and
+   * failed the ambiguity assertion, which was the assertion doing its job: the mapping genuinely
+   * was ambiguous.
+   *
+   * Matching `app.<method>(` immediately before the literal resolves it, and is strictly more
+   * precise than what it replaces. **There is still no fallback**: a route matching no module, or
+   * more than one, is a failure. The header above records why a fallback that widened the
+   * population is how a real gap survived once already.
+   * ═══════════════════════════════════════════════════════════════════════════════════════════
+   */
+  const registers = (code: string, method: string, url: string): boolean =>
+    new RegExp(`app\\.${method.toLowerCase()}(?:<[^>]*>)?\\s*\\(\\s*'${url}'`).test(code)
+
+  const moduleFor = (route: RouteOptions, sources: Map<string, string>): string[] => {
+    const verbs = methodsOf(route).filter((method) => method !== 'HEAD')
+    return [...sources]
+      .filter(([, code]) => verbs.some((method) => registers(code, method, route.url)))
+      .map(([file]) => file)
+  }
 
   it('maps every administrative route to exactly one module', () => {
     // The derivation the audit assertions rest on. If this breaks, they stop meaning anything —
     // so it is asserted on its own rather than inside them.
-    const sources = moduleSources()
+    const sources = routeOnlySources()
     const ambiguous = adminRoutes()
-      .map((route) => ({ url: route.url, files: moduleFor(route.url, sources) }))
+      // Fastify registers a `HEAD` alongside every `GET`. It is not a separate declaration and
+      // no module contains an `app.head(` call, so it maps to nothing by construction — which
+      // the URL-only matcher this replaced could not tell from a genuinely unmapped route.
+      .filter((route) => methodsOf(route).some((method) => method !== 'HEAD'))
+      .map((route) => ({ url: route.url, files: moduleFor(route, sources) }))
       .filter((entry) => entry.files.length !== 1)
 
     expect(
@@ -147,21 +224,25 @@ describe('the administrative audit trail is complete (FR-994, SC-911)', () => {
    * (`admin-promotion.test.ts`, `admin-remove-question.test.ts`, `admin-tier-boundary.test.ts`).
    */
   it('records an entry from every administrative write route (FR-994)', () => {
-    const sources = moduleSources()
+    const routeOnly = routeOnlySources()
+    const withDelegation = moduleSources()
 
     const writing = adminRoutes()
       .filter((route) => methodsOf(route).some((method) => WRITE_METHODS.includes(method)))
-      .flatMap((route) => labels(route).map((label) => ({ label, url: route.url })))
+      .flatMap((route) => labels(route).map((label) => ({ label, route })))
       .filter(({ label }) => !WRITES_NOTHING.has(label))
 
     expect(writing.length, 'no administrative write routes were found').toBeGreaterThan(3)
 
     const unaudited = writing
-      .filter(({ url }) => {
-        const files = moduleFor(url, sources)
+      .filter(({ route }) => {
+        // Mapped on the route module alone — that is where the registration is — and then read
+        // **with its delegated query modules**, because 014 writes its entries there. See the
+        // note on `delegatedSource`.
+        const files = moduleFor(route, routeOnly)
         // No fallback. A route that traces to no module is caught by the mapping assertion
         // above; here it counts as unaudited rather than being waved through.
-        return !files.some((file) => /appendAuditEntry/.test(sources.get(file) ?? ''))
+        return !files.some((file) => /appendAuditEntry/.test(withDelegation.get(file) ?? ''))
       })
       .map(({ label }) => label)
 
@@ -263,11 +344,14 @@ describe('the administrative audit trail is complete (FR-994, SC-911)', () => {
   it('records nothing from a read, except the one disclosure (FR-995)', () => {
     const sources = moduleSources()
 
-    // Modules with **only** read routes must not mention the append at all.
+    // Modules with **only** read routes must not mention the append at all. Read from the route
+    // sources rather than the delegated ones: `me.ts` legitimately imports query modules that
+    // audit on behalf of other routes, and the claim here is about this module's own handlers.
     const readOnlyModules = ['me.ts']
-    for (const file of readOnlyModules) {
+    for (const file of routeOnlySources().keys()) {
+      if (!readOnlyModules.includes(file)) continue
       expect(
-        sources.get(file) ?? '',
+        routeOnlySources().get(file) ?? '',
         `${file} appends an audit entry. Navigation is not a disclosure, and a trail that ` +
           'recorded it would bury the acts it exists to make reviewable (FR-995).',
       ).not.toMatch(/appendAuditEntry/)

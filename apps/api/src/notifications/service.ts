@@ -43,8 +43,8 @@ export interface StoredSubscription {
  * a payload rather than a column, since a notification is the one place this product's data leaves
  * it for a surface nobody here controls.
  */
-export interface PushPayload {
-  /** Who it is from. FR-553 requires the sender to be identified. */
+interface PushPayloadBase {
+  /** Who or what it is from. FR-553 requires the sender to be identified. */
   readonly title: string
   /**
    * The message, truncated to fit the encrypted payload budget (M7, research R12).
@@ -53,10 +53,70 @@ export interface PushPayload {
    * and whether an attendee may suppress that was deliberately not decided (constitution 3.1.0,
    * "Notification delivery"). The alternative — "you have a message" — makes the attendee open the
    * application to learn whether it mattered, which is most of the value gone.
+   *
+   * **014 accepts the same cost a second time and does not solve it either.** A saved-session
+   * notification carries a session **title**, so what somebody chose to attend is now on their
+   * locked device alongside what somebody said to them. That is register entry 27, promoted from
+   * a deferral that had sat in prose since v3.1.0 precisely because a consequence recorded twice
+   * in the same words is one nobody acts on.
    */
   readonly body: string
+}
+
+/** What 007 delivers: somebody wrote to you. Activating it opens that conversation (FR-554). */
+export interface MessagePushPayload extends PushPayloadBase {
+  readonly kind?: 'message'
   readonly conversationId: string
 }
+
+/**
+ * T072 (014) — what the **second** trigger delivers (v4.2.0 N1, FR-1029, FR-1034, FR-1034b).
+ *
+ * ═════════════════════════════════════════════════════════════════════════════════════════════
+ * **TWO SHAPES, AND WHICH ONE ARRIVES IS THE WHOLE OF THE COALESCING RULE.**
+ *
+ *   - **One session changed** → `sessionId` is present. Activating it opens that session, which
+ *     is where the attendee can see what happened and decide what to do (FR-1029).
+ *   - **Several of one attendee's saved sessions changed in one act** → `count` is present and
+ *     `sessionId` is not. Activating it opens **Agenda**, where the changed rows carry their
+ *     individual markers — and explicitly **not** a list of changes, because that list is the
+ *     surface FR-1031 forbids (FR-1034b).
+ *
+ * ─────────────────────────────────────────────────────────────────────────────────────────────
+ * **`count` IS THE ONLY AGGREGATE OVER CHANGES THIS PRODUCT MAY PRODUCE, AND IT MAY EXIST HERE
+ * AND NOWHERE ELSE** (FR-1034a, v4.2.0 N2).
+ *
+ * N2's prohibition governs **in-app surfaces**, where an aggregate becomes the notification
+ * centre v3.1.0 forbids. A notification is a single interruption by nature, and twelve
+ * interruptions for one organizer act is exactly the outcome that exclusion existed to prevent —
+ * so a count in the body is what makes coalescing possible at all.
+ *
+ * **The moment a screen answers "how many things changed", this is broken** regardless of what
+ * this payload does. `apps/web/tests/unit/authoring-absences.test.tsx` and its API sibling assert
+ * that, in both products.
+ * ─────────────────────────────────────────────────────────────────────────────────────────────
+ * ═════════════════════════════════════════════════════════════════════════════════════════════
+ */
+export interface SessionChangePushPayload extends PushPayloadBase {
+  readonly kind: 'session-change'
+  /** Present when exactly one saved session changed. Activating it opens that session. */
+  readonly sessionId?: string
+  /** Present when several did. Activating it opens Agenda, never a list (FR-1034b). */
+  readonly count?: number
+  /** The conference, so activation can open the right Agenda. */
+  readonly eventId: string
+}
+
+/**
+ * What is delivered.
+ *
+ * **Identifiers rather than a URL**, so the port carries no knowledge of the client's addressing
+ * scheme — the service worker builds the address it opens (FR-554). And **nothing beyond these
+ * fields**: Principle VIII's collect-only-what-a-requirement-names applied to a payload rather
+ * than a column, since a notification is the one place this product's data leaves it for a
+ * surface nobody here controls.
+ */
+export type PushPayload = MessagePushPayload | SessionChangePushPayload
 
 /**
  * The outcome of one delivery attempt to one device.

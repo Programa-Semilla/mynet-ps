@@ -124,28 +124,75 @@ describe('011 — the guards this feature did not touch are still in force', () 
    * notice the audit being edited to permit one.
    * ═══════════════════════════════════════════════════════════════════════════════════════════
    */
-  it('leaves the notification trigger audit unedited, with a received message its only trigger (FR-935, SC-910)', () => {
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════════════════════
+   * **T020 (014) — 013 REQUIRED THIS AUDIT TO BE UNEDITED. 014 EDITS IT, AND THAT IS THE
+   * MECHANISM WORKING RATHER THAN FAILING.**
+   *
+   * The assertion below used to read: *the audit must not mention an administrative concept,
+   * because if 013 needed one that would be a second trigger and a governance conversation.* It
+   * was right, and 013 passed it.
+   *
+   * **014 had that conversation.** Constitution v4.2.0, ratified 2026-08-12, admits a second
+   * trigger — a material change to a session the attendee has **saved**, where material means
+   * exactly *cancelled, start time, room*. The amendment gated the first line of this feature's
+   * code, exactly as v3.1.0 gated 007's Phase 7 and v3.3.0 gated 009.
+   *
+   * So the claim changes from *"unedited"* to *"edited to exactly what was granted"*, and the
+   * three things it now checks are what the amendment actually bounds:
+   *
+   *   1. Both permitted triggers are still named.
+   *   2. The **acts 013 was refused** are still absent — promotion, demotion, report resolution.
+   *      Those remain forbidden (FR-935, FR-946) and would be a **third** trigger.
+   *   3. The **changes v4.2.0 did not grant** are still absent from the dispatch path: a title
+   *      or summary edit, a speaker change, a reinstatement, and a session *starting*.
+   * ═══════════════════════════════════════════════════════════════════════════════════════════
+   */
+  it('keeps the notification trigger audit at exactly the two triggers admitted (FR-935, N1)', () => {
     const guard = read(join(unitDir, 'notification-triggers.test.ts'))
 
     expect(
       guard.length,
-      '`notification-triggers.test.ts` is missing or empty. It is the guard that keeps the ' +
-        'notification trigger set at a received message (FR-561, FR-935).',
+      '`notification-triggers.test.ts` is missing or empty. It is the guard that bounds the ' +
+        'notification trigger set (FR-561, FR-935, FR-1026).',
     ).toBeGreaterThan(500)
 
     expect(
       guard,
-      'The notification trigger audit no longer names the message send as its permitted trigger.',
+      'The notification trigger audit no longer names the message send as a permitted trigger.',
     ).toMatch(/message/i)
 
-    // The audit must not have acquired an administrative exemption. If 011 needed one, that
-    // would be a second trigger and a governance conversation (v3.1.0, standing decision 21).
     expect(
-      /admin|operator|promot|resolv/i.test(guard),
-      'The notification trigger audit mentions an administrative concept, which means somebody ' +
-        'has taught it about a second trigger. The trigger set is a received message and nothing ' +
-        'else — a second one needs another amendment (FR-935, SC-910).',
-    ).toBe(false)
+      guard,
+      'The notification trigger audit no longer names the authoring caller. v4.2.0 admits a ' +
+        'material change to a SAVED session as the second trigger, and this audit is where the ' +
+        'permitted callers are declared — if the name is gone, either the trigger was removed ' +
+        'or the dispatch has moved somewhere the audit does not scan (research R3).',
+    ).toMatch(/routes\/admin\/catalog\.ts/)
+
+    // ─────────────────────────────────────────────────────────────────────────────────────────
+    // The acts 013 was refused, and 014 was not granted either. Each is an obvious product idea
+    // and each would be a **third** trigger needing its own amendment.
+    // ─────────────────────────────────────────────────────────────────────────────────────────
+    for (const forbidden of ['promot', 'demot', 'resolv']) {
+      expect(
+        new RegExp(forbidden, 'i').test(guard),
+        `The notification trigger audit mentions "${forbidden}", which means somebody has ` +
+          'taught it about a third trigger. Telling somebody they have been promoted, or ' +
+          'telling a reporter their report was read, are both forbidden (FR-935, FR-946).',
+      ).toBe(false)
+    }
+
+    // And the changes v4.2.0 deliberately did NOT make material. The audit asserts these are
+    // absent from the dispatch path; this asserts it still asks.
+    for (const bounded of ['reinstat', 'speakerChanged', 'titleChanged']) {
+      expect(
+        guard,
+        `The notification trigger audit no longer checks that "${bounded}" cannot dispatch. ` +
+          'v4.2.0 enumerated the material set — cancelled, start time, room — precisely so that ' +
+          'widening it is an edit somebody has to justify.',
+      ).toContain(bounded)
+    }
   })
 
   /**

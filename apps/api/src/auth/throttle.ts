@@ -607,6 +607,111 @@ export const THRESHOLDS: Record<ThrottleAction, ActionThreshold> = {
     source: { freeAttempts: 6_000, ceilingMs: READ_MAX_DELAY_MS },
     mayDeny: false,
   },
+
+  /**
+   * T022 (014) — **creating a conference** (FR-1039, research R10).
+   *
+   * ═════════════════════════════════════════════════════════════════════════════════════════
+   * **THE TIGHTEST ENTRY IN THIS TABLE, AND THE ONLY ONE BOUNDING A PRODUCT-WIDE CAPABILITY.**
+   *
+   * v4.2.0's N3 gives a conference organizer exactly one authority that is not confined to the
+   * conferences they are assigned: they may create one. The amendment accepts, in writing, that
+   * **nothing bounds how many** — the bound is trust, since promotion is platform-tier only.
+   *
+   * "Bounded by trust" is a statement about *authorisation*, not about *rate*, and this is what
+   * keeps the two apart. Three an hour is far beyond any real sequence — standing up an event is
+   * a deliberate act somebody does once — and far below what a script would want. A creation
+   * mints a join code and an organizer assignment, so an unbounded loop is unbounded rows in two
+   * tables that every administrative read then pages through.
+   *
+   * `mayDeny: true` on the rule this table runs on: keyed on the acting operator's own
+   * authenticated identity, so a refusal falls only on them.
+   * ═════════════════════════════════════════════════════════════════════════════════════════
+   */
+  conference_create: {
+    identifier: { freeAttempts: 3, ceilingMs: IDENTIFIER_MAX_DELAY_MS },
+    source: { freeAttempts: 30, ceilingMs: SOURCE_MAX_DELAY_MS },
+    mayDeny: true,
+  },
+
+  /**
+   * T022 (014) — editing sessions (FR-1039).
+   *
+   * The ordinary authoring action, and the loosest of this feature's five: building a programme
+   * is dozens of writes in one sitting, and an organizer laying out a conference the evening
+   * before must not be slowed by the tool they were given to do it.
+   *
+   * Deliberately **separate from `session_cancel`** even though both write the same table. A
+   * busy afternoon of edits must not consume the allowance that bounds the one act which reaches
+   * attendees' phones, and the reverse would be worse: the two are an order of magnitude apart
+   * on purpose.
+   */
+  session_write: {
+    identifier: { freeAttempts: 120, ceilingMs: IDENTIFIER_MAX_DELAY_MS },
+    source: { freeAttempts: 600, ceilingMs: SOURCE_MAX_DELAY_MS },
+    mayDeny: true,
+  },
+
+  /**
+   * T022 (014) — **cancelling a session: the only authoring act that reaches attendees' phones**
+   * (FR-1039, FR-1026, research R10).
+   *
+   * ═════════════════════════════════════════════════════════════════════════════════════════
+   * **THIS IS THE ENTRY THAT MATTERS, AND IT IS `report_submit`'s ARGUMENT ARRIVING A SECOND
+   * TIME.**
+   *
+   * Every other throttle in this table bounds work the server does for itself. Two bound
+   * something leaving the product: `report_submit` bounds mail to the single address a human is
+   * supposed to read, and this bounds **push notifications to every attendee who saved
+   * anything**.
+   *
+   * A cancel/reinstate loop is a push amplifier: each cancellation fans out to every saver of
+   * that session, and the attendees on the receiving end did nothing and cannot opt out of the
+   * trigger — permission is all-or-nothing (v3.1.0). So the person a denial falls on is the
+   * operator looping, and the people an *absent* denial falls on are everybody else.
+   *
+   * Ten an hour is generous against real use — cancelling a handful of sessions when a speaker
+   * drops out is an ordinary bad morning — and nowhere near enough to be used as a weapon.
+   * Coalescing (FR-1034) already bounds one *act* to one notification per attendee; this bounds
+   * the number of acts.
+   * ═════════════════════════════════════════════════════════════════════════════════════════
+   */
+  session_cancel: {
+    identifier: { freeAttempts: 10, ceilingMs: IDENTIFIER_MAX_DELAY_MS },
+    source: { freeAttempts: 60, ceilingMs: SOURCE_MAX_DELAY_MS },
+    mayDeny: true,
+  },
+
+  /**
+   * T022 (014) — deleting a session (FR-1039).
+   *
+   * Tighter than `session_write` and looser than `session_cancel`. It is destructive and
+   * irreversible, but FR-1018 already means it can only ever remove a session **nobody has
+   * touched** — so the harm a loop could do is bounded by the refusal rather than by this.
+   * Clearing up a mis-imported programme is a legitimate burst; twenty an hour covers it.
+   */
+  session_delete: {
+    identifier: { freeAttempts: 20, ceilingMs: IDENTIFIER_MAX_DELAY_MS },
+    source: { freeAttempts: 120, ceilingMs: SOURCE_MAX_DELAY_MS },
+    mayDeny: true,
+  },
+
+  /**
+   * T022 (014) — writing tracks, rooms and speakers (FR-1039).
+   *
+   * One counter for the three, and that is the one place this feature groups rather than
+   * separates. They are the same act at the same scale — naming a thing in a conference — and
+   * nothing distinguishes what a denial on one would cost from what it would cost on another.
+   * Sessions are separate because they carry times, and times are what notify people.
+   *
+   * As generous as `session_write`, for the same reason: an organizer setting up a conference
+   * creates every room and every speaker in one sitting.
+   */
+  catalog_write: {
+    identifier: { freeAttempts: 120, ceilingMs: IDENTIFIER_MAX_DELAY_MS },
+    source: { freeAttempts: 600, ceilingMs: SOURCE_MAX_DELAY_MS },
+    mayDeny: true,
+  },
 }
 
 /**

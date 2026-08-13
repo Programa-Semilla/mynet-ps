@@ -1,6 +1,7 @@
 import 'fastify'
 import type { FastifyReply, FastifyRequest } from 'fastify'
 
+import type { ConferenceAuthorityScope } from '../admin/require-conference-authority.js'
 import type { OperatorScope, PlatformScope } from '../admin/scope.js'
 import type { MailService } from '../mail/service.js'
 import type { PushService } from '../notifications/service.js'
@@ -104,6 +105,27 @@ declare module 'fastify' {
      */
     platformScope?: PlatformScope
     /**
+     * ═══════════════════════════════════════════════════════════════════════════════════════
+     * 014 — proof that this administrative principal may **author the conference named in the
+     * path** (FR-1035, FR-1036).
+     *
+     * **The fifth sibling, and the first that joins two things neither of which is an
+     * attendee's relationship to a record.** `eventScope` proves a registration,
+     * `conversationScope` a symmetric membership, `cardScope` a directional holding, and
+     * `operatorScope` establishes which principal is calling. This one is a join between an
+     * **operator and a conference** — product-wide for the platform tier, assignment-wide for
+     * an organizer — and no existing guard has the second operand to express it.
+     *
+     * **Not `eventScope`, and the difference is not cosmetic.** `requireEventAccess` mints from
+     * an attendee's registration; an organizer authoring a conference has none and needs none,
+     * and a platform operator has no `attendees` row at all.
+     *
+     * Set only by `requireConferenceAuthority`, which runs **after** `requireOperator` and reads
+     * the scope it produced. A handler reads it through `conferenceAuthorityOf`.
+     * ═══════════════════════════════════════════════════════════════════════════════════════
+     */
+    conferenceAuthority?: ConferenceAuthorityScope
+    /**
      * 011 — the current administrative session id, used by sign-out to revoke exactly this
      * device (FR-919). The sibling of `authSessionId`, and separate for the same reason the
      * table is: ending one product's session must not end the other's (decision 37).
@@ -153,6 +175,16 @@ declare module 'fastify' {
      * report queue tells somebody exactly what to go looking for.
      */
     requirePlatformOperator: (request: FastifyRequest, reply: FastifyReply) => Promise<void>
+    /**
+     * 014 — route-level conference-authority guard (FR-1035). Composed **after**
+     * `requireOperator`, whose scope it reads: a platform operator passes for any conference
+     * that exists, an organizer passes only for one they are assigned, and everything else is
+     * the same 404 (FR-1036).
+     *
+     * A 403 would tell an organizer that a conference exists and somebody else runs it, which
+     * is an enumeration oracle over the conference list.
+     */
+    requireConferenceAuthority: (request: FastifyRequest, reply: FastifyReply) => Promise<void>
     /**
      * 004 — durable binary content, behind a project-owned port (FR-352, research D3).
      *

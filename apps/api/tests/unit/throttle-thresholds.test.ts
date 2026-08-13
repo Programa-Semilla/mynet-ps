@@ -195,3 +195,112 @@ describe('the read bounds are configured to delay and never deny (FR-802, FR-803
     expect(delayFor(freeAttempts + 40, freeAttempts, ceilingMs)).toBe(READ_MAX_DELAY_MS)
   })
 })
+
+/**
+ * T022 (014) — **the five authoring actions, and the two of them that carry an argument**
+ * (FR-1039, research R10).
+ *
+ * ═════════════════════════════════════════════════════════════════════════════════════════════
+ * **THREE OF THE FIVE ARE ORDINARY AND ARE ASSERTED ONLY AS PRESENT. TWO ARE NOT.**
+ *
+ * `session_write`, `session_delete` and `catalog_write` bound work the server does for itself, at
+ * a scale nobody has a reason to exceed — `throttle-actions.test.ts` already requires every
+ * declared action to have a threshold, a reachable one, and the right `mayDeny` flag, which is
+ * the whole of what those three need.
+ *
+ * The other two are the reason FR-1039 names the five individually rather than covering them
+ * with one `authoring` bucket, and each carries a property a shared counter would destroy.
+ * ═════════════════════════════════════════════════════════════════════════════════════════════
+ */
+describe('the authoring bounds (T022, FR-1039)', () => {
+  const AUTHORING = [
+    'conference_create',
+    'session_write',
+    'session_cancel',
+    'session_delete',
+    'catalog_write',
+  ] as const
+
+  it.each(AUTHORING)('%s exists, is thresholded, and may deny', (action) => {
+    expect(THROTTLE_ACTIONS).toContain(action)
+    expect(THRESHOLDS[action]).toBeDefined()
+    expect(
+      THRESHOLDS[action].mayDeny,
+      `${action} is keyed on the acting operator's own authenticated identity, so a refusal can ` +
+        'only inconvenience the person authoring. Delay-only is the exceptional configuration ' +
+        'and is correct only when a denial could fall on somebody else (FR-331) or when a ' +
+        'refused action is a failure the actor cannot act on (FR-511a). Neither applies here.',
+    ).toBe(true)
+  })
+
+  it.each(AUTHORING)('%s has a counter of its own', (action) => {
+    // The failure this catches is a "simplification": one authoring counter shared by five acts.
+    // It would pass every assertion above while letting an afternoon of ordinary session edits
+    // consume the allowance that bounds the act which reaches attendees' phones.
+    const others = AUTHORING.filter((other) => other !== action)
+    for (const other of others) {
+      expect(THRESHOLDS[action], `${action} and ${other} share one threshold object`).not.toBe(
+        THRESHOLDS[other],
+      )
+    }
+  })
+
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════════════════════
+   * **`session_cancel` IS THE ONE THAT MATTERS, AND `report_submit`'s ARGUMENT IS WHY.**
+   *
+   * Two actions in this product send something **out** of it. `report_submit` bounds mail to the
+   * single address a human is supposed to read; this bounds **push notifications to every
+   * attendee who saved the session**. A cancel/reinstate loop is a push amplifier aimed at people
+   * who did nothing, cannot opt out of the trigger, and have no way to make it stop — permission
+   * is all-or-nothing under v3.1.0.
+   *
+   * Coalescing (FR-1034) bounds one *act* to one notification per attendee. Nothing but this
+   * bounds the number of acts, which is why the allowance is an order of magnitude below the
+   * ordinary editing one rather than beside it.
+   * ═══════════════════════════════════════════════════════════════════════════════════════════
+   */
+  it('bounds cancellation far more tightly than ordinary session editing', () => {
+    expect(
+      THRESHOLDS.session_cancel.identifier.freeAttempts,
+      'Cancelling is bounded no more tightly than editing. It is the only authoring act that ' +
+        "reaches attendees' phones — if these two ever converge, one of them has been tuned " +
+        'without the reasoning being revisited.',
+    ).toBeLessThan(THRESHOLDS.session_write.identifier.freeAttempts / 5)
+  })
+
+  it('still leaves room for a genuinely bad morning', () => {
+    // The other direction, and the one a "tightening" would break. A speaker dropping out means
+    // cancelling a handful of sessions in a few minutes; a bound that caught that would be a
+    // product defect wearing a defence's clothes — `report_submit` records the same shape.
+    expect(THRESHOLDS.session_cancel.identifier.freeAttempts).toBeGreaterThanOrEqual(5)
+  })
+
+  /**
+   * `conference_create` is the **only product-wide capability a conference organizer holds**
+   * (v4.2.0 N3), and the amendment accepts in writing that nothing bounds how many they may
+   * make. That is a statement about authorisation; this is the one about rate, and the two are
+   * deliberately not the same thing.
+   */
+  it('keeps conference creation the tightest authoring bound', () => {
+    for (const action of AUTHORING) {
+      if (action === 'conference_create') continue
+      expect(
+        THRESHOLDS.conference_create.identifier.freeAttempts,
+        `conference_create is not tighter than ${action}. Creating a conference mints a join ` +
+          'code and an organizer assignment, and it is the one act an organizer may perform ' +
+          'outside the conferences they are assigned.',
+      ).toBeLessThanOrEqual(THRESHOLDS[action].identifier.freeAttempts)
+    }
+  })
+
+  it('keeps every authoring source allowance an order of magnitude above its identifier', () => {
+    // An administrative office behind one address must not be the thing that trips these — the
+    // reasoning every entry in this table gives, applied to a much smaller population.
+    for (const action of AUTHORING) {
+      expect(THRESHOLDS[action].source.freeAttempts).toBeGreaterThanOrEqual(
+        THRESHOLDS[action].identifier.freeAttempts * 5,
+      )
+    }
+  })
+})

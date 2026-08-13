@@ -116,7 +116,14 @@ export class SinkPushService implements PushService {
         endpoint: subscription.endpoint,
         title: payload.title,
         body: payload.body,
-        conversationId: payload.conversationId,
+        // 014 — whichever identifier this payload shape carries. Read defensively rather than by
+        // narrowing on `kind`, because this is a log line: a shape it does not recognise should
+        // produce a line with a missing field, never a crash inside the fallback adapter that
+        // exists so a clone with no VAPID keys still works.
+        target:
+          'conversationId' in payload
+            ? payload.conversationId
+            : (payload.sessionId ?? payload.eventId),
       },
       'push RECORDED by the development sink — not delivered to a device (register entry 20)',
     )

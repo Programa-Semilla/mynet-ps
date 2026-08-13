@@ -150,14 +150,20 @@ export class WebPushService implements PushService {
           // clearer in a schema than a JSON blob nothing can constrain.
           keys: { p256dh: subscription.p256dhKey, auth: subscription.authKey },
         },
-        // The service worker parses exactly this (`sw.ts`, the `push` handler). It carries the
-        // conversation **identifier** rather than a URL: the client owns its own addressing, and a
-        // server emitting `/messages/<id>` would be a second place that scheme is decided.
-        JSON.stringify({
-          title: payload.title,
-          body: payload.body,
-          conversationId: payload.conversationId,
-        }),
+        // ─────────────────────────────────────────────────────────────────────────────────────
+        // The service worker parses exactly this (`sw.ts`, the `push` handler). It carries
+        // **identifiers** rather than a URL: the client owns its own addressing, and a server
+        // emitting `/messages/<id>` would be a second place that scheme is decided.
+        //
+        // 014 — serialised **whole** rather than field by field, which is what lets a second
+        // payload shape exist without this adapter knowing anything about it. The union is
+        // closed and every member is plain data, so the adapter stays what it is: something that
+        // signs and posts. Listing fields here meant the message shape was hard-coded in the
+        // transport, and a session-change payload would have arrived with its identifiers
+        // silently dropped — a notification that opens the wrong place rather than one that
+        // fails.
+        // ─────────────────────────────────────────────────────────────────────────────────────
+        JSON.stringify(payload),
         {
           vapidDetails: {
             subject: this.#subject,

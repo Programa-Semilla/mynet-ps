@@ -17,6 +17,7 @@ import { loadConfig } from './config.js'
 import { closeDb } from './db/client.js'
 import maintenance from './maintenance.js'
 import authContext from './plugins/auth-context.js'
+import requireConferenceAuthorityPlugin from './admin/require-conference-authority.js'
 import requireOperatorPlugin from './admin/require-operator.js'
 import cardAccess from './plugins/card-access.js'
 import errors from './plugins/errors.js'
@@ -246,6 +247,24 @@ export const buildApp = async (options: BuildAppOptions = {}): Promise<FastifyIn
   //     success** (research R5, FR-905). `tests/unit/operator-audit.test.ts` is the fourth audit.
   // ─────────────────────────────────────────────────────────────────────────────────────────
   await app.register(requireOperatorPlugin)
+
+  // ─────────────────────────────────────────────────────────────────────────────────────────
+  // 5a-quinquies. Conference authority (014). Decorates the instance with
+  //     `requireConferenceAuthority`, which produces the `ConferenceAuthorityScope` every
+  //     authoring write demands (FR-1035, research R2).
+  //
+  //     **The fifth sibling, and the first whose ordering genuinely matters.** It reads the
+  //     `OperatorScope` that step 5a-quater's guard produced, so it declares
+  //     `dependencies: ['require-operator']` — a registration order that is a real constraint
+  //     rather than a readability choice, and `fastify-plugin` enforces it rather than this
+  //     comment.
+  //
+  //     No sixth route audit accompanies it. Every authoring route names its conference in the
+  //     path, and `operator-audit.test.ts` — which already covers `/admin/*` by prefix — gained
+  //     the two assertions that make naming it load-bearing: an administrative route naming a
+  //     conference must carry this guard, and it must bind the operator first.
+  // ─────────────────────────────────────────────────────────────────────────────────────────
+  await app.register(requireConferenceAuthorityPlugin)
 
   // 5b. The two ports 004 introduces — durable binary content and transactional account mail
   //     (FR-352, FR-394). Appended after the guards and before maintenance: nothing in steps

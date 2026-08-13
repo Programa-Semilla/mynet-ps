@@ -2,7 +2,11 @@ import type { RouteOptions } from 'fastify'
 import { beforeAll, describe, expect, it } from 'vitest'
 
 import { buildApp } from '../../src/app.js'
+import { requireConferenceAuthority } from '../../src/admin/require-conference-authority.js'
 import { requireOperator, requirePlatformOperator } from '../../src/admin/require-operator.js'
+
+/** Verbs that change something. Shared by the conference-authority assertions below. */
+const WRITE_METHODS = ['POST', 'PUT', 'PATCH', 'DELETE']
 
 /**
  * T011 (013) — the administrative route audit (FR-905, FR-906, contracts, research R5).
@@ -282,6 +286,125 @@ describe('administrative route audit', () => {
    * would put it inside a guarantee that does not apply to it, and would make the event audit
    * demand a registration the caller does not and must not have.
    */
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════════════════════
+   * **T009 (014) — THE FIFTH GUARD, AND THE TWO ASSERTIONS THAT MAKE 014 NEED NO SIXTH AUDIT.**
+   *
+   * `requireOperator` establishes **who** is calling. It says nothing about **which conference**
+   * they may write to — and a conference organizer holding only that would reach every
+   * conference in the product, which is exactly what decision 32 confines the tier away from and
+   * what FR-1035 requires be a server-enforced predicate.
+   *
+   * 007 and 008 each had to build a whole new audit at this point, because their resources named
+   * no conference and `event-scope-audit` therefore **reported success** on them. 009 was the
+   * exception: every one of its routes named its conference, so the existing audit reached them,
+   * and it pinned the naming rule with an assertion rather than a comment.
+   *
+   * 014 is in 009's position and takes 009's measure. These two assertions are what make it
+   * safe — one demands the guard wherever a conference is named, the other demands the ordering
+   * that makes the guard able to do anything.
+   * ═══════════════════════════════════════════════════════════════════════════════════════════
+   */
+  const NAMES_NO_CONFERENCE = new Map<string, string>([
+    [
+      'POST /admin/conferences',
+      'Creating one. There is no conference to hold authority over yet, which is the single ' +
+        'place the authoring guard cannot apply (FR-1007, FR-1008). Guarded by ' +
+        '`requireOperator`, throttled on its own `conference_create` action, and the creating ' +
+        'organizer is assigned to the result in the same transaction.',
+    ],
+  ])
+
+  it('guards every conference-authority route with the fifth predicate (FR-1035)', () => {
+    // The population is the authoring routes: everything in `routes/admin/catalog.ts`. Found by
+    // the guard they carry rather than by their path, so a route moved to another module is
+    // still checked — and a route that dropped the guard lands in the assertion below instead.
+    const authoring = routes
+      .filter((route) => preHandlersOf(route).includes(requireConferenceAuthority))
+      .flatMap(labelsOf)
+
+    expect(
+      authoring.length,
+      'No routes carry `requireConferenceAuthority`. Either 014 was removed, or the guard was ' +
+        'renamed — and both assertions here are now vacuous.',
+    ).toBeGreaterThan(10)
+
+    // Every one of them names its conference. This is 009's rule, and it is what makes the
+    // *event* audit's bound reach these routes at all: tidying `…/conferences/:eventId/sessions`
+    // to `…/sessions` would remove them from that audit's view entirely, with the whole suite
+    // staying green.
+    const unnamed = routes
+      .filter((route) => preHandlersOf(route).includes(requireConferenceAuthority))
+      .filter((route) => !/:eventId\b/.test(route.url))
+      .flatMap(labelsOf)
+
+    expect(
+      unnamed,
+      'These routes prove authority over a conference they do not name. The guard reads ' +
+        '`:eventId` from the path, so a route without one authorises over `undefined` — and it ' +
+        'also disappears from `event-scope-audit`, which examines a route only if it declares ' +
+        'an event parameter and REPORTS SUCCESS otherwise.',
+    ).toEqual([])
+  })
+
+  it('binds the operator FIRST, by reference and not by count (FR-1035)', () => {
+    // `requireConferenceAuthority` reads the scope `requireOperator` produced, so a route
+    // listing them the other way round would be authorising against nobody. Compared by
+    // reference because `[someUnrelatedHook, requireConferenceAuthority]` satisfies a count —
+    // the exact weakness `event-scope-audit` had to repair for its own ordering assertion.
+    const wrong = routes
+      .filter((route) => preHandlersOf(route).includes(requireConferenceAuthority))
+      .filter((route) => {
+        const handlers = preHandlersOf(route)
+        const identity = handlers.indexOf(requireOperator)
+        return identity === -1 || identity > handlers.indexOf(requireConferenceAuthority)
+      })
+      .flatMap(labelsOf)
+
+    expect(
+      wrong,
+      'These routes verify conference authority without establishing the operator first, so the ' +
+        'guard has no principal to check.',
+    ).toEqual([])
+  })
+
+  it('lets no administrative write reach conference content without it', () => {
+    // The other direction: a route that writes a session, track, room or speaker and carries
+    // only `requireOperator`. `event-scope-audit` asserts the same thing from its side; this is
+    // the half that lives beside the tier table, where somebody adding an administrative route
+    // is already reading.
+    const unguarded = routes
+      .filter((route) => ADMIN_ROUTE.test(route.url))
+      .filter((route) => methodsOf(route).some((method) => WRITE_METHODS.includes(method)))
+      .filter((route) => /\/(sessions|tracks|rooms|speakers)(\/|$)/.test(route.url))
+      .filter((route) => !preHandlersOf(route).includes(requireConferenceAuthority))
+      .flatMap(labelsOf)
+
+    expect(unguarded).toEqual([])
+  })
+
+  it('keeps the names-no-conference list to routes that genuinely cannot name one', () => {
+    const labels = new Set(routes.flatMap(labelsOf))
+
+    for (const [label, reason] of NAMES_NO_CONFERENCE) {
+      expect(labels.has(label), `${label} is declared but no longer exists`).toBe(true)
+      expect(reason.length, `${label} is declared without a written reason`).toBeGreaterThan(80)
+      expect(
+        routes
+          .filter((route) => labelsOf(route).includes(label))
+          .every((route) => !preHandlersOf(route).includes(requireConferenceAuthority)),
+        `${label} is declared as unable to name a conference but carries the guard anyway`,
+      ).toBe(true)
+    }
+
+    expect(
+      NAMES_NO_CONFERENCE.size,
+      'Only conference CREATION can legitimately be an administrative content write with no ' +
+        'conference to be authorised over. A second entry means a route acts on a conference ' +
+        'without proving which one.',
+    ).toBeLessThanOrEqual(1)
+  })
+
   it('registers no administrative route beneath the attendee event prefix', () => {
     const misplaced = routes
       .filter((route) => /^\/events\/[:{].*\/admin/.test(route.url))

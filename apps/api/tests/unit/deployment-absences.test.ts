@@ -89,11 +89,13 @@ describe('no migration was added (FR-890)', () => {
 
     expect(
       applied.at(-1),
-      'An unrecorded migration was added. 011 added none (FR-890) and 013 reserves `0009`; ' +
-        'anything past that has to be recorded here and in the roadmap first. A migration also ' +
-        'means the Drizzle snapshot was regenerated, which the migration README warns against: ' +
-        '`drizzle-kit generate` JSON-parses every file in meta/, so move that README aside first.',
-    ).toBe('0009_administrative_foundation.sql')
+      'An unrecorded migration was added. 011 added none (FR-890); 013 reserves `0009` and 014 ' +
+        'reserves `0011` — **`0010` is 012’s, from a parallel branch, and is deliberately not ' +
+        'here yet**. Anything past that has to be recorded here and in the roadmap first. A ' +
+        'migration also means the Drizzle snapshot was regenerated, which the migration README ' +
+        'warns against: `drizzle-kit generate` JSON-parses every file in meta/, so move that ' +
+        'README aside first.',
+    ).toBe('0011_conference_authoring.sql')
   })
 
   it('leaves the journal alone', () => {
@@ -102,6 +104,9 @@ describe('no migration was added (FR-890)', () => {
     const journal = readFileSync(`${MIGRATIONS}meta/_journal.json`, 'utf8')
     expect(journal).toContain('0008_session_qa')
     expect(journal).toContain('0009_administrative_foundation')
+    // 014 — the tag was renamed to the reserved number while `idx` stayed at its array position.
+    // The README's third deviation records why, and what 012 must do when it generates next.
+    expect(journal).toContain('0011_conference_authoring')
   })
 })
 

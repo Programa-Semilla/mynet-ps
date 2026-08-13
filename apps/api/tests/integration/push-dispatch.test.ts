@@ -126,8 +126,13 @@ describe('dispatching a notification for a received message', () => {
 
     const payload = push.delivered()[0]?.payload
     expect(payload?.body).toBe('Are you nearby?')
+    // 014 — `PushPayload` became a union when the second trigger arrived, so the shape is
+    // narrowed rather than assumed. Asserting the narrowing is itself worth something: a message
+    // send producing a session-change payload would be a delivery that opens the wrong place.
+    expect(payload && 'conversationId' in payload, 'a message send must produce a message payload')
+      .toBe(true)
     expect(
-      payload?.conversationId,
+      payload && 'conversationId' in payload ? payload.conversationId : undefined,
       'The conversation rather than a URL: the service worker builds the address, so the server ' +
         'port carries no knowledge of the client’s addressing scheme.',
     ).toBe(conversationId)

@@ -189,6 +189,33 @@ export const THROTTLE_ACTIONS = [
   // ───────────────────────────────────────────────────────────────────────────────────────
   'directory_read',
   'thread_read',
+
+  // ───────────────────────────────────────────────────────────────────────────────────────
+  // 014 — FR-1039. **Five actions, all authenticated against an ADMINISTRATIVE session, and
+  // all `mayDeny: true`.**
+  //
+  // The rule this list runs on is *who a denial falls on*, and every one of these is keyed on
+  // the acting operator's own identity — so a refusal can only inconvenience the person
+  // authoring. That is the same reasoning `join_code`, `export`, `card_share` and the rest are
+  // configured under, and it is what separates all of them from `reset_request` and
+  // `admin_sign_in`, whose keys are a submitted address somebody else may own.
+  //
+  // **Named individually rather than covered by one `authoring` bucket**, which FR-1039
+  // requires in those words. Two of them matter for reasons the other three do not have, and a
+  // shared counter would let either be spent by the others: `conference_create` is the only
+  // product-wide act an organizer holds and nothing else bounds how many conferences they may
+  // make (v4.2.0 N3 accepts that as bounded by trust), and `session_cancel` is the only
+  // authoring act that reaches attendees' phones — an unthrottled cancel loop is a push
+  // amplifier pointed at every attendee who saved anything.
+  //
+  // **NO MIGRATION.** `action` is a `text` column carrying a TypeScript union, so adding
+  // members changes types and nothing else — the same note 010 records above.
+  // ───────────────────────────────────────────────────────────────────────────────────────
+  'conference_create',
+  'session_write',
+  'session_cancel',
+  'session_delete',
+  'catalog_write',
 ] as const
 
 export type ThrottleAction = (typeof THROTTLE_ACTIONS)[number]

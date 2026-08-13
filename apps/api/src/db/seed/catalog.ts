@@ -21,9 +21,36 @@ import type { SeedContext, SeedModule } from './index.js'
  * into overlap through a later well-meaning edit.
  * ═════════════════════════════════════════════════════════════════════════════════════════
  *
- * **Seeded content is the only way a programme comes to exist.** There is no write path and no
- * import path at any privilege (FR-132, FR-134) — both would be organizer administration.
- * Adding a conference is a reviewed change to this file.
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ * **T019 (014) — "SEEDED CONTENT IS THE ONLY WAY A PROGRAMME COMES TO EXIST" IS NO LONGER
+ * TRUE, AND THE REPLACEMENT IS NARROWER THAN "ANYBODY MAY WRITE".**
+ *
+ * The sentence here read: *there is no write path and no import path at any privilege (FR-132,
+ * FR-134) — both would be organizer administration. Adding a conference is a reviewed change to
+ * this file.* CLAUDE.md names this header among the five code-level guards enforcing the
+ * reversed prohibition, so it is corrected in place rather than deleted.
+ *
+ * **What is permitted now, and to whom** (v4.2.0, FR-1001, FR-1002, FR-1007):
+ *
+ *   - A **conference organizer** may create, edit and delete tracks, rooms, speakers and
+ *     sessions in a conference they are **assigned to**, and may create a conference (and is
+ *     assigned to what they create).
+ *   - A **platform operator** may do all of that in **every** conference.
+ *   - **No attendee may write any of it**, at any privilege, ever. That half is unchanged and is
+ *     what `catalog-read-only.test.ts` and the event route audit still assert.
+ *   - There is still **no import path**. Bulk import is not authoring, and the route audit
+ *     continues to fail any path containing `import`, `bulk` or `upload`.
+ *
+ * **A reviewed change to this file stays a valid route and stops being the only one** (v4.0.0,
+ * decision 34). A seeded conference is an **ordinary editable conference**: no privileged
+ * content, no immutable content, and no control that renders for a conference it cannot act on.
+ * An organizer assigned to one of these two programmes may rewrite it entirely.
+ *
+ * **The fixture properties above are load-bearing and must survive that** (FR-1043).
+ * `assertDisjoint` runs at seed time and is unaffected by what an organizer does afterwards —
+ * but anybody re-seeding a database an organizer has been editing gets the fixture back, which
+ * is the point of a fixture.
+ * ═════════════════════════════════════════════════════════════════════════════════════════
  */
 
 interface SeedSession {

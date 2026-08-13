@@ -90,10 +90,20 @@ export type NotesResponse =
 export type WriteNoteResponse =
   paths['/events/{eventId}/agenda/notes/{sessionId}']['put']['responses'][200]['content']['application/json']
 
+// ───────────────────────────────────────────────────────────────────────────────────────────────
 // 005 — the saved set arrives as identifiers, never as whole sessions: a second copy of session
-// data could disagree with the programme, and this is what would notice if the route ever
-// started sending one (FR-188).
-export type _SavedSessionsAreIdentifiers = Satisfies<SavedSessionsResponse['sessionIds'], string[]>
+// data could disagree with the programme, and this is what would notice if the route ever started
+// sending one (FR-188).
+//
+// **T074 (014) — the entry gained a second field and the rule is unchanged.** Each entry is now
+// `{ sessionId, changedSinceViewed }`: an identifier and one boolean about *this attendee's*
+// relationship to it. That is not session data arriving by the back door — nothing here describes
+// the session — and the binding still fails if a title, a time or a room ever appears.
+// ───────────────────────────────────────────────────────────────────────────────────────────────
+export type _SavedSessionsAreIdentifiers = Satisfies<
+  SavedSessionsResponse['sessions'][number],
+  { sessionId: string; changedSinceViewed: boolean }
+>
 
 // 005 — a note carries its `updatedAt`, and so does the response to writing one. That second
 // binding is load-bearing: the editor may enter its *saved* status only from a confirmed

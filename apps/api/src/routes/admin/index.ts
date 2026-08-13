@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify'
 
+import { adminCatalogRoutes } from './catalog.js'
 import { adminConferenceRoutes } from './conferences.js'
 import { adminMeRoutes } from './me.js'
 import { adminModerationRoutes } from './moderation.js'
@@ -52,4 +53,11 @@ export const adminRoutes = async (app: FastifyInstance): Promise<void> => {
 
   // US5 — operator deactivation. Authority must not outlive the access it depends on.
   await adminOperatorRoutes(app)
+
+  // ─────────────────────────────────────────────────────────────────────────────────────────
+  // 014 — conference content authoring, appended per the append-only rule. **The first routes
+  // beneath this prefix that name a conference and are guarded by authority over it** rather
+  // than by tier alone, and the first that dispatch a notification.
+  // ─────────────────────────────────────────────────────────────────────────────────────────
+  await adminCatalogRoutes(app)
 }
