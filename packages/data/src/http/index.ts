@@ -73,3 +73,8 @@ export {
   HttpAdminReportRepository,
   HttpAdminSessionRepository,
 } from './administration-repository.js'
+
+// 014 — conference content authoring, in its own module rather than appended to the three above.
+// It is the only administrative repository whose every path names a conference, because authority
+// over one is the predicate the server checks (FR-1035); the others are guarded by tier alone.
+export { HttpAdminCatalogRepository } from './admin-catalog-repository.js'

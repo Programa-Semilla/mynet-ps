@@ -1,10 +1,12 @@
 import {
+  HttpAdminCatalogRepository,
   HttpAdminConferenceRepository,
   HttpAdminReportRepository,
   HttpAdminSessionRepository,
   HttpClient,
 } from '@mynet/data/http'
 import type {
+  AdminCatalogRepository,
   AdminConferenceRepository,
   AdminReportRepository,
   AdminSessionRepository,
@@ -45,6 +47,16 @@ export interface AdminServices {
   readonly session: AdminSessionRepository
   readonly reports: AdminReportRepository
   readonly conferences: AdminConferenceRepository
+  /**
+   * T036 (014) — conference content authoring (FR-1001).
+   *
+   * **A fourth repository and no fourth mechanism.** It is undecorated like the other three, for
+   * a reason that is sharper here: the engagement counts on the programme are a **decision
+   * input** — what an organizer reads to choose between deleting a session and cancelling it — so
+   * a cached zero would present deletion as safe for a session somebody has since saved, and the
+   * server's refusal would contradict the screen in front of them.
+   */
+  readonly catalog: AdminCatalogRepository
 }
 
 export const createAdminServices = (): AdminServices => {
@@ -68,5 +80,6 @@ export const createAdminServices = (): AdminServices => {
     session: new HttpAdminSessionRepository(http),
     reports: new HttpAdminReportRepository(http),
     conferences: new HttpAdminConferenceRepository(http),
+    catalog: new HttpAdminCatalogRepository(http),
   }
 }

@@ -6540,6 +6540,18 @@ export interface paths {
                         "application/json": {
                             code?: string;
                             message?: string;
+                            /** @description Counts only, with nobody identified (FR-1025). Present when a deletion is refused because attendees have engaged with the session — it is what turns "no" into "cancel instead". No attendee identity accompanies it, at any tier (FR-1042). */
+                            engagement?: {
+                                saved?: number;
+                                notes?: number;
+                                questions?: number;
+                                votes?: number;
+                            };
+                            /** @description The sessions a date-range change would orphan, named (FR-1014). They are the caller's own content, and an organizer told only "no" would have to guess which of forty sessions is in the way. */
+                            sessions?: {
+                                id?: string;
+                                title?: string;
+                            }[];
                         };
                     };
                 };
@@ -6902,6 +6914,18 @@ export interface paths {
                         "application/json": {
                             code?: string;
                             message?: string;
+                            /** @description Counts only, with nobody identified (FR-1025). Present when a deletion is refused because attendees have engaged with the session — it is what turns "no" into "cancel instead". No attendee identity accompanies it, at any tier (FR-1042). */
+                            engagement?: {
+                                saved?: number;
+                                notes?: number;
+                                questions?: number;
+                                votes?: number;
+                            };
+                            /** @description The sessions a date-range change would orphan, named (FR-1014). They are the caller's own content, and an organizer told only "no" would have to guess which of forty sessions is in the way. */
+                            sessions?: {
+                                id?: string;
+                                title?: string;
+                            }[];
                         };
                     };
                 };

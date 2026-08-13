@@ -9840,6 +9840,39 @@
                     },
                     "message": {
                       "type": "string"
+                    },
+                    "engagement": {
+                      "type": "object",
+                      "description": "Counts only, with nobody identified (FR-1025). Present when a deletion is refused because attendees have engaged with the session — it is what turns \"no\" into \"cancel instead\". No attendee identity accompanies it, at any tier (FR-1042).",
+                      "properties": {
+                        "saved": {
+                          "type": "integer"
+                        },
+                        "notes": {
+                          "type": "integer"
+                        },
+                        "questions": {
+                          "type": "integer"
+                        },
+                        "votes": {
+                          "type": "integer"
+                        }
+                      }
+                    },
+                    "sessions": {
+                      "type": "array",
+                      "description": "The sessions a date-range change would orphan, named (FR-1014). They are the caller's own content, and an organizer told only \"no\" would have to guess which of forty sessions is in the way.",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "title": {
+                            "type": "string"
+                          }
+                        }
+                      }
                     }
                   }
                 }
@@ -10185,6 +10218,39 @@
                     },
                     "message": {
                       "type": "string"
+                    },
+                    "engagement": {
+                      "type": "object",
+                      "description": "Counts only, with nobody identified (FR-1025). Present when a deletion is refused because attendees have engaged with the session — it is what turns \"no\" into \"cancel instead\". No attendee identity accompanies it, at any tier (FR-1042).",
+                      "properties": {
+                        "saved": {
+                          "type": "integer"
+                        },
+                        "notes": {
+                          "type": "integer"
+                        },
+                        "questions": {
+                          "type": "integer"
+                        },
+                        "votes": {
+                          "type": "integer"
+                        }
+                      }
+                    },
+                    "sessions": {
+                      "type": "array",
+                      "description": "The sessions a date-range change would orphan, named (FR-1014). They are the caller's own content, and an organizer told only \"no\" would have to guess which of forty sessions is in the way.",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "title": {
+                            "type": "string"
+                          }
+                        }
+                      }
                     }
                   }
                 }

@@ -1,8 +1,10 @@
 import type { AdminConference } from '@mynet/data'
 import { useCallback, useEffect, useState } from 'react'
+import { Link } from 'react-router'
 
 import { classify, describe } from '../errors.js'
 import { useAdminSession } from '../session.js'
+import { CreateConferenceDialog } from './CreateConferenceDialog.js'
 import { PromoteDialog } from './PromoteDialog.js'
 
 /**
@@ -34,6 +36,7 @@ export const ConferenceList = () => {
   const [conferences, setConferences] = useState<readonly AdminConference[] | null>(null)
   const [failure, setFailure] = useState<string | null>(null)
   const [promoting, setPromoting] = useState<AdminConference | null>(null)
+  const [creating, setCreating] = useState(false)
 
   const load = useCallback(async () => {
     setFailure(null)
@@ -60,7 +63,24 @@ export const ConferenceList = () => {
 
   return (
     <div className="mx-auto max-w-3xl">
-      <h1 className="text-2xl font-semibold text-text-primary">Conferences</h1>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h1 className="text-2xl font-semibold text-text-primary">Conferences</h1>
+        {/*
+          014 — **rendered for BOTH tiers, which makes it the only control here that is.**
+          Everything else on this screen is platform-only and hidden from an organizer so they are
+          never offered a door that answers "there is nothing here". Creating a conference is
+          different by constitution: v4.2.0's N3 makes it the one product-wide capability a
+          conference organizer holds, stated rather than inferred because decision 32's "authority
+          reaches only the conferences they are assigned" cannot describe the act of creating one.
+        */}
+        <button
+          type="button"
+          onClick={() => setCreating(true)}
+          className="min-h-11 rounded-lg bg-coral-600 px-3 text-sm font-medium text-text-inverse hover:bg-coral-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-coral-500"
+        >
+          Create a conference
+        </button>
+      </div>
 
       {failure ? (
         <p role="alert" className="mt-4 rounded-lg bg-danger-100 px-3 py-2 text-sm text-danger-700">
@@ -91,7 +111,18 @@ export const ConferenceList = () => {
           >
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
-                <h2 className="font-semibold text-text-primary">{conference.name}</h2>
+                <h2 className="font-semibold text-text-primary">
+                  {/*
+                    014 — the way into the programme editor, and the only one. The address names
+                    the conference because the server's guard reads it from the path (FR-1035).
+                  */}
+                  <Link
+                    to={`/conferences/${conference.id}/programme`}
+                    className="hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-coral-500"
+                  >
+                    {conference.name}
+                  </Link>
+                </h2>
                 {conference.unassigned ? (
                   <p className="mt-1 inline-block rounded-full bg-warning-100 px-2 py-0.5 text-xs font-medium text-warning-700">
                     Unassigned — nobody organizes this
@@ -135,6 +166,12 @@ export const ConferenceList = () => {
           </li>
         ))}
       </ul>
+
+      <CreateConferenceDialog
+        open={creating}
+        onClose={() => setCreating(false)}
+        onCreated={() => void load()}
+      />
 
       <PromoteDialog
         open={promoting !== null}
