@@ -7,7 +7,7 @@
 > citing N1–N5 stands as written. The amendment gated the first line of code, as v3.1.0 gated 007's
 > Phase 7, v3.2.0 gated 008, v3.3.0 gated 009 and v4.0.0 gated 013.
 >
-> ### T001–T105 are TRANCHE 1. This feature is open and has a second tranche with no tasks yet.
+> ### T001–T105 are TRANCHE 1, merged to `develop` on 2026-08-14. The feature is still open.
 >
 > Brainstorm #11 rescoped 014 on 2026-08-12 from a parallel branch, after this list was written and
 > largely executed. The owner decided on **2026-08-14** that 014 stays open and grows rather than

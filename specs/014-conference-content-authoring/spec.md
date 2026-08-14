@@ -4,9 +4,10 @@
 
 **Created**: 2026-08-12
 
-**Status**: **OPEN — tranche 1 of 2 implemented and green; tranche 2 specified below and not built.**
-Constitution v5.2.0 RATIFIED 2026-08-12. **This feature is not complete and this document does not
-claim it is.**
+**Status**: **OPEN — tranche 1 of 2 MERGED to `develop` 2026-08-14 (PR #23, squash); tranche 2
+specified below, with no code and no tasks.** Constitution v5.2.0 RATIFIED 2026-08-12. **This feature
+is not complete and this document does not claim it is.** Tranche 2 starts from a fresh branch off
+`develop` against this same directory, and it is the change that closes 014.
 
 **Input**: Brainstorm #10 (`brainstorm/10-conference-content-authoring.md`), decided 2026-08-12,
 **and brainstorm #11** (`brainstorm/11-client-feedback-programme.md`), which rescoped this feature

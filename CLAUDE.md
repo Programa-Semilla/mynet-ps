@@ -1578,22 +1578,26 @@ lesson about version numbers three times over. **A third strand now runs beside 
 feedback programme that v5.0.0 opened, of which **016 is delivered and 017 (the Q&A rebuild) is
 not startable**.
 
-**014 is in flight as of 2026-08-14, is HELD RATHER THAN MERGED, and that is a decision.**
-That sentence replaces one written a day earlier saying nothing was in flight.
+**014's tranche 1 is MERGED to `develop`, and 014 itself remains OPEN.** That sentence replaces one
+written a day earlier saying nothing was in flight, and one written hours earlier saying this work
+would be held un-integrated — **the hold was reversed the same day, before it took effect.**
 
-**Tranche 1 is complete, green on CI and on `verify:clean`, pushed, and deliberately NOT integrated.**
-PR [#23](https://github.com/Programa-Semilla/mynet-ps/pull/23) was opened, passed all eleven CI jobs,
-and was **closed unmerged by owner decision** — held, not rejected. 014 stays whole, so nothing lands
-until tranche 2 is built. **`spec/014-conference-content-authoring` must not be deleted**: it carries
-22 commits, constitution v5.2.0, migration `0011` and `deviations.md` D22.
+Tranche 1 landed via PR [#23](https://github.com/Programa-Semilla/mynet-ps/pull/23), squash-merged
+after all eleven CI jobs passed and `verify:clean` ran 13 of 13 green against a database that had
+never existed. It carries constitution **v5.2.0**, migration `0011`, and `deviations.md` **D22**.
 
-**One obligation travels with that decision, and it is not optional.** This branch already diverged
-from `develop` once, and merging 016 back into it cost a full session and collided on **five**
-separate numbering tables — constitution version, standing decisions, register entries, brainstorm
-session number, and nearly the migration number. Holding it open means paying that again, and the
-cost grows with every commit on either side. **Re-merge `develop` into this branch on every merge to
-`develop`**, rather than letting it accumulate. A branch held for an unknown period without that is
-the implicit-coupling failure this project has now fixed three times. This is the collision itself, recorded where it happened: 016 was authored on
+**What "open" now means, precisely, because the branch is gone.** The feature is not complete:
+tranche 2 — event types, optional sessions with capacity and enrolment, the profile taxonomy — has no
+code and no tasks. `specs/014-conference-content-authoring/` stays in place and carries that scope.
+**Tranche 2 starts from a fresh branch off `develop`**, against the same spec directory, and it is
+the change that closes 014.
+
+**Merging rather than holding removed a standing obligation, and that is why it was the better
+choice.** Held, this branch would have had to re-merge `develop` on every merge to `develop` —
+because it had already diverged once, and reconciling 016 cost a full session and collided on **five**
+separate numbering tables: constitution version, standing decisions, register entries, brainstorm
+session number, and nearly the migration number. Integrated, that debt is paid and tranche 2 begins
+from a current base. This is the collision itself, recorded where it happened: 016 was authored on
 `develop` while 014 was authored on a branch taken before it, and each artifact honestly described a
 project in which the other did not exist. 014 is implemented and merged `develop` into itself on
 2026-08-14, taking the renumbering described under standing decision 45. **017 is blocked** —
