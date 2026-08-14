@@ -217,7 +217,8 @@ alternative — the mark at the head of `TabletRail` in coral, mirroring `Deskto
 weighed, because the spec recorded that surface as not existing. Corrected in the spec; the
 arrangement is an owner decision under register entry 4.
 
-**016 (App fixes, mutual card exchange, and the install icon) is implemented** — six items the
+**016 (App fixes, mutual card exchange, and the install icon) is shipped**, squash-merged to
+`develop` in [#21](https://github.com/Programa-Semilla/mynet-ps/pull/21) — six items the
 owner reported after using the deployed product, plus the reversal C1 ratified. Five repairs, one
 reversal, one asset change: the composer is bounded so a long message can be sent on a phone, the
 conversation list refreshes itself, five password fields across two products gained a reveal
@@ -231,11 +232,13 @@ refuses in feature code — so US5 was gated on **constitution v5.1.0**, adding 
 capability to Principle V's list. The specification and its review gate both missed it; Principle V
 is what surfaced it, which is the boundary working as designed.
 
-**Its by-hand validation is outstanding, and it is the only thing outstanding.** T067 (quickstart
+**Its by-hand validation is outstanding, it is the only thing outstanding, and it shipped without
+it — deliberately, on the merge decision of 2026-08-13.** T067 (quickstart
 scenarios 1–7, two browser profiles) and **T068 — install on a physical phone, judge the icon, and
 retype the composer test with a real keyboard** — join the same unwalked scenarios from 007, 008,
 009 and 013. SC-1001 and SC-1009 are explicitly not machine-checkable, and **this feature exists
-because a person found what the gates could not.**
+because a person found what the gates could not** — which is exactly why an unwalked T068 is a
+larger debt here than the four it joins, rather than one more of the same.
 
 A contact is somebody whose digital business card you hold. Sharing was **one-directional** as
 shipped — **reversed 2026-08-12 by constitution v5.0.0 (C1): it is now a mutual exchange**, one act
@@ -1399,7 +1402,7 @@ Historically: v3.2.0 closed the connection model, card-exchange semantics
 and Q&A attribution; **v3.3.0** closed public Q&A visibility and withdrew FR-756a; **v3.4.0** closed
 the oldest entry of all, the brand mark; **v3.5.0** closed four more — the UAT address, the mail
 provider, VAPID custody and the operator address; and **v4.0.0/v4.1.0** opened entries 24, 25 and 26
-and closed all three in the same session. **009, 010, 011 and 013 are shipped, and the attendee
+and closed all three in the same session. **009, 010, 011, 013 and 016 are shipped, and the attendee
 delivery roadmap is complete.** Two of those closures — card-exchange semantics and Q&A visibility —
 were **reversed on 2026-08-12 by v5.0.0**, which is the first time this project has reopened settled
 ground on client feedback rather than on a design finding.
@@ -1409,7 +1412,16 @@ rather than re-deriving.** The attendee roadmap ends at **012 — Launch Readine
 still queued. The administrative programme runs **013, 014, 015** and began while 011 was in a
 parallel branch; 013 took the next free number rather than the next number in its own sequence,
 because parallel branches cannot see each other's reservations. The constitution records the same
-lesson about version numbers three times over.
+lesson about version numbers three times over. **A third strand now runs beside both** — the client
+feedback programme that v5.0.0 opened, of which **016 is delivered and 017 (the Q&A rebuild) is
+not startable**.
+
+**Nothing is in flight as of 2026-08-13, and what comes next is a choice rather than a queue.**
+016 landed and no branch is open. **017 is blocked** — register entry 27 (Q&A attribution) is the
+first open question to block a feature since v3.2.0, and it is the client's to answer; the case that
+decides it is two attendees named Ana at one event. **012 is blocked** on register entries 22 and 4.
+**014 and 015 are startable now** and are the administrative programme's own next steps. Choosing
+among them is an owner decision, not a planning inference.
 
 The closing sequence for 24, 25 and 26 is worth keeping, because it is the argument for opening
 entries you cannot yet answer: those three produced a **third privacy exception**, a
