@@ -4,6 +4,7 @@ import { ReplaceCredential } from './auth/ReplaceCredential.js'
 import { SignIn } from './auth/SignIn.js'
 import { ConferenceList } from './conferences/ConferenceList.js'
 import { OperatorList } from './conferences/OperatorList.js'
+import { ProgrammeEditor } from './conferences/ProgrammeEditor.js'
 import { ReportQueue } from './reports/ReportQueue.js'
 import { useAdminSession } from './session.js'
 import { AdminHome } from './shell/AdminHome.js'
@@ -59,6 +60,18 @@ export const AdminRoutes = () => {
       <Routes>
         <Route path="/" element={<AdminHome />} />
         <Route path="/conferences" element={<ConferenceList />} />
+        {/*
+          014 — the programme editor, nested under the conference it edits. **The address names
+          the conference**, mirroring the server: `requireConferenceAuthority` reads `:eventId`
+          from the path, and every authoring route names its conference for the reason 009's Q&A
+          routes do — a route that finds its parent from a child id is invisible to the audit
+          that covers it.
+
+          No tier check here either, for the reason the header gives: an organizer who types the
+          address of a conference they do not run gets the server's 404, which is the same answer
+          a conference that does not exist gives (FR-1036).
+        */}
+        <Route path="/conferences/:eventId/programme" element={<ProgrammeEditor />} />
         {/* The queue and one report share a screen, so the detail is a nested address on it. */}
         <Route path="/reports" element={<ReportQueue />} />
         <Route path="/reports/:reportId" element={<ReportQueue />} />

@@ -76,7 +76,7 @@ describe('the next-saved-session card', () => {
   }: {
     sessions?: typeof PROGRAMME
     saved?: string[]
-    listSaved?: () => Promise<string[]>
+    listSaved?: () => Promise<{ sessionId: string; changedSinceViewed: boolean }[]>
     listSessions?: () => Promise<never>
   } = {}) =>
     render(
@@ -87,9 +87,16 @@ describe('the next-saved-session card', () => {
             listTracks: async () => [],
           },
           savedSessions: {
-            listSaved: listSaved ?? (async () => saved),
+            // 014 — the saved read carries a marker per entry (FR-1030). This card projects the
+            // identifiers out and renders no marker of its own: Home's marker belongs on rows
+            // the attendee can act on, and a count anywhere is FR-1031's prohibition.
+            listSaved:
+              listSaved ??
+              (async () => saved.map((sessionId) => ({ sessionId, changedSinceViewed: false }))),
             save: async () => {},
             unsave: async () => {},
+
+            markViewed: async () => {},
           },
         })}
       >
@@ -105,7 +112,9 @@ describe('the next-saved-session card', () => {
     )
 
   it('LOADING — says so rather than showing nothing', () => {
-    renderCard({ listSaved: () => new Promise<string[]>(() => {}) })
+    renderCard({
+      listSaved: () => new Promise<{ sessionId: string; changedSinceViewed: boolean }[]>(() => {}),
+    })
 
     expect(screen.getByText(/loading your saved sessions/i)).toBeInTheDocument()
   })

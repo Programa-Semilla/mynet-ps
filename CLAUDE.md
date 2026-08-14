@@ -5,7 +5,7 @@ Guidance for Claude Code (claude.ai/code) working in this repository.
 This file is the **working brief**: what the product is, what has been decided, and how work is
 done here. It is deliberately short. Depth lives elsewhere, and these are authoritative over it:
 
-1. **`.specify/memory/constitution.md` (v5.1.0)** — governance and the authoritative decision
+1. **`.specify/memory/constitution.md` (v5.2.0)** — governance and the authoritative decision
    register. Supersedes tool defaults, habit, and any conflicting statement in this file.
 2. **`docs/superpowers/specs/2026-08-06-mynet-delivery-roadmap-design.md`** — the decomposition of
    the remaining product into features, with dependency order, reserved migration numbers, and gate
@@ -401,8 +401,14 @@ tests; three helpers named callers that were inlined copies. In a codebase whose
 the comment is the record, a header is a claim that needs a guard like any other — and **three of
 the four already had the executor parameter**, so what looked like design work was wiring.
 
-**Migrations claimed so far run to `0009`** (`0009_administrative_foundation.sql`; 010 added no
-schema). **012 reserves `0010`.** The journal lists `0003` before `0004` while carrying a
+**Migrations claimed so far run to `0011`** (`0011_conference_authoring.sql`, applied; `0009` is
+013's and 010 added no schema). **012 still reserves `0010`, unclaimed — it adds no schema — and 015
+reserves `0012`.** That numbering was the **third** collision between parallel branches over a
+reservation, and **014 extended the roadmap's reserved-number table rather than correcting it**
+(T102): it stopped at the shipped attendee programme and covered neither programme in flight, so a
+feature reserving a number had nothing to read. The rule it gained is that a phase in a *parallel*
+programme must extend that table in the same change, because the branch it would otherwise collide
+with is one nobody can see from its own. The journal lists `0003` before `0004` while carrying a
 later timestamp — `apps/api/migrations/meta/README.md` explains why both halves are load-bearing and
 what a regenerating feature must not "fix". Anyone regenerating must move that README aside first,
 because `drizzle-kit generate` JSON-parses every file in `meta/`.
@@ -414,6 +420,88 @@ and a later `when`. **`lock_timeout` went into `migrate.ts`, not the SQL** — a
 generated file is erased by the next regeneration, and putting it on a dedicated migration
 connection covers *every* migration, including `0003`, whose missing timeout was a recorded
 unclaimed defect from 004's review.
+
+**014 (Conference content authoring) is OPEN, with its first tranche implemented and green.**
+Brainstorm #11 rescoped it from a parallel branch on 2026-08-12, and the owner decided on 2026-08-14
+that **014 stays open and grows** rather than closing at what was built — #11's *"rescoped and kept
+whole"*, honoured literally. Tranche 2 is event types, optional sessions with capacity and enrolment,
+and the profile taxonomy; **two of its three parts are unblocked today**, and only the taxonomy waits
+on the client's interest, sector and subsector lists, which do not exist. It has no tasks and no
+code, and `specs/014-conference-content-authoring/spec.md` carries the scope. Everything below
+describes **tranche 1**, which is complete.
+
+**Tranche 1 is implemented**, on constitution **v5.2.0** — the amendment
+that gated its first line of code, as v3.1.0 gated 007's Phase 7, v3.2.0 gated 008, v3.3.0 gated 009
+and v4.0.0 gated 013. It delivers standing decisions 45–49 and is the **second** administrative
+feature: an organizer authors tracks, rooms, speakers and sessions in a conference they are assigned
+to, a platform operator does so in every conference, and either tier may create one.
+
+**The split is the opposite of the one anyone would guess.** Authoring looks like the big new thing
+and is mostly wiring — 013 built the site, the shell, the session, the audit trail and the tier
+model. The genuinely new mechanisms are both small and both on the **attendee** side: a second
+notification trigger, and a marker that must not become an inbox.
+
+**Its by-hand validation is outstanding, and it is the only thing outstanding.** T105 —
+`quickstart.md` scenarios 6–9, which need a person and a phone: the notification, the coalescing,
+the denied permission, and the three widths plus a screen-reader pass. It **joins** the unwalked
+scenarios from 007, 008, 009 and 013 rather than replacing them. Everything a machine can check is
+checked and green, including an end-to-end journey in two browser profiles across two origins.
+
+**The most transferable thing it produced is a defect the client had already been taught to
+avoid, arriving from the other end.** 008 classified refusals on the **class** — `ApiError extends
+RequestRefusedError`, every non-2xx throws `ApiError` — and swallowed every message its routes wrote
+to be read. The rule that came out of it was *classify on `error.code`, never on the class*. 014
+obeyed that rule and reproduced the outcome anyway: its routes were written with **four distinct 409
+explanations all carrying `refused`** and two distinct 400s all carrying `validation_failed`, so six
+carefully-written refusals rendered as two sentences. The one that mattered most —
+*"cancel it instead, everything they wrote stays where it is"*, which teaches decision 49's whole
+rule at the moment an organizer meets it — was unreachable. **The rule needed its other half
+stated: classifying on the code is worth nothing unless the code says which refusal it is.** Six
+codes were added, following `question_has_votes` and `own_question`. Found by the
+**mutual-difference** assertion and by nothing else — a test checking that each code maps to *a*
+message would have passed, because every one of them did. Two of them.
+
+**Three further invariants this feature establishes:**
+
+- **A second notification trigger exists, and it is bounded by three named changes** — cancelled,
+  start time, room (v5.2.0 N1). A session **starting** is still forbidden, and the distinction is
+  load-bearing: a reminder is something an attendee can set themselves, a change is information only
+  the product holds. `no-session-start-trigger.test.ts` asserts the **mechanism** rather than the
+  word — nothing time-driven may dispatch, because a reminder needs a scheduler and a grep for
+  "starting" can be renamed around. `DISPATCH_CALLERS` now has two entries and both are route
+  modules; a third is another amendment.
+- **The marker is per-row state and the count exists only in the payload.** It rides on the existing
+  `listSaved` read (research R7), so 014 declares **no new cached read**, adds **no device
+  capability**, and leaves `substitution.test.ts` untouched — asserted as an unchanged file against
+  the branch point, which is the cheapest proof a capability was not added. *That guard originally
+  froze the count at seven and broke when 016 ratified an eighth; it now compares the set against
+  this branch's own base, which is the property 014 owes and which no later amendment can falsify.*
+  The one member added is
+  `markViewed`, a **write**, whose cache purge is correct rather than tolerated: the programme it
+  clears is the one that just changed. *"No view in either product may present that count"* is
+  asserted over both clients.
+- **A session anybody has engaged with may be cancelled and must not be deleted** (decision 49),
+  checked under `SELECT … FOR UPDATE` **inside** the deleting transaction. The four cascades from
+  `sessions.id` are **not removed** — they stay correct for the case deletion is still permitted —
+  so the protection is the refusal plus the lock rather than a change to the referential rules.
+  Cancellation is **stored state**, unlike 008's derived `lapsed`, because it is an organizer's act
+  rather than a function of the clock.
+
+**One asymmetry is worth reading twice, because it is one condition wide.** FR-1022 marks a
+cancelled session everywhere — the programme, the Agenda row, the panel, the rest-of-day timeline —
+and FR-1022a **omits** it from exactly one surface: "Up next", which answers *where do I go now*.
+`nextSession()` is the single change point serving both Home cards that ask it; `restOfVenueDay`
+deliberately does not inherit the filter. The two functions sit six lines apart and the difference
+between them is one condition, so it is asserted at the unit layer **and** at the component layer,
+where two Home cards read the same programme and disagree about it on purpose.
+
+**Three absence guards were written too broadly and caught correct code**, each corrected by
+narrowing to the population the requirement is actually about — the same class of correction 009
+made to the event audit's conference-content predicate. Filtering by an identity the caller already
+holds is not disclosing it (a `WHERE` is not a `SELECT`); 013's report queue reads reported messages
+under its own recorded exception; and `appointments.status` is a negotiation between two attendees,
+not a content lifecycle. All three are recorded in `deviations.md` D14, because "scoped deliberately"
+and "weakened until it passed" are indistinguishable in a diff.
 
 ## Architectural invariants
 
@@ -1234,7 +1322,81 @@ made, and the only one drafted by an implementation rather than requested by any
     install API at all, and a shape built only around the first makes the second look like a failure
     and invites a control that cannot work. **Nothing about notification triggers moves** — a
     received message is still the only thing that dispatches, and the guidance requests no
-    permission.
+    permission. *That last clause was true when written and is superseded by decision 45 below,
+    which was ratified the same day on a branch this one could not see. The trigger set is two.*
+
+**2026-08-12** (ratified in constitution **v5.2.0**, drafted and ratified as v5.2.0 — see below) —
+**the amendment gating 014, and the first widening of the notification trigger set since v3.1.0
+created it.** Two decisions, stated separately because either could have been inferred from the other
+and neither was.
+
+**Read the renumbering before the decisions.** This amendment and v5.0.0/v5.1.0 were taken on the
+same day from the same base on branches that could not see each other. v5.0.0 merged first, so it
+keeps its numbers and this one rebases: the amendment is **v5.2.0**, its standing decisions are
+**45–49** (drafted as 40–44), and its register entries are **29 and 30** (drafted as 27 and 28).
+Nothing in it changed in substance. It is the fourth numbering collision this project has had — after
+constitution versions, migration numbers and feature numbers — and the first to reach the decision
+register, which is now known to be a shared numbering table like the others.
+
+45. **A second notification trigger exists: a material change to a session the attendee has SAVED.**
+    Material means **exactly three things — the session is cancelled, its start time changes, or its
+    room changes.** The principle that generated the set is *a notification is raised when a change
+    affects **where or whether** the attendee must be somewhere*; a title, a summary or a change of
+    speaker is content, and content does not strand anybody in the wrong corridor. **The set is
+    enumerated rather than described on purpose**: v3.1.0's rule was narrow *by construction* — "a
+    feature that wants a second trigger MUST amend this block" — and 014 is the first feature to take
+    it up, so the rule worked exactly as designed. What widening costs is that "one trigger" could be
+    checked by reading one sentence and "two triggers, the second bounded by three named changes"
+    cannot. **A session *starting* is still forbidden**, and that distinction is load-bearing: the
+    first is a reminder an attendee could set themselves, the second is information only the product
+    holds. **The bell and the in-app notification centre remain forbidden**, unchanged.
+46. **The in-app marker is per-row state, never an inbox — and the prohibition governs surfaces
+    INSIDE the product.** A changed saved session is marked on its own row in Agenda and on Home.
+    One organizer act dispatches **one coalesced notification per attendee** whose body carries a
+    count, however many of their saved sessions it touched: a notification is a single interruption
+    by nature, and a dozen interruptions from one act is the product v3.1.0's exclusion existed to
+    prevent. So **a count is permitted in the payload and forbidden everywhere it could become
+    something to look at.** Two rules hold that line: activating such a notification MUST land on the
+    destination carrying the per-row markers, never on a list of changes; and **no view in either
+    product may present that count.** The moment a screen answers "how many things changed", this is
+    broken regardless of what the payload does.
+47. **A conference organizer may create a conference, and is assigned to what they create.** This is
+    the **only product-wide capability the tier holds**, and it is stated rather than inferred
+    because decision 32's *"authority reaches only the conferences they are assigned"* cannot
+    describe the act of creating one. Two bounds keep that clause true in substance: authority over a
+    conference they did **not** create still comes only from assignment by a platform operator, and
+    creating is **not a promotion path** — it grants no platform capability and no route to promote
+    anybody. **Nothing bounds how many conferences an organizer may create**, which is bounded by
+    trust rather than by a limit, since promotion is itself platform-tier only. Recorded as accepted,
+    not overlooked.
+48. **Conference content is live-edited. There is no draft/publish lifecycle**, and a feature MUST
+    NOT add one without an amendment. A conference is reachable only by its join code, so an
+    unfinished one is already private to whoever holds that code — a lifecycle would be a second gate
+    over a gate that exists, and a second state for every read path to consult. The consequence is
+    accepted rather than hidden: an organizer authors into a conference their attendees can already
+    see.
+49. **A session ANY attendee has engaged with may be CANCELLED and MUST NOT be deleted.** Engagement
+    means a saved session, a private note, a question, or a vote. Deletion stays available only while
+    nothing is attached; cancellation is **stored state**, not derived — unlike 008's `lapsed`,
+    because it is an organizer's act rather than a function of the clock. **This is a correction of a
+    live hazard rather than a preference**: `saved_sessions`, `session_notes`, `session_questions`
+    and `question_votes` each cascade from `sessions.id`, so before 014 one delete would have
+    destroyed other people's private writing with no confirmation and no record. **009's precedent
+    does not license it** — a withdrawn question takes everybody's votes because the *author*
+    exercised erasure over their own words, and that does not transfer to a third party erasing
+    somebody else's. The cascades are **not removed**; they stay correct for the case deletion is
+    still permitted, and the protection is the refusal plus a lock, not a change to the referential
+    rules.
+
+**Two register entries opened by v5.2.0, and neither blocks 014**: **29** — whether an attendee may
+suppress content in notifications, **promoted** from a deferral that had sat in prose since v3.1.0,
+because a saved-session push now puts a session title on a lock screen alongside message text and two
+amendments have accepted the same cost without deciding the mitigation; and **30** — speakers are
+personal data about people who are not attendees, which is not new, but v5.2.0 makes those rows
+**organizer-authored** rather than seeded, moving responsibility from a reviewed commit to a promoted
+attendee typing into a form. **Entry 29 shares a boundary with v5.0.0's entry 27** — both are about
+what the product discloses about a person without asking them — and they are deliberately not merged.
+
 
 ## How work is done here
 
@@ -1416,12 +1578,33 @@ lesson about version numbers three times over. **A third strand now runs beside 
 feedback programme that v5.0.0 opened, of which **016 is delivered and 017 (the Q&A rebuild) is
 not startable**.
 
-**Nothing is in flight as of 2026-08-13, and what comes next is a choice rather than a queue.**
-016 landed and no branch is open. **017 is blocked** — register entry 27 (Q&A attribution) is the
-first open question to block a feature since v3.2.0, and it is the client's to answer; the case that
-decides it is two attendees named Ana at one event. **012 is blocked** on register entries 22 and 4.
-**014 and 015 are startable now** and are the administrative programme's own next steps. Choosing
-among them is an owner decision, not a planning inference.
+**014's tranche 1 is MERGED to `develop`, and 014 itself remains OPEN.** That sentence replaces one
+written a day earlier saying nothing was in flight, and one written hours earlier saying this work
+would be held un-integrated — **the hold was reversed the same day, before it took effect.**
+
+Tranche 1 landed via PR [#23](https://github.com/Programa-Semilla/mynet-ps/pull/23), squash-merged
+after all eleven CI jobs passed and `verify:clean` ran 13 of 13 green against a database that had
+never existed. It carries constitution **v5.2.0**, migration `0011`, and `deviations.md` **D22**.
+
+**What "open" now means, precisely, because the branch is gone.** The feature is not complete:
+tranche 2 — event types, optional sessions with capacity and enrolment, the profile taxonomy — has no
+code and no tasks. `specs/014-conference-content-authoring/` stays in place and carries that scope.
+**Tranche 2 starts from a fresh branch off `develop`**, against the same spec directory, and it is
+the change that closes 014.
+
+**Merging rather than holding removed a standing obligation, and that is why it was the better
+choice.** Held, this branch would have had to re-merge `develop` on every merge to `develop` —
+because it had already diverged once, and reconciling 016 cost a full session and collided on **five**
+separate numbering tables: constitution version, standing decisions, register entries, brainstorm
+session number, and nearly the migration number. Integrated, that debt is paid and tranche 2 begins
+from a current base. This is the collision itself, recorded where it happened: 016 was authored on
+`develop` while 014 was authored on a branch taken before it, and each artifact honestly described a
+project in which the other did not exist. 014 is implemented and merged `develop` into itself on
+2026-08-14, taking the renumbering described under standing decision 45. **017 is blocked** —
+register entry 27 (Q&A attribution) is the first open question to block a feature since v3.2.0, and
+it is the client's to answer; the case that decides it is two attendees named Ana at one event.
+**012 is blocked** on register entries 22 and 4. **015 is startable.** Choosing among them is an
+owner decision, not a planning inference.
 
 The closing sequence for 24, 25 and 26 is worth keeping, because it is the argument for opening
 entries you cannot yet answer: those three produced a **third privacy exception**, a
@@ -1431,6 +1614,21 @@ not been opened deliberately.
 
 - ~~**Register entries 24, 25 and 26**~~ — **RESOLVED 2026-08-11 in v4.1.0** as standing decisions
   38, 39 and 37 respectively. They are now binding text rather than questions.
+
+- **Register entry 29 — whether an attendee may suppress content in notifications.** Opened by
+  v5.2.0, and **promoted** rather than new: it has sat in prose since v3.1.0 as "accepted rather than
+  solved". A saved-session notification carries a session title, so what somebody chose to attend is
+  now on their locked device alongside what somebody said to them. **Two amendments have accepted the
+  same cost without deciding the mitigation**, and the usual one — a per-attendee content preference
+  — has never been weighed. Numbered now because a consequence recorded twice in the same words is
+  one nobody acts on. **Blocks nothing.**
+
+- **Register entry 30 — speakers are personal data about people who are not attendees.** A speaker
+  row carries a real person's name, title and company, and has since 002. What v5.2.0 changes is that
+  the rows become **organizer-authored**, moving responsibility from a reviewed commit to a promoted
+  attendee typing into a form. Principle VIII has only ever considered attendees, and both coverage
+  tests derive from the schema, so the question they cannot ask is who answers for somebody who never
+  signed up. **Blocks nothing today; blocks any claim that Principle VIII's coverage is complete.**
 
 - **Register entries 19 and 21 are ADDRESSED but NOT closed — by v4.0.0, v4.1.0, or 013 shipping.**
   013 built the first actor capable of moderating an avatar and of reading a report queue, and

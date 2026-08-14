@@ -38,7 +38,12 @@ const quietConversations = {
 
 const healthy = {
   catalog: { listSessions: async () => PROGRAMME, listTracks: async () => [] },
-  savedSessions: { listSaved: async () => [], save: async () => {}, unsave: async () => {} },
+  savedSessions: {
+    listSaved: async () => [],
+    save: async () => {},
+    unsave: async () => {},
+    markViewed: async () => {},
+  },
 }
 
 const renderHome = (services: Parameters<typeof testServices>[0]) =>
@@ -101,6 +106,8 @@ describe('the unread indicator and the rest of Home', () => {
         },
         save: async () => {},
         unsave: async () => {},
+
+        markViewed: async () => {},
       },
       directory: {
         list: async () => {

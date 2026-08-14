@@ -114,12 +114,48 @@ describe('no notification surface exists in the product (FR-560)', () => {
    * The permission surface is the one thing 007 *does* add, and it is not a bell: it asks a
    * question once and then renders nothing forever. This asserts it stays that shape.
    */
-  it('the permission surface is the only notification-related component, and it lives in Messages', () => {
-    const components = sourcesUnder(SRC)
-      .filter(({ name }) => /Notification/i.test(name))
-      .map(({ name }) => name)
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════════════════════
+   * **TWO FILES NOW, AND THE SECOND IS ASSERTED TO RENDER NOTHING RATHER THAN MERELY ALLOWED.**
+   *
+   * 014's deep review added `app/NotificationTarget.tsx`, which consumes the `?event=` a
+   * notification carries so the address it opens resolves against the right conference (FR-1029,
+   * FR-1034b) — without it, a notification about a conference the attendee is not currently in
+   * landed on "That session is not available to you".
+   *
+   * Adding a name to this list is exactly the move this guard exists to make expensive, so the
+   * allowance is paid for: the assertion below requires the new file to **return null**. FR-560
+   * forbids a notification *surface* — a bell, a centre, a list of things that happened — and a
+   * component that renders nothing cannot become one without failing this test. That is a stronger
+   * statement than the old one, which permitted `NotificationPrompt` to render whatever it liked.
+   * ═══════════════════════════════════════════════════════════════════════════════════════════
+   */
+  it('the notification-related components are exactly two, and one of them renders nothing', () => {
+    const found = sourcesUnder(SRC).filter(({ name }) => /Notification/i.test(name))
 
-    expect(components).toEqual(['app/messages/NotificationPrompt.tsx'])
+    expect(found.map(({ name }) => name).sort()).toEqual([
+      'app/NotificationTarget.tsx',
+      'app/messages/NotificationPrompt.tsx',
+    ])
+
+    const target = found.find(({ name }) => name === 'app/NotificationTarget.tsx')
+
+    expect(
+      target && /return null/.test(codeOf(target.text)),
+      '`NotificationTarget` renders something. It exists to consume a query parameter and switch ' +
+        'the active conference; the moment it renders, it is a notification surface, which FR-560 ' +
+        'forbids. A banner saying "a notification could not open" is the first step to a centre.',
+    ).toBe(true)
+
+    // And it must not be a *list* of anything, which is the specific shape FR-1031 forbids.
+    for (const forbidden of ['map(', '<ul', '<li', 'role="list"']) {
+      expect(
+        codeOf(target?.text ?? '').includes(forbidden),
+        `\`NotificationTarget\` contains \`${forbidden}\`. It must not iterate or list — a ` +
+          'surface whose subject is "things that happened" is the notification centre v3.1.0 ' +
+          'excluded and v5.2.0 N2 kept excluded (FR-1031).',
+      ).toBe(false)
+    }
   })
 
   it('nothing outside that component requests permission or subscribes (FR-551, FR-1036)', () => {

@@ -147,7 +147,9 @@ describe("one attendee cannot reach another's data, server-side (FR-389)", () =>
 
     // The same conference, the same address, a different attendee. Grace saved nothing.
     expect(graces.statusCode).toBe(200)
-    expect((graces.json() as { sessionIds: string[] }).sessionIds).toEqual([])
+    // T074 (014) — the payload became `{ sessions: [{ sessionId, changedSinceViewed }] }`. The
+    // claim is unchanged: Grace's saved set for this conference is empty, whatever Ada has saved.
+    expect((graces.json() as { sessions: unknown[] }).sessions).toEqual([])
   })
 
   it("never serves one attendee the other's private notes (FR-208)", async () => {

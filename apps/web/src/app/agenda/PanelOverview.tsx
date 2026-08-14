@@ -1,6 +1,6 @@
 import type { Session } from '@mynet/data'
 
-import { TrackChip } from '../SessionPresentation.js'
+import { CancelledChip, TrackChip } from '../SessionPresentation.js'
 import { venueDayLabelOf, venueTimeOf } from '../sessions.js'
 
 /**
@@ -27,6 +27,13 @@ export const PanelOverview = ({ session, timezone }: { session: Session; timezon
 
     <div className="mb-3 flex flex-wrap items-center gap-2">
       <TrackChip track={session.track} />
+      {/*
+        T053 (014) — FR-1022. The panel is where an attendee reads what happened to a session
+        they saved, so cancellation belongs at the top of it rather than only on the row that
+        brought them here. In **text**, beside the track: colour is never the sole carrier, and
+        this is the one piece of information that, missed, sends somebody to an empty room.
+      */}
+      {session.cancelled && <CancelledChip />}
       <span className="text-sm text-text-muted">{session.room.name}</span>
     </div>
 

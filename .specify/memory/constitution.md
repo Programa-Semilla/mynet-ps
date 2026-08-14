@@ -1,5 +1,133 @@
 <!--
 SYNC IMPACT REPORT
+Version change: 5.1.0 → 5.2.0
+
+**REBASED 2026-08-14, FROM 4.1.0 → 4.2.0, AND THE RENUMBERING IS THE RECORD OF A COLLISION.** This
+amendment was drafted and ratified on 2026-08-12 as **4.2.0**, on a branch taken from 4.1.0. On the
+same day and from the same base, a parallel branch produced 5.0.0 and 5.1.0 and merged first. Nothing
+in this amendment's substance changes; its **base** moves from 4.1.0 to 5.1.0 and its number with it,
+because 4.2.0 is not above 5.1.0 and a version that sorts below its own predecessor is not a version.
+
+**This is the fourth collision of this kind, and the first to hit the register rather than a file
+name.** The register entries this amendment opened were **27 and 28**; 5.0.0 opened its own 27 and 28
+hours earlier, on different subjects. They are renumbered here to **29 and 30** — the same
+merged-first-keeps-the-number rule this project applied when 009 and the brand mark were both drafted
+as 3.3.0, and when 013 took the next free feature number rather than the next in its own programme.
+**The rule that comes out of it is the one 014 already wrote for migrations, generalised**: a phase in
+a parallel programme must extend the shared numbering table in the same change, and the register is
+now known to be such a table. A branch cannot see a reservation made on a branch it cannot see.
+
+RATIFICATION STATUS: **RATIFIED 2026-08-12 by the project owner**, on reading the drafted amendment
+together with the specification, plan and task list it gates. Drafted the same day at his request
+following brainstorm #10 (`brainstorm/10-conference-content-authoring.md`), which decided the shape
+of feature 014 — conference content authoring.
+
+It was drafted first and ratified second, because this project does not let an amendment ratify
+itself. 3.2.0 and 3.3.0 were each ratified by the owner at the gate of the feature they licensed,
+3.4.0 by the act of supplying the asset it recorded, and 4.0.0 on reading the drafted text.
+**Feature 014 is licensed from this point**, including its first line of code.
+
+**What ratification does NOT do**: entries 29 and 30 remain open, and neither blocks 014. Ratifying
+a second notification trigger did not decide whether an attendee may suppress its content, nor who
+answers for a speaker's personal data. Entries 19, 21, 4 and 22 are untouched.
+
+Rationale: MINOR. Notification scope is materially expanded — from one trigger to two — and one
+authority boundary is stated that 4.0.0 left implicit. No principle is removed or redefined, nothing
+delivered is retracted, and no work performed under 4.0.0, 4.1.0, 5.0.0 or 5.1.0 is invalidated. It
+is the same test 3.1.0 applied to itself when it brought delivery into scope at all, and for the same
+reason it is **not PATCH**: widening a trigger set changes what the product may do to somebody's
+phone, and that is not a clarification of what it already did.
+
+**ONE SENTENCE IN 5.1.0 IS SUPERSEDED BY THIS AMENDMENT, AND IT IS LEFT STANDING DELIBERATELY.**
+5.1.0's report states *"nothing about notification triggers moves. A received message remains the
+only thing that dispatches"*. That was true when it was written and is false once this lands. It is
+**not edited**, because a prior sync report is a record of what was decided when, and rewriting one
+to agree with a later decision destroys the only evidence that the two were taken independently. The
+binding statement is the "Notification delivery" section, which this amendment amends in place.
+
+**5.0.0 refused two candidate triggers and this grants a third, distinct one — the refusals stand.**
+Its "deliberately NOT decided" block declines REQ-095 (a push when a Q&A document is published) and
+REQ-112 (a push when a session is about to start), and REQ-112 is refused here too and by name: a
+session *starting* remains forbidden, because a reminder is something an attendee can set themselves.
+Neither refusal touches N1's set. 5.0.0 also restates the mechanism this amendment used —
+*"'Notification delivery' already requires an amendment per trigger"* — so the two agree on process
+and were, without either knowing it, applying the same rule on the same day.
+
+Owner decisions cited by this amendment (all 2026-08-12):
+  N1. A SECOND NOTIFICATION TRIGGER EXISTS: a material change to a session the attendee has SAVED.
+      The set is **named rather than described** — cancellation, a change of start time, and a
+      change of room — and the principle it follows from is stated with it: a push fires when a
+      change affects **where or whether** the attendee must be somewhere. Title, summary and speaker
+      changes are content, and content does not strand anybody in the wrong corridor.
+      This is the first widening of a rule that has held since 3.1.0. The set is closed rather than
+      open-ended precisely because a boundary a later feature can argue about is a boundary that
+      moves.
+  N2. THE IN-APP MARKER IS PER-ROW STATE, NOT AN INBOX. 014 marks a changed saved session on the row
+      itself, in Agenda and on Home. The bell and the in-app notification centre remain forbidden,
+      unchanged and unweakened, and the distinction MUST be testable as an absence.
+      **The prohibition governs surfaces INSIDE the product**, and that scope is stated rather than
+      assumed: a single organizer act may materially change several of one attendee's saved sessions
+      at once, and it dispatches **one coalesced notification** whose body carries a count. A
+      notification is a single interruption by nature, and twelve interruptions for one act is the
+      outcome 3.1.0's exclusion existed to prevent — so the count is permitted in the payload and
+      **forbidden everywhere it could become a surface**. Activating it MUST land on the destination
+      holding the per-row markers, never on a list of changes.
+  N3. A CONFERENCE ORGANIZER MAY CREATE A CONFERENCE and is assigned to it. A2's "authority reaches
+      only the conferences they are assigned" cannot describe the act of creating one. This is the
+      **only** product-wide capability the tier holds; authority over conferences it did not create
+      still comes only from assignment by a platform operator.
+  N4. CONFERENCE CONTENT IS LIVE-EDITED, WITH NO DRAFT/PUBLISH LIFECYCLE. A conference is reachable
+      only by its join code, so an unfinished one is already private to whoever holds that code. A
+      lifecycle would be a second gate over a gate that already exists.
+  N5. A SESSION ANY ATTENDEE HAS ENGAGED WITH MAY BE CANCELLED BUT NOT DELETED. Saved sessions,
+      private notes, questions and votes survive an organizer's act. This is a **correction of a
+      live hazard rather than a preference**: `saved_sessions`, `session_notes`, `session_questions`
+      and `question_votes` each cascade from `sessions.id` today, so one delete would destroy other
+      people's private writing silently, with no confirmation and no record. 013 could not have
+      caught it, because 013 built no write path into the catalog at all.
+
+Added binding constraints:
+  - "Notification delivery" — the trigger set becomes two, enumerated; the marker-is-not-an-inbox
+    rule; the lock-screen consequence extended to a second content type.
+  - "Data scoping, content provenance, and composition" — the 4.0.0 seed clause gains the
+    live-editing rule and the cancel-not-delete rule.
+  - "Administration, and the second actor" — the organizer's one product-wide capability, stated
+    rather than left to be inferred from its absence.
+
+Register changes (**drafted as 27 and 28, renumbered on the rebase** — see the head of this report):
+  - 29. OPENED. Whether an attendee may suppress content in notifications. **Promoted** from a
+    deferral recorded in prose since 3.1.0 to a numbered entry, because 5.2.0 makes it apply to a
+    second content type and it has now gone undecided across two amendments. Blocks nothing.
+    **It now shares a subject boundary with 5.0.0's entry 27**, which asks how a question is
+    attributed: both are about what the product discloses about a person without asking them, and a
+    reader settling one should read the other. They are not the same question and are not merged.
+  - 30. OPENED. Speakers are personal data about people who are not attendees, and 5.2.0 makes them
+    organizer-authored rather than seeded. Blocks nothing today; blocks any claim that Principle
+    VIII's coverage is complete.
+  - **No entry is closed.** 19 and 21 remain ADDRESSED-not-closed; 4 and 22 remain open and still
+    block 012. 5.0.0's entries 27 and 28 are untouched by this amendment.
+
+Templates and dependent artifacts:
+  - .specify/templates/spec-template.md — ⚠ **changed by 5.0.0, not by this amendment**: Feature
+    Declarations gains C3's administrative-counterpart row. 014's spec predates the row and is
+    brought into compliance on this rebase rather than left as the one feature that never declared
+    it. plan-template.md, tasks-template.md — ✅ no change required.
+  - CLAUDE.md — ✅ updated on ratification: standing decisions 45–49 (drafted as 40–44), register
+    entries 29 and 30.
+  - brainstorm/00-overview.md, brainstorm/10-conference-content-authoring.md — ✅ current.
+  - specs/014-conference-content-authoring/{spec,plan,tasks}.md — ✅ ratification gate lifted.
+
+Deferred: none. Feature 014 has no blocking register entry.
+
+A NOTE ON WHAT THIS AMENDMENT COSTS, because the trade is not obvious: 3.1.0's trigger rule was
+written to be narrow **by construction** — "a feature that wants a second trigger MUST amend this
+block" — and 014 is the first feature to take it up. The rule worked exactly as designed. What
+widening it costs is that "one trigger" was a property anybody could verify by reading one sentence,
+and "two triggers, the second bounded by three named changes" is not. That is why N1 enumerates the
+set instead of describing it, and why the set is logistics rather than content.
+
+PRIOR REPORT (5.0.0 → 5.1.0), the amendment this one was rebased onto:
+
 Version change: 5.0.0 → 5.1.0
 
 RATIFICATION STATUS: **RATIFIED 2026-08-12**, on the same standing this project has used four
@@ -138,6 +266,8 @@ Templates and guidance requiring updates:
   ✅ CLAUDE.md — standing decisions, invariants, and open questions
   ⚠ scripts/brand-audit.mjs — C4's named exception is feature 016's implementation work, not this
     amendment's; the amendment states the rule, the feature encodes it
+
+PRIOR REPORT (4.0.0 → 4.1.0):
 
 Version change: 4.0.0 → 4.1.0
 
@@ -1822,6 +1952,35 @@ Decided by the project owner on 2026-08-06. Binding on every subsequent feature.
     load-bearing in a way it was not when no organizer existed. Networking intent and availability
     remain decisions a person makes, not facts an organizer records.
 
+    *Sharpened 5.2.0.* **A speaker is conference content; a speaker is not an attendee.** 014 makes
+    speaker records organizer-authored rather than seeded, and an organizer editing a speaker row
+    MUST NOT become a route to editing a person's profile — not even where the same human being
+    holds both. The two are different records about different things, and the rule above governs the
+    profile whatever the speaker row says.
+
+  *Extended 5.2.0 by N4 and N5.* Authoring is live, and it has one prohibition attached:
+
+  - **Conference content is LIVE-EDITED. There is no draft/publish lifecycle**, and a feature MUST
+    NOT add one without an amendment. A conference is reachable only by its join code, so an
+    unfinished conference is already private to whoever holds that code — a lifecycle would be a
+    second gate over a gate that already exists, and a second state for every read path to consult.
+    The consequence is accepted rather than hidden: an organizer authors into a conference their
+    attendees can already see.
+
+  - **A session ANY attendee has engaged with MAY BE CANCELLED, and MUST NOT BE DELETED.**
+    Engagement means a saved session, a private note, a question, or a vote. Deletion stays
+    available only while nothing is attached. Cancellation is **stored state** on the session — it
+    cannot be derived, unlike 008's `lapsed`, because it is an organizer's act rather than a
+    function of the clock — and the attendee state survives it intact.
+
+    This is a **correction of a live hazard, not a preference.** `saved_sessions`, `session_notes`,
+    `session_questions` and `question_votes` each cascade from `sessions.id`, so before 014 a single
+    delete would have destroyed other people's private writing with no confirmation and no record.
+    **009's precedent does not license it**: a withdrawn question takes everybody's votes because
+    the *author* exercised erasure over their own words, and that reasoning does not transfer to a
+    third party deleting somebody else's — the same non-transfer 009 itself found when 007's answer
+    for conversations did not carry across.
+
 - **Home is composed, not aggregated.** Home is a registry of independent cards. Each card owns its
   own loading, empty, and failure states, and a card that fails MUST NOT blank the dashboard or
   prevent any other card from rendering. No card may depend on another card's presence, ordering, or
@@ -2116,21 +2275,61 @@ attribution turned out to carry and the three consequences that bound it.*
 
 *Added 3.1.0 by M4, M5 and M7. This block is where register entry 10's surviving half now lives:
 the entry is struck through, and a struck-through entry is not where anybody looks for a rule.*
+*Extended 5.2.0 by N1 and N2 — the trigger set becomes two, and the second is bounded by a named set
+of changes rather than by a description.*
 
-**Engagement notification delivery is in product scope, for a received message and nothing else.**
-Until 3.1.0 it was excluded outright. What changed is one thing only, and the boundary is narrow by
-construction rather than by convention.
+**Engagement notification delivery is in product scope, for TWO triggers and nothing else.** Until
+3.1.0 it was excluded outright; from 3.1.0 to 5.2.0 there was exactly one trigger. The boundary is
+narrow by construction rather than by convention, and widening it cost something that is named at
+the end of this block rather than glossed.
 
-- **A received message is the ONLY trigger.** No notification may be raised for anything else — not
-  a saved session starting, not an appointment, not an audience question, not an announcement.
-  A feature that wants a second trigger MUST amend this block. Enforced by test, not by convention:
-  a trigger set that can only be widened deliberately is the difference between a bounded capability
-  and a channel every later feature helps itself to.
+- **There are exactly TWO triggers, and they are enumerated here.**
+
+  1. **A received message.** *3.1.0, M4.*
+  2. **A material change to a session the attendee has SAVED.** *5.2.0, N1.* **Material means
+     exactly three things: the session is cancelled, its start time changes, or its room changes.**
+     The principle the set follows from MUST be applied when reading it — a notification is raised
+     when a change affects **where or whether the attendee must be somewhere**. A title, a summary,
+     or a change of speaker is content, and content does not strand anybody in the wrong corridor.
+
+  **A session STARTING is not a trigger and remains forbidden**, and so do an appointment, an
+  audience question, and an announcement. The distinction between a session *starting* and a session
+  being *changed by an organizer* is load-bearing rather than pedantic: the first is a reminder the
+  attendee could set for themselves, the second is information only the product holds. Reading N1 as
+  licensing "starting soon" alerts would reverse 3.1.0's entire reasoning while appearing to follow
+  it.
+
+  **A feature that wants a third trigger MUST amend this block.** Enforced by test, not by
+  convention: a trigger set that can only be widened deliberately is the difference between a
+  bounded capability and a channel every later feature helps itself to.
+  `apps/api/tests/unit/notification-triggers.test.ts` is that test — it walks the real source tree
+  and names the files permitted to dispatch — and an amendment widening the set MUST edit it in the
+  same change. **Editing that test IS the conversation**, and a feature that finds itself editing it
+  without an amendment has already gone wrong.
 
 - **The notification bell MUST NOT be reproduced, and neither MUST an in-app notification centre.**
   This is entry 10's original prohibition, carried forward **unchanged and unweakened**. Delivery
   and an inbox are separable, and bringing the first in does not bring the second. The prototype
   header's bell with its unread dot remains forbidden.
+
+  *Extended 5.2.0 by N2.* 014 marks a changed saved session **on the row itself**, in Agenda and on
+  Home. That marker is **per-row state about one session the attendee saved**, and it MUST NOT
+  become an inbox: no aggregate count, no list of changes, no surface whose subject is "things that
+  happened" rather than "this session". The distinction MUST be testable as an absence, in the shape
+  009's and 013's absence guards already establish. It is written down because a per-row marker is
+  the natural first step toward the centre this rule forbids, and the second step would not feel
+  like a decision at the time somebody took it.
+
+  **This prohibition governs surfaces INSIDE the product, and that scope is deliberate.** One
+  organizer act may materially change several of an attendee's saved sessions at once, and it
+  dispatches **one coalesced notification whose body carries a count** rather than one notification
+  per session. A notification is a single interruption by its nature, and a dozen interruptions from
+  one act is precisely the product 3.1.0's exclusion existed to prevent — so a count is permitted
+  **in the payload** and forbidden everywhere it could become something to look at. Two rules make
+  that boundary hold rather than blur: **activating such a notification MUST land on the destination
+  carrying the per-row markers**, never on a list of what changed; and **no view inside either
+  product may present that count**. The moment a screen answers "how many things changed", this rule
+  has been broken regardless of what the payload does.
 
 - **Delivery MUST go through `NotificationService`** (Principle V), over a domain shape rather than
   the browser's own `PushSubscription` type. The signing key is a secret and MUST NOT appear in
@@ -2163,6 +2362,14 @@ construction rather than by convention.
   not decided**, and it is recorded here as outstanding rather than closed. Principle VIII's
   collect-only-what-a-requirement-names rule is unaffected: nothing new is stored.
 
+  *Extended 5.2.0 by N1.* The same consequence now reaches a **second** content type: a
+  saved-session notification carries a session title, which discloses what the attendee chose to
+  attend to whoever is holding the device. It is accepted on the same reasoning — a notification
+  saying only "something changed" sends them into the app to find out what, which is most of the
+  value gone — and it is still **not solved**. Because it has now gone undecided across two
+  amendments, it is promoted from a deferral in prose to **register entry 29**. Recording it a
+  second time in the same words is how it would have stopped being noticed.
+
 - **Subscriptions are per device, not per session.** Signing out MUST NOT revoke one; revoking
   permission and a permanent delivery failure MUST. A subscription record holds credentials rather
   than content, and MUST NOT be reproduced in the personal-data export — the presence of a device
@@ -2172,6 +2379,20 @@ construction rather than by convention.
 a session ended is worth very little. That is the whole of what M4 buys, and it is why the reversal
 is narrow: the exclusion existed to keep MyNet from becoming a product that interrupts people, and
 one trigger tied to a message somebody actually sent does not make it one.
+
+*Rationale for the second trigger (5.2.0)*: 014 lets an organizer change a programme attendees are
+already relying on, and the two failure modes it creates are physical rather than informational —
+walking to a room that moved, and arriving for a session that was cancelled. Neither is discoverable
+by an attendee who has no reason to re-open the app, which is precisely the case a notification
+exists for. **What keeps this consistent with M4's reasoning rather than a departure from it**: both
+triggers are somebody else's act, addressed to this attendee, that the attendee cannot learn any
+other way in time. A session starting is none of those things, which is why it stays out.
+
+*What widening it cost, recorded because the property was load-bearing*: "there is exactly one
+trigger" could be checked by reading one sentence. "There are two, the second bounded by three named
+changes" cannot. The enumeration above is what replaces that property, and it is only as good as its
+refusal to be reasoned wider — which is why N1 names the three cases instead of stating the
+principle alone, even though the principle is what generated them.
 
 ### Reporting conduct out of the product
 
@@ -2352,6 +2573,22 @@ absence in the attendee product rather than asserted in prose.
   A conference organizer **is** an attendee, with a real profile, who continues to use MyNet as one.
   **Promotion MUST NOT alter their attendee experience** in any observable way — it grants capability
   in the administrative product and nothing in this one.
+
+  *Extended 5.2.0 by N3.* **A conference organizer MAY CREATE a conference, and is assigned to the
+  conference they create.** This is the **only product-wide capability the tier holds**, and it is
+  stated here rather than inferred because the clause above — "authority reaches only the conferences
+  they are assigned" — cannot describe the act of creating one. Two bounds travel with it and are
+  what keep A2 true in substance:
+
+  - **Authority over a conference they did not create still comes only from assignment** by a
+    platform operator. Creating grants authority over the new conference and reaches no existing one.
+  - **It is not a promotion path.** Creating a conference does not widen the tier, does not grant
+    any platform-operator capability, and gives no route to promote anybody — promotion remains
+    platform-tier only, and A2's no-self-sign-up rule is untouched.
+
+  **Nothing bounds how many conferences an organizer may create**, which is bounded by trust rather
+  than by a limit, because promotion is itself platform-tier only. That is recorded as accepted
+  rather than overlooked.
 
 **No self sign-up into either tier** is the load-bearing rule, and it is the exact mirror of D5.
 Self sign-up was chosen for attendees because it was the only model that left the attendee sole
@@ -2851,6 +3088,33 @@ leaving a question explicitly open for the phase told to answer it.
   the pattern is that this project's ten correctness gates verify that a control exists, is labelled,
   is focusable and works — and none of them looks at where it is. **This amendment does not close
   it**, and no feature may be read as having validated a layout because its tests are green.
+
+**Opened in 5.2.0**
+
+Both are opened rather than answered, following 3.2.0's precedent of leaving a question explicitly
+open for whoever is told to answer it. **Neither blocks feature 014.**
+
+**These two were drafted as entries 27 and 28** and are renumbered here, because 5.0.0 opened its own
+27 and 28 on the same day from a parallel branch. See this amendment's sync report for why the
+collision was possible and what it costs; the entries themselves are unchanged in substance.
+
+- **29. Whether an attendee may suppress content in notifications.** **Promoted** from a deferral
+  that has sat in prose since 3.1.0 — it was recorded there as "accepted rather than solved" and
+  never given a number. 5.2.0 makes it apply to a **second** content type: a saved-session
+  notification carries a session title, so what somebody chose to attend is now visible on their
+  locked device alongside what somebody said to them. Two amendments have now accepted the same cost
+  without deciding the mitigation, and the usual one — a per-attendee content preference — has never
+  been weighed. It is numbered now because a consequence recorded twice in the same words is a
+  consequence nobody is going to act on. **Blocks nothing.**
+
+- **30. Speakers are personal data about people who are not attendees.** A speaker row carries a
+  real person's name, title and company. This is not new — the rows have been seeded since 002 — but
+  5.2.0 makes them **organizer-authored**, which moves responsibility from a reviewed commit to a
+  promoted attendee typing into a form. Principle VIII has only ever considered attendees, and both
+  coverage tests derive their expectations from the schema, so the question they cannot ask is who
+  answers for a person who never signed up. **Blocks nothing today; it blocks any claim that
+  Principle VIII's coverage is complete.**
+
 **Open — require a client decision**
 
 *Numbering is stable.* Resolved entries are **struck through in place** rather than removed, and
@@ -3254,4 +3518,4 @@ so a gap in the source would silently render as the wrong number against a neigh
 stay consistent with this constitution and MUST NOT contain implementation plans, session tasks,
 progress updates, or invented requirements.
 
-**Version**: 5.1.0 | **Ratified**: 2026-08-04 | **Last Amended**: 2026-08-12
+**Version**: 5.2.0 | **Ratified**: 2026-08-04 | **Last Amended**: 2026-08-12

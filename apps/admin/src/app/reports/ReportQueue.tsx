@@ -2,7 +2,7 @@ import type { AdminReportSummary } from '@mynet/data'
 import { useCallback, useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router'
 
-import { classify, describe } from '../errors.js'
+import { classify, describe, detailOf } from '../errors.js'
 import { useAdminSession } from '../session.js'
 import { ReportDetail } from './ReportDetail.js'
 
@@ -42,7 +42,7 @@ export const ReportQueue = () => {
     try {
       setReports(await services.reports.list())
     } catch (error) {
-      setFailure(describe(classify(error)))
+      setFailure(describe(classify(error), detailOf(error)))
     }
   }, [services])
 

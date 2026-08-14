@@ -37,6 +37,20 @@ import {
  * presentation, and an attacker does not use it.
  * ═════════════════════════════════════════════════════════════════════════════════════════
  */
+/**
+ * T074 (014) — the saved-session identifiers out of the agenda payload.
+ *
+ * The read returned `{ sessionIds: string[] }` until 014 and now returns
+ * `{ sessions: { sessionId, changedSinceViewed }[] }`: the marker travels on the existing payload
+ * rather than on a read of its own, because a `listChangedSessions` would be a read whose subject
+ * is *things that happened* — the surface FR-1031 forbids (research R7).
+ *
+ * Projected here so the assertions below stay about **which sessions are saved**, which is what
+ * they were always about.
+ */
+const savedIdsOf = (body: unknown): string[] =>
+  (body as { sessions: { sessionId: string }[] }).sessions.map((entry) => entry.sessionId)
+
 describe("another attendee's agenda", () => {
   let app: FastifyInstance
   let adaCookie: string
@@ -134,10 +148,10 @@ describe("another attendee's agenda", () => {
 
   it('the fixture is real, or every assertion below is trivially true', async () => {
     // Guard against the suite passing because Ada has nothing to leak.
-    const saved = (await as(adaCookie).saved()).json() as { sessionIds: string[] }
+    const saved = savedIdsOf((await as(adaCookie).saved()).json())
     const notes = (await as(adaCookie).notes()).json() as { notes: Array<{ body: string }> }
 
-    expect(saved.sessionIds).toContain(adaSessionId)
+    expect(saved).toContain(adaSessionId)
     expect(notes.notes[0]?.body).toContain("Ada's private note")
   })
 
@@ -148,7 +162,9 @@ describe("another attendee's agenda", () => {
     // back is *her own* set, which is empty.
     expect(response.statusCode).toBe(200)
     expect(
-      (response.json() as { sessionIds: string[] }).sessionIds,
+      (response.json() as { sessions: { sessionId: string }[] }).sessions.map(
+        (entry) => entry.sessionId,
+      ),
       "Grace's saved set must be hers. The route takes no attendee identifier, so there is no " +
         'expression that could have returned Ada’s.',
     ).toEqual([])
@@ -200,15 +216,15 @@ describe("another attendee's agenda", () => {
   it('Grace UNSAVING a session does not unsave it for Ada', async () => {
     await as(graceCookie).unsave(adaSessionId)
 
-    const ada = (await as(adaCookie).saved()).json() as { sessionIds: string[] }
-    expect(ada.sessionIds).toContain(adaSessionId)
+    const ada = savedIdsOf((await as(adaCookie).saved()).json())
+    expect(ada).toContain(adaSessionId)
   })
 
   it('Grace SAVING a session does not appear in Ada’s set', async () => {
     await as(graceCookie).save(adaSecondSessionId)
 
-    const ada = (await as(adaCookie).saved()).json() as { sessionIds: string[] }
-    expect(ada.sessionIds).not.toContain(adaSecondSessionId)
+    const ada = savedIdsOf((await as(adaCookie).saved()).json())
+    expect(ada).not.toContain(adaSecondSessionId)
 
     const rows = await getDb()
       .select()

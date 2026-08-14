@@ -1,6 +1,6 @@
 import { useState } from 'react'
 
-import { classify, describe } from '../errors.js'
+import { classify, describe, detailOf } from '../errors.js'
 import { useAdminSession } from '../session.js'
 import { AdminDialog } from '../shell/AdminDialog.js'
 
@@ -51,7 +51,7 @@ export const RemoveQuestionDialog = ({
       await services.reports.removeQuestion({ reportId, questionId })
       onRemoved()
     } catch (error) {
-      setFailure(describe(classify(error)))
+      setFailure(describe(classify(error), detailOf(error)))
     } finally {
       setSubmitting(false)
     }

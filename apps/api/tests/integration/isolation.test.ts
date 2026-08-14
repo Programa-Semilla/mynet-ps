@@ -280,6 +280,18 @@ describe('attendee data isolation', () => {
         undo: { method: 'DELETE', template: '/events/:eventId/agenda/saved/:sessionId' },
       },
       { template: '/events/:eventId/agenda/saved/:sessionId', method: 'DELETE', ok: 204 },
+      // ─────────────────────────────────────────────────────────────────────────────────────
+      // 014 — clearing a session's change marker (FR-1030). Scoped exactly like the two saves
+      // above: `attendee_id` comes from the session cookie and the session must belong to the
+      // verified conference, so an attendee cannot mark another's row viewed and cannot reach a
+      // session outside the conference they named.
+      //
+      // **204 whether or not a row was stamped.** It is a no-op for a session the attendee has
+      // not saved, which is what stops opening a session in Agenda's "All" view being an error —
+      // so the isolation assertion here is about the refusal for a conference they are not
+      // registered for, which is the same 404 as everything else.
+      // ─────────────────────────────────────────────────────────────────────────────────────
+      { template: '/events/:eventId/agenda/saved/:sessionId/viewed', method: 'POST', ok: 204 },
       { template: '/events/:eventId/agenda/notes', method: 'GET', ok: 200 },
       {
         template: '/events/:eventId/agenda/notes/:sessionId',

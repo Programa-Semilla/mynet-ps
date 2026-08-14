@@ -95,31 +95,104 @@ clientsClaim()
  * `data.conversationId` is what `notificationclick` below opens. It is carried in `data` rather
  * than encoded into the tag or the title, because those are for the reader.
  * ─────────────────────────────────────────────────────────────────────────────────────────
+ *
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ * **T073 (014) — A SECOND PAYLOAD SHAPE, AND THE DEFAULTS BECOME SHAPE-DEPENDENT.**
+ *
+ * v5.2.0 admits a second trigger: a material change to a session the attendee **saved**. Its
+ * payload carries `kind: 'session-change'` and either a `sessionId` (one session changed) or a
+ * `count` (several did, in one organizer act — FR-1034).
+ *
+ * The fallback wording has to move with it. "You have a new message" is the honest default for a
+ * message and a **false statement** about a cancelled session, and this handler's whole reason
+ * for existing is that a payload it cannot parse must still produce something true. So the
+ * defaults are chosen from `kind` before the rest of the payload is trusted.
+ * ═════════════════════════════════════════════════════════════════════════════════════════
  */
 self.addEventListener('push', (event: PushEvent) => {
   const shown = (async () => {
     let title = 'New message'
     let body = 'You have a new message.'
     let conversationId: string | undefined
+    let sessionId: string | undefined
+    let eventId: string | undefined
+    let dispatchId: string | undefined
+    let kind: 'message' | 'session-change' = 'message'
 
     try {
       const payload = event.data?.json() as
-        { title?: string; body?: string; conversationId?: string } | undefined
+        | {
+            kind?: string
+            title?: string
+            body?: string
+            conversationId?: string
+            sessionId?: string
+            eventId?: string
+            dispatchId?: string
+            count?: number
+          }
+        | undefined
+
+      if (payload?.kind === 'session-change') {
+        kind = 'session-change'
+        // A different default for a different shape. The server always sends both fields; these
+        // stand only when the payload arrived truncated or unparseable in part.
+        title = 'Your agenda changed'
+        body = 'A session you saved has changed.'
+      }
+
       if (payload?.title) title = payload.title
       if (payload?.body) body = payload.body
       if (payload?.conversationId) conversationId = payload.conversationId
+      if (payload?.sessionId) sessionId = payload.sessionId
+      if (payload?.eventId) eventId = payload.eventId
+      if (payload?.dispatchId) dispatchId = payload.dispatchId
     } catch {
       // Malformed or absent payload. The defaults above stand — see the header for why showing
       // nothing is not an option.
     }
 
     await self.registration.showNotification(title, {
-      body,
+      // ───────────────────────────────────────────────────────────────────────────────────────
       // One notification per conversation, replaced rather than stacked: five messages from the
       // same person while a phone is in a pocket should be one notification saying the latest
       // thing, not five to dismiss.
-      tag: conversationId ? `conversation-${conversationId}` : 'message',
-      data: { conversationId },
+      //
+      // 014 — the same reasoning, keyed on the session. Two material changes to one saved session
+      // replace each other, because the second is the current truth about it: a cancellation
+      // superseding an earlier room move is what anybody would want.
+      //
+      // ═══════════════════════════════════════════════════════════════════════════════════════
+      // **A COALESCED PAYLOAD IS TAGGED WITH THE ACT, NOT THE CONFERENCE, AND THE DIFFERENCE
+      // IS FR-1028b.**
+      //
+      // This used to read `agenda-${eventId}`, so **two coalesced acts at one conference
+      // replaced each other on screen.** The delivery layer was correct — two notifications were
+      // sent, and `dispatch-coalescing.test.ts` asserts it — and the collapse happened here,
+      // one layer below where anything was looking.
+      //
+      // FR-1028b names this failure as its own reason for existing: *"a time-window rule would
+      // suppress a cancellation because a room moved earlier, which is the failure this whole
+      // trigger exists to prevent."* A shared tag is a time-window rule whose window is forever.
+      // Act one cancels two of somebody's saved sessions; act two moves a room on two others;
+      // the attendee sees a single notification saying two sessions changed and never learns
+      // about the cancellation.
+      //
+      // The act id is what the server already coalesces on (`last_change_act_id`), so the
+      // identifier that groups one act is the one that separates two, and nothing new is stored
+      // to obtain it. Still not a running total: within one act the tag replaces.
+      // ═══════════════════════════════════════════════════════════════════════════════════════
+      // ───────────────────────────────────────────────────────────────────────────────────────
+      body,
+      tag:
+        kind === 'session-change'
+          ? sessionId
+            ? `session-${sessionId}`
+            : `agenda-${dispatchId ?? eventId ?? 'changed'}`
+          : conversationId
+            ? `conversation-${conversationId}`
+            : 'message',
+      data: { kind, conversationId, sessionId, eventId },
     })
   })()
 
@@ -147,9 +220,51 @@ self.addEventListener('push', (event: PushEvent) => {
 self.addEventListener('notificationclick', (event: NotificationEvent) => {
   event.notification.close()
 
-  const conversationId = (event.notification.data as { conversationId?: string } | undefined)
-    ?.conversationId
-  const target = conversationId ? `/messages/${conversationId}` : '/messages'
+  const data = event.notification.data as
+    { kind?: string; conversationId?: string; sessionId?: string; eventId?: string } | undefined
+
+  /**
+   * ═════════════════════════════════════════════════════════════════════════════════════════
+   * **T073 (014) — A COALESCED NOTIFICATION OPENS AGENDA, NEVER A LIST OF CHANGES** (FR-1034b).
+   *
+   * The obvious destination for "4 of your saved sessions changed" is a screen listing the four.
+   * **That screen is the surface FR-1031 forbids** — an in-app aggregate over things that
+   * happened, which is the notification centre v3.1.0's exclusion exists to prevent. So the
+   * count lives in the notification body, which is a single interruption, and activating it
+   * lands on Agenda where the changed rows carry their **individual** markers.
+   *
+   * One session changed → that session's panel, which is where the attendee can see *what*
+   * changed (FR-1029). Several → Agenda. Neither address is a list.
+   * ═════════════════════════════════════════════════════════════════════════════════════════
+   */
+  /*
+   * ─────────────────────────────────────────────────────────────────────────────────────────
+   * **THE CONFERENCE TRAVELS IN THE ADDRESS, AND WITHOUT IT THE ADDRESS DOES NOT RESOLVE.**
+   *
+   * Every attendee address resolves against the **active** conference, which is server-side state
+   * changed only through the event switcher — so this used to discard `eventId` and send a
+   * notification about conference A to A's session id interpreted inside B's programme, where the
+   * panel renders "That session is not available to you". Multi-conference membership is ordinary,
+   * not an edge case.
+   *
+   * The worker cannot switch the conference itself: that is a server write behind a repository.
+   * So it names the conference and `app/NotificationTarget.tsx` acts on it, then removes the
+   * parameter so a reload cannot replay it.
+   *
+   * A message needs none of this — a conversation is cross-event by 007's design (FR-507), which
+   * is why the pattern does not simply transfer.
+   * ─────────────────────────────────────────────────────────────────────────────────────────
+   */
+  const conference = data?.eventId ? `?event=${encodeURIComponent(data.eventId)}` : ''
+
+  const target =
+    data?.kind === 'session-change'
+      ? data.sessionId
+        ? `/agenda/${data.sessionId}${conference}`
+        : `/agenda${conference}`
+      : data?.conversationId
+        ? `/messages/${data.conversationId}`
+        : '/messages'
 
   event.waitUntil(
     (async () => {

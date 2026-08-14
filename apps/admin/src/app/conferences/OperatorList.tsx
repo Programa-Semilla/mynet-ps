@@ -1,6 +1,6 @@
 import { useState } from 'react'
 
-import { classify, describe } from '../errors.js'
+import { classify, describe, detailOf } from '../errors.js'
 import { useAdminSession } from '../session.js'
 import { AdminDialog } from '../shell/AdminDialog.js'
 
@@ -51,7 +51,7 @@ export const OperatorList = () => {
       setOperatorId('')
       setConfirming(false)
     } catch (error) {
-      setFailure(describe(classify(error)))
+      setFailure(describe(classify(error), detailOf(error)))
       setConfirming(false)
     } finally {
       setSubmitting(false)

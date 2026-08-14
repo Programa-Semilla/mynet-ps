@@ -214,6 +214,27 @@ export const clearThrottle = async (): Promise<void> => {
 }
 
 export const teardown = async (app: FastifyInstance): Promise<void> => {
+  // ═════════════════════════════════════════════════════════════════════════════════════════════
+  // **BACKGROUND WORK DRAINS BEFORE THE APPLICATION AND THE POOL CLOSE, AND EVERY FILE NEEDS THIS
+  // WHETHER OR NOT IT ASSERTS ON A NOTIFICATION.**
+  //
+  // 014's saved-session fan-out outlives the response deliberately: awaited in the organizer's
+  // request it is `recipients × push RTT` against a 10s `connectionTimeout`. The consequence for
+  // this suite is that **any** file which cancels or edits a session starts work that can still be
+  // running when its `afterAll` fires — and these files share one database, seeded once for the
+  // whole run.
+  //
+  // Left undrained, that work runs while the next file's `resetDatabase()`/`seed()` is executing,
+  // and the symptom is D9's exactly: a later suite failing to find a seeded attendee, in a file
+  // with nothing to do with authoring. It presents as flakiness that moves between files run to
+  // run, which is precisely how it was found.
+  //
+  // Five files already await `afterDispatch` because they assert on the sink. This is the same
+  // drain, applied to every file by putting it where teardown already happens — the property is
+  // "a file does not outlive its own writes", which is not specific to asserting on them. It is
+  // also the same call `server.ts` makes on SIGTERM, so nothing here is a test-only path.
+  // ═════════════════════════════════════════════════════════════════════════════════════════════
+  await app.background.drain()
   await app.close()
   await closeDb()
 }

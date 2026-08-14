@@ -21,9 +21,30 @@ import { rooms, sessions, sessionSpeakers, speakers, tracks } from '../schema/ca
  * a scope, or to explain in review why this read is not attendee-facing.
  * ═════════════════════════════════════════════════════════════════════════════════════════
  *
- * **There is no write path in this file, and there must not be one** (FR-132, FR-134). The
- * catalog is seeded content; creating or editing it would be organizer administration, which
- * Principle III places out of scope. T072's audit asserts no write route exists.
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ * **T014 (014) — THERE IS STILL NO WRITE PATH IN THIS FILE AND THERE MUST NOT BE ONE. WHAT
+ * CHANGED IS THE REASON, AND THE OLD REASON IS NOW FALSE.**
+ *
+ * It read: *the catalog is seeded content; creating or editing it would be organizer
+ * administration, which Principle III places out of scope.* Constitution v4.0.0 brought
+ * administration into scope and v5.2.0 gave it a write path into these exact tables, so that
+ * sentence no longer justifies anything — and it is corrected rather than deleted, because "the
+ * comment stopped being true" and "the rule was withdrawn" look identical in a diff.
+ *
+ * **The write path is `db/queries/admin-catalog.ts`, and it is a different file because it
+ * serves a different principal with a different authority model.** Every function here takes an
+ * `EventScope`, minted by `requireEventAccess` from an **attendee's registration**. Every
+ * function there takes a `ConferenceAuthorityScope`, minted by `requireConferenceAuthority` from
+ * an operator's tier or assignment. An organizer authoring a conference has no registration and
+ * needs none; a platform operator has no `attendees` row at all.
+ *
+ * Widening these signatures to serve both would make one module answer to two principals under
+ * two authority models, and `catalog-read-only.test.ts`'s name-shape assertion would have to
+ * become a list of permitted write names — the "weakened until it stops checking anything"
+ * failure that guard's own comment warns about. So **FR-191 survives literally**:
+ * `CatalogRepository` is read-only in perpetuity, and 014 did not reinterpret "in perpetuity" to
+ * mean "until 014" (research R1).
+ * ═════════════════════════════════════════════════════════════════════════════════════════
  */
 
 export type SessionRow = {
@@ -32,6 +53,15 @@ export type SessionRow = {
   readonly summary: string | null
   readonly startsAt: string
   readonly endsAt: string
+  /**
+   * T053 (014) — **cancelled, and therefore still on the programme** (FR-1020, FR-1022).
+   *
+   * A cancelled session is **presented, not withheld**: it stays in Agenda, in the detail panel
+   * and in Home's rest-of-day timeline, marked. An attendee who saved it needs to see that it
+   * will not happen, and a session that simply vanished would be indistinguishable from one they
+   * misremembered. Home's "Up next" is the single exception and skips it (FR-1022a).
+   */
+  readonly cancelled: boolean
   readonly track: { readonly id: string; readonly name: string; readonly colorToken: string }
   readonly room: { readonly id: string; readonly name: string }
   readonly speakers: ReadonlyArray<{
@@ -76,6 +106,7 @@ export const listSessions = async (unverified: EventScope): Promise<SessionRow[]
       summary: sessions.summary,
       startsAt: sessions.startsAt,
       endsAt: sessions.endsAt,
+      cancelledAt: sessions.cancelledAt,
       trackId: tracks.id,
       trackName: tracks.name,
       trackColorToken: tracks.colorToken,
@@ -125,6 +156,9 @@ export const listSessions = async (unverified: EventScope): Promise<SessionRow[]
     // is computed at display time against the reader's clock, or not at all.
     startsAt: row.startsAt.toISOString(),
     endsAt: row.endsAt.toISOString(),
+    // A boolean rather than the instant. **When** it was cancelled is the organizer's business
+    // and answers no question an attendee surface asks; `whether` is the whole of FR-1022.
+    cancelled: row.cancelledAt !== null,
     track: { id: row.trackId, name: row.trackName, colorToken: row.trackColorToken },
     room: { id: row.roomId, name: row.roomName },
     speakers: bySession.get(row.id) ?? [],

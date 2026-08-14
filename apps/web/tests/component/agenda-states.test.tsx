@@ -75,7 +75,12 @@ describe('SC-209 — the filter and the saved list', () => {
   it('FAILED: the saved set failing does not take the programme down with it', async () => {
     renderAgenda({
       overrides: {
-        savedSessions: { listSaved: failing, save: async () => {}, unsave: async () => {} },
+        savedSessions: {
+          listSaved: failing,
+          save: async () => {},
+          unsave: async () => {},
+          markViewed: async () => {},
+        },
       },
     })
 

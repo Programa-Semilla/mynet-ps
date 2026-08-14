@@ -1,8 +1,10 @@
 import type {
   AdminConference,
   AdminIdentity,
+  AdminProgramme,
   AdminReportDetail,
   AdminReportSummary,
+  AdminSession,
 } from '@mynet/data'
 import type { ReactNode } from 'react'
 import { MemoryRouter } from 'react-router'
@@ -69,6 +71,63 @@ export const stubServices = (overrides: ServiceOverrides = {}): AdminServices =>
     deactivateOperator: unexpected('conferences.deactivateOperator'),
     ...overrides.conferences,
   },
+  // 014 — the fourth repository. Every member throws by default, for the reason `unexpected`
+  // records: a screen calling something a test did not stub is a screen doing something the test
+  // does not know about, and this one has seventeen members.
+  catalog: {
+    programme: unexpected('catalog.programme'),
+    createTrack: unexpected('catalog.createTrack'),
+    updateTrack: unexpected('catalog.updateTrack'),
+    deleteTrack: unexpected('catalog.deleteTrack'),
+    createRoom: unexpected('catalog.createRoom'),
+    updateRoom: unexpected('catalog.updateRoom'),
+    deleteRoom: unexpected('catalog.deleteRoom'),
+    createSpeaker: unexpected('catalog.createSpeaker'),
+    updateSpeaker: unexpected('catalog.updateSpeaker'),
+    deleteSpeaker: unexpected('catalog.deleteSpeaker'),
+    createSession: unexpected('catalog.createSession'),
+    updateSession: unexpected('catalog.updateSession'),
+    deleteSession: unexpected('catalog.deleteSession'),
+    cancelSession: unexpected('catalog.cancelSession'),
+    reinstateSession: unexpected('catalog.reinstateSession'),
+    patchConference: unexpected('catalog.patchConference'),
+    createConference: unexpected('catalog.createConference'),
+    ...overrides.catalog,
+  },
+})
+
+/** A programme fixture with sensible defaults, so a test states only what it cares about (014). */
+export const programme = (over: Partial<AdminProgramme> = {}): AdminProgramme => ({
+  conference: {
+    id: 'event-1',
+    name: 'A Conference',
+    location: 'A Venue',
+    startsOn: '2027-03-01',
+    endsOn: '2027-03-03',
+    timezone: 'UTC',
+    joinCode: 'JOINCODE',
+    timezoneEditable: true,
+    ...over.conference,
+  },
+  tracks: over.tracks ?? [{ id: 'track-1', name: 'Design', colorToken: 'track-design' }],
+  rooms: over.rooms ?? [{ id: 'room-1', name: 'Hall A' }],
+  speakers: over.speakers ?? [],
+  sessions: over.sessions ?? [],
+})
+
+/** One session on the programme. Not cancelled and untouched, unless a test says otherwise. */
+export const adminSession = (over: Partial<AdminSession> = {}): AdminSession => ({
+  id: 'session-1',
+  title: 'Opening Keynote',
+  summary: null,
+  startsAt: '2027-03-01T09:00:00.000Z',
+  endsAt: '2027-03-01T10:00:00.000Z',
+  trackId: 'track-1',
+  roomId: 'room-1',
+  speakerIds: [],
+  cancelledAt: null,
+  engagement: { saved: 0, notes: 0, questions: 0, votes: 0 },
+  ...over,
 })
 
 /** A signed-in principal of the given tier, with the credential already replaced. */

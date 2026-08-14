@@ -1,5 +1,7 @@
 import { Outlet } from 'react-router'
 
+import { NotificationTarget } from '../app/NotificationTarget.js'
+
 import { DesktopRail } from './DesktopRail.js'
 import { MobileNav } from './MobileNav.js'
 import { OfflineBanner } from './OfflineBanner.js'
@@ -103,6 +105,13 @@ export const AppShell = () => (
         <Outlet />
       </main>
     </div>
+
+    {/*
+      014 — consumes the `?event=` a notification carries, switching the active conference before
+      the address below it resolves (FR-1029, FR-1034b). Renders nothing. Mounted in the shell
+      rather than in a destination because a notification may land on any of them.
+    */}
+    <NotificationTarget />
 
     <MobileNav />
   </div>

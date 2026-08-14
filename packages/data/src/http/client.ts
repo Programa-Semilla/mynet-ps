@@ -41,6 +41,29 @@ export interface ApiErrorBody {
   code?: string
   message?: string
   retryAfterSeconds?: number
+  /**
+   * Structured detail a refusal carries beyond its sentence.
+   *
+   * ═══════════════════════════════════════════════════════════════════════════════════════════
+   * **THE SERVER WAS PRODUCING THIS AND THE CLIENT WAS DROPPING IT AT THE TRANSPORT BOUNDARY.**
+   *
+   * 014's `detailedRefusal` carries two of these — the engagement counts behind a refused deletion
+   * (FR-1019, FR-1025) and **the sessions a date-range change would orphan, named** (FR-1014, whose
+   * text is *"the refusal MUST name the sessions concerned"*). The route declares them in its
+   * response schema after a long comment about Fastify stripping what a schema does not name, and
+   * `patchConference` runs an extra ordered query solely to build the list.
+   *
+   * All of that terminated here: this type named three fields, so everything else in the body was
+   * discarded before any client could see it, and the organizer was shown "Those dates would leave
+   * sessions outside the conference" with no indication of which of forty.
+   *
+   * Deliberately opaque (`unknown` values). This is the transport boundary, and it must not learn
+   * the shape of any one feature's refusal — the client that understands `sessions` is the one that
+   * renders it. `retryAfterSeconds` stays a named field because every throttled route in the
+   * product carries it and it predates this.
+   * ═══════════════════════════════════════════════════════════════════════════════════════════
+   */
+  [detail: string]: unknown
 }
 
 /**
@@ -53,12 +76,22 @@ export interface ApiErrorBody {
 export class ApiError extends RequestRefusedError {
   readonly status: number
   readonly retryAfterSeconds: number | undefined
+  /**
+   * Whatever else the refusal carried, unread by this layer.
+   *
+   * A caller that knows a code knows what accompanies it — see `ApiErrorBody`. Kept as the raw
+   * body rather than a copy with the known fields removed, so nothing here decides what a future
+   * refusal is allowed to carry.
+   */
+  readonly details: Readonly<Record<string, unknown>>
 
   constructor(status: number, body: ApiErrorBody) {
     super(body.code ?? 'unknown', body.message ?? 'The request could not be completed.')
     this.name = 'ApiError'
     this.status = status
-    this.retryAfterSeconds = body.retryAfterSeconds
+    this.retryAfterSeconds =
+      typeof body.retryAfterSeconds === 'number' ? body.retryAfterSeconds : undefined
+    this.details = body
   }
 }
 

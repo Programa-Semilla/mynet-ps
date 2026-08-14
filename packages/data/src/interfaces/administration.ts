@@ -28,6 +28,8 @@
  * no `reads` map to omit from and no `args[0]` to misread.
  */
 
+import type { TrackColorToken } from '../contract.js'
+
 /** Which tier the signed-in principal holds (FR-900, FR-924). */
 export type OperatorTier = 'platform' | 'organizer'
 
@@ -152,6 +154,199 @@ export interface AdminConferenceRepository {
   deactivateOperator(operatorId: string): Promise<void>
 }
 
+/** One track, room or speaker as the programme editor holds it (014). */
+export interface AdminTrack {
+  readonly id: string
+  readonly name: string
+  /**
+   * A theme token NAME, never a colour value (FR-136, FR-1004).
+   *
+   * **Typed from the generated contract rather than as `string`.** It was `string`, which is what
+   * let `CatalogForms.tsx` carry a third hand-written copy of the closed set with nothing binding
+   * it to the server's — so adding a token server-side left the form unable to offer it, and
+   * removing one left the form offering a value every write refuses. See `contract.ts`.
+   */
+  readonly colorToken: TrackColorToken
+}
+
+export interface AdminRoom {
+  readonly id: string
+  readonly name: string
+}
+
+export interface AdminSpeaker {
+  readonly id: string
+  readonly name: string
+  readonly title: string | null
+  readonly company: string | null
+}
+
+/**
+ * What an organizer is shown when choosing between deleting a session and cancelling it
+ * (FR-1025).
+ *
+ * ═════════════════════════════════════════════════════════════════════════════════════════════
+ * **COUNTS, AND THERE IS NO FIELD HERE THAT COULD HOLD A NAME.**
+ *
+ * FR-1042 forbids any administrative read of a note, a message, or the identity of anybody who
+ * saved, questioned or voted on a session. This type is where that is enforced on the client
+ * side: there is nothing to render but four integers, and no method below accepts an argument
+ * that would ask for more.
+ *
+ * The spec records that the aggregate is thin at small scale — with three registrants, "1
+ * attendee wrote a note" is close to a name — and names the mitigation available without an
+ * owner decision: a **threshold** rather than a count. That change is this type and its two
+ * readers, and nothing else.
+ * ═════════════════════════════════════════════════════════════════════════════════════════════
+ */
+export interface AdminEngagementCounts {
+  readonly saved: number
+  readonly notes: number
+  readonly questions: number
+  readonly votes: number
+}
+
+export interface AdminSession {
+  readonly id: string
+  readonly title: string
+  readonly summary: string | null
+  readonly startsAt: string
+  readonly endsAt: string
+  readonly trackId: string
+  readonly roomId: string
+  readonly speakerIds: readonly string[]
+  /** Stored state, never derived from the clock (FR-1020). Null means it is happening. */
+  readonly cancelledAt: string | null
+  readonly engagement: AdminEngagementCounts
+}
+
+export interface AdminProgramme {
+  readonly conference: {
+    readonly id: string
+    readonly name: string
+    readonly location: string
+    readonly startsOn: string
+    readonly endsOn: string
+    readonly timezone: string
+    /** Not a credential (FR-317a). Shown so an organizer can distribute it (FR-1009). */
+    readonly joinCode: string
+    /** False once any session exists (FR-1015), so the control matches what the server will do. */
+    readonly timezoneEditable: boolean
+  }
+  readonly tracks: readonly AdminTrack[]
+  readonly rooms: readonly AdminRoom[]
+  readonly speakers: readonly AdminSpeaker[]
+  readonly sessions: readonly AdminSession[]
+}
+
+export interface AdminSessionInput {
+  readonly title: string
+  readonly summary: string | null
+  readonly startsAt: string
+  readonly endsAt: string
+  readonly trackId: string
+  readonly roomId: string
+  readonly speakerIds: readonly string[]
+}
+
+/**
+ * T036 (014) — **conference content authoring, in the ADMINISTRATIVE product only** (FR-1001,
+ * FR-1003).
+ *
+ * ═════════════════════════════════════════════════════════════════════════════════════════════
+ * **THIS IS THE WRITE PATH `CatalogRepository` STILL DOES NOT HAVE, AND THE SEPARATION IS THE
+ * WHOLE OF FR-1003.**
+ *
+ * MyNet consumes `CatalogRepository`, which declares reads and nothing else — *in perpetuity*,
+ * asserted by name-shape in `catalog-read-only.test.ts`. Adding a write there would put an
+ * authoring capability in the attendee bundle whether or not any component called it.
+ *
+ * This interface is composed only in `apps/admin/src/app/services.ts` and is deliberately absent
+ * from the `Repositories` aggregate, like every other administrative repository — see this file's
+ * header for why that absence is what keeps administrative code out of MyNet's dependency graph.
+ * ═════════════════════════════════════════════════════════════════════════════════════════════
+ *
+ * **Every method names its conference.** Authority is a server-enforced predicate over the
+ * principal and the named conference (FR-1035), so an `eventId` here is not a convenience: it is
+ * the operand of the check. A method without one would be a method the server could not
+ * authorise.
+ */
+export interface AdminCatalogRepository {
+  /** The whole programme, with engagement counts per session (FR-1025). */
+  programme(eventId: string): Promise<AdminProgramme>
+
+  createTrack(eventId: string, input: { name: string; colorToken: TrackColorToken }): Promise<void>
+  updateTrack(
+    eventId: string,
+    id: string,
+    input: { name: string; colorToken: TrackColorToken },
+  ): Promise<void>
+  /** Refused with a reason while any session references it (FR-1017). */
+  deleteTrack(eventId: string, id: string): Promise<void>
+
+  createRoom(eventId: string, input: { name: string }): Promise<void>
+  updateRoom(eventId: string, id: string, input: { name: string }): Promise<void>
+  deleteRoom(eventId: string, id: string): Promise<void>
+
+  createSpeaker(
+    eventId: string,
+    input: { name: string; title: string | null; company: string | null },
+  ): Promise<void>
+  updateSpeaker(
+    eventId: string,
+    id: string,
+    input: { name: string; title: string | null; company: string | null },
+  ): Promise<void>
+  deleteSpeaker(eventId: string, id: string): Promise<void>
+
+  /** Returns any same-room overlap warnings (FR-1016). Overlap is permitted, never refused. */
+  createSession(eventId: string, input: AdminSessionInput): Promise<{ warnings: readonly string[] }>
+  updateSession(
+    eventId: string,
+    id: string,
+    input: AdminSessionInput,
+  ): Promise<{ warnings: readonly string[] }>
+
+  /**
+   * Permitted only while **zero** attendees have engaged (FR-1018). Otherwise refused with a
+   * reason and the counts, and cancellation offered instead (FR-1019).
+   */
+  deleteSession(eventId: string, id: string): Promise<void>
+
+  /** Stored state, and **the one authoring act that reaches attendees' phones** (FR-1026). */
+  cancelSession(eventId: string, id: string): Promise<void>
+  /** **Dispatches nothing** (FR-1024). */
+  reinstateSession(eventId: string, id: string): Promise<void>
+
+  /** Refuses a range that would orphan a session, and a timezone change once one exists. */
+  patchConference(
+    eventId: string,
+    input: Partial<{
+      name: string
+      location: string
+      startsOn: string
+      endsOn: string
+      timezone: string
+    }>,
+  ): Promise<void>
+
+  /**
+   * **Both tiers** (FR-1007, FR-1008). An organizer is assigned to what they create, in the same
+   * transaction — and creating grants no authority over any other conference and no platform
+   * capability (FR-1010): it is not a promotion path.
+   *
+   * Returns the minted join code so the organizer can distribute it (FR-1009). There is no
+   * `deleteConference` at any tier (FR-1011), and its absence is asserted.
+   */
+  createConference(input: {
+    name: string
+    location: string
+    startsOn: string
+    endsOn: string
+    timezone: string
+  }): Promise<{ id: string; joinCode: string }>
+}
+
 /**
  * ═════════════════════════════════════════════════════════════════════════════════════════════
  * **DELIBERATELY ABSENT FROM THIS FILE, EACH FOR ITS OWN REASON.**
@@ -161,8 +356,11 @@ export interface AdminConferenceRepository {
  *   exist. `deviations.md` D1 records this against T036.
  * - **No profile read or write, at any tier** (FR-973). Decision 33: *conference content is
  *   authorable, a person is not.*
- * - **No conference content authoring.** That is 012, and FR-974 keeps `catalog-read-only.test.ts`
- *   in force until it lands.
+ * - **Conference content authoring HAS LANDED — see `AdminCatalogRepository` above.** This entry
+ *   used to read *"that is 012, and FR-974 keeps `catalog-read-only.test.ts` in force until it
+ *   lands"*. It landed as **014**, on constitution v5.2.0, and `catalog-read-only.test.ts` is
+ *   **still in force**: research R1 found its two subjects are the attendee query module and
+ *   `CatalogRepository`, and authoring is neither. FR-191 survives literally.
  * - **No join-code method.** That is 013, and FR-975 keeps `join-grants-nothing.test.ts` in force.
  * - **No attendee suspension, removal or restriction** (FR-955), and no avatar moderation
  *   (FR-954) — register entry 19's standard is undecided, and building the action would decide it

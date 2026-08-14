@@ -112,6 +112,9 @@ export const testServices = (
       listSaved: async () => [],
       save: async () => {},
       unsave: async () => {},
+      // 014 — a no-op double. Clearing a marker resolves and records nothing: a test asserting
+      // that the panel clears it substitutes its own.
+      markViewed: async () => {},
     },
     sessionNotes: {
       listNotes: async () => [],
@@ -297,6 +300,10 @@ export const aSession = (overrides: Partial<TestSession> = {}): TestSession => (
   track: { id: 'track-1', name: 'Design Systems', colorToken: 'track-design' },
   room: { id: 'room-1', name: 'Miró Room' },
   speakers: [{ id: 'speaker-1', name: 'Ingrid Halvorsen', title: null, company: 'Fjord Labs' }],
+  // 014 — the default is a session that is happening. A test asserting FR-1022 or FR-1022a says
+  // `cancelled: true` explicitly, which is what keeps the cancelled cases visible in the tests
+  // that are about them rather than incidental to every fixture.
+  cancelled: false,
   ...overrides,
 })
 
@@ -309,4 +316,5 @@ export interface TestSession {
   track: { id: string; name: string; colorToken: string }
   room: { id: string; name: string }
   speakers: Array<{ id: string; name: string; title: string | null; company: string | null }>
+  cancelled: boolean
 }

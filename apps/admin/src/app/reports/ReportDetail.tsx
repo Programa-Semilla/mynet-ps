@@ -1,7 +1,7 @@
 import type { AdminReportDetail } from '@mynet/data'
 import { useCallback, useEffect, useState } from 'react'
 
-import { classify, describe } from '../errors.js'
+import { classify, describe, detailOf } from '../errors.js'
 import { useAdminSession } from '../session.js'
 import { RemoveQuestionDialog } from './RemoveQuestionDialog.js'
 import { ResolveDialog } from './ResolveDialog.js'
@@ -47,7 +47,7 @@ export const ReportDetail = ({
     try {
       setReport(await services.reports.detail(reportId))
     } catch (error) {
-      setFailure(describe(classify(error)))
+      setFailure(describe(classify(error), detailOf(error)))
     }
   }, [services, reportId])
 

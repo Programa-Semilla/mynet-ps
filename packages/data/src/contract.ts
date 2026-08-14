@@ -90,10 +90,20 @@ export type NotesResponse =
 export type WriteNoteResponse =
   paths['/events/{eventId}/agenda/notes/{sessionId}']['put']['responses'][200]['content']['application/json']
 
+// ───────────────────────────────────────────────────────────────────────────────────────────────
 // 005 — the saved set arrives as identifiers, never as whole sessions: a second copy of session
-// data could disagree with the programme, and this is what would notice if the route ever
-// started sending one (FR-188).
-export type _SavedSessionsAreIdentifiers = Satisfies<SavedSessionsResponse['sessionIds'], string[]>
+// data could disagree with the programme, and this is what would notice if the route ever started
+// sending one (FR-188).
+//
+// **T074 (014) — the entry gained a second field and the rule is unchanged.** Each entry is now
+// `{ sessionId, changedSinceViewed }`: an identifier and one boolean about *this attendee's*
+// relationship to it. That is not session data arriving by the back door — nothing here describes
+// the session — and the binding still fails if a title, a time or a room ever appears.
+// ───────────────────────────────────────────────────────────────────────────────────────────────
+export type _SavedSessionsAreIdentifiers = Satisfies<
+  SavedSessionsResponse['sessions'][number],
+  { sessionId: string; changedSinceViewed: boolean }
+>
 
 // 005 — a note carries its `updatedAt`, and so does the response to writing one. That second
 // binding is load-bearing: the editor may enter its *saved* status only from a confirmed
@@ -160,5 +170,46 @@ export type _VisibleProfileMatchesContract = Satisfies<
   Required<VisibleProfileResponse>,
   VisibleProfile
 >
+
+/**
+ * T-review (014) — **the track colour set, derived from the contract rather than copied.**
+ *
+ * ═════════════════════════════════════════════════════════════════════════════════════════════
+ * **IT WAS WRITTEN OUT BY HAND THREE TIMES AND THE THIRD COPY WAS TYPED `string`.**
+ *
+ * `TRACK_COLOR_TOKENS` on the server, the `enum` in the route schema, and `TRACK_TOKENS` in the
+ * administrative form — with `AdminTrack.colorToken` a bare `string` between them, so nothing
+ * connected any copy to any other. The server's two agree because one generates the other; the
+ * form agreed by somebody having typed it correctly.
+ *
+ * The failure that shape produces is quiet in both directions. **Add a fifth token server-side**
+ * and the form silently cannot offer it — an organizer sees four choices and no error anywhere.
+ * **Remove one** and the form offers a value every write refuses with a 404, because
+ * `isTrackColorToken` narrows before the query layer is reached.
+ *
+ * FR-136 is what makes this worth binding rather than tolerating: the palette lives in
+ * `apps/web/src/theme/tokens.css` and nowhere else, and a token name is the only thing that
+ * crosses the wire. A set that can drift is a set that can name a token the theme does not define,
+ * which renders as an unstyled track rather than as a failure.
+ * ═════════════════════════════════════════════════════════════════════════════════════════════
+ */
+export type CreateTrackBody =
+  paths['/admin/conferences/{eventId}/tracks']['post']['requestBody']['content']['application/json']
+
+/** The closed set of track colour tokens, as the generated contract declares it (FR-136, FR-1004). */
+export type TrackColorToken = CreateTrackBody['colorToken']
+
+/**
+ * The enum must stay an enum.
+ *
+ * A membership check (`Satisfies<'track-design', TrackColorToken>`) proves the wrong thing here:
+ * `'track-design'` extends `string`, so it would keep compiling after the route relaxed
+ * `colorToken` to a bare string — the one change this binding exists to notice. The conditional
+ * asks the question the other way round, and only a widened type answers it wrongly.
+ */
+type ClosednessOf<T> = string extends T ? 'RELAXED_TO_STRING' : 'closed'
+
+export type _TrackColorTokenIsClosed = Satisfies<ClosednessOf<TrackColorToken>, 'closed'>
+export type _TrackColorTokenHasTheDesignToken = Satisfies<'track-design', TrackColorToken>
 
 export type { components, paths }

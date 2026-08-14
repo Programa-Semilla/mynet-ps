@@ -135,8 +135,25 @@ const Programme = ({ event }: { event: { id: string; timezone: string } }) => {
       // rather than a loss introduced here.
       notes: notes.bySession,
       restoreFocusTo,
+      /**
+       * T075 (014) — opening the panel is what clears this session's change marker (FR-1030).
+       *
+       * The panel is the surface an attendee reads to find out **what** changed, so viewing it
+       * is what "they have looked at it" means. Handed down rather than called from the panel's
+       * own repository, because the marker lives in `useSavedSessions` here — one owner for the
+       * saved set and the markers on it, rather than two readers that can disagree.
+       */
+      markViewed: saved.markViewed,
     }),
-    [programmeState, sessions, event.timezone, event.id, notes.bySession, restoreFocusTo],
+    [
+      programmeState,
+      sessions,
+      event.timezone,
+      event.id,
+      notes.bySession,
+      restoreFocusTo,
+      saved.markViewed,
+    ],
   )
 
   if (sessions.status === 'loading') {
@@ -248,6 +265,7 @@ const Programme = ({ event }: { event: { id: string; timezone: string } }) => {
                       saved: saved.ids.has(session.id),
                       onToggle: () => saved.toggle(session.id),
                     }}
+                    changed={saved.changed.has(session.id)}
                     openHref={`/agenda/${session.id}`}
                     registerOpener={(element) => {
                       if (element) openers.current.set(session.id, element)

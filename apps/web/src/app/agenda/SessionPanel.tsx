@@ -66,6 +66,15 @@ export interface AgendaOutletContext {
   readonly notes: ReadonlyMap<string, SessionNote>
   /** Returns focus to the control that opened the panel (FR-202). */
   readonly restoreFocusTo: (sessionId: string) => void
+  /**
+   * T075 (014) — records that the attendee has looked at this session, clearing its change
+   * marker (FR-1030).
+   *
+   * Handed down rather than reached for through a repository here, because the marker's state
+   * lives with the saved set in `useSavedSessions` — two readers of the same fact are two
+   * things that can disagree about it.
+   */
+  readonly markViewed: (sessionId: string) => void
 }
 
 export const SessionPanel = () => {
@@ -124,6 +133,48 @@ export const SessionPanel = () => {
     // background. `show` would render an overlay that a Tab could walk straight out of.
     dialog.showModal()
   })
+
+  /**
+   * T075 (014) — **opening this panel is what "the attendee has viewed the session" means**
+   * (FR-1030).
+   *
+   * ═══════════════════════════════════════════════════════════════════════════════════════════
+   * Not the row appearing in a list, and not the destination being open. The panel is where an
+   * attendee finds out **what** changed — the time, the room, the cancellation — so it is the
+   * only surface on which "they have seen it" is true.
+   *
+   * Keyed on `sessionId` so opening a second session marks that one and not the first, and
+   * `markViewed` is stable across renders, so this fires once per session opened rather than on
+   * every re-render of an open panel.
+   *
+   * A session the attendee has not saved has no row to stamp; the write is a no-op and is
+   * deliberately not conditional here — the panel does not know the saved set, and asking would
+   * be a second reader of a fact `useSavedSessions` already owns.
+   * ═══════════════════════════════════════════════════════════════════════════════════════════
+   */
+  const { markViewed } = context
+  useEffect(() => {
+    // ═══════════════════════════════════════════════════════════════════════════════════════
+    // **ONLY WHEN THE PANEL ACTUALLY SHOWED THE SESSION.**
+    //
+    // This fired on every `sessionId` change regardless of what was on screen: while the
+    // programme was still loading, while it had **failed**, and when the address named a session
+    // that is not in this conference at all. In each of those the attendee is looking at
+    // "This session could not be loaded" or "not available to you" — and the write succeeded
+    // anyway, because it touches only `saved_sessions`.
+    //
+    // So the marker for a change they demonstrably had not seen was cleared, both on the server
+    // and locally. FR-1030 says the marker clears once the attendee has **viewed** it, and this
+    // file's own header asserts the panel is "the only surface on which 'they have seen it' is
+    // true" — which is false whenever the panel is showing a failure instead.
+    //
+    // Keyed on the resolved session rather than the address, so the effect cannot run before the
+    // thing it is acknowledging exists.
+    // ═══════════════════════════════════════════════════════════════════════════════════════
+    if (context.status !== 'ready') return
+    if (!session) return
+    markViewed(session.id)
+  }, [markViewed, context.status, session])
 
   return (
     <dialog
@@ -277,6 +328,7 @@ const PanelBody = ({
         key={`questions-${session.id}`}
         eventId={context.eventId}
         sessionId={session.id}
+        cancelled={session.cancelled}
       />
     </>
   )

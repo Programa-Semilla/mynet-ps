@@ -71,6 +71,13 @@
       "when": 1786509049808,
       "tag": "0009_administrative_foundation",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1786601533140,
+      "tag": "0011_conference_authoring",
+      "breakpoints": true
     }
   ]
 }

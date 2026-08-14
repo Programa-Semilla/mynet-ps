@@ -1,8 +1,10 @@
 # Migration metadata — read this before regenerating
 
-Everything in this directory is written by `drizzle-kit generate`, except this file and the two
-deliberate deviations it records. Both exist because **004 claims migration number `0003`, which
-005 skipped and left free** (delivery roadmap; 004 spec, FR-396).
+Everything in this directory is written by `drizzle-kit generate`, except this file and the three
+deliberate deviations it records. The first two exist because **004 claims migration number `0003`,
+which 005 skipped and left free** (delivery roadmap; 004 spec, FR-396). The third exists because
+**014 claims `0011` while `0010` is reserved by a feature on another branch** — the same shape,
+arriving from the other direction.
 
 ## The journal is not in `when` order, and that is on purpose
 
@@ -39,6 +41,34 @@ number the roadmap reserves for it. Nothing needs adjusting; just do not hand-wr
 
 **Confirmed by 006**: it did exactly that. `0005_snapshot.json` re-parents onto `0004_snapshot.json`,
 the chain stayed contiguous, and the journal took index 5 with a `when` later than every entry.
+
+## `0010_snapshot.json` belongs to `0011_conference_authoring.sql`, and `0010_*.sql` is not written yet
+
+014 (conference content authoring) reserves migration **`0011`**; **012 reserves `0010`** and is
+being built on a parallel branch. Two programmes are in flight, and a parallel branch cannot see the
+other's reservation — this is the **third** collision this project has had over one, which is why
+`tasks.md` T102 extends the roadmap's reserved-number table rather than correcting it.
+
+`drizzle-kit generate` knows nothing about reservations. It produced
+`0010_violet_goblin_queen.sql` at journal index 10, and **only the tag was renamed** — to
+`0011_conference_authoring` — leaving `idx: 10` alone. Both halves are deliberate:
+
+- **`idx` is the array position and nothing else.** The migrator reads `${tag}.sql`, never
+  `${idx}`; the section above explains that array position is what decides application order on a
+  fresh database. Renumbering `idx` to 11 would put a hole at position 10 and make the ordering
+  claim above false.
+- **The snapshot filename follows `idx`, so it stays `0010_snapshot.json`.** It records the schema
+  *after* `0011_conference_authoring.sql`, exactly as `0004_snapshot.json` records the state after
+  two migrations. Do not rename it to match the SQL file: `drizzle-kit` picks the last snapshot by
+  filename to diff against, and a hand-renamed one either breaks the chain or duplicates a `prevId`.
+
+**Consequence for 012**, which will generate next and expects `0010`: it will take journal index 11
+and be offered the tag `0011_…`, which is taken. Rename its tag to `0010_launch_readiness` (or
+whatever it names itself), leave its `idx` at 11, and leave `0011_snapshot.json` — the file
+`drizzle-kit` will write — where it lands. The journal will then list `0011_conference_authoring`
+before `0010_…`, with `0010_…` carrying the later `when`. That is the same shape as `0003`/`0004`
+above and it is correct for the same reason: array position orders a fresh database, `when` decides
+what an existing one receives, and the two migrations are independent.
 
 ## This file breaks `drizzle-kit generate`, and you have to move it
 

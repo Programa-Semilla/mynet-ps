@@ -46,6 +46,35 @@ const apiSrc = fileURLToPath(new URL('../../src/', import.meta.url))
 
 const read = (path: string): string => readFileSync(path, 'utf8')
 
+/**
+ * ═════════════════════════════════════════════════════════════════════════════════════════════
+ * **T-review (014) — THE SAME FILE, WITH ITS COMMENTS REMOVED, BECAUSE THIS GUARD WAS
+ * SATISFIABLE BY DOCUMENTATION.**
+ *
+ * Every assertion below matched the **raw text** of the guard it audits — and each of those
+ * guards explains its own absences at length in a header. So `qa-absences.test.ts` with every
+ * assertion deleted and its prose intact still contained the words "answered", "pinned",
+ * "downvote", "voter" and "bell", and this file reported it as in force. The audit of the audits
+ * could be satisfied by a comment.
+ *
+ * That is the defect 009 recorded about its own absence guards, in those words: *"both guards
+ * strip comments before matching, because every pattern also appears in the prose explaining the
+ * absence — matching raw text fails on a correct implementation, and the natural repair is to
+ * weaken the pattern until it checks nothing."* This file is where that lesson had not been
+ * applied, which matters more here than anywhere: it is the guard whose whole subject is guards
+ * that have stopped guarding.
+ *
+ * **Stripping cuts both ways and both are corrections.** A presence assertion becomes strictly
+ * stronger — the pattern has to be in executable code. An absence assertion becomes strictly more
+ * honest: a header explaining *why* promotion must never notify anybody would otherwise fail a
+ * check that promotion is not wired up.
+ * ═════════════════════════════════════════════════════════════════════════════════════════════
+ */
+const codeOnly = (path: string): string =>
+  read(path)
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')
+    .replace(/^\s*\/\/.*$/gm, ' ')
+
 describe('011 — the guards this feature did not touch are still in force', () => {
   /**
    * **FR-974 — conference content stays read-only. That is 012's, not this feature's.**
@@ -55,7 +84,7 @@ describe('011 — the guards this feature did not touch are still in force', () 
    * over the administrative route table.
    */
   it('keeps the catalog read-only guard checking writes (FR-974)', () => {
-    const guard = read(join(unitDir, 'catalog-read-only.test.ts'))
+    const guard = codeOnly(join(unitDir, 'catalog-read-only.test.ts'))
 
     expect(
       guard.length,
@@ -98,7 +127,7 @@ describe('011 — the guards this feature did not touch are still in force', () 
    * conference organizer comes into being, and it acts on somebody **already registered**.
    */
   it('keeps the join-grants-nothing guard in force (FR-975)', () => {
-    const guard = read(join(integrationDir, 'join-grants-nothing.test.ts'))
+    const guard = codeOnly(join(integrationDir, 'join-grants-nothing.test.ts'))
     expect(
       guard.length,
       '`join-grants-nothing.test.ts` is missing or empty (FR-975).',
@@ -124,28 +153,75 @@ describe('011 — the guards this feature did not touch are still in force', () 
    * notice the audit being edited to permit one.
    * ═══════════════════════════════════════════════════════════════════════════════════════════
    */
-  it('leaves the notification trigger audit unedited, with a received message its only trigger (FR-935, SC-910)', () => {
-    const guard = read(join(unitDir, 'notification-triggers.test.ts'))
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════════════════════
+   * **T020 (014) — 013 REQUIRED THIS AUDIT TO BE UNEDITED. 014 EDITS IT, AND THAT IS THE
+   * MECHANISM WORKING RATHER THAN FAILING.**
+   *
+   * The assertion below used to read: *the audit must not mention an administrative concept,
+   * because if 013 needed one that would be a second trigger and a governance conversation.* It
+   * was right, and 013 passed it.
+   *
+   * **014 had that conversation.** Constitution v5.2.0, ratified 2026-08-12, admits a second
+   * trigger — a material change to a session the attendee has **saved**, where material means
+   * exactly *cancelled, start time, room*. The amendment gated the first line of this feature's
+   * code, exactly as v3.1.0 gated 007's Phase 7 and v3.3.0 gated 009.
+   *
+   * So the claim changes from *"unedited"* to *"edited to exactly what was granted"*, and the
+   * three things it now checks are what the amendment actually bounds:
+   *
+   *   1. Both permitted triggers are still named.
+   *   2. The **acts 013 was refused** are still absent — promotion, demotion, report resolution.
+   *      Those remain forbidden (FR-935, FR-946) and would be a **third** trigger.
+   *   3. The **changes v5.2.0 did not grant** are still absent from the dispatch path: a title
+   *      or summary edit, a speaker change, a reinstatement, and a session *starting*.
+   * ═══════════════════════════════════════════════════════════════════════════════════════════
+   */
+  it('keeps the notification trigger audit at exactly the two triggers admitted (FR-935, N1)', () => {
+    const guard = codeOnly(join(unitDir, 'notification-triggers.test.ts'))
 
     expect(
       guard.length,
-      '`notification-triggers.test.ts` is missing or empty. It is the guard that keeps the ' +
-        'notification trigger set at a received message (FR-561, FR-935).',
+      '`notification-triggers.test.ts` is missing or empty. It is the guard that bounds the ' +
+        'notification trigger set (FR-561, FR-935, FR-1026).',
     ).toBeGreaterThan(500)
 
     expect(
       guard,
-      'The notification trigger audit no longer names the message send as its permitted trigger.',
+      'The notification trigger audit no longer names the message send as a permitted trigger.',
     ).toMatch(/message/i)
 
-    // The audit must not have acquired an administrative exemption. If 011 needed one, that
-    // would be a second trigger and a governance conversation (v3.1.0, standing decision 21).
     expect(
-      /admin|operator|promot|resolv/i.test(guard),
-      'The notification trigger audit mentions an administrative concept, which means somebody ' +
-        'has taught it about a second trigger. The trigger set is a received message and nothing ' +
-        'else — a second one needs another amendment (FR-935, SC-910).',
-    ).toBe(false)
+      guard,
+      'The notification trigger audit no longer names the authoring caller. v5.2.0 admits a ' +
+        'material change to a SAVED session as the second trigger, and this audit is where the ' +
+        'permitted callers are declared — if the name is gone, either the trigger was removed ' +
+        'or the dispatch has moved somewhere the audit does not scan (research R3).',
+    ).toMatch(/routes\/admin\/catalog\.ts/)
+
+    // ─────────────────────────────────────────────────────────────────────────────────────────
+    // The acts 013 was refused, and 014 was not granted either. Each is an obvious product idea
+    // and each would be a **third** trigger needing its own amendment.
+    // ─────────────────────────────────────────────────────────────────────────────────────────
+    for (const forbidden of ['promot', 'demot', 'resolv']) {
+      expect(
+        new RegExp(forbidden, 'i').test(guard),
+        `The notification trigger audit mentions "${forbidden}", which means somebody has ` +
+          'taught it about a third trigger. Telling somebody they have been promoted, or ' +
+          'telling a reporter their report was read, are both forbidden (FR-935, FR-946).',
+      ).toBe(false)
+    }
+
+    // And the changes v5.2.0 deliberately did NOT make material. The audit asserts these are
+    // absent from the dispatch path; this asserts it still asks.
+    for (const bounded of ['reinstat', 'speakerChanged', 'titleChanged']) {
+      expect(
+        guard,
+        `The notification trigger audit no longer checks that "${bounded}" cannot dispatch. ` +
+          'v5.2.0 enumerated the material set — cancelled, start time, room — precisely so that ' +
+          'widening it is an edit somebody has to justify.',
+      ).toContain(bounded)
+    }
   })
 
   /**
@@ -155,7 +231,7 @@ describe('011 — the guards this feature did not touch are still in force', () 
    * diff and check nothing in practice, which is exactly what FR-976 forbids.
    */
   it('keeps the two amended guards refusing everything they always refused (FR-976)', () => {
-    const qa = read(join(unitDir, 'qa-absences.test.ts'))
+    const qa = codeOnly(join(unitDir, 'qa-absences.test.ts'))
     for (const forbidden of ['answered', 'pinned', 'downvote', 'voter', 'bell']) {
       expect(
         qa.toLowerCase(),
@@ -164,7 +240,7 @@ describe('011 — the guards this feature did not touch are still in force', () 
       ).toContain(forbidden)
     }
 
-    const reports = read(join(unitDir, 'no-report-read-surface.test.ts'))
+    const reports = codeOnly(join(unitDir, 'no-report-read-surface.test.ts'))
     expect(
       reports,
       'no-report-read-surface no longer names FR-548. It is narrowed to `apps/web` and the ' +

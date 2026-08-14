@@ -39,15 +39,25 @@ import { adminAuditEntries, type AdminAuditAction } from '../schema/admin-audit.
  */
 
 /**
- * What one administrative act records.
- *
- * `operatorId` is required at the call site even though the column is nullable: the column is
- * nullable so the *sweep* can eventually clear a deactivated operator, not so a caller can omit
- * one. An entry written with no operator would be an accountability record accounting for
- * nobody.
+ * **Who acted.** Exactly one of the two, required at the call site even though both columns are
+ * nullable: they are nullable so the *sweep* and *pseudonymisation* can eventually clear them,
+ * not so a caller can omit one. An entry written with no principal would be an accountability
+ * record accounting for nobody.
  */
-export interface AuditEntryDraft {
-  readonly operatorId: string
+export type AuditPrincipal =
+  /** A platform operator: a row in `operators`, which is what `operator_id` references. */
+  | { readonly operatorId: string; readonly actorAttendeeId?: never }
+  /**
+   * T013 (014) — **a conference organizer, who has no `operators` row by design** (FR-1037).
+   *
+   * A union rather than two optional columns, so an entry naming **neither** principal is
+   * unwritable: `schema/admin-audit.ts` explains why the database cannot carry that rule as a
+   * check constraint (`operator_id` is `ON DELETE SET NULL`, so both-null is a legitimate later
+   * state), which leaves the type as the only place it can be expressed at all.
+   */
+  | { readonly actorAttendeeId: string; readonly operatorId?: never }
+
+export type AuditEntryDraft = AuditPrincipal & {
   readonly action: AdminAuditAction
   /**
    * The attendee this act concerns, if any. **Cleared on their erasure** (FR-997a) — see
@@ -56,6 +66,30 @@ export interface AuditEntryDraft {
   readonly subjectAttendeeId?: string | undefined
   readonly subjectResourceId?: string | undefined
   readonly subjectKind?: string | undefined
+  /**
+   * The conference the act was performed in (FR-1038).
+   *
+   * ═════════════════════════════════════════════════════════════════════════════════════════
+   * **FR-1038 NAMES THE CONFERENCE AND THE ENTRY DID NOT CARRY IT.**
+   *
+   * The requirement is *"the principal, **the conference**, the act, the entity acted on and the
+   * instant"*. Only `create_conference` and `update_conference` recorded it, incidentally, because
+   * for those the subject **is** the event. For the other six authoring actions the conference was
+   * recoverable only by joining `subject_resource_id` back to `tracks`/`rooms`/`speakers`/
+   * `sessions` — and for `delete_catalog` and `delete_session` that row is gone by definition, so
+   * those entries were **permanently unattributable to a conference**.
+   *
+   * The trail could not answer "what was authored in conference X", which is the first question
+   * anybody would ask of it. FR-999 forbids a read path, so nothing surfaced the gap: it would
+   * have appeared the first time somebody needed the record.
+   *
+   * **No foreign key**, following `abuse_reports.message_ids` and `sessions.last_change_act_id`:
+   * the trail outlives what it describes, and a conference that no longer exists must not take its
+   * accountability record with it. 013's six platform-tier acts are product-wide rather than
+   * per-conference, so this is absent from them by nature rather than by omission.
+   * ═════════════════════════════════════════════════════════════════════════════════════════
+   */
+  readonly subjectEventId?: string | undefined
 }
 
 /**
@@ -76,18 +110,48 @@ export interface AuditEntryDraft {
  * not undo a safety action; the opposite holds here. If the entry cannot be written, the
  * administrative act must not commit — an unaudited promotion is worse than a failed one.
  * ─────────────────────────────────────────────────────────────────────────────────────────────
+ *
+ * ═════════════════════════════════════════════════════════════════════════════════════════════
+ * **T013 (014) — IT NOW RETURNS THE ENTRY'S ID, AND THAT ID IS 014's COALESCING KEY** (FR-1034,
+ * research R4).
+ *
+ * One organizer act may materially change a dozen sessions, and FR-1034 requires each affected
+ * attendee to be interrupted **once**. That needs a name for "this act", and every alternative
+ * invents one — a batch id, a time bucket, a request id. The audit entry is already all three by
+ * construction: unique per act, generated **inside the act's transaction**, and meaningless
+ * outside it.
+ *
+ * It also makes the relationship between the two records the correct one: **an attendee was
+ * interrupted because a recorded act happened.** The notification and the accountability entry
+ * refer to the same thing rather than to two parallel accounts of it.
+ *
+ * Returning the id discloses nothing and creates no read path over the trail (FR-999 survives):
+ * the caller already knows what it just wrote, and there is still no function here that can read
+ * an entry back.
+ * ═════════════════════════════════════════════════════════════════════════════════════════════
  */
 export const appendAuditEntry = async (
   entry: AuditEntryDraft,
   db: Pick<ReturnType<typeof getDb>, 'insert'> = getDb(),
-): Promise<void> => {
-  await db.insert(adminAuditEntries).values({
-    operatorId: entry.operatorId,
-    action: entry.action,
-    subjectAttendeeId: entry.subjectAttendeeId ?? null,
-    subjectResourceId: entry.subjectResourceId ?? null,
-    subjectKind: entry.subjectKind ?? null,
-  })
+): Promise<string> => {
+  const [row] = await db
+    .insert(adminAuditEntries)
+    .values({
+      operatorId: entry.operatorId ?? null,
+      actorAttendeeId: entry.actorAttendeeId ?? null,
+      action: entry.action,
+      subjectAttendeeId: entry.subjectAttendeeId ?? null,
+      subjectResourceId: entry.subjectResourceId ?? null,
+      subjectKind: entry.subjectKind ?? null,
+      subjectEventId: entry.subjectEventId ?? null,
+    })
+    .returning({ id: adminAuditEntries.id })
+
+  // `RETURNING` on a single-row insert cannot come back empty. Asserted rather than assumed
+  // because the id is what the fan-out coalesces on, and a silent `undefined` would turn one
+  // notification per attendee into one per session — the outcome FR-1034 exists to prevent.
+  if (!row) throw new Error('Could not record an administrative audit entry.')
+  return row.id
 }
 
 /**
@@ -128,6 +192,12 @@ export const pruneAuditEntries = async (): Promise<void> => {
     .where(
       and(
         sql`${adminAuditEntries.subjectAttendeeId} is null`,
+        // T013 (014) — **the second attendee reference has to satisfy the same condition, or the
+        // predicate stops meaning what its name says.** An entry naming a conference organizer as
+        // the principal is live accountability about a person who still exists, in exactly the
+        // sense an entry naming a subject is. Without this clause every authoring entry an
+        // organizer wrote would be swept on age alone a year later while still identifying them.
+        sql`${adminAuditEntries.actorAttendeeId} is null`,
         lt(
           adminAuditEntries.occurredAt,
           sql`now() - ${sql.raw(`interval '${AUDIT_RETENTION_DAYS} days'`)}`,
@@ -171,6 +241,38 @@ export const pseudonymiseAuditEntriesFor = async (
       and(
         isNotNull(adminAuditEntries.subjectAttendeeId),
         sql`${adminAuditEntries.subjectAttendeeId} = ${attendeeId}`,
+      ),
+    )
+
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════════════════════
+   * **T013 (014) — THE SAME ERASURE, APPLIED TO THE OTHER REFERENCE, AND IT IS A SECOND
+   * STATEMENT RATHER THAN A WIDENED `WHERE` FOR A REASON.**
+   *
+   * A conference organizer is an ordinary attendee (013), so an organizer exercising erasure is
+   * an ordinary account deletion — and every authoring act they performed names them here. FR-997a
+   * says what survives: **the act, not whom it was done to**, and by exactly the same reasoning,
+   * not *who did it* once that person has been erased.
+   *
+   * The cost is stated rather than hidden, because it is larger here than for a subject: the
+   * trail keeps *that a session was cancelled and when*, and loses *which organizer cancelled
+   * it*. That is the price decision 12 sets — erasure is unconditional and no administrative role
+   * may make it depend on another person's interest in the record.
+   *
+   * **Two statements, because one `WHERE (subject = $1 OR actor = $1)` with a single `SET` would
+   * clear the subject on an entry where only the actor matched**, silently destroying the
+   * accountability half of an unrelated act. The columns mean different things and are cleared
+   * independently; an entry where the departing attendee is both is updated by both, which is
+   * correct.
+   * ═══════════════════════════════════════════════════════════════════════════════════════════
+   */
+  await db
+    .update(adminAuditEntries)
+    .set({ actorAttendeeId: null })
+    .where(
+      and(
+        isNotNull(adminAuditEntries.actorAttendeeId),
+        sql`${adminAuditEntries.actorAttendeeId} = ${attendeeId}`,
       ),
     )
 }

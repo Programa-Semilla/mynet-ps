@@ -63,6 +63,7 @@ export const catalogRoutes = async (app: FastifyInstance): Promise<void> => {
                 'summary',
                 'startsAt',
                 'endsAt',
+                'cancelled',
                 'track',
                 'room',
                 'speakers',
@@ -74,6 +75,11 @@ export const catalogRoutes = async (app: FastifyInstance): Promise<void> => {
                 summary: { type: ['string', 'null'] },
                 startsAt: { type: 'string', format: 'date-time' },
                 endsAt: { type: 'string', format: 'date-time' },
+                cancelled: {
+                  type: 'boolean',
+                  description:
+                    'T053 (014), FR-1020 and FR-1022. A cancelled session is **presented, not withheld**: it stays in the programme, in Agenda, in the detail panel and in Home’s rest-of-day timeline, marked. An attendee who saved it needs to see that it will not happen, and a session that simply vanished would be indistinguishable from one they misremembered. Home’s "Up next" is the single exception and skips it (FR-1022a), because that card answers *where do I go now*.',
+                },
                 track: {
                   type: 'object',
                   required: ['id', 'name', 'colorToken'],

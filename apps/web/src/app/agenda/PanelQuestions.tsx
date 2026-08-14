@@ -48,7 +48,26 @@ const QUESTION_MAX_LENGTH = 500
  */
 const REMAINING_VISIBLE_AT = 100
 
-export const PanelQuestions = ({ eventId, sessionId }: { eventId: string; sessionId: string }) => {
+export const PanelQuestions = ({
+  eventId,
+  sessionId,
+  cancelled = false,
+}: {
+  eventId: string
+  sessionId: string
+  /**
+   * T057 (014) — the session will not happen (FR-1022, spec Assumptions).
+   *
+   * Closes the composer and leaves every existing question readable. **Nothing is destroyed** —
+   * FR-1021 governs that, and cancellation deliberately preserves questions and votes — but
+   * nothing new is invited: a question is asked *of a speaker at a session*, and a session that
+   * will not happen has no reader for one.
+   *
+   * Recorded in the spec as an assumption rather than derived from a requirement, which is why
+   * it is stated here too: if the owner reads it differently, this prop is where it changes.
+   */
+  cancelled?: boolean
+}) => {
   const questions = useSessionQuestions(eventId, sessionId)
   const headingId = useId()
 
@@ -76,7 +95,14 @@ export const PanelQuestions = ({ eventId, sessionId }: { eventId: string; sessio
         Audience questions
       </h3>
 
-      <QuestionComposer questions={questions} />
+      {cancelled ? (
+        <p className="mb-3 rounded-md bg-surface-sunken px-3 py-2 text-sm text-text-muted">
+          This session has been cancelled, so no new questions can be asked. The questions already
+          here stay where they are.
+        </p>
+      ) : (
+        <QuestionComposer questions={questions} />
+      )}
       <QuestionList questions={questions} self={self} />
     </section>
   )

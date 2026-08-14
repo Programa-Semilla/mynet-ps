@@ -26,6 +26,36 @@ import * as catalogQueries from '../../src/db/queries/catalog.js'
  * Asserted **by name-shape over the exported surface**, not by a hand-maintained list, so a
  * differently-named write is caught too.
  * ═════════════════════════════════════════════════════════════════════════════════════════
+ *
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ * **T015 (014) — ITS SUBJECT IS THE ATTENDEE READ PATH SPECIFICALLY, AND NOT ONE ASSERTION
+ * BELOW CHANGES.**
+ *
+ * CLAUDE.md names this among the five guards enforcing the reversed organizer-administration
+ * prohibition, each of which "must be amended deliberately, never weakened until it stops
+ * checking anything". 014 gives an organizer a write path into the catalog, so a reader would
+ * reasonably expect this file to be the casualty. **It is not**, and research R1 explains why in
+ * one sentence: this guard's two subjects are the **attendee-scoped query module** and the
+ * **client-facing repository interface**, and the write path is neither.
+ *
+ * `db/queries/admin-catalog.ts` serves a different principal under a different authority model —
+ * a `ConferenceAuthorityScope`, not an `EventScope` — and `apps/admin` reaches it through
+ * `AdministrationRepository`, not through `CatalogRepository`. So both assertions stay true and
+ * stay valuable:
+ *
+ *   - **The query layer here exports reads only.** Widening it would make one module answer to
+ *     an attendee and an operator at once, and this assertion would have to become a list of
+ *     permitted write names — which is the failure mode the paragraph above names.
+ *   - **`CatalogRepository` declares no write method.** That is now the stronger of the two:
+ *     adding one would put an authoring capability in the **attendee bundle** whether or not any
+ *     component called it, and FR-1003 forbids MyNet gaining an authoring surface at all.
+ *
+ * **What changed is one sentence of justification, in the two files this test reads.** "A catalog
+ * write is organizer administration, which Principle III places out of scope" was true until
+ * v4.0.0 and is now false; the rule it was offered in support of is unchanged. FR-191's
+ * "read-only in perpetuity" survives **literally**, rather than by reinterpreting "in perpetuity"
+ * to mean "until 014".
+ * ═════════════════════════════════════════════════════════════════════════════════════════
  */
 
 /** Verbs that would make a function a write, however it is spelled. */

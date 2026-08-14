@@ -11,6 +11,10 @@ import { assertVerifiedScope, requireEventAccess } from '../../src/plugins/event
 // **the guard they carry** rather than by their path. See that assertion for why the difference
 // matters.
 import { requireOperator, requirePlatformOperator } from '../../src/admin/require-operator.js'
+// 014 — the fifth predicate. Imported so the administrative-exclusion bound can demand it by
+// reference rather than by name: a route satisfying the bound by declaring a differently-named
+// function called `requireConferenceAuthority` would be a route guarded by nothing.
+import { requireConferenceAuthority } from '../../src/admin/require-conference-authority.js'
 
 /**
  * T068, T072 (002) — the route audit (FR-149, FR-132, FR-134, SC-105).
@@ -123,6 +127,23 @@ const ADMINISTRATIVE = /^\/admin(\/|$)/
  * the same discipline every allow-list in this file and in `deletion-coverage.test.ts` applies.
  */
 const ADMIN_ROUTES_NAMING_AN_EVENT = new Map([
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════════════════════
+   * **T033 (014) — THIS MAP STOPPED BEING AN ENUMERATION AND BECAME AN EXCEPTION LIST, BECAUSE
+   * 014 REGISTERS FOURTEEN ROUTES THAT NAME A CONFERENCE.**
+   *
+   * 013 registered two, so writing them down individually was the cheapest way to make the
+   * disagreement between two audits a decision somebody had taken. Fourteen more would be
+   * fourteen paragraphs saying the same sentence, and a list nobody reads is a list somebody
+   * appends to without thinking — which is how an allow-list becomes a hole.
+   *
+   * So the rule moved: **an administrative route naming a conference must carry
+   * `requireConferenceAuthority`**, asserted below and again in `operator-audit.test.ts`. That is
+   * strictly stronger than the enumeration it replaces — it demands a guard rather than a
+   * paragraph — and these two entries survive because they are the routes that name a conference
+   * and must **not** carry it.
+   * ═══════════════════════════════════════════════════════════════════════════════════════════
+   */
   [
     'POST /admin/conferences/:eventId/organizers',
     'Promotion names the conference it grants authority over. The caller is a PLATFORM ' +
@@ -296,25 +317,35 @@ describe('event scope route audit', () => {
    * level up, and the same one `deletion-coverage.test.ts` forces about a new table.
    * ═══════════════════════════════════════════════════════════════════════════════════════════
    */
-  it('bounds the administrative exclusion to the routes that declared themselves', () => {
+  it('bounds the administrative exclusion: a conference named is a conference guarded', () => {
     const naming = routes
       .filter(isAdministrative)
       .filter(acceptsEventIdentifier)
+      .filter((route) => !preHandlersOf(route).includes(requireConferenceAuthority))
       .flatMap((route) => methodsOf(route).map((method) => `${method} ${route.url}`))
       .filter((label) => !label.startsWith('HEAD '))
       .sort()
 
     expect(
       naming,
-      'An administrative route names a conference and is not declared in ' +
-        '`ADMIN_ROUTES_NAMING_AN_EVENT`. This audit no longer examines `/admin/*`, so an ' +
-        'undeclared route here is covered by the operator audit alone — which checks that it ' +
-        'has an OPERATOR guard, not that naming a conference was the right shape. Write down ' +
-        'why the event guard cannot apply to it.',
+      'An administrative route names a conference, carries no `requireConferenceAuthority`, and ' +
+        'is not one of the two declared exceptions. This audit does not examine `/admin/*`, so ' +
+        'such a route is covered by the operator audit alone — which checks that it has AN ' +
+        'operator guard, not that it has authority over the conference it names. A platform ' +
+        'operator would reach it correctly and a conference organizer would reach ANY ' +
+        "conference's content through it (FR-1035).",
     ).toEqual([...ADMIN_ROUTES_NAMING_AN_EVENT.keys()].sort())
 
     for (const [label, reason] of ADMIN_ROUTES_NAMING_AN_EVENT) {
       expect(reason.length, `${label} is declared without a written reason`).toBeGreaterThan(80)
+    }
+
+    // The exceptions must still exist, or they are protecting nothing while looking like they do.
+    const labels = new Set(
+      routes.flatMap((route) => methodsOf(route).map((method) => `${method} ${route.url}`)),
+    )
+    for (const declared of ADMIN_ROUTES_NAMING_AN_EVENT.keys()) {
+      expect(labels.has(declared), `${declared} is declared but no longer exists`).toBe(true)
     }
   })
 
@@ -360,17 +391,36 @@ describe('event scope route audit', () => {
    * in the product's scope rather than in its architecture, which means nothing else in the
    * codebase would object to a `POST /events/:eventId/sessions` appearing one day.
    */
-  it('exposes NO write route against conference content', () => {
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════════════════════
+   * **T033 (014) — THE POPULATION NARROWS TO THE ATTENDEE SURFACE, AND THE RULE THERE IS
+   * UNCHANGED AND ABSOLUTE.**
+   *
+   * This asserted that **no** route writes conference content, at any privilege, on the
+   * reasoning that creating or editing a programme is organizer administration and Principle III
+   * places that out of scope. Constitution v4.0.0 brought administration in and v5.2.0 gave it
+   * exactly this write path, so the assertion as written would now fail on fourteen legitimate
+   * routes — and the natural repair, deleting it, would take the attendee half with it.
+   *
+   * The attendee half is the one that was always load-bearing: **no attendee may write
+   * conference content, at any privilege, ever.** That is what stays here, and it is now stated
+   * about the population it was always about. The administrative half moves to the assertion
+   * below, where it becomes *guarded presence* rather than absence.
+   * ═══════════════════════════════════════════════════════════════════════════════════════════
+   */
+  it('exposes NO write route against conference content on the ATTENDEE surface', () => {
     const writes = routes
       .filter((route) => addressesConferenceContent(route.url))
+      .filter((route) => !isAdministrative(route))
       .filter((route) => methodsOf(route).some((method) => WRITE_METHODS.includes(method)))
       .map((route) => `${methodsOf(route).join('/')} ${route.url}`)
 
     expect(
       writes,
-      'A write route against seeded conference content exists. Creating, editing or importing a ' +
-        'programme is organizer administration, which Principle III places out of product scope ' +
-        'and which the constitution separately forbids without an amendment (FR-132, FR-134).',
+      'An ATTENDEE-facing write route against conference content exists. Authoring came into ' +
+        'scope at v5.2.0 for the **administrative product only** (FR-1001, FR-1003): MyNet gains ' +
+        'no authoring surface, no privileged view and no rendering that branches on tier. A ' +
+        'route here would put an authoring capability behind an attendee session.',
     ).toEqual([])
   })
 
@@ -536,22 +586,52 @@ describe('event scope route audit', () => {
     ).toEqual([])
   })
 
-  it('exposes no administrative route that writes conference content (FR-974)', () => {
-    // The half of the assertion above that used to be carried by the word `admin`. 011 builds
-    // moderation and promotion; it builds no way to create, edit or delete a session, track,
-    // room, speaker or event. A route here would be 012 arriving without its amendment.
-    const authoring = routes
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════════════════════
+   * **T033 (014) — WHAT WAS AN ABSENCE IS NOW A GUARDED PRESENCE, AND THAT IS THE WHOLE
+   * DIFFERENCE THE AMENDMENT MADE.**
+   *
+   * 013 asserted that no administrative route writes conference content, because authoring was
+   * a later feature and FR-974 kept the door shut until it arrived with its amendment. It has:
+   * v5.2.0, ratified 2026-08-12. So the question is no longer *whether* an administrative route
+   * may write a session — it is *whether it proves authority over the conference it writes to*.
+   *
+   * An administrative content write with only `requireOperator` would be reachable by **any**
+   * conference organizer over **every** conference, which is precisely the predicate FR-1035
+   * exists to be and precisely what decision 32 confines the tier to.
+   * ═══════════════════════════════════════════════════════════════════════════════════════════
+   */
+  it('lets no administrative content write skip the conference-authority guard (FR-1035)', () => {
+    const unguarded = routes
       .filter(isAdministrative)
       .filter((route) => methodsOf(route).some((method) => WRITE_METHODS.includes(method)))
-      .filter((route) => /\/(events|sessions|tracks|rooms|speakers)(\/|$)/.test(route.url))
+      .filter((route) => /\/(sessions|tracks|rooms|speakers)(\/|$)/.test(route.url))
+      .filter((route) => !preHandlersOf(route).includes(requireConferenceAuthority))
       .map((route) => `${methodsOf(route).join('/')} ${route.url}`)
 
     expect(
-      authoring,
-      'An administrative route writes conference content. 011 delivers moderation and ' +
-        'promotion; authoring is 012 (FR-974). `/admin/conferences` is a READ of which ' +
-        'conferences exist and who organizes them — it writes assignments, never content.',
+      unguarded,
+      'An administrative route writes conference content without proving authority over the ' +
+        'conference it writes to. `requireOperator` establishes WHO is calling and nothing more ' +
+        '— a conference organizer holding it would reach every conference in the product ' +
+        '(FR-1035, decision 32). Add `requireConferenceAuthority` after it.',
     ).toEqual([])
+  })
+
+  it('still finds administrative content writes to check, now that they exist', () => {
+    // The inverse, and it is what stops the assertion above passing vacuously. Until v5.2.0 the
+    // right answer was zero; from 014 it is not, and a zero here means the routes were removed
+    // or renamed out of the pattern rather than that the guard is holding.
+    const authoring = routes
+      .filter(isAdministrative)
+      .filter((route) => methodsOf(route).some((method) => WRITE_METHODS.includes(method)))
+      .filter((route) => /\/(sessions|tracks|rooms|speakers)(\/|$)/.test(route.url))
+
+    expect(
+      authoring.length,
+      'No administrative content-write routes were found. Either 014 was removed, or the ' +
+        'pattern has stopped recognising them — and the guard assertion above is now vacuous.',
+    ).toBeGreaterThan(5)
   })
 
   /**

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 
-import { classify, describe } from '../errors.js'
+import { classify, describe, detailOf } from '../errors.js'
 import { useAdminSession } from '../session.js'
 import { AdminDialog } from '../shell/AdminDialog.js'
 
@@ -53,7 +53,7 @@ export const ResolveDialog = ({
       await services.reports.resolve(reportId, { outcome, note: note.trim() })
       onResolved()
     } catch (error) {
-      setFailure(describe(classify(error)))
+      setFailure(describe(classify(error), detailOf(error)))
     } finally {
       setSubmitting(false)
     }

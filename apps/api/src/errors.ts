@@ -89,6 +89,57 @@ export type ErrorCode =
    * `reportAlreadyResolved` below and `schema/report-resolutions.ts`.
    */
   | 'report_already_resolved'
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════════════════════
+   * **014 — SIX AUTHORING REFUSALS, EACH WITH ITS OWN CODE, AND THE SEPARATION IS THE POINT.**
+   *
+   * These arrived sharing two codes: four 409s as `refused` and two 400s as `validation_failed`.
+   * Each carried a different, carefully written `publicMessage` — and the administrative client
+   * classifies on the **code**, so all four 409s rendered *"That could not be completed."* and
+   * both 400s rendered *"Something went wrong."*
+   *
+   * That is 008's defect from the other end. 008 classified on the CLASS and collapsed codes
+   * that differed; here the client classified correctly and the **codes** did not differ. The
+   * rule *"classify on `error.code`, never on the class"* is worth nothing unless the code says
+   * which refusal it is.
+   *
+   * Every one passes the test each explained refusal in this product must pass: **the follow-up
+   * question is about the caller.** All six describe the caller's own conference — content they
+   * authored, dates they chose, a time they supplied. None discloses anything about an attendee:
+   * `session_has_engagement` carries counts and no identity (FR-1025), and
+   * `would_orphan_sessions` names sessions, which are the caller's own content.
+   * ═══════════════════════════════════════════════════════════════════════════════════════════
+   */
+  /** FR-1017 (014) — a track or room a session still references. */
+  | 'still_referenced'
+  /** FR-1018, FR-1019 (014) — deletion refused; cancel instead, and nothing is lost. */
+  | 'session_has_engagement'
+  /** FR-1014 (014) — a date range that would leave existing sessions outside it. */
+  | 'would_orphan_sessions'
+  /** FR-1015 (014) — a timezone change with sessions already scheduled. */
+  | 'timezone_frozen'
+  /** FR-1012 (014) — the session falls outside the conference's days, in venue-local time. */
+  | 'outside_conference_days'
+  /** FR-1013 (014) — the end is at or before the start. */
+  | 'ends_before_start'
+  /**
+   * FR-1007 (014) — a timezone PostgreSQL does not recognise.
+   *
+   * Added by the deep review. The seed validated the zone twice and the authoring path inherited
+   * neither check, so an organizer's typo stored a conference that could never hold a session (the
+   * server raises inside `AT TIME ZONE`) and broke every joining attendee's Home (the client throws
+   * inside `Intl.DateTimeFormat`, during render).
+   */
+  | 'unknown_timezone'
+  /**
+   * FR-1007 (014) — a conference whose last day precedes its first.
+   *
+   * Distinct from `ends_before_start`, which is about a **session**: a one-day conference where the
+   * two dates are equal is legal, and that message says otherwise.
+   */
+  | 'conference_ends_before_start'
+  /** 014 — a start or end that is not a readable instant. Previously reported as a 404. */
+  | 'malformed_time'
 
 export class AppError extends Error {
   readonly statusCode: number

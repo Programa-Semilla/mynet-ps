@@ -42,6 +42,19 @@ import { sessions } from '../schema/catalog.js'
  * ─────────────────────────────────────────────────────────────────────────────────────────
  */
 
+/**
+ * T074 (014) — one saved session, with whether it has moved since the attendee last looked.
+ *
+ * This read returned bare identifiers until 014. The marker travels here rather than on a method
+ * of its own, deliberately: a `listChangedSessions` would be a read whose subject is *things that
+ * happened*, which is the surface FR-1031 forbids — and once the read exists, rendering it is a
+ * small ask (research R7).
+ */
+export type SavedSessionRow = {
+  readonly sessionId: string
+  readonly changedSinceViewed: boolean
+}
+
 export type NoteRow = {
   readonly sessionId: string
   readonly body: string
@@ -82,21 +95,78 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
  * An attendee who has saved nothing gets `[]` — a valid answer that the client renders as an
  * explicit empty state, never a failure (FR-195).
  */
-export const listSavedSessionIds = async (unverified: EventScope): Promise<string[]> => {
+export const listSavedSessions = async (unverified: EventScope): Promise<SavedSessionRow[]> => {
   // Membership, not merely shape. A value can satisfy `EventScope` and still never have been
   // through the guard; this is the check that makes the guarantee true at runtime, not only in
   // the type system.
   const scope = assertVerifiedScope(unverified)
 
   const rows = await getDb()
-    .select({ sessionId: savedSessions.sessionId })
+    .select({
+      sessionId: savedSessions.sessionId,
+      // ─────────────────────────────────────────────────────────────────────────────────────
+      // T074 (014) — **the marker, computed rather than stored** (FR-1030, research R7).
+      //
+      // Two timestamps and a comparison. Nothing is written per change and nothing is written
+      // per saver: the rejected alternative — flagging every saver's row when a session moves —
+      // is one write per saver, so a keynote with a thousand savers would be a thousand row
+      // updates inside an organizer's request. Deriving costs nothing on write.
+      //
+      // `logistics_changed_at` is null until a session's first material change, and `null > x`
+      // is null in SQL rather than false, which would arrive as `null` on the wire and render as
+      // a marker in a client that checked truthiness. `coalesce` is what stops that.
+      // ─────────────────────────────────────────────────────────────────────────────────────
+      changedSinceViewed: sql<boolean>`coalesce(
+        ${sessions.logisticsChangedAt} > ${savedSessions.viewedAt}, false
+      )`,
+    })
     .from(savedSessions)
     .innerJoin(sessions, eq(sessions.id, savedSessions.sessionId))
     .where(and(eq(savedSessions.attendeeId, scope.attendeeId), eq(sessions.eventId, scope.eventId)))
     // A total order, so two reads cannot disagree and a diff of the response is meaningful.
     .orderBy(asc(savedSessions.sessionId))
 
-  return rows.map((row) => row.sessionId)
+  return rows.map((row) => ({
+    sessionId: row.sessionId,
+    changedSinceViewed: row.changedSinceViewed,
+  }))
+}
+
+/**
+ * T075 (014) — records that this attendee has looked at this session, clearing its marker
+ * (FR-1030).
+ *
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ * **The instant is `now()` in the database, never a value the client sends.** A timestamp on the
+ * wire would let a client clear a marker for a change it has not seen, and would put the
+ * marker's correctness on the device's clock — the same reasoning `throttle.ts` records for
+ * measuring its window in PostgreSQL rather than in Node.
+ *
+ * **Idempotent, and a no-op for a session the attendee has not saved.** There is no row to stamp
+ * and refusing would make opening a session in Agenda's "All" view an error. Scoped identically
+ * to every other write here: `attendee_id` comes from the scope, and the session must belong to
+ * the verified conference.
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ */
+export const markSessionViewed = async (
+  unverified: EventScope,
+  sessionId: string,
+): Promise<boolean> => {
+  const scope = assertVerifiedScope(unverified)
+  if (!UUID.test(sessionId)) return false
+
+  await getDb().execute(sql`
+    UPDATE ${savedSessions}
+    SET viewed_at = now()
+    WHERE attendee_id = ${scope.attendeeId}::uuid
+      AND session_id = ${sessionId}::uuid
+      AND EXISTS (
+        SELECT 1 FROM ${sessions}
+        WHERE ${sessions.id} = ${sessionId}::uuid AND ${sessions.eventId} = ${scope.eventId}::uuid
+      )
+  `)
+
+  return sessionBelongsToScope(scope, sessionId)
 }
 
 /**

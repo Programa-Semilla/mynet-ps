@@ -3,7 +3,8 @@ import type { FastifyInstance } from 'fastify'
 import {
   deleteNote,
   listNotes,
-  listSavedSessionIds,
+  listSavedSessions,
+  markSessionViewed,
   saveSession,
   unsaveSession,
   upsertNote,
@@ -103,20 +104,32 @@ export const agendaRoutes = async (app: FastifyInstance): Promise<void> => {
       preHandler: [app.requireAttendee, app.requireEventAccess],
       schema: {
         tags: ['agenda'],
-        summary: "The attendee's saved session identifiers for this conference",
+        summary: "The attendee's saved sessions for this conference",
         description:
-          'Identifiers only, not whole sessions (FR-188). The programme is fetched separately and already carries the session data; returning it again here would be a second source of truth that could disagree with the first. An attendee who has saved nothing gets an empty array — a valid answer, not a 404 (FR-195).',
+          'Identifiers only, not whole sessions (FR-188). The programme is fetched separately and already carries the session data; returning it again here would be a second source of truth that could disagree with the first. An attendee who has saved nothing gets an empty array — a valid answer, not a 404 (FR-195).\n\n**014 adds `changedSinceViewed` to each entry** (FR-1030): true while the session has materially changed — cancelled, start time, or room — since this attendee last viewed it. It is **per-row state about one saved session** and never an aggregate: no surface in either product may present a count of them (FR-1031, v5.2.0 N2).',
         security: [{ sessionCookie: [] }],
         params: eventIdParam,
         response: {
           200: {
             type: 'object',
-            required: ['sessionIds'],
+            required: ['sessions'],
             additionalProperties: false,
             properties: {
-              sessionIds: {
+              sessions: {
                 type: 'array',
-                items: { type: 'string', format: 'uuid' },
+                items: {
+                  type: 'object',
+                  required: ['sessionId', 'changedSinceViewed'],
+                  additionalProperties: false,
+                  properties: {
+                    sessionId: { type: 'string', format: 'uuid' },
+                    changedSinceViewed: {
+                      type: 'boolean',
+                      description:
+                        'Computed server-side as `sessions.logistics_changed_at > saved_sessions.viewed_at` — two timestamps and a comparison, with nothing stored per change. That is what keeps FR-1031 structural: there is no per-change record to list and no counter to sum.',
+                    },
+                  },
+                },
               },
             },
           },
@@ -126,7 +139,31 @@ export const agendaRoutes = async (app: FastifyInstance): Promise<void> => {
     },
     // `eventScopeOf` is the only way in: `request.params.eventId` is deliberately not used, so
     // there is no second value that could disagree with what was verified.
-    async (request) => ({ sessionIds: await listSavedSessionIds(eventScopeOf(request)) }),
+    async (request) => ({ sessions: await listSavedSessions(eventScopeOf(request)) }),
+  )
+
+  app.post<{ Params: SessionParams }>(
+    '/events/:eventId/agenda/saved/:sessionId/viewed',
+    {
+      preHandler: [app.requireAttendee, app.requireEventAccess],
+      schema: {
+        tags: ['agenda'],
+        summary: 'Record that the attendee has looked at this session, clearing its marker',
+        description:
+          'T075 (014), FR-1030. **Carries no body**: the instant is the server’s. A timestamp on the wire would let a client clear a marker for a change it has not seen, and would put the marker’s correctness on the device’s clock.\n\nIdempotent, and a no-op for a session the attendee has not saved — there is no row to stamp, and refusing would make opening a session in Agenda’s "All" view an error.',
+        security: [{ sessionCookie: [] }],
+        params: sessionIdParam,
+        response: {
+          204: { type: 'null' },
+          ...refusals,
+        },
+      },
+    },
+    async (request, reply) => {
+      const known = await markSessionViewed(eventScopeOf(request), request.params.sessionId)
+      if (!known) throw notFound()
+      return reply.code(204).send()
+    },
   )
 
   app.put<{ Params: SessionParams }>(

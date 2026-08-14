@@ -120,6 +120,25 @@ const UNTHROTTLED_READS: Record<string, string> = {
   'GET /admin/reports/:reportId':
     'one report, opened from the queue by a person. **Writes an audit entry** (FR-995), which ' +
     'makes repeated reading accountable rather than rate-limited.',
+
+  // ─────────────────────────────────────────────────────────────────────────────────────────
+  // **014 — the programme editor's one read**, and it inherits the whole administrative
+  // argument above: the population is a handful of promoted attendees and seeded operators,
+  // neither tier is reachable by self sign-up, and nothing in `apps/admin/src` polls.
+  //
+  // Worth naming what it carries, because it is the one administrative read that touches
+  // attendee state at all: **engagement counts per session** (FR-1025). Counts only — no
+  // attendee is identified and no note, question or vote content is disclosed (FR-1042) — so
+  // there is no directory to harvest here, which is the harm FR-803a's read bounds exist for.
+  //
+  // Its **writes** are all bounded, on five dedicated actions (FR-1039), and `session_cancel`
+  // is the one that matters: it is the only authoring act that reaches attendees' phones.
+  // ─────────────────────────────────────────────────────────────────────────────────────────
+  'GET /admin/conferences/:eventId/programme':
+    'the programme editor, read when a conference is opened and after each write. Carries ' +
+    'engagement COUNTS per session and no attendee identity (FR-1025, FR-1042), so there is ' +
+    'nothing here to collect in bulk. Every write on this surface is throttled on its own ' +
+    'action instead.',
 }
 
 const methodsOf = (route: RouteOptions): string[] =>

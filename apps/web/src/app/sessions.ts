@@ -82,15 +82,33 @@ export const venueDayLabelOf = (iso: string, timezone: string): string =>
  * resolve to the same one on every read and on every device rather than to whichever the
  * iteration happened to reach first.
  */
-export const nextSession = (
-  sessions: readonly Session[],
+export const nextSession = <T extends Session>(
+  sessions: readonly T[],
   now: Date,
   timezone: string,
-): Session | null => {
+): T | null => {
   const today = venueDateOf(now, timezone)
 
   const upcoming = sessions.filter(
     (session) =>
+      // ═══════════════════════════════════════════════════════════════════════════════════════
+      // **T054 (014) — A CANCELLED SESSION IS NOT AN ANSWER TO "WHERE DO I GO NOW"** (FR-1022a).
+      //
+      // This is the **one surface in the product where a cancelled session is omitted rather
+      // than marked**, and the exception is deliberate. FR-1022 presents cancellation everywhere
+      // else — the programme, Agenda, the detail panel, the rest-of-day timeline — because an
+      // attendee needs to see that something will not happen. "Up next" asks a different
+      // question, and it is the most prominent thing in the first viewport: naming a cancelled
+      // session there sends somebody across a venue to an empty room.
+      //
+      // **One change point, serving both cards** (research R8). `UpNext` and `NextSavedSession`
+      // both call this, so FR-1022a is satisfied for both by editing one filter — while
+      // `RestOfDay` renders the full list from `restOfVenueDay` below and is deliberately
+      // unaffected. That the composition allowed this is 002's and 005's doing: the computation
+      // lives in a module rather than in each card, and Home's registry forbids a card editing
+      // a neighbour.
+      // ═══════════════════════════════════════════════════════════════════════════════════════
+      !session.cancelled &&
       new Date(session.startsAt).getTime() > now.getTime() &&
       venueDateOf(new Date(session.startsAt), timezone) === today,
   )
@@ -107,19 +125,41 @@ export const nextSession = (
   )
 }
 
+/*
+ * Generic over the session type, so a caller that has attached per-attendee state to its rows gets
+ * that state back rather than a widened `Session`. Home's saved-session card needs it for exactly
+ * one field — FR-1030's change marker — and the alternative was looking the flag back up by id
+ * after this returned, which is a second source of truth for a fact the row already carries.
+ *
+ * Behaviour is unchanged: the filter and the ordering never read anything outside `Session`.
+ */
+
 /**
  * What is left of the venue's today, after the session already named as "up next".
  *
  * Scoped to the venue's current date rather than "the next N sessions", so the card says
  * something true — "the rest of today" — instead of spilling into tomorrow's programme when the
  * afternoon is quiet.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ * **T055 (014) — CANCELLED SESSIONS STAY HERE, MARKED, AND THAT IS THE REQUIREMENT** (FR-1022).
+ *
+ * It would be easy to inherit `nextSession`'s new filter on the reasoning that both functions
+ * are about "what is coming". They are not: this one lists **the rest of the day**, and an
+ * attendee whose 14:00 was cancelled needs to see that in the timeline they are reading — the
+ * cancellation is the information. Omitting it here would make the afternoon look like it always
+ * had a gap.
+ *
+ * `apps/web/tests/unit/sessions.test.ts` asserts the asymmetry, because the two functions sit
+ * six lines apart and the difference between them is one condition.
+ * ─────────────────────────────────────────────────────────────────────────────────────────
  */
-export const restOfVenueDay = (
-  sessions: readonly Session[],
+export const restOfVenueDay = <T extends Session>(
+  sessions: readonly T[],
   now: Date,
   timezone: string,
   excludeId?: string,
-): Session[] => {
+): T[] => {
   const today = venueDateOf(now, timezone)
 
   return sessions

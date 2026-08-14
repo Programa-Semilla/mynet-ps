@@ -515,6 +515,8 @@ export interface paths {
                             startsAt: string;
                             /** Format: date-time */
                             endsAt: string;
+                            /** @description T053 (014), FR-1020 and FR-1022. A cancelled session is **presented, not withheld**: it stays in the programme, in Agenda, in the detail panel and in Home’s rest-of-day timeline, marked. An attendee who saved it needs to see that it will not happen, and a session that simply vanished would be indistinguishable from one they misremembered. Home’s "Up next" is the single exception and skips it (FR-1022a), because that card answers *where do I go now*. */
+                            cancelled: boolean;
                             track: {
                                 /** Format: uuid */
                                 id: string;
@@ -650,8 +652,10 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * The attendee's saved session identifiers for this conference
+         * The attendee's saved sessions for this conference
          * @description Identifiers only, not whole sessions (FR-188). The programme is fetched separately and already carries the session data; returning it again here would be a second source of truth that could disagree with the first. An attendee who has saved nothing gets an empty array — a valid answer, not a 404 (FR-195).
+         *
+         *     **014 adds `changedSinceViewed` to each entry** (FR-1030): true while the session has materially changed — cancelled, start time, or room — since this attendee last viewed it. It is **per-row state about one saved session** and never an aggregate: no surface in either product may present a count of them (FR-1031, v5.2.0 N2).
          */
         get: {
             parameters: {
@@ -671,7 +675,12 @@ export interface paths {
                     };
                     content: {
                         "application/json": {
-                            sessionIds: string[];
+                            sessions: {
+                                /** Format: uuid */
+                                sessionId: string;
+                                /** @description Computed server-side as `sessions.logistics_changed_at > saved_sessions.viewed_at` — two timestamps and a comparison, with nothing stored per change. That is what keeps FR-1031 structural: there is no per-change record to list and no counter to sum. */
+                                changedSinceViewed: boolean;
+                            }[];
                         };
                     };
                 };
@@ -703,6 +712,72 @@ export interface paths {
         };
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/events/{eventId}/agenda/saved/{sessionId}/viewed": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Record that the attendee has looked at this session, clearing its marker
+         * @description T075 (014), FR-1030. **Carries no body**: the instant is the server’s. A timestamp on the wire would let a client clear a marker for a change it has not seen, and would put the marker’s correctness on the device’s clock.
+         *
+         *     Idempotent, and a no-op for a session the attendee has not saved — there is no row to stamp, and refusing would make opening a session in Agenda’s "All" view an error.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    eventId: string;
+                    sessionId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Not registered for that conference, **or** no such conference, **or** the session is not part of it. All three are deliberately indistinguishable — identical status and identical body — so that an attendee cannot enumerate conferences or sessions by watching which refusal comes back (FR-204, FR-231). */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+            };
+        };
         delete?: never;
         options?: never;
         head?: never;
@@ -5202,7 +5277,94 @@ export interface paths {
             };
         };
         put?: never;
-        post?: never;
+        /**
+         * Create a conference
+         * @description **Both tiers** (FR-1007, FR-1008). An organizer is assigned to what they create, in the same transaction — and creating grants no authority over any other conference and no platform capability (FR-1010): it is not a promotion path. A join code is minted and returned so the organizer can distribute it (FR-1009). There is **no delete** at any tier (FR-1011).
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        name: string;
+                        location: string;
+                        /** Format: date */
+                        startsOn: string;
+                        /** Format: date */
+                        endsOn: string;
+                        timezone: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            id: string;
+                            joinCode: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Throttled, keyed on the acting operator's own authenticated identity so a refusal can only inconvenience the person authoring (FR-1039). */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                            retryAfterSeconds?: number;
+                        };
+                    };
+                };
+            };
+        };
         delete?: never;
         options?: never;
         head?: never;
@@ -5416,6 +5578,1378 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/admin/conferences/{eventId}/programme": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The whole programme of one conference, for the editor
+         * @description Sessions, tracks, rooms and speakers, plus **engagement counts per session** so the delete-versus-cancel decision needs no second request (FR-1025). Counts only — no attendee is identified and no note, question or vote content is disclosed to any administrative tier (FR-1042).
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    eventId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/conferences/{eventId}/tracks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Add a track */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    eventId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        name: string;
+                        /**
+                         * @description A theme token name, never a colour value (FR-1004, FR-136). The palette lives in `apps/web/src/theme/tokens.css` and nowhere else; a colour here would put it in two places and let an organizer alter the design system without touching it.
+                         * @enum {string}
+                         */
+                        colorToken: "track-design" | "track-product" | "track-tech" | "track-keynote";
+                    };
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Throttled, keyed on the acting operator's own authenticated identity so a refusal can only inconvenience the person authoring (FR-1039). */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                            retryAfterSeconds?: number;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/conferences/{eventId}/tracks/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove a track
+         * @description Refused with 409 and a reason while any session references it (FR-1017). The reason is permitted because it describes the caller's own conference — they can see the sessions, and the fix is to move them.
+         */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    eventId: string;
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Throttled, keyed on the acting operator's own authenticated identity so a refusal can only inconvenience the person authoring (FR-1039). */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                            retryAfterSeconds?: number;
+                        };
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        /** Edit a track */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    eventId: string;
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        name: string;
+                        /**
+                         * @description A theme token name, never a colour value (FR-1004, FR-136). The palette lives in `apps/web/src/theme/tokens.css` and nowhere else; a colour here would put it in two places and let an organizer alter the design system without touching it.
+                         * @enum {string}
+                         */
+                        colorToken: "track-design" | "track-product" | "track-tech" | "track-keynote";
+                    };
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Throttled, keyed on the acting operator's own authenticated identity so a refusal can only inconvenience the person authoring (FR-1039). */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                            retryAfterSeconds?: number;
+                        };
+                    };
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/admin/conferences/{eventId}/rooms": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Add a room */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    eventId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        name: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Throttled, keyed on the acting operator's own authenticated identity so a refusal can only inconvenience the person authoring (FR-1039). */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                            retryAfterSeconds?: number;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/conferences/{eventId}/rooms/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove a room
+         * @description Refused while any session references it (FR-1017).
+         */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    eventId: string;
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Throttled, keyed on the acting operator's own authenticated identity so a refusal can only inconvenience the person authoring (FR-1039). */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                            retryAfterSeconds?: number;
+                        };
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        /** Edit a room */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    eventId: string;
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        name: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Throttled, keyed on the acting operator's own authenticated identity so a refusal can only inconvenience the person authoring (FR-1039). */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                            retryAfterSeconds?: number;
+                        };
+                    };
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/admin/conferences/{eventId}/speakers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Add a speaker
+         * @description Conference content describing a real person who may or may not hold an attendee account. **No route leads from here to a profile, at any tier** (FR-1006): conference content is authorable, a person is not (decision 33). register entry 30 records the open question — a speaker is personal data about somebody who never signed up, and 014 moves responsibility for it from a reviewed commit to a form.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    eventId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        name: string;
+                        title?: string | null;
+                        company?: string | null;
+                    };
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Throttled, keyed on the acting operator's own authenticated identity so a refusal can only inconvenience the person authoring (FR-1039). */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                            retryAfterSeconds?: number;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/conferences/{eventId}/speakers/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove a speaker
+         * @description Unlike a track or a room, this carries **no reference check**: speakers are optional on a session (FR-138), so removing one leaves a legitimate programme. A session with no track or no room cannot exist at all, which is why those two refuse.
+         */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    eventId: string;
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Throttled, keyed on the acting operator's own authenticated identity so a refusal can only inconvenience the person authoring (FR-1039). */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                            retryAfterSeconds?: number;
+                        };
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        /** Edit a speaker */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    eventId: string;
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        name: string;
+                        title?: string | null;
+                        company?: string | null;
+                    };
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Throttled, keyed on the acting operator's own authenticated identity so a refusal can only inconvenience the person authoring (FR-1039). */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                            retryAfterSeconds?: number;
+                        };
+                    };
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/admin/conferences/{eventId}/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Add a session
+         * @description Validated against the conference's date range **in the venue's timezone** (FR-1012) and for end-after-start (FR-1013). Two sessions in the same room at overlapping times are **permitted**, and the response carries a warning (FR-1016) — conferences genuinely overlap during changeover, and refusing would be a rule the product invented.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    eventId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        title: string;
+                        summary?: string | null;
+                        /** Format: date-time */
+                        startsAt: string;
+                        /** Format: date-time */
+                        endsAt: string;
+                        /** Format: uuid */
+                        trackId: string;
+                        /** Format: uuid */
+                        roomId: string;
+                        speakerIds?: string[];
+                    };
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Throttled, keyed on the acting operator's own authenticated identity so a refusal can only inconvenience the person authoring (FR-1039). */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                            retryAfterSeconds?: number;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/conferences/{eventId}/sessions/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete a session
+         * @description Permitted only while **zero** attendees have engaged with it (FR-1018), checked under `SELECT … FOR UPDATE` **inside** the deleting transaction so a save arriving mid-delete blocks rather than being destroyed (FR-1019a). Otherwise 409 with counts and an offer to cancel instead (FR-1019, FR-1025).
+         */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    eventId: string;
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                            /** @description Counts only, with nobody identified (FR-1025). Present when a deletion is refused because attendees have engaged with the session — it is what turns "no" into "cancel instead". No attendee identity accompanies it, at any tier (FR-1042). */
+                            engagement?: {
+                                saved?: number;
+                                notes?: number;
+                                questions?: number;
+                                votes?: number;
+                            };
+                            /** @description The sessions a date-range change would orphan, named (FR-1014). They are the caller's own content, and an organizer told only "no" would have to guess which of forty sessions is in the way. */
+                            sessions?: {
+                                id?: string;
+                                title?: string;
+                            }[];
+                        };
+                    };
+                };
+                /** @description Throttled, keyed on the acting operator's own authenticated identity so a refusal can only inconvenience the person authoring (FR-1039). */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                            retryAfterSeconds?: number;
+                        };
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        /**
+         * Edit a session
+         * @description A **material** change — the start time or the room — dispatches one notification to every attendee who saved it (FR-1026), coalesced to one per attendee per act (FR-1034). A title, summary, track or speaker edit dispatches nothing (FR-1027): content does not strand anybody in the wrong corridor.
+         */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    eventId: string;
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        title: string;
+                        summary?: string | null;
+                        /** Format: date-time */
+                        startsAt: string;
+                        /** Format: date-time */
+                        endsAt: string;
+                        /** Format: uuid */
+                        trackId: string;
+                        /** Format: uuid */
+                        roomId: string;
+                        speakerIds?: string[];
+                    };
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Throttled, keyed on the acting operator's own authenticated identity so a refusal can only inconvenience the person authoring (FR-1039). */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                            retryAfterSeconds?: number;
+                        };
+                    };
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/admin/conferences/{eventId}/sessions/{id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel a session
+         * @description **The one authoring act that reaches attendees’ phones.** Stored state, not a deletion (FR-1020): every saved-session row, private note, question and vote stays exactly where it is (FR-1021). Reversible, and reinstating dispatches nothing (FR-1024).
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    eventId: string;
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Throttled, keyed on the acting operator's own authenticated identity so a refusal can only inconvenience the person authoring (FR-1039). */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                            retryAfterSeconds?: number;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/conferences/{eventId}/sessions/{id}/reinstate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reinstate a cancelled session
+         * @description **Dispatches nothing** (FR-1024). The notification rule names cancellation and not its reversal, and an attendee whose session comes back has lost nothing by not being told. No marker is set either — there is nothing they need to do.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    eventId: string;
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Throttled, keyed on the acting operator's own authenticated identity so a refusal can only inconvenience the person authoring (FR-1039). */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                            retryAfterSeconds?: number;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/conferences/{eventId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Edit a conference
+         * @description Refuses a date range that would orphan an existing session, **naming them** (FR-1014), and refuses a timezone change once any session exists (FR-1015). There is no draft or published state and no lifecycle gate (FR-1040, v5.2.0 N4): a conference is reachable only by its join code, so an unfinished one is already private to whoever holds it.
+         */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    eventId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        name?: string;
+                        location?: string;
+                        /** Format: date */
+                        startsOn?: string;
+                        /** Format: date */
+                        endsOn?: string;
+                        timezone?: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                            /** @description Counts only, with nobody identified (FR-1025). Present when a deletion is refused because attendees have engaged with the session — it is what turns "no" into "cancel instead". No attendee identity accompanies it, at any tier (FR-1042). */
+                            engagement?: {
+                                saved?: number;
+                                notes?: number;
+                                questions?: number;
+                                votes?: number;
+                            };
+                            /** @description The sessions a date-range change would orphan, named (FR-1014). They are the caller's own content, and an organizer told only "no" would have to guess which of forty sessions is in the way. */
+                            sessions?: {
+                                id?: string;
+                                title?: string;
+                            }[];
+                        };
+                    };
+                };
+                /** @description Throttled, keyed on the acting operator's own authenticated identity so a refusal can only inconvenience the person authoring (FR-1039). */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                            retryAfterSeconds?: number;
+                        };
+                    };
+                };
+            };
+        };
         trace?: never;
     };
 }

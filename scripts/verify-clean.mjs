@@ -57,6 +57,28 @@ const MAX_IDENTIFIER_LENGTH = 63
  */
 const WEB_BASE = 5673
 const API_BASE = 3500
+/**
+ * ═══════════════════════════════════════════════════════════════════════════════════════════════
+ * **014 — THE ADMINISTRATIVE SITE IS A SECOND APPLICATION AND THIS SCRIPT DID NOT KNOW.**
+ *
+ * `verify-clean` predates 013's second product. It allocated a web port and an API port, and the
+ * administrative preview therefore fell back to its default 5174 — colliding with a running
+ * `pnpm start` — while `ADMIN_ORIGIN` went unset entirely.
+ *
+ * The second half is the one that actually broke: `app.ts` allows CORS on administrative routes
+ * from `config.adminOrigin ?? false`, so an unset value means **the browser** refuses every
+ * request the admin client makes. Nothing fails server-side, the API looks healthy, and the specs
+ * wait for a response that never arrives — **twelve administrative end-to-end tests time out**,
+ * including specs that have nothing to do with the feature under test.
+ *
+ * CI has supplied `ADMIN_ORIGIN` since 013 and its comment explains why, adding that *"it passed
+ * locally only because `pnpm start` writes `ADMIN_ORIGIN` into `.env.local`"*. **That claim is not
+ * true** — `.env.local` carries `WEB_ORIGIN` and never carried this — so the local runner has been
+ * unable to reproduce a green CI run for as long as the administrative specs have existed. Found
+ * by 014's first full local `pnpm verify`.
+ * ═══════════════════════════════════════════════════════════════════════════════════════════════
+ */
+const ADMIN_BASE = 5873
 
 /**
  * The gates, cheapest first.
@@ -119,11 +141,13 @@ const main = async () => {
   const offset = portOffsetFor(directory, { isMainWorktree: false })
   const webPort = WEB_BASE + offset
   const apiPort = API_BASE + offset
+  const adminPort = ADMIN_BASE + offset
   const database = `${instance.databaseName}_verify`.slice(0, MAX_IDENTIFIER_LENGTH)
 
   for (const [name, port] of [
     ['web', webPort],
     ['API', apiPort],
+    ['admin', adminPort],
   ]) {
     if (await portInUse(port)) {
       throw new Error(
@@ -136,7 +160,10 @@ const main = async () => {
   await ensureContainer()
 
   console.log(`\nVerifying ${instance.name} against a clean database: ${database}`)
-  console.log(`Ports ${webPort} (web) and ${apiPort} (API) — your running instance is untouched.\n`)
+  console.log(
+    `Ports ${webPort} (web), ${adminPort} (admin) and ${apiPort} (API) — your running instance ` +
+      'is untouched.\n',
+  )
 
   // Dropped first, not only at the end: a previous run killed midway leaves one behind, and
   // silently reusing it would forfeit the single property this script exists to provide.
@@ -148,6 +175,12 @@ const main = async () => {
     API_PORT: String(apiPort),
     MYNET_WEB_PORT: String(webPort),
     WEB_ORIGIN: `http://localhost:${webPort}`,
+    // 014 — both halves are required and they do different jobs. `MYNET_ADMIN_PORT` is what the
+    // admin Vite config serves on; `ADMIN_ORIGIN` is what the API adds to its CORS allow-list,
+    // and without it the browser refuses every administrative request while the server stays
+    // silent. See `ADMIN_BASE` above.
+    MYNET_ADMIN_PORT: String(adminPort),
+    ADMIN_ORIGIN: `http://localhost:${adminPort}`,
     VITE_API_BASE_URL: `http://localhost:${apiPort}`,
   }
 

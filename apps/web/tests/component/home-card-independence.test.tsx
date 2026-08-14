@@ -49,6 +49,8 @@ describe('Home when one card fails', () => {
         },
         save: async () => {},
         unsave: async () => {},
+
+        markViewed: async () => {},
       },
     })
 
@@ -79,7 +81,12 @@ describe('Home when one card fails', () => {
         },
         listTracks: async () => [],
       },
-      savedSessions: { listSaved: async () => [], save: async () => {}, unsave: async () => {} },
+      savedSessions: {
+        listSaved: async () => [],
+        save: async () => {},
+        unsave: async () => {},
+        markViewed: async () => {},
+      },
     })
 
     for (const name of ['Up next', 'Rest of your day', 'Next saved session']) {
@@ -112,6 +119,8 @@ describe('Home when one card fails', () => {
         },
         save: async () => {},
         unsave: async () => {},
+
+        markViewed: async () => {},
       },
       // ───────────────────────────────────────────────────────────────────────────────────────
       // 007 — **every read means every read.** The unread indicator renders nothing at zero

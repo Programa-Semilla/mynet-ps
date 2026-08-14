@@ -239,8 +239,8 @@ describe('session notes', () => {
           url: `/events/${summitId}/agenda/saved`,
           headers: { cookie: cookieHeader(cookie) },
         })
-      ).json() as { sessionIds: string[] }
-    ).sessionIds
+      ).json() as { sessions: { sessionId: string }[] }
+    ).sessions.map((entry) => entry.sessionId)
     expect(saved).not.toContain(target)
 
     // Noting and saving are independent. Requiring a save first would add a rule the attendee

@@ -17,7 +17,15 @@ Then #09 brainstormed **the administrative product** — the first work to requi
 Principle III *prohibition* rather than an omission — ratified as **v4.0.0**, the project's first
 MAJOR bump since v3.0.0, with **v4.1.0** following in the same session to close the three entries
 v4.0.0 opened. It opens a **second programme** of three features, delivered from **012** because
-011 was taken by the UAT work while the administrative branch was in flight)
+011 was taken by the UAT work while the administrative branch was in flight.
+
+**013 has since shipped** ([#20](https://github.com/Programa-Semilla/mynet-ps/pull/20)), and **#10
+brainstormed 014 — conference content authoring**, the second feature of that programme. Its
+amendment **v5.2.0 was ratified on 2026-08-12** as standing decisions 45–49, carrying two changes: a
+**second notification trigger** — the first since v3.1.0 bounded delivery to a received message and
+nothing else — and an explicit statement that a conference organizer may **create** a conference,
+which decision 32's "only conferences they are assigned" did not anticipate. It opens register
+entries 29 and 30 and closes none. **014 is specified, planned and unblocked**)
 
 The authoritative registers live elsewhere — open questions in `.specify/memory/constitution.md`,
 delivery sequence in `docs/superpowers/specs/2026-08-06-mynet-delivery-roadmap-design.md`. This file
@@ -39,8 +47,16 @@ win and this is stale.
 | 08 | 2026-08-10 | brand-mark-and-app-icons | **specified, then implemented**; register entry 2 ratified in constitution **v3.4.0** | `specs/010-brand-mark-and-app-icons/` |
 | 08 | 2026-08-10 | uat-deployment-and-hardening | **shipped (PR #19)**; five owner decisions ratified in constitution **v3.5.0** | `brainstorm/08-uat-deployment-and-hardening.md` |
 | 09 | 2026-08-11 | administrative-product | **decided, and ratified as constitution v4.0.0** the same day — standing decisions 31–36. Opened entries 24, 25, 26; **all three closed by v4.1.0** as decisions 37–39. Delivered as **012** | `brainstorm/09-administrative-product.md` |
+| 10 | 2026-08-12 | conference-content-authoring | **decided, and ratified as constitution v5.2.0** (drafted as v5.2.0) the same day — standing decisions 45–49; opens entries 29 and 30. Specified, planned and **implemented**: 51 FRs, 105 tasks. Live editing from day one; **cancel replaces delete once attendees have engaged**; an in-app marker **and** a push for a changed saved session; both tiers create conferences. One PR, migration `0011` | `brainstorm/10-conference-content-authoring.md` |
 | 10 | 2026-08-12 | app-fixes-and-install-icon | **active** — six owner items from using the running product. Two are not what they look like: mutual card exchange **reverses v3.2.0 N2**, and the new icon is a *different mark* rather than a new size. Feeds **016** | `brainstorm/10-app-fixes-and-install-icon.md` |
 | 11 | 2026-08-12 | client-feedback-programme | **active** — decomposes `assets/feedback-1.md` (118 requirements, 19 areas) into five features. **Absorbs into the administrative programme** rather than running beside it. Reverses **v3.3.0** 48 hours after ratification. Feeds **017, 014, 015, 018, 019** | `brainstorm/11-client-feedback-programme.md` |
+
+**There are two session 10s, and the duplicate is left in place rather than renumbered.** Both were
+held on 2026-08-12, on branches that could not see each other, and both files exist on disk under the
+number their own session used. Renumbering either would break the citations already written into a
+constitution amendment, a specification and a review-findings document. The rule this project keeps
+relearning applies here too: a shared numbering table needs extending in the same change that claims
+a number, and a brainstorm number is one of those tables.
 
 Session 05 has no document of its own: 006 was specified without one, and the row records the
 session rather than a file. 009 likewise — it went straight to specification, and its row is
@@ -111,8 +127,9 @@ requires reversing a Principle III **prohibition** rather than filling an omissi
 | 013 | Administrative foundation — second actor, admin site, **abuse-report queue** | **shipped** — squash-merged to `develop`; amendments ratified as **v4.0.0** and **v4.1.0**. Migration `0009` | ~~24, 25, 26~~ — **all three closed by v4.1.0** |
 | 016 | App fixes, mutual card exchange, install icon | **brainstormed** (#10). Amendment: reverses **v3.2.0 N2**, records the icon-upscale exception, ratifies the admin-counterpart rule. **No migration** | — |
 | 017 | **Q&A rebuilt** — moderation, identity, lifecycle, projection | **brainstormed** (#11). Amendment: reverses **v3.3.0** attribution and retracts shipped 009 FRs | 013 |
-| 014 | Conference content authoring — **rescoped and kept whole** | **re-brainstormed** (#11); #09's scoping superseded. Now also carries event types, optional sessions with capacity and enrolment, and the profile taxonomy | 013; **the client's interest and subsector lists, which do not exist** |
+| 014 | Conference content authoring — **rescoped and kept whole** | **OPEN, AND DELIBERATELY SO** (decided 2026-08-14). #10's scope is **implemented and green** on `spec/014-conference-content-authoring` (51 FRs, 105 tasks, migration `0011`, amendment **v5.2.0**), authored before #11 existed. #11's additions — event types, optional sessions with capacity and enrolment, the profile taxonomy — are **in scope and not built**. The feature closes when both are done. See the note below the table | 013 ✓; v5.2.0 ✓. The profile taxonomy is blocked on **the client's interest, sector and subsector lists, which do not exist**; the rest is unblocked |
 | 015 | Registration and **invitations** — rescoped | **re-brainstormed** (#11). Completes standing decision 11 rather than reversing it | 013 |
+| ~~015~~ | ~~Registration and attendee management~~ | superseded by the row above; #09's scoping is read as replaced by #11's | — |
 | 018 | Profile QR | **brainstormed** (#11) | 014 |
 | 019 | Event lifecycle and post-event material | **brainstormed** (#11). Carries **notification triggers 2 and 3**, and the question of whether this product gains a job runner | 014, 017 |
 
@@ -125,6 +142,65 @@ conference-content tables is the implicit coupling this project has already had 
 now the third time this has happened (011 over the administrative programme, 013 over its own
 sequence, and now these). It is not worth correcting; parallel reservations cannot see each other
 and the number settles at merge.
+
+### 014 is built to #10's scope and rescoped by #11 — DECIDED 2026-08-14: it stays open and grows
+
+**This is the same collision as the numbering, arriving on scope instead**, and it is the one place
+in this merge where the honest answer was to record the conflict rather than resolve it.
+
+`spec/014-conference-content-authoring` was branched before #11 existed and implements #10's 014 in
+full: tracks, rooms, speakers and sessions authored by an assigned organizer or a platform operator,
+live-edited with no draft lifecycle, cancel-not-delete once anyone has engaged, the second
+notification trigger and the per-row marker. It is complete, reviewed, and green.
+
+#11 then decided — on `develop`, on the same day — that 014 "grows rather than being duplicated" and
+also carries **event types, optional sessions with capacity and enrolment, and the profile taxonomy**
+(REQ-010–014, 027–042, 078–086, 113–115). None of that is built, and #11 itself records the blocker:
+the client's interest and subsector lists do not exist.
+
+**Three ways to reconcile were put to the owner on 2026-08-14, and the second was chosen:**
+
+1. Ship what is built as 014 and move #11's additions to a new feature.
+2. **Hold 014 open and grow it to #11's scope. — CHOSEN.**
+3. Ship as 014 phase 1, with #11's additions as 014 phase 2 in the same feature directory.
+
+**What the decision means, stated so it is not softened later.** 014 is **not complete** and its
+specification must not claim to be. #11's "rescoped and kept whole" is honoured literally: this is
+one feature carrying both scopes, and it closes when both are built. The cost is accepted rather
+than hidden — a complete, reviewed, thirteen-gates-green body of work waits on a client artifact
+that does not exist, and the wait has no known end.
+
+**What remains, and what it is blocked on:**
+
+| Added by #11 | Requirements | Blocked on |
+|---|---|---|
+| Multiple event types; agenda items with base information; virtual sessions carrying an access link; presenters in the event model | REQ-010–014 | nothing |
+| The profile taxonomy — sector, subsector, short productive-activity description, networking interests chosen from predefined options, optional company name | REQ-027–042 | **the client's interest, sector and subsector lists (REQ-033, REQ-034, REQ-036), which do not exist** |
+| Optional sessions with a maximum capacity, explicit enrolment, and per-activity closing rules and deadlines | REQ-078–086 | nothing |
+| An administrative interface for creating events | REQ-113–115 | **already delivered by the built tranche** |
+
+**One row of that table is worth reading twice.** REQ-113–115 asks for exactly what this branch has
+already built, so #11's rescope is not four additions to an unbuilt feature — it is three additions
+to a feature whose original request is done. Two of the three are unblocked today; only the profile
+taxonomy waits on the client, and it waits on a *list*, not a decision.
+
+**#11's reasoning for absorbing rather than paralleling stands and is why this choice is coherent**:
+two programmes writing the same conference-content tables is the implicit-coupling failure this
+project has already fixed twice. Splitting 014 would have recreated it.
+
+**Tranche 1 is MERGED to `develop`; 014 stays open for tranche 2.** PR #23 was opened on 2026-08-14,
+passed all eleven CI jobs, was briefly closed unmerged under a hold decision, and was then reopened
+and **squash-merged the same day when the hold was reversed.** Both are recorded because a closed PR
+and a merged one tell different stories about the same code, and the record should show which
+happened and in what order.
+
+**Merging removed a standing obligation rather than creating one.** Held, this branch would have had
+to re-merge `develop` on every merge to `develop` — it had already diverged once, and reconciling 016
+cost a session and collided on five numbering tables. Integrated, that debt is paid.
+
+**Tranche 2 starts from a fresh branch off `develop`**, against `specs/014-conference-content-authoring/`,
+and it is the change that closes 014. Two of its three outstanding rows are unblocked today; only the
+profile taxonomy waits on the client's lists.
 
 **Numbered 011–013 when #09 ran, and delivered as 013–015.** The UAT deployment work took 011 from a
 parallel branch while this programme was in flight, so it shifted rather than renumbering a phase
@@ -430,6 +506,45 @@ deployment or release.
   is public, and `branches/develop/protection` returns **404 — no rule set**. Branch protection is
   free on public repositories, so this is a configuration task rather than an accepted risk
   (corrected 2026-08-06)
+
+### Design questions carried into 014's specification
+
+From #10. The decision itself is made; **the amendment it needs, v5.2.0, is not yet drafted and
+gates the first line of code.** These are for `/speckit-specify`, except where they are governance
+and must be escalated. **None may be silently resolved.**
+
+- **Which changes are "material" enough to dispatch?** Cancellation certainly, a start-time change
+  certainly, a room change probably; a title, summary or speaker swap probably not. **The amendment
+  must name the set**, because the set *is* the scope of the second trigger — leaving it to a
+  handler is exactly the drift v3.1.0's one-sentence rule was written to prevent.
+- **A saved-session push carries a session title to a lock screen.** v3.1.0 accepted the equivalent
+  for message content and explicitly did **not** solve whether an attendee may suppress it. 014
+  makes that unsolved question apply to a second content type, which is the second time it has come
+  up unanswered. Escalate rather than decide.
+- **Is the count that gates delete-vs-cancel a disclosure?** Showing an organizer "12 attendees
+  saved this, 4 wrote notes" is an aggregate over attendee state with no identity attached, so
+  probably not a Principle VIII exception — but v3.3.0's whole point is that this project records
+  such things rather than deriving them.
+- **Speakers are personal data about people who are not attendees.** Seeded rows already carry a
+  real person's name, title and company; what 014 changes is that they become *organizer-authored*,
+  which moves responsibility. `deletion-coverage.test.ts` and `export-coverage.test.ts` derive from
+  the schema, and Principle VIII has only ever considered attendees.
+- **May an attendee still ask questions on a cancelled session?** Its existing Q&A survives by
+  requirement; whether the composer stays open is undecided.
+- **Does the event timezone stay editable once sessions exist?** `timestamptz` means no absolute
+  instant moves, but every displayed local time shifts — including saved-session rows and Home's
+  "Up next". The same decision as the material-change question, approached from the other end.
+- **May a conference be deleted, and by whom?** The cancel-not-delete rule answers this for sessions
+  and says nothing one level up, where registrations make it worse.
+- **Nothing bounds how many conferences a promoted attendee may create.** Bounded by trust, since
+  promotion is platform-tier only. Worth a deliberate decision rather than an accident.
+- **Register entry 22 gets staler in a new way.** A cached conference can already outlive a
+  withdrawn registration by 24 hours; 014 makes an *edited* programme sit in the same cache. The
+  entry is filed against 012, 013 did not answer it, and 014 is the first feature to make the cached
+  copy wrong for a reason other than access.
+- **The roadmap's reserved-number table stops at the attendee programme**, and has now been wrong
+  for two features running. Housekeeping, not a decision — but it is the third collision, and 013
+  took `0009` while 012 holds `0010`, which is why 014 reserves `0011`.
 
 ### Design questions carried into 011's specification
 

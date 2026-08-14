@@ -78,6 +78,14 @@ export type AccountExport = {
     readonly sessionTitle: string
     readonly eventId: string
     readonly savedAt: string
+    /**
+     * T003 (014) — when this attendee last looked at the session (FR-1030).
+     *
+     * Exported because it is attendee data: it records something *they* did, and it is what
+     * decides whether their Agenda row carries a change marker. `export-coverage.test.ts`
+     * derives from the schema, so the column fails the build by existing until it appears here.
+     */
+    readonly viewedAt: string
   }[]
   readonly sessionNotes: readonly {
     readonly sessionId: string
@@ -390,8 +398,14 @@ export const assembleExport = async (
       SELECT event_id, updated_at FROM active_event_selections
       WHERE attendee_id = ${attendeeId}::uuid
     `),
-    db.execute<{ session_id: string; title: string; event_id: string; saved_at: Date }>(sql`
-      SELECT ss.session_id, s.title, s.event_id, ss.saved_at
+    db.execute<{
+      session_id: string
+      title: string
+      event_id: string
+      saved_at: Date
+      viewed_at: Date
+    }>(sql`
+      SELECT ss.session_id, s.title, s.event_id, ss.saved_at, ss.viewed_at
       FROM saved_sessions ss JOIN sessions s ON s.id = ss.session_id
       WHERE ss.attendee_id = ${attendeeId}::uuid
       ORDER BY ss.session_id
@@ -631,6 +645,7 @@ export const assembleExport = async (
       sessionTitle: row.title,
       eventId: row.event_id,
       savedAt: iso(row.saved_at) as string,
+      viewedAt: iso(row.viewed_at) as string,
     })),
     sessionNotes: notes.map((row) => ({
       sessionId: row.session_id,

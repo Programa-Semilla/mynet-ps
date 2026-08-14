@@ -4,7 +4,7 @@ import { useCallback } from 'react'
 import { Link } from 'react-router'
 
 import { Failed, Loading, useAsync } from '../../AsyncState.js'
-import { SpeakerLine, TrackChip } from '../../SessionPresentation.js'
+import { CancelledChip, ChangedChip, SpeakerLine, TrackChip } from '../../SessionPresentation.js'
 import { nextSession, venueTimeOf } from '../../sessions.js'
 import type { EventCardProps, HomeCard } from '../contract.js'
 
@@ -47,14 +47,36 @@ const NextSavedSessionCard = ({ event }: EventCardProps) => {
       savedSessions.listSaved(event.id),
     ])
 
-    const savedIds = new Set(saved)
-    return sessions.filter((session) => savedIds.has(session.id))
+    // =====================================================================================
+    // **T074 (014), corrected by the deep review — THE MARKER IS CARRIED, NOT PROJECTED AWAY.**
+    //
+    // This used to reduce the saved read to bare identifiers, with a comment saying the card
+    // "renders what is next, never a marker: Home's marker belongs on the rows the attendee can
+    // act on". No Home surface rendered one. FR-1030 says the marker appears "on its row in
+    // Agenda **and on Home**", and US3 scenario 2 says the same — so the requirement's named
+    // surface was missing while the data to satisfy it was being read and discarded here.
+    //
+    // `RestOfDay` cannot be the surface: it renders the whole programme's remainder and knows
+    // nothing about the attendee's saved set. This card already reads both, which makes it the
+    // one place on Home where "a saved session of yours has changed" is answerable.
+    //
+    // **Still per-row and still never a count** (FR-1031): what travels below is one boolean for
+    // one session, and nothing here can total them.
+    // =====================================================================================
+    const changed = new Set(
+      saved.filter((entry) => entry.changedSinceViewed).map((entry) => entry.sessionId),
+    )
+    const savedIds = new Set(saved.map((entry) => entry.sessionId))
+
+    return sessions
+      .filter((session) => savedIds.has(session.id))
+      .map((session) => ({ ...session, changed: changed.has(session.id) }))
   }, [catalog, savedSessions, event.id])
 
   // `emptyWhen: () => false` — "nothing saved" is a state this card renders itself, with its
   // own wording, because it is different from "nothing left today" and the attendee needs to
   // be able to tell them apart (FR-225).
-  const saved = useAsync<Session[]>(load, [load], { emptyWhen: () => false })
+  const saved = useAsync<MarkedSession[]>(load, [load], { emptyWhen: () => false })
 
   return (
     <section
@@ -83,7 +105,21 @@ const NextSavedSessionCard = ({ event }: EventCardProps) => {
   )
 }
 
-const NextSavedBody = ({ saved, event }: { saved: Session[]; event: EventCardProps['event'] }) => {
+/**
+ * A saved session plus whether it has materially changed since this attendee last looked.
+ *
+ * One boolean per session, and deliberately nothing else — no total, no list, no "3 changes"
+ * anywhere (FR-1031, v5.2.0 N2). The count that FR-1034a permits exists only in a push payload.
+ */
+type MarkedSession = Session & { readonly changed: boolean }
+
+const NextSavedBody = ({
+  saved,
+  event,
+}: {
+  saved: MarkedSession[]
+  event: EventCardProps['event']
+}) => {
   /**
    * ───────────────────────────────────────────────────────────────────────────────────────
    * **T080 — scoped to the venue's current day, and that scoping IS the requirement** (FR-224,
@@ -137,6 +173,13 @@ const NextSavedBody = ({ saved, event }: { saved: Session[]; event: EventCardPro
           {venueTimeOf(upcoming.startsAt, event.timezone)}
         </time>
         <TrackChip track={upcoming.track} />
+        {/*
+          FR-1030 — the marker, on Home as well as on the Agenda row. In **text**, beside the
+          track, for the reason `ChangedChip` records: a coloured dot is exactly the marker a
+          screen reader cannot report. Suppressed while the session is cancelled, because
+          `CancelledChip` is then the more specific truth — the same precedence `SessionRow` uses.
+        */}
+        {upcoming.cancelled ? <CancelledChip /> : upcoming.changed ? <ChangedChip /> : null}
       </div>
 
       <h3 className="font-display text-lg font-medium text-text-primary">

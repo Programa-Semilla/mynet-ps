@@ -1,4 +1,5 @@
 import type {
+  SavedSession,
   SavedSessionRepository,
   SessionNote,
   SessionNotesRepository,
@@ -32,11 +33,19 @@ export class HttpSavedSessionRepository implements SavedSessionRepository {
     this.#http = http
   }
 
-  async listSaved(eventId: string): Promise<string[]> {
-    // The route answers `{ sessionIds: [...] }` rather than a bare array, so the response has
-    // somewhere to grow without becoming a breaking change. The interface promises the list.
-    const body = await this.#http.request<{ sessionIds: string[] }>(agendaPath(eventId, '/saved'))
-    return body.sessionIds
+  /**
+   * T074 (014) — **the room the response was given to grow into is the room the marker uses.**
+   *
+   * This read `{ sessionIds: [...] }` and returned the bare list; 005's comment said the object
+   * wrapper existed "so the response has somewhere to grow without becoming a breaking change".
+   * 014 is that growth: `sessions` carries the identifier **and** the marker, computed
+   * server-side from two timestamps (FR-1030, research R7).
+   */
+  async listSaved(eventId: string): Promise<SavedSession[]> {
+    const body = await this.#http.request<{ sessions: SavedSession[] }>(
+      agendaPath(eventId, '/saved'),
+    )
+    return body.sessions
   }
 
   /**
@@ -54,6 +63,20 @@ export class HttpSavedSessionRepository implements SavedSessionRepository {
     await this.#http.request<void>(agendaPath(eventId, `/saved/${encodeURIComponent(sessionId)}`), {
       method: 'DELETE',
     })
+  }
+
+  /**
+   * T075 (014) — `POST` rather than `PUT` on a `viewed` sub-resource.
+   *
+   * The instant is the server's, not the client's: a `PUT` carrying a timestamp would let a
+   * client clear a marker for a change it has not seen, and would put the marker's correctness
+   * on the device's clock. There is nothing to send, so there is nothing to get wrong.
+   */
+  async markViewed(eventId: string, sessionId: string): Promise<void> {
+    await this.#http.request<void>(
+      agendaPath(eventId, `/saved/${encodeURIComponent(sessionId)}/viewed`),
+      { method: 'POST' },
+    )
   }
 }
 
