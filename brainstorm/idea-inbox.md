@@ -270,15 +270,6 @@ An entry is removed once a brainstorm document has been written from it.
 
 > Two of the three are real and neither is about the caller. An unseeded or fully-deactivated operator table is a misconfiguration somebody must act on, and a bounded retry loop that gives up is the case whose own header argues it should "fail loudly rather than spinning" — a 404 indistinguishable from an authorisation refusal is the quietest failure available.
 
-### cancelled-session-time-edits-still-notify
-
-- **Source**: deep-review
-- **Date**: 2026-08-12
-- **Reference**: spec/014-conference-content-authoring
-- **Summary**: `materialChangeOf` treats a time or room edit on an already-cancelled session as material, so it dispatches "This session has moved to a new time" for something that is not happening — while `SessionRow` suppresses the in-app marker for cancelled rows, so the push arrives with no in-app counterpart.
-
-> v5.2.0 N1's generating principle is quoted in that very file: a notification is raised when a change affects **where or whether** the attendee must be somewhere. A cancelled session has already answered "whether" with no. Narrowing it is a judgement about N1's scope rather than a bug fix, because the spec enumerates the trigger set without qualifying it by cancellation state — but the marker and the notification are supposed to agree, and here they cannot.
-
 ### self-assignment-names-an-uninvolved-operator
 
 - **Source**: deep-review
@@ -287,39 +278,3 @@ An entry is removed once a brainstorm document has been written from it.
 - **Summary**: A creating organizer's self-assignment sets `assigned_by` to the first non-deactivated operator, who took no part in the grant — so `organizer_assignments` records a grant that never happened, and the compensating record is the audit trail FR-999 forbids reading. Separately, `requireOperator` admits anyone holding *any* live assignment.
 
 > Two consequences worth deciding rather than inheriting. The column's own schema comment says it means "the platform operator who granted this (FR-933)", and it now means two different things depending on which write produced the row, with nothing distinguishing them. And because creating mints a fresh live assignment while revocation is per-conference and manual, an organizer being wound down can keep administrative access alive by creating conferences — v5.2.0's N3 accepted "bounded by trust" for how many, but does not appear to have weighed demotion resistance.
-
-### migration-lock-window-under-live-traffic
-
-- **Source**: deep-review
-- **Date**: 2026-08-12
-- **Reference**: spec/014-conference-content-authoring
-- **Summary**: Drizzle wraps all pending migrations in a single transaction, so `0011`'s `ACCESS EXCLUSIVE` locks on `sessions` and `saved_sessions` are held until the last statement commits — including a CHECK-constraint validation scan of `admin_audit_entries` and three non-concurrent `CREATE INDEX` builds — while `deploy.sh` runs it with the previous API container still serving.
-
-> The two tables locked are the ones every attendee request touches, and their unavailability window is set by unrelated work in the same transaction. `lock_timeout` bounds waiting for a lock, not holding one or building an index, and no `statement_timeout` is set. Sub-second at today's volumes; the exposure appears the first time either table is large. Worth a `statement_timeout` on the migration connection, a note in the deploy runbook, and a runner path that can issue `CREATE INDEX CONCURRENTLY` outside a transaction.
-
-### admin-conference-list-is-unpaginated
-
-- **Source**: deep-review
-- **Date**: 2026-08-12
-- **Reference**: spec/014-conference-content-authoring
-- **Summary**: `listConferences` selects every event in the product with two left joins, no `LIMIT` and no keyset, then filters an organizer down to their own assignments in JavaScript — and 014 is the feature that makes `events` grow at runtime.
-
-> The `conference_create` threshold comment reasons about "unbounded rows in two tables that every administrative read then pages through", and no administrative read paginates. An organizer assigned to one conference pays for reading every conference in the product, on every navigation to the list. Not urgent at pilot scale; it is the growth vector this feature opens and the only read positioned to feel it.
-
-### coalescing-is-structurally-unreachable
-
-- **Source**: deep-review
-- **Date**: 2026-08-12
-- **Reference**: spec/014-conference-content-authoring
-- **Summary**: `stampMaterialChange` is only ever called with a single session id, so `attendeesToNotify` can never return a recipient carrying two — which makes `payloadFor`'s multi-session branch, the `count` field, the `agenda-<eventId>` tag and the `/agenda` click target dead in the shipped product.
-
-> SC-1012 states its verification method as "changing four saved sessions in one act and counting dispatches", and no request the product offers can do that; FR-1028b's contrast between per-act and per-window coalescing describes a distinction with no observable difference today. The investment is reasonable against 015's bulk edit — but it means the notification shape most likely to reach a real phone in future is the one no integration path exercises.
-
-### migration-number-reservation-policy
-
-- **Source**: deep-review
-- **Date**: 2026-08-12
-- **Reference**: spec/014-conference-content-authoring
-- **Summary**: The journal now carries `idx: 10` with tag `0011_conference_authoring` and snapshot `0010_snapshot.json` — a permanent three-way skew adopted to reserve `0010` for a feature that, by the working brief's own account, adds no schema.
-
-> Third collision of this kind, and each one adds a rename step plus a paragraph to every future generation — on top of the README that must be moved out of `meta/` before `drizzle-kit generate` runs at all. The policy question rather than the individual deviation: should a number be claimed by whichever branch generates first, with the roadmap recording the mapping, instead of reserved in advance for features that may never write a migration?
