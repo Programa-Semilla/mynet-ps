@@ -17,7 +17,7 @@ import { adminSession, identity, programme, stubServices } from '../support/serv
  * US4 creates a conference with no programme at all, so the empty state is not an edge case
  * reachable by deleting things — it is the entry point. The constitution requires an empty state
  * to be an invitation rather than an absence, and this one carries a second job: saying out loud
- * that there is no draft to publish from, because decision 43 means an organizer authors into a
+ * that there is no draft to publish from, because decision 48 means an organizer authors into a
  * conference their attendees can already see.
  * ═════════════════════════════════════════════════════════════════════════════════════════════
  *

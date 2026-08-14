@@ -69,7 +69,7 @@ export const ConferenceList = () => {
           014 — **rendered for BOTH tiers, which makes it the only control here that is.**
           Everything else on this screen is platform-only and hidden from an organizer so they are
           never offered a door that answers "there is nothing here". Creating a conference is
-          different by constitution: v4.2.0's N3 makes it the one product-wide capability a
+          different by constitution: v5.2.0's N3 makes it the one product-wide capability a
           conference organizer holds, stated rather than inferred because decision 32's "authority
           reaches only the conferences they are assigned" cannot describe the act of creating one.
         */}

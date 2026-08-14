@@ -12,7 +12,7 @@ import { AdminDialog } from '../shell/AdminDialog.js'
  *
  * Every other control on the conference list is platform-tier only, and `ConferenceList` hides
  * them from an organizer so they are never offered a door that answers "there is nothing here".
- * This one is different by constitution: v4.2.0's N3 makes creating a conference **the one
+ * This one is different by constitution: v5.2.0's N3 makes creating a conference **the one
  * product-wide capability a conference organizer holds**, stated rather than inferred because
  * decision 32's *"authority reaches only the conferences they are assigned"* cannot describe the
  * act of creating one.

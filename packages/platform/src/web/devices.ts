@@ -8,6 +8,7 @@ import type {
 } from '../interfaces/index.js'
 import { WebConnectivityService } from './connectivity.js'
 import { WebNotificationService } from './notifications.js'
+import { WebInstallService } from './install.js'
 import { WebVisibilityService } from './visibility.js'
 
 /**
@@ -109,6 +110,9 @@ export const webDevices = (options: { vapidPublicKey?: string } = {}): DeviceSer
   // 007 — the seventh capability. `interfaces/index.ts` records why it exists rather than
   // `useConversation.ts` reading `document.visibilityState` behind a lint exemption.
   visibility: new WebVisibilityService(),
+  // 016 — the eighth capability, added to Principle V's list in constitution v5.1.0. One line,
+  // per the append-only extension point; `interfaces/index.ts` records why it exists.
+  install: new WebInstallService(),
   notifications: notificationsWith(options.vapidPublicKey),
   calendar,
   camera,

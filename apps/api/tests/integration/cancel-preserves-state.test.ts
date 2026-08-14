@@ -35,7 +35,7 @@ import {
  * Before 014 an organizer had no way to touch a session at all. The moment they do, one `DELETE`
  * is enough for PostgreSQL to silently destroy four kinds of other people's writing — a saved
  * session, a private note, a question, and every vote on it — with no confirmation and no record.
- * v4.2.0's N5 calls that a **correction of a live hazard rather than a preference**.
+ * v5.2.0's N5 calls that a **correction of a live hazard rather than a preference**.
  *
  * Cancellation is the answer, and this is the assertion that it is a real one: every record still
  * present, still readable **by the attendee who wrote it**, through the ordinary attendee routes.

@@ -492,7 +492,7 @@ export const RoomSection = ({
  * There is no link, no lookup and no "find this attendee" control, and
  * `profile-uneditable.test.ts` asserts that over the whole administrative surface.
  *
- * Register entry 28 records the open question this leaves: these rows are personal data about
+ * register entry 30 records the open question this leaves: these rows are personal data about
  * somebody who never signed up, and 014 moves responsibility for them from a reviewed commit to a
  * promoted attendee typing into this form.
  * ─────────────────────────────────────────────────────────────────────────────────────────────

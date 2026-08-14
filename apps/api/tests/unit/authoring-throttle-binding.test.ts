@@ -105,7 +105,7 @@ const EXPECTED: readonly {
   // that moves the date range (FR-1014) and the gate on FR-1015's timezone freeze.
   { method: 'PATCH', path: '/admin/conferences/:eventId', action: 'conference_write' },
 
-  // The only product-wide capability an organizer holds (v4.2.0 N3).
+  // The only product-wide capability an organizer holds (v5.2.0 N3).
   { method: 'POST', path: '/admin/conferences', action: 'conference_create' },
 ]
 

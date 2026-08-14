@@ -162,7 +162,7 @@ describe('011 — the guards this feature did not touch are still in force', () 
    * because if 013 needed one that would be a second trigger and a governance conversation.* It
    * was right, and 013 passed it.
    *
-   * **014 had that conversation.** Constitution v4.2.0, ratified 2026-08-12, admits a second
+   * **014 had that conversation.** Constitution v5.2.0, ratified 2026-08-12, admits a second
    * trigger — a material change to a session the attendee has **saved**, where material means
    * exactly *cancelled, start time, room*. The amendment gated the first line of this feature's
    * code, exactly as v3.1.0 gated 007's Phase 7 and v3.3.0 gated 009.
@@ -173,7 +173,7 @@ describe('011 — the guards this feature did not touch are still in force', () 
    *   1. Both permitted triggers are still named.
    *   2. The **acts 013 was refused** are still absent — promotion, demotion, report resolution.
    *      Those remain forbidden (FR-935, FR-946) and would be a **third** trigger.
-   *   3. The **changes v4.2.0 did not grant** are still absent from the dispatch path: a title
+   *   3. The **changes v5.2.0 did not grant** are still absent from the dispatch path: a title
    *      or summary edit, a speaker change, a reinstatement, and a session *starting*.
    * ═══════════════════════════════════════════════════════════════════════════════════════════
    */
@@ -193,7 +193,7 @@ describe('011 — the guards this feature did not touch are still in force', () 
 
     expect(
       guard,
-      'The notification trigger audit no longer names the authoring caller. v4.2.0 admits a ' +
+      'The notification trigger audit no longer names the authoring caller. v5.2.0 admits a ' +
         'material change to a SAVED session as the second trigger, and this audit is where the ' +
         'permitted callers are declared — if the name is gone, either the trigger was removed ' +
         'or the dispatch has moved somewhere the audit does not scan (research R3).',
@@ -212,13 +212,13 @@ describe('011 — the guards this feature did not touch are still in force', () 
       ).toBe(false)
     }
 
-    // And the changes v4.2.0 deliberately did NOT make material. The audit asserts these are
+    // And the changes v5.2.0 deliberately did NOT make material. The audit asserts these are
     // absent from the dispatch path; this asserts it still asks.
     for (const bounded of ['reinstat', 'speakerChanged', 'titleChanged']) {
       expect(
         guard,
         `The notification trigger audit no longer checks that "${bounded}" cannot dispatch. ` +
-          'v4.2.0 enumerated the material set — cancelled, start time, room — precisely so that ' +
+          'v5.2.0 enumerated the material set — cancelled, start time, room — precisely so that ' +
           'widening it is an edit somebody has to justify.',
       ).toContain(bounded)
     }

@@ -106,7 +106,7 @@ export const agendaRoutes = async (app: FastifyInstance): Promise<void> => {
         tags: ['agenda'],
         summary: "The attendee's saved sessions for this conference",
         description:
-          'Identifiers only, not whole sessions (FR-188). The programme is fetched separately and already carries the session data; returning it again here would be a second source of truth that could disagree with the first. An attendee who has saved nothing gets an empty array — a valid answer, not a 404 (FR-195).\n\n**014 adds `changedSinceViewed` to each entry** (FR-1030): true while the session has materially changed — cancelled, start time, or room — since this attendee last viewed it. It is **per-row state about one saved session** and never an aggregate: no surface in either product may present a count of them (FR-1031, v4.2.0 N2).',
+          'Identifiers only, not whole sessions (FR-188). The programme is fetched separately and already carries the session data; returning it again here would be a second source of truth that could disagree with the first. An attendee who has saved nothing gets an empty array — a valid answer, not a 404 (FR-195).\n\n**014 adds `changedSinceViewed` to each entry** (FR-1030): true while the session has materially changed — cancelled, start time, or room — since this attendee last viewed it. It is **per-row state about one saved session** and never an aggregate: no surface in either product may present a count of them (FR-1031, v5.2.0 N2).',
         security: [{ sessionCookie: [] }],
         params: eventIdParam,
         response: {

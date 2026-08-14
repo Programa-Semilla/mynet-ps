@@ -61,7 +61,7 @@ describe('the administrative sign-in screen', () => {
     await userEvent.type(screen.getByLabelText(/email/i), 'operator@mynet.invalid')
     expect(submit, 'submit enabled with only the address filled').toBeDisabled()
 
-    await userEvent.type(screen.getByLabelText(/password/i), 'a-password')
+    await userEvent.type(screen.getByLabelText(/^password$/i), 'a-password')
     expect(submit).toBeEnabled()
   })
 
@@ -75,7 +75,7 @@ describe('the administrative sign-in screen', () => {
     renderApp(services)
 
     await userEvent.type(await screen.findByLabelText(/email/i), 'operator@mynet.invalid')
-    await userEvent.type(screen.getByLabelText(/password/i), 'wrong')
+    await userEvent.type(screen.getByLabelText(/^password$/i), 'wrong')
     await userEvent.click(screen.getByRole('button', { name: /sign in/i }))
 
     // Announced, not merely rendered: it is the only feedback this form gives, and a
@@ -105,7 +105,7 @@ describe('the administrative sign-in screen', () => {
     renderApp(services)
 
     await userEvent.type(await screen.findByLabelText(/email/i), 'operator@mynet.invalid')
-    await userEvent.type(screen.getByLabelText(/password/i), 'a-password')
+    await userEvent.type(screen.getByLabelText(/^password$/i), 'a-password')
     await userEvent.click(screen.getByRole('button', { name: /sign in/i }))
 
     // Required wherever data crosses the network.

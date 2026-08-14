@@ -47,7 +47,7 @@ export interface SessionNote {
  *
  * ═════════════════════════════════════════════════════════════════════════════════════════
  * **`changedSinceViewed` IS PER-ROW STATE ABOUT ONE SESSION, AND THAT IS THE WHOLE OF N2**
- * (FR-1030, FR-1031, constitution v4.2.0).
+ * (FR-1030, FR-1031, constitution v5.2.0).
  *
  * The server computes it as `sessions.logistics_changed_at > saved_sessions.viewed_at` — two
  * timestamps and a comparison, with nothing stored per change. It travels on **this existing
@@ -74,7 +74,7 @@ export interface SavedSession {
   readonly sessionId: string
   /**
    * True while the session has materially changed — cancelled, start time, or room — since this
-   * attendee last viewed it (v4.2.0 N1). Cleared by `markViewed`, never by time passing.
+   * attendee last viewed it (v5.2.0 N1). Cleared by `markViewed`, never by time passing.
    */
   readonly changedSinceViewed: boolean
 }

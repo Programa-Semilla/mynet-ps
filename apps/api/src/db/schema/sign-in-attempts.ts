@@ -204,13 +204,13 @@ export const THROTTLE_ACTIONS = [
   // requires in those words. Two of them matter for reasons the other three do not have, and a
   // shared counter would let either be spent by the others: `conference_create` is the only
   // product-wide act an organizer holds and nothing else bounds how many conferences they may
-  // make (v4.2.0 N3 accepts that as bounded by trust), and `session_cancel` bounds an act that
+  // make (v5.2.0 N3 accepts that as bounded by trust), and `session_cancel` bounds an act that
   // reaches attendees' phones — an unthrottled cancel loop is a push amplifier pointed at every
   // attendee who saved anything.
   //
   // **`session_notify` is a sixth, added by the deep review, and it exists because the sentence
   // above used to say `session_cancel` was the *only* act that reaches a phone.** It is not: a
-  // start-time or room change is material too (v4.2.0 N1), and that path is charged
+  // start-time or room change is material too (v5.2.0 N1), and that path is charged
   // `session_write` at twelve times the allowance. Materiality is only knowable after the write,
   // so the **interruption** is bounded on its own rather than the edit being charged the tighter
   // bound — a title edit must not cost what a cancellation costs. Exhausting it skips the push

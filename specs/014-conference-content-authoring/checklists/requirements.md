@@ -38,7 +38,7 @@
 **One [NEEDS CLARIFICATION] marker remains**, at **FR-1034**: whether a single organizer action that
 materially changes several of an attendee's saved sessions produces one notification per session or
 one coalesced notification. It is retained rather than defaulted because the two readings have
-materially different user experiences **and** the coalesced form brushes against constitution v4.2.0
+materially different user experiences **and** the coalesced form brushes against constitution v5.2.0
 N2, which forbids an aggregate over changes. Defaulting it would resolve a governance boundary by
 inference, which is the failure mode v3.3.0 exists to prevent.
 
@@ -56,7 +56,7 @@ consequence, and the third is the one worth noticing.
 1. FR-1034 rewritten, with FR-1034a and FR-1034b added to hold the boundary; FR-1029 narrowed to
    the single-session case; FR-1031 and SC-1009 scoped to surfaces inside the product; Story 3
    gained acceptance scenario 1a; SC-1012 added to count dispatches.
-2. **Constitution v4.2.0's N2 was amended in its draft** rather than stacked as a later version,
+2. **Constitution v5.2.0's N2 was amended in its draft** rather than stacked as a later version,
    because a coalesced body carrying a count is an aggregate over changes and N2 as first drafted
    forbade exactly that shape. N2 now states that the prohibition governs surfaces **inside** the
    product, with two rules holding the line: activation must land on the destination carrying the
@@ -95,6 +95,6 @@ asserted.
    verified against real mechanisms, and a declaration naming no mechanism cannot be checked. The
    body of the spec (Requirements, Success Criteria) stays free of them.
 2. *"Scope is clearly bounded"* passes for the feature, but the spec is **gated on constitution
-   v4.2.0, which is drafted and not ratified.** Five requirements cite N1–N5 directly. If the
+   v5.2.0, which is drafted and not ratified.** Five requirements cite N1–N5 directly. If the
    amendment is reworded at ratification, FR-1026/1027/1031/1040 and the cancellation block change
    with it. Recorded in the spec header as a blocking condition.

@@ -11,7 +11,7 @@ import { AdminDialog } from '../shell/AdminDialog.js'
  *
  * `saved_sessions`, `session_notes`, `session_questions` and `question_votes` all cascade from
  * `sessions.id`. One `DELETE` and four kinds of other people's writing are gone — silently, with
- * no confirmation and no record. v4.2.0's N5 calls that a **correction of a live hazard rather
+ * no confirmation and no record. v5.2.0's N5 calls that a **correction of a live hazard rather
  * than a preference**, and the server refuses it (FR-1019); this is the surface that makes the
  * refusal comprehensible **before** the organizer meets it.
  *

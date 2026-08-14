@@ -54,7 +54,7 @@ describe('the notification payload (T072, FR-1029, FR-1034)', () => {
   })
 
   it('says WHAT changed, in the body, for each of the three material changes', () => {
-    // The three v4.2.0's N1 enumerates. An attendee reading a lock screen needs to know whether
+    // The three v5.2.0's N1 enumerates. An attendee reading a lock screen needs to know whether
     // to go somewhere else or not to go at all, and "a session changed" answers neither.
     expect(payloadFor(act('cancelled'), ['session-1'], 'event-1', 'dispatch-1').body).toMatch(
       /cancelled/i,

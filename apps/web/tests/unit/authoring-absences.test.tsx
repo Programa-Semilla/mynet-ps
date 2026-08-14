@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 
 /**
  * T066 (014) — **the count is permitted in the payload and forbidden everywhere it could become
- * something to look at** (FR-1031, SC-1009, constitution v4.2.0 N2).
+ * something to look at** (FR-1031, SC-1009, constitution v5.2.0 N2).
  *
  * ═════════════════════════════════════════════════════════════════════════════════════════════
  * **THIS IS THE ONE ABSENCE 014 CAN BREACH BY SATISFYING ITS OWN REQUIREMENTS.**
@@ -16,7 +16,7 @@ import { describe, expect, it } from 'vitest'
  * the coalesced payload carries a count (FR-1034a), and a badge is neither a bell nor a list. It
  * would still be exactly the surface N2 forbids.
  *
- * v4.2.0 draws the line in one sentence and this file is where it is enforced: **no view in
+ * v5.2.0 draws the line in one sentence and this file is where it is enforced: **no view in
  * either product may present that count.** The moment a screen answers *"how many things
  * changed"*, this is broken regardless of what the payload does.
  *
@@ -102,7 +102,7 @@ describe('014 — no aggregate and no change list in either client (FR-1031, SC-
       offenders(COUNT),
       'A view counts changed sessions. The count is permitted in the notification payload ' +
         '(FR-1034a) and forbidden everywhere it could become something to look at — the moment a ' +
-        'screen answers "how many things changed", v4.2.0 N2 is broken however the payload ' +
+        'screen answers "how many things changed", v5.2.0 N2 is broken however the payload ' +
         'behaves.',
     ).toEqual([])
   })
@@ -155,7 +155,7 @@ describe('014 — no aggregate and no change list in either client (FR-1031, SC-
 
     expect(
       offenders(BELL),
-      'A bell exists. v4.2.0 widened the trigger set and left this prohibition untouched: the ' +
+      'A bell exists. v5.2.0 widened the trigger set and left this prohibition untouched: the ' +
         'bell and the in-app notification centre remain forbidden, unchanged.',
     ).toEqual([])
   })

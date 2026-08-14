@@ -285,7 +285,7 @@ product's actions and both must be edited. The five are `conference_create`, `se
 
 **Two deserve real thresholds rather than a default**: `conference_create`, because it is the only
 product-wide act an organizer holds and nothing else bounds how many conferences they may make
-(v4.2.0 accepts this as bounded by trust); and `session_cancel`, because it is the only authoring
+(v5.2.0 accepts this as bounded by trust); and `session_cancel`, because it is the only authoring
 act that reaches attendees' phones — an unthrottled cancel loop is a push amplifier pointed at every
 attendee who saved anything.
 

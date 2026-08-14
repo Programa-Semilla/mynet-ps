@@ -28,13 +28,13 @@ import {
 
 /**
  * T060 (014) — **the second notification trigger, and the three changes that are it**
- * (FR-1026, FR-1027, SC-1006, constitution v4.2.0 N1).
+ * (FR-1026, FR-1027, SC-1006, constitution v5.2.0 N1).
  *
  * ═════════════════════════════════════════════════════════════════════════════════════════════
  * **THE NEGATIVE CASES ARE THE POINT, BECAUSE THE SET IS ENUMERATED RATHER THAN DESCRIBED.**
  *
  * v3.1.0 admitted exactly one trigger — a received message — and was worded so a second would
- * require an amendment. v4.2.0 is that amendment, and what it granted is **cancelled, start time,
+ * require an amendment. v5.2.0 is that amendment, and what it granted is **cancelled, start time,
  * room. Nothing else.** The principle that generated the set is *a notification is raised when a
  * change affects **where or whether** the attendee must be somewhere*; a title, a summary, a
  * track or a change of speaker is **content**, and content does not strand anybody in the wrong
@@ -196,7 +196,7 @@ describe('what a material change is (T060, FR-1026, FR-1027)', () => {
     expect(
       push.delivered(),
       'A track change dispatched. A track is how a session is categorised, which is content — it ' +
-        'does not strand anybody in the wrong corridor (FR-1027, v4.2.0 N1).',
+        'does not strand anybody in the wrong corridor (FR-1027, v5.2.0 N1).',
     ).toEqual([])
   })
 
@@ -390,7 +390,7 @@ describe('what a material change is (T060, FR-1026, FR-1027)', () => {
     it('marks only the attendee who saved it, and only the session that changed', async () => {
       // Two isolations in one: the marker is per-row state about one saved session, so a second
       // saved session must not inherit it — and it is per attendee, which is what stops it ever
-      // being a product-wide "something changed" signal (FR-1031, v4.2.0 N2).
+      // being a product-wide "something changed" signal (FR-1031, v5.2.0 N2).
       const other = await app.inject({
         method: 'POST',
         url: at('/sessions'),
@@ -408,7 +408,7 @@ describe('what a material change is (T060, FR-1026, FR-1027)', () => {
         rows.find((one) => one.sessionId === otherId)?.changedSinceViewed,
         'A session nothing happened to carries a marker. The marker is per-row state about one ' +
           'saved session; a second row inheriting it is the first step towards it meaning ' +
-          '"something changed somewhere", which is the inbox v4.2.0 N2 forbids.',
+          '"something changed somewhere", which is the inbox v5.2.0 N2 forbids.',
       ).toBe(false)
     })
   })

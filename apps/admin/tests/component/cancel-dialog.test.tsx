@@ -7,13 +7,13 @@ import { adminSession } from '../support/services.js'
 
 /**
  * T-review (014) — **the dialog that decides between cancelling and deleting** (FR-1018,
- * FR-1019, FR-1025, constitution v4.2.0 N5).
+ * FR-1019, FR-1025, constitution v5.2.0 N5).
  *
  * ═════════════════════════════════════════════════════════════════════════════════════════════
  * **THIS COMPONENT HAD NO TEST OF ANY KIND, AND IT CARRIES THE ONE RULE THIS FEATURE WAS
  * AMENDED TO ADD.**
  *
- * v4.2.0's N5 is a correction of a live hazard rather than a preference: `saved_sessions`,
+ * v5.2.0's N5 is a correction of a live hazard rather than a preference: `saved_sessions`,
  * `session_notes`, `session_questions` and `question_votes` each cascade from `sessions.id`, so
  * before 014 a single `DELETE` destroyed four kinds of other people's private writing with no
  * confirmation and no record. The server refuses it under a `FOR UPDATE` lock — that is the
@@ -107,7 +107,7 @@ describe('a session attendees have engaged with', () => {
       screen.queryByRole('button', { name: DELETE_LABEL }),
       'The dialog offered deletion for a session somebody has engaged with. The server refuses ' +
         'it (FR-1019), so this is a control that can only ever answer 409 — and the organizer ' +
-        'would learn v4.2.0 N5’s rule from a refusal rather than from the screen.',
+        'would learn v5.2.0 N5’s rule from a refusal rather than from the screen.',
     ).toBeNull()
 
     // Cancelling is always available, and is the act the dialog leads with.

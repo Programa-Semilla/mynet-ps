@@ -51,9 +51,9 @@ const codeOf = (text: string): string =>
  *
  * ═════════════════════════════════════════════════════════════════════════════════════════
  * **T020 (014) — `routes/admin/catalog.ts` IS THE SECOND ENTRY, AND ITS PLACEMENT IS THE
- * FINDING RATHER THAN A DETAIL** (constitution v4.2.0 N1, FR-1026, research R3).
+ * FINDING RATHER THAN A DETAIL** (constitution v5.2.0 N1, FR-1026, research R3).
  *
- * v3.1.0 admitted one trigger and was worded so a second would require an amendment. v4.2.0 is
+ * v3.1.0 admitted one trigger and was worded so a second would require an amendment. v5.2.0 is
  * that amendment, and what it granted is **enumerated rather than described**: a material change
  * to a session the attendee has **saved**, where material means exactly three things —
  * *cancelled, start time, room*. A title, a summary or a change of speaker is content, and
@@ -172,7 +172,7 @@ describe('the notification trigger set is exactly two (FR-561, FR-1026)', () => 
     expect(
       importers.sort(),
       'A module reaches the dispatcher and is not one of the two declared triggers. The set is ' +
-        'a received message (v3.1.0) and a material change to a saved session (v4.2.0 N1) — ' +
+        'a received message (v3.1.0) and a material change to a saved session (v5.2.0 N1) — ' +
         'nothing else, and a third requires an amendment rather than an import.',
     ).toEqual([...DISPATCH_CALLERS].sort())
   })
@@ -230,7 +230,7 @@ describe('the notification trigger set is exactly two (FR-561, FR-1026)', () => 
       'The authoring module calls its dispatch helper from more than one place. A material ' +
         'change is one thing that happens — a session was cancelled, moved, or put in another ' +
         'room — and the fan-out is the same for all three. A second call site means an act that ' +
-        'is not one of v4.2.0 N1s three has been given a push.',
+        'is not one of v5.2.0 N1s three has been given a push.',
     ).toBe(2)
   })
 
@@ -249,7 +249,7 @@ describe('the notification trigger set is exactly two (FR-561, FR-1026)', () => 
     ['a session reminder', /\bsessionReminder\b|\bstartingSoon\b|\bupNext\b|\bstarting\b/i],
     ['a marketing or digest send', /\bdigest\b|\bannouncement\b|\bbroadcast\b/i],
     // 014 — the three changes the amendment did NOT grant. Each is a plausible next ask and each
-    // needs its own amendment: v4.2.0 enumerated the set precisely so that widening it is an
+    // needs its own amendment: v5.2.0 enumerated the set precisely so that widening it is an
     // edit somebody has to justify rather than a line somebody adds.
     ['a title or summary edit', /\btitleChanged\b|\bsummaryChanged\b/i],
     ['a speaker change', /\bspeakerChanged\b|\bspeakerAdded\b/i],
@@ -269,7 +269,7 @@ describe('the notification trigger set is exactly two (FR-561, FR-1026)', () => 
       dispatchers,
       'A dispatch path names a trigger the constitution has not admitted. The set is a received ' +
         'message (v3.1.0) and a cancellation, start-time change or room change to a SAVED ' +
-        'session (v4.2.0 N1). Anything else is a scope change that needs an amendment — and ' +
+        'session (v5.2.0 N1). Anything else is a scope change that needs an amendment — and ' +
         'this assertion reads the dispatch helper bodies, so moving the word elsewhere in the ' +
         'module is not the fix.',
     ).toEqual([])
@@ -286,6 +286,45 @@ describe('the notification trigger set is exactly two (FR-561, FR-1026)', () => 
       expect(region.length, `no dispatch region extracted from ${caller}`).toBeGreaterThan(80)
       expect(region, `the region extracted from ${caller} does not dispatch`).toMatch(
         /dispatchToDevices|dispatchPush/,
+      )
+    }
+  })
+
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════════════════
+   * T036 (016) — **the card exchange dispatches nothing** (FR-1029).
+   *
+   * The two structural cases above already make this impossible, since only
+   * `routes/conversations.ts` may import the dispatcher or reach `app.push`. This names the card
+   * path anyway, for a reason 016 supplies and 007 could not:
+   *
+   * **C1 made acquiring a contact PASSIVE.** Until v5.0.0 a card only ever arrived because the
+   * holder reciprocated, so there was nothing to announce and nobody was tempted to announce it.
+   * Now a card appears in somebody's Network from another person's act, and "tell them" becomes
+   * the obvious next thought — it is one line, it reads as a kindness, and it is a second
+   * notification trigger, which the constitution requires somebody to *decide*.
+   *
+   * The specification records this as the open question C1 creates (*"is 'found on your next
+   * visit to Network' enough?"*) and answers it for now with FR-1029 plus FR-1030's absent Home
+   * card. So the refusal is deliberate and needs a named guard rather than an incidental one.
+   * ═══════════════════════════════════════════════════════════════════════════════════════
+   */
+  it('T036 — nothing on the card write path can dispatch (FR-1029)', () => {
+    const cardPath = ['routes/cards.ts', 'db/queries/cards.ts']
+
+    const sources = sourcesUnder(SRC).filter(({ name }) => cardPath.includes(name))
+
+    // The files exist. Renaming one must fail this rather than silently checking nothing.
+    expect(sources.map(({ name }) => name).sort()).toEqual([...cardPath].sort())
+
+    for (const { name, text } of sources) {
+      const code = codeOf(text)
+
+      expect(code, `${name} imports the notification dispatcher`).not.toMatch(
+        /from '.*notifications\//,
+      )
+      expect(code, `${name} reaches the push port`).not.toMatch(
+        /\bapp\.push\b|\bfastify\.push\b|\brequest\.server\.push\b/,
       )
     }
   })

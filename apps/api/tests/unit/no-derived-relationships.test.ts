@@ -30,7 +30,7 @@ import { describe, expect, it } from 'vitest'
  *     administrative act.
  *   - **Appointment.** A speaker on a session becomes a meeting slot with the speaker. No:
  *     a speaker is conference content describing a person who may hold no account at all
- *     (register entry 28), and an appointment claims a slot of somebody's time.
+ *     (register entry 30), and an appointment claims a slot of somebody's time.
  *
  * Each would be a *feature*, not a bug, to whoever added it — which is exactly why it is asserted
  * as an absence with the reasoning attached rather than left to review.
@@ -114,7 +114,7 @@ describe('014 — no relationship is derived from an authoring act (FR-1044)', (
     expect(
       joining,
       'A speaker is joined to an attendee account. A speaker is conference content describing a ' +
-        'person who may hold no account at all (register entry 28); resolving them to one would ' +
+        'person who may hold no account at all (register entry 30); resolving them to one would ' +
         'make a programme edit into a route to somebody’s profile.',
     ).toEqual([])
   })

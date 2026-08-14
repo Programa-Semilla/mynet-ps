@@ -271,7 +271,11 @@ test.describe('responsive layout', () => {
     await expectCentred(page, 'the attendee profile')
 
     await profile.getByRole('button', { name: /share your card with/i }).click()
-    await expect(profile.getByRole('status')).toContainText(/your card is now with/i)
+    // 016 — the confirmation states the EXCHANGE (FR-1021, FR-1022). It said "your card is now
+    // with …" until C1 made sharing mutual, and this assertion is only here to wait for the
+    // status region before pressing Escape — but a stale phrase would have failed the whole
+    // responsive sweep for a reason having nothing to do with layout.
+    await expect(profile.getByRole('status')).toContainText(/have exchanged cards/i)
     await page.keyboard.press('Escape')
 
     // ─────────────────────────────────────────────────────────────────────────────────────
@@ -492,7 +496,7 @@ test.describe('responsive layout', () => {
     for (const width of SCROLL_WIDTHS) {
       await page.setViewportSize({ width, height: 900 })
       await page.goto('/')
-      await expect(page.getByLabel('Password')).toBeVisible()
+      await expect(page.getByLabel('Password', { exact: true })).toBeVisible()
 
       const { overflow, widest } = await horizontalOverflow(page)
       expect(
@@ -832,6 +836,99 @@ test.describe('responsive layout', () => {
         expect(
           overflow,
           `${path} overflows by ${overflow}px at ${width}px. Widest: ${JSON.stringify(widest)}`,
+        ).toBeLessThanOrEqual(0)
+      }
+    }
+  })
+
+  /**
+   * T007 (016) — **the send control stays inside the viewport at every composer height**
+   * (FR-1003, SC-1001).
+   *
+   * ═════════════════════════════════════════════════════════════════════════════════════════
+   * **THIS MEASURES POSITION, WHICH IS THE CLASS OF DEFECT THIS PROJECT KEEPS SHIPPING.**
+   *
+   * 008's scheduling dialog rendered in the top-left corner having passed 135 e2e tests, five
+   * review agents and CodeRabbit, because every one of them checked *behaviour*. The composer is
+   * the same shape of failure found the same way — by the owner using the product — and no
+   * behavioural assertion can see it: the field accepts text, the button is enabled, the send
+   * resolves, and the message cannot be sent because the control is below the fold.
+   *
+   * So this asserts the box, at all three bands, with the composer driven to its maximum.
+   * ═════════════════════════════════════════════════════════════════════════════════════════
+   *
+   * **A short viewport is used deliberately.** 844px is the phone the prototype was drawn at;
+   * 420px stands in for that phone *with an on-screen keyboard raised*, which Playwright cannot
+   * summon and which is the exact configuration that produced the original report. A bound
+   * expressed as a proportion is what makes the second case pass, and a fixed height or a line
+   * count is what would fail it — so this is also the test that would catch FR-1002 being
+   * satisfied by the wrong kind of rule.
+   */
+  test('the send control stays within the viewport at every composer height', async ({ page }) => {
+    await signedIn(page)
+
+    // 500 characters, which is SC-1001's stated floor, with no spaces long enough to wrap
+    // unnaturally — a realistic long message rather than one unbroken token.
+    const longMessage = 'This is a long message that keeps going. '.repeat(13)
+    expect(longMessage.length).toBeGreaterThanOrEqual(500)
+
+    for (const { px, layout } of WIDTHS) {
+      // The tall case is the ordinary one; the short case stands in for a raised keyboard.
+      for (const height of [844, 420]) {
+        await page.setViewportSize({ width: px, height })
+        await page.goto('/discover')
+
+        await page
+          .getByRole('link', { name: new RegExp(GRACE.displayName) })
+          .first()
+          .click()
+        await page
+          .getByRole('dialog')
+          .getByRole('link', { name: new RegExp(`message ${GRACE.displayName}`, 'i') })
+          .click()
+
+        const composer = page.getByRole('textbox', { name: /message/i })
+        await expect(composer).toBeVisible()
+        await composer.fill(longMessage)
+
+        const send = page.getByRole('button', { name: /send message/i })
+        await expect(send).toBeVisible()
+
+        const box = await send.boundingBox()
+        expect(box, `no box for the send control at ${px}×${height}`).not.toBeNull()
+
+        const viewport = page.viewportSize()!
+        const where = `${layout} ${px}×${height}`
+
+        // Fully within, on every edge — not merely intersecting. A control half off the bottom
+        // is a control an attendee cannot reliably hit with a thumb.
+        expect(box!.y, `send control starts above the viewport at ${where}`).toBeGreaterThanOrEqual(
+          0,
+        )
+        expect(
+          box!.y + box!.height,
+          `send control is cut off below the viewport at ${where} — this is the original defect: ` +
+            `a long message cannot be sent at all`,
+        ).toBeLessThanOrEqual(viewport.height)
+        expect(
+          box!.x,
+          `send control starts left of the viewport at ${where}`,
+        ).toBeGreaterThanOrEqual(0)
+        expect(
+          box!.x + box!.width,
+          `send control extends past the right edge at ${where}`,
+        ).toBeLessThanOrEqual(viewport.width)
+
+        // It has to be usable, not merely present: a control behind the keyboard area would
+        // satisfy a box check and still refuse the tap.
+        await expect(send).toBeEnabled()
+
+        // And the composer must not have introduced page-level sideways scrolling by growing.
+        const { overflow, widest } = await horizontalOverflow(page)
+        expect(
+          overflow,
+          `the grown composer overflows by ${overflow}px at ${where}. ` +
+            `Widest: ${JSON.stringify(widest)}`,
         ).toBeLessThanOrEqual(0)
       }
     }

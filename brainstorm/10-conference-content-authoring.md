@@ -1,8 +1,8 @@
 # Brainstorm: Conference content authoring (014)
 
 **Date:** 2026-08-12
-**Status:** spec-created — `specs/014-conference-content-authoring/`; amendment **v4.2.0 ratified
-2026-08-12** as standing decisions 40–44
+**Status:** spec-created — `specs/014-conference-content-authoring/`; amendment **v5.2.0 ratified
+2026-08-12** as standing decisions 45–49
 
 ## Problem Framing
 
@@ -160,10 +160,10 @@ cannot describe the act of creating one.
 ## Decision
 
 Build **conference content authoring in the administrative product**, with **live editing from day
-one**, gated by a **constitution amendment (v4.2.0)** carrying **two** changes, and delivered as
+one**, gated by a **constitution amendment (v5.2.0)** carrying **two** changes, and delivered as
 **one PR** reserving **migration `0011`**.
 
-**Why v4.2.0 is MINOR.** It extends notification scope and clarifies an authority boundary. Nothing
+**Why v5.2.0 is MINOR.** It extends notification scope and clarifies an authority boundary. Nothing
 delivered is retracted, no principle is removed, and no prior work is invalidated — the test
 v3.1.0 applied to itself when it brought delivery into scope at all.
 
@@ -223,7 +223,7 @@ Agreed during this session. These feed the spec; they are not the spec.
     guarantee and the deliberately empty third conference that keeps the "no programme" state from
     rotting.
 13. **Migration `0011`.**
-14. **Constitution amendment v4.2.0 gates the first line of code**, as v3.1.0 gated 007's Phase 7,
+14. **Constitution amendment v5.2.0 gates the first line of code**, as v3.1.0 gated 007's Phase 7,
     v3.2.0 gated 008, v3.3.0 gated 009 and v4.0.0 gated 013.
 
 ## Open Questions

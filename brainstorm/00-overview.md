@@ -1,6 +1,13 @@
 # Brainstorm Overview
 
-Last updated: 2026-08-12 (**the delivery roadmap is complete**. Two sessions numbered #08 ran in
+Last updated: 2026-08-12 — **#10 and #11 land a client feedback round that reverses two amendments
+ratified in the previous 72 hours** (v3.2.0's one-directional card, v3.3.0's Q&A attribution),
+decomposes `assets/feedback-1.md` — 118 requirements from a 52-minute client conversation — into
+five features, and **absorbs them into the administrative programme** rather than running a third
+track. A new standing rule arrives with them: every App capability must state its administrative
+counterpart, or state that it has none.
+
+Earlier that day (**the delivery roadmap is complete**. Two sessions numbered #08 ran in
 parallel and both shipped: the **brand mark and application icons**, ratified as constitution
 **v3.4.0**, closing register entry 2 — the oldest in the register; and **UAT deployment and
 pre-public hardening**, ratified as **v3.5.0**. MyNet is deployed and serving at
@@ -14,11 +21,11 @@ v4.0.0 opened. It opens a **second programme** of three features, delivered from
 
 **013 has since shipped** ([#20](https://github.com/Programa-Semilla/mynet-ps/pull/20)), and **#10
 brainstormed 014 — conference content authoring**, the second feature of that programme. Its
-amendment **v4.2.0 was ratified on 2026-08-12** as standing decisions 40–44, carrying two changes: a
+amendment **v5.2.0 was ratified on 2026-08-12** as standing decisions 45–49, carrying two changes: a
 **second notification trigger** — the first since v3.1.0 bounded delivery to a received message and
 nothing else — and an explicit statement that a conference organizer may **create** a conference,
 which decision 32's "only conferences they are assigned" did not anticipate. It opens register
-entries 27 and 28 and closes none. **014 is specified, planned and unblocked**)
+entries 29 and 30 and closes none. **014 is specified, planned and unblocked**)
 
 The authoritative registers live elsewhere — open questions in `.specify/memory/constitution.md`,
 delivery sequence in `docs/superpowers/specs/2026-08-06-mynet-delivery-roadmap-design.md`. This file
@@ -40,7 +47,16 @@ win and this is stale.
 | 08 | 2026-08-10 | brand-mark-and-app-icons | **specified, then implemented**; register entry 2 ratified in constitution **v3.4.0** | `specs/010-brand-mark-and-app-icons/` |
 | 08 | 2026-08-10 | uat-deployment-and-hardening | **shipped (PR #19)**; five owner decisions ratified in constitution **v3.5.0** | `brainstorm/08-uat-deployment-and-hardening.md` |
 | 09 | 2026-08-11 | administrative-product | **decided, and ratified as constitution v4.0.0** the same day — standing decisions 31–36. Opened entries 24, 25, 26; **all three closed by v4.1.0** as decisions 37–39. Delivered as **012** | `brainstorm/09-administrative-product.md` |
-| 10 | 2026-08-12 | conference-content-authoring | **decided, and ratified as constitution v4.2.0** the same day — standing decisions 40–44; opens entries 27 and 28. Specified and planned: 51 FRs, 105 tasks. Live editing from day one; **cancel replaces delete once attendees have engaged**; an in-app marker **and** a push for a changed saved session; both tiers create conferences. One PR, migration `0011` | `brainstorm/10-conference-content-authoring.md` |
+| 10 | 2026-08-12 | conference-content-authoring | **decided, and ratified as constitution v5.2.0** (drafted as v5.2.0) the same day — standing decisions 45–49; opens entries 29 and 30. Specified, planned and **implemented**: 51 FRs, 105 tasks. Live editing from day one; **cancel replaces delete once attendees have engaged**; an in-app marker **and** a push for a changed saved session; both tiers create conferences. One PR, migration `0011` | `brainstorm/10-conference-content-authoring.md` |
+| 10 | 2026-08-12 | app-fixes-and-install-icon | **active** — six owner items from using the running product. Two are not what they look like: mutual card exchange **reverses v3.2.0 N2**, and the new icon is a *different mark* rather than a new size. Feeds **016** | `brainstorm/10-app-fixes-and-install-icon.md` |
+| 11 | 2026-08-12 | client-feedback-programme | **active** — decomposes `assets/feedback-1.md` (118 requirements, 19 areas) into five features. **Absorbs into the administrative programme** rather than running beside it. Reverses **v3.3.0** 48 hours after ratification. Feeds **017, 014, 015, 018, 019** | `brainstorm/11-client-feedback-programme.md` |
+
+**There are two session 10s, and the duplicate is left in place rather than renumbered.** Both were
+held on 2026-08-12, on branches that could not see each other, and both files exist on disk under the
+number their own session used. Renumbering either would break the citations already written into a
+constitution amendment, a specification and a review-findings document. The rule this project keeps
+relearning applies here too: a shared numbering table needs extending in the same change that claims
+a number, and a brainstorm number is one of those tables.
 
 Session 05 has no document of its own: 006 was specified without one, and the row records the
 session rather than a file. 009 likewise — it went straight to specification, and its row is
@@ -109,8 +125,52 @@ requires reversing a Principle III **prohibition** rather than filling an omissi
 | # | Phase | Status | Blocked by |
 |---|-------|--------|------------|
 | 013 | Administrative foundation — second actor, admin site, **abuse-report queue** | **shipped** — squash-merged to `develop`; amendments ratified as **v4.0.0** and **v4.1.0**. Migration `0009` | ~~24, 25, 26~~ — **all three closed by v4.1.0** |
-| 014 | Conference content authoring | **specified and planned; unblocked.** Amendment **v4.2.0 ratified 2026-08-12** (decisions 40–44). Live editing from day one, so #09's central question — what editing a live conference does to attendees who saved those sessions — is answered here rather than deferred: **cancel replaces delete once anyone has engaged**. 51 FRs, 105 tasks, migration `0011` | 013 ✓; v4.2.0 ✓ |
-| 015 | Registration and attendee management | **brainstormed** (#09); licensed by v4.0.0 | 013 |
+| 016 | App fixes, mutual card exchange, install icon | **brainstormed** (#10). Amendment: reverses **v3.2.0 N2**, records the icon-upscale exception, ratifies the admin-counterpart rule. **No migration** | — |
+| 017 | **Q&A rebuilt** — moderation, identity, lifecycle, projection | **brainstormed** (#11). Amendment: reverses **v3.3.0** attribution and retracts shipped 009 FRs | 013 |
+| 014 | Conference content authoring — **rescoped and kept whole** | ⚠ **SPLIT IN FACT, AND THE SPLIT IS NOT YET A DECISION.** #10's scope is **implemented** on `spec/014-conference-content-authoring` (51 FRs, 105 tasks, migration `0011`, amendment **v5.2.0**), authored before #11 existed. #11 then rescoped 014 to also carry event types, optional sessions with capacity and enrolment, and the profile taxonomy — **none of which is built**. See the note below the table | 013 ✓; v5.2.0 ✓ for the built half. The #11 additions remain blocked on **the client's interest and subsector lists, which do not exist** |
+| 015 | Registration and **invitations** — rescoped | **re-brainstormed** (#11). Completes standing decision 11 rather than reversing it | 013 |
+| ~~015~~ | ~~Registration and attendee management~~ | superseded by the row above; #09's scoping is read as replaced by #11's | — |
+| 018 | Profile QR | **brainstormed** (#11) | 014 |
+| 019 | Event lifecycle and post-event material | **brainstormed** (#11). Carries **notification triggers 2 and 3**, and the question of whether this product gains a job runner | 014, 017 |
+
+**#11 replaces #09's three-feature table.** The client conversation of 2026-08-12 arrived after the
+attendee roadmap completed, and most of what it asks for has an administrative half — so it absorbs
+into this programme rather than running beside it. Two programmes authoring the same
+conference-content tables is the implicit coupling this project has already had to fix twice.
+
+**016 and 017 take the next free numbers rather than the next numbers in this sequence**, which is
+now the third time this has happened (011 over the administrative programme, 013 over its own
+sequence, and now these). It is not worth correcting; parallel reservations cannot see each other
+and the number settles at merge.
+
+### 014 is built to #10's scope and rescoped by #11, and reconciling the two is an owner decision
+
+**This is the same collision as the numbering, arriving on scope instead**, and it is the one place
+in this merge where the honest answer was to record the conflict rather than resolve it.
+
+`spec/014-conference-content-authoring` was branched before #11 existed and implements #10's 014 in
+full: tracks, rooms, speakers and sessions authored by an assigned organizer or a platform operator,
+live-edited with no draft lifecycle, cancel-not-delete once anyone has engaged, the second
+notification trigger and the per-row marker. It is complete, reviewed, and green.
+
+#11 then decided — on `develop`, on the same day — that 014 "grows rather than being duplicated" and
+also carries **event types, optional sessions with capacity and enrolment, and the profile taxonomy**
+(REQ-010–014, 027–042, 078–086, 113–115). None of that is built, and #11 itself records the blocker:
+the client's interest and subsector lists do not exist.
+
+**Three ways to reconcile, and choosing is not a planning inference:**
+
+1. **Ship what is built as 014 and move #11's additions to a new feature.** The built half is
+   independently useful and unblocked; the additions stay blocked on a client artifact either way.
+   Costs a number and makes #11's "kept whole" false.
+2. **Hold 014 open and grow it to #11's scope.** Honours "kept whole". Holds a complete, reviewed
+   feature behind a list nobody has, for an unknown period.
+3. **Ship as 014 phase 1, with #11's additions as 014 phase 2 on the same feature directory.** Keeps
+   the number and the narrative; needs the spec to carry two scopes and two gate records.
+
+**Nothing here may be settled by whoever merges next.** #11's own reasoning for absorbing rather than
+paralleling — that two programmes writing the same conference-content tables is the coupling failure
+this project has fixed twice — applies to all three options and does not choose between them.
 
 **Numbered 011–013 when #09 ran, and delivered as 013–015.** The UAT deployment work took 011 from a
 parallel branch while this programme was in flight, so it shifted rather than renumbering a phase
@@ -233,6 +293,49 @@ named them — a reminder that the inbox ages, and that an entry can be resolved
 does not cite it, exactly as register entry 7 was.
 
 ## Open Threads
+
+### Opened 2026-08-12 by #10 and #11 — the client feedback round
+
+These are new and none of them existed four days ago. Listed first because two of them reverse
+decisions ratified inside the last 72 hours, and a reader who meets those reversals in a spec
+without meeting them here will read them as drift.
+
+- **Mutual card exchange reverses v3.2.0 N2** (decision 25), ratified 2026-08-10. Decided by the
+  owner on 2026-08-12; the amendment is 016's. **The metaphor is not the argument** — the
+  defensible ground is that a card exposes only what its owner already published to co-attendees,
+  which the client states independently at REQ-046, and that 007's block already severs cards both
+  ways. Two consequences must reach the spec: the exchange writes two rows in one transaction or
+  none, and whether the *recipient's* discoverability gates a first acquisition is genuinely
+  undecided.
+- **The client's Q&A model replaces 009's in full**, reversing v3.3.0 (decision 27) **48 hours
+  after ratification**. Correct rather than embarrassing: v3.3.0 recorded a deliberate exception
+  after explicitly refusing to derive it, which is what made it cheap to find and revisit. But
+  **first-name-versus-full-name is not settled** — the client's own OPEN-002 says so, and the
+  transcript contains both positions. 017's spec must confirm with her rather than pick.
+- **`assets/brand/new-logo.png` is a different mark, not a new size.** A gradient disc with a
+  wordmark, 114×133 RGBA, against the board's 1254×1254 coral-N-on-navy. The owner's decision is
+  **icon only, not a rebrand**. Three costs are recorded in #10: a ~4× upscale that
+  `brand-audit.mjs` currently fails the build on and which needs a *measured recorded exception*
+  rather than a weakened check; a maskable plate colour that cannot be derived the way the board's
+  was, because this source has alpha; and a home-screen icon that visibly differs from the in-app
+  coral mark, **knowingly accepted** — recorded so nobody later "fixes" it.
+- **The admin-counterpart rule is new governance**, set by the owner in this round: anything
+  requested in the App must be checked for whether its administrative counterpart exists or must be
+  built. Ratified with 016. It paid for itself immediately — "add a confirm-password field" is five
+  screens across two products, and the naive reading was one.
+- **Notification triggers 2 and 3 are in the transcript** (REQ-095, REQ-112) and the source-level
+  audit that blocks them exists for exactly this moment. Each needs an amendment, and REQ-112 needs
+  a **job runner this product has never had**.
+- **014 is now blocked on an external input.** REQ-033 and REQ-036 have the client supplying the
+  interest list and the depurated subsector lists; neither exists. Mitigated by specifying the
+  taxonomy as authored or seeded data so the schema does not wait on the content.
+- **Networking outside events is blocked on the client's lawyers**, by her own note (REQ-049). It
+  contradicts decision 7's per-event Discover, and what is actually being asked for is a *discovery*
+  surface outside an event — relationships already persist.
+- **Layout was caught by a person for the second time.** The mobile composer grows without a bound
+  until its send button is unreachable. Same class as 008's top-left dialog: the control exists, is
+  labelled, is focusable and submits, so every behavioural gate passes it. This is now a pattern
+  with two data points rather than an anecdote, and it strengthens register entry 4.
 
 ### Client decisions
 
@@ -376,7 +479,7 @@ deployment or release.
 
 ### Design questions carried into 014's specification
 
-From #10. The decision itself is made; **the amendment it needs, v4.2.0, is not yet drafted and
+From #10. The decision itself is made; **the amendment it needs, v5.2.0, is not yet drafted and
 gates the first line of code.** These are for `/speckit-specify`, except where they are governance
 and must be escalated. **None may be silently resolved.**
 

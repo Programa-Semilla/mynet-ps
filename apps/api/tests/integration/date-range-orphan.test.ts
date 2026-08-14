@@ -26,7 +26,7 @@ import { ADA, clearThrottle, SEED_PASSWORD, setupTestApp, teardown } from './hel
  * sessions outside the range while touching neither the range nor the sessions**, because the
  * same instants land on different venue-local dates.
  *
- * It also sidesteps a question v4.2.0's N1 would otherwise raise: is shifting every displayed
+ * It also sidesteps a question v5.2.0's N1 would otherwise raise: is shifting every displayed
  * local time a "change of start time", and therefore a notification to everybody? Structurally no
  * instant moves. Freezing is the answer that needs no new rule, and the spec records it as an
  * assumption rather than deriving it.

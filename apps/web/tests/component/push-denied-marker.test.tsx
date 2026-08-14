@@ -13,7 +13,7 @@ import { devicesWith } from '../support/services.js'
  * **THE MARKER IS NOT A FALLBACK FOR THE NOTIFICATION. IT IS THE PRIMARY RECORD, AND THE
  * NOTIFICATION IS THE INTERRUPTION.**
  *
- * That ordering is what makes v4.2.0's second trigger safe to grant. A design where the push is
+ * That ordering is what makes v5.2.0's second trigger safe to grant. A design where the push is
  * the delivery and the marker is a consolation prize would make permission effectively mandatory
  * — decline it and the product stops telling you your session moved — which is the attrition
  * FR-1032 forbids and which 007 already refused once for messages (*"denial is a complete

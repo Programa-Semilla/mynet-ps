@@ -163,15 +163,23 @@ export type AccountExport = {
    * T127 (008) — **cards in both directions, because one row is two different facts**
    * (FR-653, SC-610).
    *
-   * A `shared_cards` row is *a card you gave* to its sharer and *a card you hold* to its
-   * recipient. Neither section is derivable from the other, and collapsing them into one list of
-   * "cards" would force the reader to work out which side of each row they were on.
+   * A `shared_cards` row is *your card, held by them* to its sharer and *their card, held by
+   * you* to its recipient. Neither section is derivable from the other, and collapsing them into
+   * one list of "cards" would force the reader to work out which side of each row they were on.
    *
    * **Unlike `messages`, nothing is withheld here** (contrast FR-578). A held card is not the
-   * sharer's private content — it is a thing they deliberately gave to this attendee, under the
-   * standing consent constitution v3.2.0 (N2) established. What the export reproduces is the
-   * *exchange* — who, when, and at which conference — never a snapshot of the other person's
-   * profile, which resolves live and belongs to them.
+   * sharer's private content — it is a set of fields they had already published to co-attendees
+   * under decision 16's single visibility decision, which is the ground constitution **v5.0.0
+   * (C1)** licenses mutual exchange on. What the export reproduces is the *exchange* — who,
+   * when, and at which conference — never a snapshot of the other person's profile, which
+   * resolves live and belongs to them.
+   *
+   * **T042, FR-1052 (016) — this justification used to cite the standing consent of v3.2.0 (N2), and C1
+   * reverses N2.** The disclosure was and remains right; the stated reason had stopped being
+   * true, which is the defect class 013's review named its most transferable finding. Nothing
+   * about the export's behaviour changes: under mutual exchange both sections simply carry more
+   * rows, and both foreign keys already cascade, so deletion and export coverage are satisfied
+   * by the existing declarations rather than by new ones.
    * ═══════════════════════════════════════════════════════════════════════════════════════
    */
   readonly cardsShared: readonly {

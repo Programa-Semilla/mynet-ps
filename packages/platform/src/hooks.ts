@@ -7,6 +7,8 @@ import type {
   ContactShareService,
   NotificationService,
   SecureStorage,
+  InstallService,
+  InstallState,
   VisibilityService,
 } from './interfaces/index.js'
 import { PlatformContext, type PlatformServices } from './registry.js'
@@ -214,6 +216,32 @@ export const useDocumentVisible = (): boolean => {
   }, [visibility])
 
   return visible
+}
+
+/**
+ * T052 (016) — whether this application is installed, and how it could be (FR-1031, FR-1033).
+ *
+ * The same shape as `useDocumentVisible` and `useConnectivity`, for the same reason: install
+ * state is ambient, it changes underneath the reader — `beforeinstallprompt` can arrive after
+ * first paint, and `appinstalled` fires whether the install came from our own prompt or from the
+ * browser's menu — and a caller that read it once would be wrong at the moment it mattered.
+ *
+ * Returns the whole state rather than a boolean, because FR-1034 turns on **which** of its parts
+ * is true: a caller has to know that `promptToInstall` is `null` before it can decide between
+ * offering a control and giving written steps.
+ */
+export const useInstallState = (): InstallState => {
+  const install: InstallService = usePlatform().devices.install
+  const [state, setState] = useState<InstallState>(() => install.current())
+
+  useEffect(() => {
+    // Re-read on mount: the value may have changed between the initial render and the
+    // subscription being attached.
+    setState(install.current())
+    return install.subscribe(setState)
+  }, [install])
+
+  return state
 }
 
 export const useConnectivity = (): boolean => {

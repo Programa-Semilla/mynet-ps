@@ -28,11 +28,11 @@ import { events } from './events.js'
  * ═════════════════════════════════════════════════════════════════════════════════════════
  *
  * ─────────────────────────────────────────────────────────────────────────────────────────
- * **T002 (014) — "THERE IS NO WRITE PATH TO IT AT ANY PRIVILEGE" WAS TRUE UNTIL v4.2.0 AND IS
+ * **T002 (014) — "THERE IS NO WRITE PATH TO IT AT ANY PRIVILEGE" WAS TRUE UNTIL v5.2.0 AND IS
  * NOW FALSE. WHAT REPLACES IT IS NARROWER THAN "ANYBODY MAY WRITE".**
  *
  * The original sentence read: *this content is seeded, and there is no write path to it at any
- * privilege (FR-132, FR-134)*. Constitution v4.0.0 admitted a second actor and v4.2.0 gave that
+ * privilege (FR-132, FR-134)*. Constitution v4.0.0 admitted a second actor and v5.2.0 gave that
  * actor a write path into exactly these five tables. The correction is recorded here rather
  * than deleted, because a reader arriving from `queries/catalog.ts` or from
  * `catalog-read-only.test.ts` needs to know which half survived:
@@ -180,7 +180,7 @@ export const sessions = pgTable(
 
     /**
      * T002 (014) — **cancellation: conference content, and STORED rather than derived**
-     * (FR-1020, v4.2.0 N5).
+     * (FR-1020, v5.2.0 N5).
      *
      * ═════════════════════════════════════════════════════════════════════════════════════
      * Null means the session is happening. A value means an organizer cancelled it, and when.
@@ -208,7 +208,7 @@ export const sessions = pgTable(
      * T002 (014) — **when this session last changed MATERIALLY** (FR-1026, FR-1030, R7).
      *
      * ─────────────────────────────────────────────────────────────────────────────────────
-     * Set when — and only when — one of v4.2.0 N1's three changes lands: the session is
+     * Set when — and only when — one of v5.2.0 N1's three changes lands: the session is
      * cancelled, its start time changes, or its room changes. A title, summary, track or
      * speaker edit leaves it alone (FR-1027), because content does not strand anybody in the
      * wrong corridor.

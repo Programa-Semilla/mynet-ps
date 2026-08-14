@@ -1,7 +1,7 @@
 # Implementation Plan: Conference Content Authoring
 
 **Branch**: `spec/014-conference-content-authoring` | **Date**: 2026-08-12 | **Spec**: [spec.md](./spec.md)
-**Constitution**: v4.2.0 (N1–N5) — **RATIFIED 2026-08-12, unchanged from the drafted text.**
+**Constitution**: v5.2.0 (N1–N5) — **RATIFIED 2026-08-12, unchanged from the drafted text.**
 **Input**: Feature specification from `specs/014-conference-content-authoring/spec.md`
 
 ## Summary
@@ -57,7 +57,7 @@ refused. The attendee product gains no new cached read
 
 | Principle | Pre-design | Post-design |
 |---|---|---|
-| **I. Requirements define the product** | PASS — every requirement traces to v4.2.0's N1–N5 or the spec | PASS |
+| **I. Requirements define the product** | PASS — every requirement traces to v5.2.0's N1–N5 or the spec | PASS |
 | **II. Prototype is reference only** | PASS — the prototype has no authoring surface and no changed-session state | PASS |
 | **III. Attendee experience first** | PASS — authoring is confined to the second product under v4.0.0's four conditions | PASS — **with one thing to watch**: 014 is the first feature since 013 to change MyNet, so FR-1003's absence must be re-asserted rather than assumed still true |
 | **IV. Accessibility & responsiveness** | PASS — FR declarations bind both products | PASS, **with a flagged risk**: see Complexity Tracking |
@@ -71,7 +71,7 @@ refused. The attendee product gains no new cached read
 
 **Governance**: **blocked by nothing.** Resolves no register entry. **Escalates**
 entry **4** (a substantial new administrative surface at desktop width) and entry **22** (the cached
-programme gains a second way to be wrong). Opens none beyond **27** and **28**, which v4.2.0 opens.
+programme gains a second way to be wrong). Opens none beyond **27** and **28**, which v5.2.0 opens.
 Reserved migration **`0011`**.
 
 ## Project Structure

@@ -4,13 +4,13 @@
 
 **Created**: 2026-08-12
 
-**Status**: Ready for implementation — **constitution v4.2.0 RATIFIED 2026-08-12.**
+**Status**: Ready for implementation — **constitution v5.2.0 RATIFIED 2026-08-12.**
 
 **Input**: Brainstorm #10 (`brainstorm/10-conference-content-authoring.md`), decided 2026-08-12.
 Licensed in principle by constitution v4.0.0 standing decision 36, which names 014 as the second
 feature of the administrative programme.
 
-> **v4.2.0 was ratified on 2026-08-12, unchanged from the drafted text**, so every requirement citing
+> **v5.2.0 was ratified on 2026-08-12, unchanged from the drafted text**, so every requirement citing
 > N1–N5 stands as written. The amendment gated the first line of code, as v3.1.0 gated 007's Phase 7,
 > v3.2.0 gated 008, v3.3.0 gated 009 and v4.0.0 gated 013. **Nothing now blocks implementation.**
 
@@ -273,7 +273,7 @@ conference they were not assigned to.
 
 - **FR-1026**: A **material change** to a session an attendee has saved MUST dispatch exactly one
   notification to that attendee. Material means exactly three things: **the session is cancelled,
-  its start time changes, or its room changes** (constitution v4.2.0, N1).
+  its start time changes, or its room changes** (constitution v5.2.0, N1).
 - **FR-1027**: A change to a session's title, summary, track or speakers MUST NOT dispatch a
   notification.
 - **FR-1028**: A change to a session **no** attendee has saved MUST dispatch nothing.
@@ -292,7 +292,7 @@ conference they were not assigned to.
   attendee has viewed the session.
 - **FR-1031**: The marker MUST be **per-row state about one saved session**. Neither product may
   gain an aggregate count of changes, a list of changes, a notification bell, or any surface whose
-  subject is "things that happened" (constitution v4.2.0, N2). This MUST be asserted as an absence.
+  subject is "things that happened" (constitution v5.2.0, N2). This MUST be asserted as an absence.
   The coalesced notification body of FR-1034 is outside this rule and is the single stated
   exception to it.
 - **FR-1032**: An attendee who has denied notification permission MUST receive the in-app marker and
@@ -334,7 +334,7 @@ conference they were not assigned to.
 #### Absences
 
 - **FR-1040**: There MUST be no draft or published state on a conference, and no lifecycle gate
-  between authoring and attendee visibility (constitution v4.2.0, N4).
+  between authoring and attendee visibility (constitution v5.2.0, N4).
 - **FR-1041**: There MUST be no administrative route that suspends, removes or restricts an
   attendee. An administrative tier acts on content and on authority, never on a person (013).
 - **FR-1042**: There MUST be no administrative read of a private note, a message, or the identity of
@@ -358,7 +358,7 @@ conference they were not assigned to.
   session.
 - **Track, room, speaker** — unchanged in shape; they gain authorship rather than attributes. A
   **speaker** is conference content describing a real person who is not necessarily an attendee, and
-  is the subject of register entry 28.
+  is the subject of register entry 30.
 - **Organizer assignment** — unchanged in shape; creation becomes a second way one comes to exist,
   alongside promotion-then-assignment.
 - **Audit entry** — unchanged in shape; gains authoring acts as a new category of recorded act.
@@ -412,7 +412,7 @@ conference they were not assigned to.
 | **Identity scoping & server-side authorization** (Principle VIII) | Authoring authority is a **server-enforced predicate** over the administrative principal and the named conference, in the shape `EventScope`, `ConversationScope`, `CardScope` and `VerifiedOperatorScope` establish. A conference the principal has no authority over is refused **identically to one that does not exist**. On the attendee side, the marker and notification are scoped to the attendee's own saved sessions and disclose nothing about anyone else's. |
 | **Deletion & export coverage** (Principle VIII) | **Session cancellation state** and **session change records** are conference content, not attendee data: no cascade from `attendees` and no export coverage, declared with that reason rather than allow-listed silently. **The per-attendee viewed-state on a saved session IS attendee data**: it cascades from `attendees` and from `sessions`, and appears in the personal-data export alongside the saved session it belongs to. Both coverage tests derive from the schema, so each new column fails by existing until declared. **A third schema-derived guard joins them** (FR-1018a): the engagement predicate that governs whether a session may be deleted MUST also be derived from the schema, so a later feature adding an attendee-state table referencing a session cannot silently fall outside it. |
 | **Event scoping** (Standing decision D1/7) | **Per-event, throughout, and this is not a default being assumed.** Conference content is per-event by D1. Organizer assignments are already per-event. The marker is per-event because it is about a session. The one cross-event thing this feature touches is the **push subscription**, which is per device and already cross-event by 007's design — it carries delivery, not content. |
-| **Register position** (Governance) | **Blocked by**: constitution v4.2.0, drafted and not yet ratified — nothing else. **Resolves**: none. **Escalates**: entry **4** (desktop and tablet unvalidated) by adding a substantial new administrative surface; entry **22** (a cached conference outliving its registration) by giving the cached programme a **second** way to be wrong — it can now be stale rather than merely unauthorised — which 014 does not close and which remains filed against 012. **Opens**: none beyond entries **27** and **28**, which v4.2.0 opens. |
+| **Register position** (Governance) | **Blocked by**: constitution v5.2.0, drafted and not yet ratified — nothing else. **Resolves**: none. **Escalates**: entry **4** (desktop and tablet unvalidated) by adding a substantial new administrative surface; entry **22** (a cached conference outliving its registration) by giving the cached programme a **second** way to be wrong — it can now be stale rather than merely unauthorised — which 014 does not close and which remains filed against 012. **Opens**: none beyond entries **27** and **28**, which v5.2.0 opens. |
 | **Reserved migration number** (Branching — parallel work) | **`0011`.** 013 holds `0009` and 012 reserves `0010`. The roadmap's reserved-number table does not cover the administrative programme and MUST be extended; this spec's departure note records that. |
 
 ## Assumptions
@@ -440,13 +440,13 @@ reversed without re-specifying the feature.
 - **A conference's join code is minted by the product, not chosen by the organizer.** Managing codes
   — rotating, revoking, viewing — remains 015's, per brainstorm #09. 014 mints one because
   `join_code` is required for a conference to exist at all.
-- **Nothing bounds how many conferences an organizer may create.** Accepted in v4.2.0's N3 text as
+- **Nothing bounds how many conferences an organizer may create.** Accepted in v5.2.0's N3 text as
   bounded by trust, since promotion is platform-tier only.
 - **A saved-session notification carries the session title**, so what an attendee chose to attend is
   visible on a locked device. Accepted on v3.1.0's reasoning and **not solved** — this is register
-  entry 27, which 014 does not close.
+  entry 29, which 014 does not close.
 - **A speaker record is not verified against any real person.** An organizer types a name, title and
-  company. Register entry 28 records that this is personal data about somebody who never signed up;
+  company. Register entry 30 records that this is personal data about somebody who never signed up;
   this feature does not decide who answers for it.
 - **The administrative product remains non-installable** — no manifest, no service worker, no PWA
   behaviour — as 013 established structurally rather than by configuration.

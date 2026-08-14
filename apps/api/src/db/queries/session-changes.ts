@@ -30,7 +30,7 @@ import { questionVotes, sessionQuestions } from '../schema/questions.js'
  * The three changes that reach an attendee, and the fourth answer meaning *nothing did*.
  *
  * ─────────────────────────────────────────────────────────────────────────────────────────────
- * **This union IS the scope of the second notification trigger** (constitution v4.2.0 N1,
+ * **This union IS the scope of the second notification trigger** (constitution v5.2.0 N1,
  * FR-1026, FR-1027).
  *
  * v3.1.0 admitted exactly one trigger — a received message — and was worded so that a feature

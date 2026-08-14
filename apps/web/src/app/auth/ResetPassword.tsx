@@ -4,6 +4,7 @@ import { useId, useState, type FormEvent } from 'react'
 import { Link, useSearchParams } from 'react-router'
 
 import { BrandMark } from '../../shell/BrandMark.js'
+import { PasswordField } from '../../ui/PasswordField.js'
 import { PRODUCT_NAME } from '../branding.js'
 
 /**
@@ -31,15 +32,29 @@ export const ResetPassword = () => {
 
   const passwordId = useId()
   const helpId = useId()
+  const confirmId = useId()
+  const confirmHelpId = useId()
 
   const [password, setPassword] = useState('')
+  const [confirmation, setConfirmation] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [done, setDone] = useState(false)
   const [failure, setFailure] = useState<string | null>(null)
   const [expired, setExpired] = useState(!token)
 
   const longEnough = password.length >= PASSWORD_MIN_LENGTH
-  const canSubmit = Boolean(token) && longEnough && !submitting
+
+  /**
+   * T026 (016) — **the confirmation** (FR-1017, FR-1018).
+   *
+   * The stakes here are the same as at sign-up and arrive from the other direction: somebody
+   * resetting a password has *already* been locked out once, and a typo would lock them out
+   * again — with a link that has now been spent. It is never submitted (FR-1019).
+   */
+  const matches = password === confirmation
+  const mismatch = confirmation.length > 0 && !matches
+
+  const canSubmit = Boolean(token) && longEnough && matches && !submitting
 
   const blockedBecause =
     submitting || !token
@@ -48,7 +63,9 @@ export const ResetPassword = () => {
         ? `Your new password needs at least ${PASSWORD_MIN_LENGTH} characters. ${
             password.length > 0 ? `You have ${password.length}.` : ''
           }`.trim()
-        : null
+        : !matches
+          ? 'Both passwords must be the same before you can continue.'
+          : null
 
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -131,19 +148,53 @@ export const ResetPassword = () => {
             >
               New password
             </label>
-            <input
+            <PasswordField
               id={passwordId}
               name="password"
-              type="password"
               autoComplete="new-password"
               required
-              aria-describedby={helpId}
+              describedBy={helpId}
               value={password}
-              onChange={(event) => setPassword(event.target.value)}
+              onChange={setPassword}
               className="w-full rounded-sm border border-border-subtle bg-surface-raised px-3 py-2 text-text-body"
             />
             <p id={helpId} className="mt-1 text-xs text-text-muted">
               At least {PASSWORD_MIN_LENGTH} characters. Setting it signs you out everywhere else.
+            </p>
+
+            <label
+              htmlFor={confirmId}
+              className="mt-5 mb-1 block text-sm font-medium text-text-primary"
+            >
+              Confirm new password
+            </label>
+            {/*
+              **No `name`** (FR-1019, S2). It would put a second copy of the credential into the
+              form's native serialization, and this form declares neither `action` nor `method` —
+              so a native submission would navigate to the current URL with the password in the
+              query string, and from there into history, `Referer` and the proxy's access log.
+              Latent while `preventDefault()` is the first statement of `onSubmit`, and pointless
+              regardless: the confirmation is never transmitted. Autofill keys on
+              `autoComplete="new-password"`. `SignUp` carries the same reasoning at length.
+            */}
+            <PasswordField
+              id={confirmId}
+              autoComplete="new-password"
+              required
+              describedBy={confirmHelpId}
+              invalid={mismatch}
+              value={confirmation}
+              onChange={setConfirmation}
+              className="w-full rounded-sm border border-border-subtle bg-surface-raised px-3 py-2 text-text-body"
+            />
+            {/* Bound to the field, not merely placed beneath it (FR-1018). */}
+            <p
+              id={confirmHelpId}
+              className={`mt-1 text-xs ${mismatch ? 'text-danger-700' : 'text-text-muted'}`}
+            >
+              {mismatch
+                ? 'Both passwords must be the same before you can continue.'
+                : 'Type it again, so a typo does not lock you out a second time.'}
             </p>
 
             {failure && (

@@ -390,7 +390,7 @@ export const createSpeaker = async (
  *
  * That is standing decision 33's clause verbatim — *conference content is authorable, a person is
  * not* — and `tests/unit/profile-uneditable.test.ts` asserts it over the whole administrative
- * surface rather than trusting this paragraph. Register entry 28 records the open question this
+ * surface rather than trusting this paragraph. register entry 30 records the open question this
  * leaves: a speaker is personal data about somebody who never signed up, and 014 moves
  * responsibility for it from a reviewed commit to a promoted attendee typing into a form.
  * ─────────────────────────────────────────────────────────────────────────────────────────────
@@ -950,7 +950,7 @@ export interface ConferencePatch {
  * FR-1015 freezes the timezone once any session exists, and that is what makes the first check
  * sufficient. Without it a timezone edit could push sessions outside the range **without touching
  * either the range or the sessions**: the same instants land on different venue-local dates. It
- * also sidesteps a question v4.2.0 N1 would otherwise raise — whether shifting every displayed
+ * also sidesteps a question v5.2.0 N1 would otherwise raise — whether shifting every displayed
  * local time counts as "the start time changed" and therefore notifies everybody. Structurally no
  * instant moves; freezing is the answer that needs no new rule.
  * ═════════════════════════════════════════════════════════════════════════════════════════════
@@ -1068,7 +1068,7 @@ export interface ConferenceInput {
  * **THE ONLY FUNCTION HERE THAT TAKES AN `OperatorScope`, BECAUSE THERE IS NO CONFERENCE TO HOLD
  * AUTHORITY OVER YET.**
  *
- * v4.2.0's N3 makes this the **one product-wide capability a conference organizer holds**, and it
+ * v5.2.0's N3 makes this the **one product-wide capability a conference organizer holds**, and it
  * is stated in the constitution rather than inferred precisely because decision 32's *"authority
  * reaches only the conferences they are assigned"* cannot describe the act of creating one.
  *
@@ -1461,7 +1461,7 @@ const belongsToConference = async (
  *
  * `events.timezone` has no `CHECK` — `schema/events.ts` says so and states that validity is
  * enforced "at the seed boundary", which was true while a reviewed commit was the only writer.
- * v4.2.0 made it a form. The route schema asks for a string of 1–80 characters and the admin dialog
+ * v5.2.0 made it a form. The route schema asks for a string of 1–80 characters and the admin dialog
  * is a bare text input, so `Europe/Madridd` was enough.
  *
  * What that cost, in two places, neither of them recoverable — **there is no conference-delete
@@ -1655,7 +1655,7 @@ const insertWithMintedCode = async (
  *   - **Give organizers an `operators` row.** The change `schema/operators.ts` names as collapsing
  *     two tiers into one table with a flag.
  *   - **Name the seeded platform identity** — this. The grant is genuinely product-level: it is
- *     v4.2.0's N3 that permits it, not any individual operator's decision, and the audit entry
+ *     v5.2.0's N3 that permits it, not any individual operator's decision, and the audit entry
  *     beside it records the actual actor in `actor_attendee_id`.
  *
  * Returns null when no platform operator exists at all, and creation is refused rather than

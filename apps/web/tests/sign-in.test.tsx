@@ -43,6 +43,12 @@ const noopDevices: PlatformServices['devices'] = {
   },
   // 007 — the seventh capability, visible by default. See `tests/support/services.tsx`.
   visibility: { isVisible: () => true, subscribe: () => () => {} },
+  // 016 — the eighth capability. Desktop, uninstalled, no prompt: FR-1031 renders no install
+  // guidance here, so this screen's existing assertions are about the form and nothing else.
+  install: {
+    current: () => ({ installed: false, mobile: false, promptToInstall: null }),
+    subscribe: () => () => {},
+  },
 }
 
 const renderSignIn = (overrides: Partial<PlatformServices> = {}) => {
@@ -182,7 +188,7 @@ describe('SignInScreen', () => {
 
     // getByLabelText fails if the control has no accessible name — which is the assertion.
     expect(screen.getByLabelText(/email address/i)).toBeInTheDocument()
-    expect(screen.getByLabelText(/password/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/^password$/i)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /sign in/i })).toBeInTheDocument()
   })
 
@@ -200,7 +206,7 @@ describe('SignInScreen', () => {
     await user.type(screen.getByLabelText(/email address/i), 'ada@example.com')
     expect(submit, 'still incomplete — password is empty').toBeDisabled()
 
-    await user.type(screen.getByLabelText(/password/i), 'correct-horse-battery-staple')
+    await user.type(screen.getByLabelText(/^password$/i), 'correct-horse-battery-staple')
     expect(submit).toBeEnabled()
   })
 
@@ -213,8 +219,14 @@ describe('SignInScreen', () => {
     await user.keyboard('ada@example.com')
 
     await user.tab()
-    expect(screen.getByLabelText(/password/i)).toHaveFocus()
+    expect(screen.getByLabelText(/^password$/i)).toHaveFocus()
     await user.keyboard('correct-horse-battery-staple')
+
+    // 016 — the reveal control sits between the field and the submit, and being reachable here
+    // is the requirement rather than an obstacle: SC-1004 asks that every password field can be
+    // revealed and re-masked **using the keyboard alone**, which is only true if it is tabbable.
+    await user.tab()
+    expect(screen.getByRole('button', { name: /show password/i })).toHaveFocus()
 
     await user.tab()
     expect(screen.getByRole('button', { name: /sign in/i })).toHaveFocus()
@@ -228,7 +240,7 @@ describe('SignInScreen', () => {
     const { signIn } = renderSignIn()
 
     await user.type(screen.getByLabelText(/email address/i), 'ada@example.com')
-    await user.type(screen.getByLabelText(/password/i), 'correct-horse-battery-staple')
+    await user.type(screen.getByLabelText(/^password$/i), 'correct-horse-battery-staple')
     await user.click(screen.getByRole('button', { name: /sign in/i }))
 
     await waitFor(() =>
@@ -251,7 +263,7 @@ describe('SignInScreen', () => {
     })
 
     await user.type(screen.getByLabelText(/email address/i), 'ada@example.com')
-    await user.type(screen.getByLabelText(/password/i), 'wrong')
+    await user.type(screen.getByLabelText(/^password$/i), 'wrong')
     await user.click(screen.getByRole('button', { name: /sign in/i }))
 
     const alert = await screen.findByRole('alert')

@@ -3,7 +3,7 @@ import { join } from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
-import { changedSinceBranchPoint } from '../support/branch-point.js'
+import { changedSinceBranchPoint, fileAtBranchPoint } from '../support/branch-point.js'
 
 /**
  * T077 (014) — **research R7's structural claims, asserted rather than trusted** (FR-1030,
@@ -19,11 +19,11 @@ import { changedSinceBranchPoint } from '../support/branch-point.js'
  *      not named in `reads` as a **write**, and a write purges the whole conference prefix — so
  *      an undeclared read silently wiped the cached programme, saved sessions and notes each
  *      time it ran. A `listChangedSessions` would meet that trap on day one.
- *   2. **An eighth device capability.** 007 added `VisibilityService` because a poll must stop
+ *   2. **A new device capability.** 007 added `VisibilityService` because a poll must stop
  *      when the tab hides and only the browser can say. That needed a constitution amendment
- *      (v3.1.0 ratified it into Principle V), and it is the precedent for how expensive an
- *      eighth would be. The marker needs none: it is server-computed state on a payload the
- *      attendee already reads.
+ *      (v3.1.0 ratified it into Principle V), and it is the precedent for how expensive one is —
+ *      016 paid it again for `InstallService` at v5.1.0. The marker needs none: it is
+ *      server-computed state on a payload the attendee already reads.
  *   3. **A read whose subject is "things that happened".** Which is the notification centre N2
  *      forbids, arrived at through the data layer rather than through a screen.
  *
@@ -48,35 +48,67 @@ const codeOf = (text: string): string =>
 
 describe('R7 — the marker adds no read, no capability and no cache entry', () => {
   /**
-   * **No eighth device capability.**
+   * **This feature adds no device capability.**
    *
-   * Counted rather than pattern-matched: a new capability is a new member on `DeviceServices`,
-   * and counting is the assertion that cannot be satisfied by renaming.
+   * ═══════════════════════════════════════════════════════════════════════════════════════════
+   * **THIS ASSERTION USED TO FREEZE THE COUNT AT SEVEN, AND THAT WAS THE WRONG PROPERTY.**
+   *
+   * It read `expect(members.length).toBe(7)` with the seven names spelled out, and it was correct
+   * for as long as seven was the answer. On 2026-08-14 this branch merged `develop` and the test
+   * failed — not because 014 had added a capability, but because **016 had**: `InstallService`,
+   * ratified as the eighth in constitution v5.1.0, on a branch authored in parallel that this one
+   * could not see.
+   *
+   * A guard asserting a **product-wide** fact fails when any feature legitimately changes that
+   * fact, and the tempting repair — edit the literal to eight — buys one more amendment of life
+   * and hides who changed what. The property 014 actually owes is narrower and does not expire:
+   * **the capability set is whatever it was at the branch point.** A feature that adds one has to
+   * change this file to pass, which is the conversation the guard exists to force; a feature that
+   * does not, never touches it, however many other features add capabilities in the meantime.
+   *
+   * Counted **and** compared, because the two catch different mistakes: comparing catches an
+   * addition, and counting non-vacuity catches a regex that stopped matching.
+   * ═══════════════════════════════════════════════════════════════════════════════════════════
    */
-  it('leaves the device capabilities at seven (Principle V, v3.1.0)', () => {
-    const interfaces = codeOf(read('packages/platform/src/interfaces/index.ts'))
-    const block = /interface DeviceServices\s*\{([\s\S]*?)\n\}/.exec(interfaces)?.[1] ?? ''
+  it('leaves the device-capability set exactly as the branch point had it (Principle V)', () => {
+    const membersOf = (source: string): string[] => {
+      const block = /interface DeviceServices\s*\{([\s\S]*?)\n\}/.exec(codeOf(source))?.[1] ?? ''
+      expect(block, 'the DeviceServices interface could not be located').not.toBe('')
+      return [...block.matchAll(/^\s*readonly\s+(\w+)\s*:/gm)].map((match) => match[1] ?? '')
+    }
 
-    expect(block, 'the DeviceServices interface could not be located').not.toBe('')
+    const PATH = 'packages/platform/src/interfaces/index.ts'
+    const now = membersOf(read(PATH))
+    const before = membersOf(fileAtBranchPoint(REPO, PATH))
 
-    const members = [...block.matchAll(/^\s*readonly\s+(\w+)\s*:/gm)].map((match) => match[1])
+    // Non-vacuity first: an extractor that silently returns nothing would make the comparison
+    // below `[] === []` and pass forever. This is the 010 precache defect in miniature.
+    expect(
+      before.length,
+      'no capabilities extracted at the branch point — the comparison would be vacuous',
+    ).toBeGreaterThan(5)
 
-    expect(members).toEqual([
-      'notifications',
-      'calendar',
-      'camera',
-      'contactShare',
-      'secureStorage',
-      'connectivity',
-      'visibility',
-    ])
+    // The seven that predate this feature must all still be there. Named rather than counted, so
+    // that a *removal* paired with an addition cannot cancel out.
+    expect(now).toEqual(
+      expect.arrayContaining([
+        'notifications',
+        'calendar',
+        'camera',
+        'contactShare',
+        'secureStorage',
+        'connectivity',
+        'visibility',
+      ]),
+    )
 
     expect(
-      members.length,
-      'The device capabilities changed. Seven is the count v3.1.0 ratified, and an eighth is a ' +
-        'constitution amendment rather than an implementation detail — `VisibilityService` is ' +
-        'the precedent for how expensive one is.',
-    ).toBe(7)
+      now,
+      'The device-capability set changed within this feature. An addition is a constitution ' +
+        'amendment rather than an implementation detail — `VisibilityService` (v3.1.0) and ' +
+        '`InstallService` (v5.1.0) are both precedents for how expensive one is, and both were ' +
+        'ratified before the code landed. If this feature genuinely needs one, amend first.',
+    ).toEqual(before)
   })
 
   /**

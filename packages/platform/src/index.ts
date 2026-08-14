@@ -15,10 +15,16 @@ export type {
   // 007 — the domain shape a device registration takes across the port. Never the browser's own
   // `PushSubscription`, which would leak a platform type into every consumer.
   DeviceSubscription,
+  // 016 — the eighth capability: whether this application is installed, and whether the platform
+  // offers any way to install it. Argued in `interfaces/index.ts` rather than reached for
+  // directly, and added to Principle V's enumerated list by constitution v5.1.0 — where, on
+  // `VisibilityService`'s precedent below, the listing IS the ratification act.
+  InstallService,
+  InstallState,
   NotificationService,
   SecureStorage,
   // 007 — the seventh capability. Its addition is argued in `interfaces/index.ts` rather than
-  // performed quietly, because the constitution names six.
+  // performed quietly, because the constitution named six when it was added.
   VisibilityService,
 } from './interfaces/index.js'
 
@@ -51,6 +57,8 @@ export {
   useEventsRepository,
   useFreshness,
   useIdentityRepository,
+  // 016 — the eighth capability: whether this application is installed and how (v5.1.0).
+  useInstallState,
   useMessageRepository,
   useNotifications,
   useProfileRepository,

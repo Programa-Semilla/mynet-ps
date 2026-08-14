@@ -277,7 +277,7 @@ An entry is removed once a brainstorm document has been written from it.
 - **Reference**: spec/014-conference-content-authoring
 - **Summary**: `materialChangeOf` treats a time or room edit on an already-cancelled session as material, so it dispatches "This session has moved to a new time" for something that is not happening — while `SessionRow` suppresses the in-app marker for cancelled rows, so the push arrives with no in-app counterpart.
 
-> v4.2.0 N1's generating principle is quoted in that very file: a notification is raised when a change affects **where or whether** the attendee must be somewhere. A cancelled session has already answered "whether" with no. Narrowing it is a judgement about N1's scope rather than a bug fix, because the spec enumerates the trigger set without qualifying it by cancellation state — but the marker and the notification are supposed to agree, and here they cannot.
+> v5.2.0 N1's generating principle is quoted in that very file: a notification is raised when a change affects **where or whether** the attendee must be somewhere. A cancelled session has already answered "whether" with no. Narrowing it is a judgement about N1's scope rather than a bug fix, because the spec enumerates the trigger set without qualifying it by cancellation state — but the marker and the notification are supposed to agree, and here they cannot.
 
 ### self-assignment-names-an-uninvolved-operator
 
@@ -286,7 +286,7 @@ An entry is removed once a brainstorm document has been written from it.
 - **Reference**: spec/014-conference-content-authoring
 - **Summary**: A creating organizer's self-assignment sets `assigned_by` to the first non-deactivated operator, who took no part in the grant — so `organizer_assignments` records a grant that never happened, and the compensating record is the audit trail FR-999 forbids reading. Separately, `requireOperator` admits anyone holding *any* live assignment.
 
-> Two consequences worth deciding rather than inheriting. The column's own schema comment says it means "the platform operator who granted this (FR-933)", and it now means two different things depending on which write produced the row, with nothing distinguishing them. And because creating mints a fresh live assignment while revocation is per-conference and manual, an organizer being wound down can keep administrative access alive by creating conferences — v4.2.0's N3 accepted "bounded by trust" for how many, but does not appear to have weighed demotion resistance.
+> Two consequences worth deciding rather than inheriting. The column's own schema comment says it means "the platform operator who granted this (FR-933)", and it now means two different things depending on which write produced the row, with nothing distinguishing them. And because creating mints a fresh live assignment while revocation is per-conference and manual, an organizer being wound down can keep administrative access alive by creating conferences — v5.2.0's N3 accepted "bounded by trust" for how many, but does not appear to have weighed demotion resistance.
 
 ### migration-lock-window-under-live-traffic
 

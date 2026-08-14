@@ -398,7 +398,7 @@ describe('event scope route audit', () => {
    *
    * This asserted that **no** route writes conference content, at any privilege, on the
    * reasoning that creating or editing a programme is organizer administration and Principle III
-   * places that out of scope. Constitution v4.0.0 brought administration in and v4.2.0 gave it
+   * places that out of scope. Constitution v4.0.0 brought administration in and v5.2.0 gave it
    * exactly this write path, so the assertion as written would now fail on fourteen legitimate
    * routes — and the natural repair, deleting it, would take the attendee half with it.
    *
@@ -418,7 +418,7 @@ describe('event scope route audit', () => {
     expect(
       writes,
       'An ATTENDEE-facing write route against conference content exists. Authoring came into ' +
-        'scope at v4.2.0 for the **administrative product only** (FR-1001, FR-1003): MyNet gains ' +
+        'scope at v5.2.0 for the **administrative product only** (FR-1001, FR-1003): MyNet gains ' +
         'no authoring surface, no privileged view and no rendering that branches on tier. A ' +
         'route here would put an authoring capability behind an attendee session.',
     ).toEqual([])
@@ -593,7 +593,7 @@ describe('event scope route audit', () => {
    *
    * 013 asserted that no administrative route writes conference content, because authoring was
    * a later feature and FR-974 kept the door shut until it arrived with its amendment. It has:
-   * v4.2.0, ratified 2026-08-12. So the question is no longer *whether* an administrative route
+   * v5.2.0, ratified 2026-08-12. So the question is no longer *whether* an administrative route
    * may write a session — it is *whether it proves authority over the conference it writes to*.
    *
    * An administrative content write with only `requireOperator` would be reachable by **any**
@@ -619,7 +619,7 @@ describe('event scope route audit', () => {
   })
 
   it('still finds administrative content writes to check, now that they exist', () => {
-    // The inverse, and it is what stops the assertion above passing vacuously. Until v4.2.0 the
+    // The inverse, and it is what stops the assertion above passing vacuously. Until v5.2.0 the
     // right answer was zero; from 014 it is not, and a zero here means the routes were removed
     // or renamed out of the pattern rather than that the guard is holding.
     const authoring = routes

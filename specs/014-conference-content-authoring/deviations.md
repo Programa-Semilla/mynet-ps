@@ -117,7 +117,7 @@ different rather than worse:
   absolute; the administrative half became *guarded presence* in a new assertion.
 
 - **`guards-still-in-force.test.ts`** — 013 required the trigger audit be **unedited**. 014 edits
-  it, which is the mechanism working rather than failing: v4.2.0 is the conversation that guard
+  it, which is the mechanism working rather than failing: v5.2.0 is the conversation that guard
   demanded. It now checks that both admitted triggers are named and that the acts neither feature
   was granted — promotion, demotion, report resolution, reinstatement, a title or speaker change —
   are still absent.
@@ -226,7 +226,7 @@ six situations: four rendered *"That could not be completed."* and two rendered 
 wrong."*
 
 The one that mattered most was `has-engagement` — *"cancel it instead, everything they wrote stays
-where it is"* — which is the sentence that teaches decision 44's whole rule at the moment an
+where it is"* — which is the sentence that teaches decision 49's whole rule at the moment an
 organizer meets it. It was unreachable.
 
 **The rule needed its other half stated**: *classify on `error.code`* is worth nothing unless the

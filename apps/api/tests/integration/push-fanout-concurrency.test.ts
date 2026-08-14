@@ -123,26 +123,68 @@ describe('push fan-out is concurrent, not sequential (SC-503)', () => {
     expect(await allSubscriptionRows(), 'devices at send time').toHaveLength(DEVICES)
     expect(await subscriptionRows(graceId), 'bound to the RECIPIENT').toHaveLength(DEVICES)
 
-    const startedAt = Date.now()
-    const response = await app.inject({
-      method: 'POST',
-      url: `/conversations/${conversationId}/messages`,
-      headers: { cookie: cookieHeader(adaCookie) },
-      payload: { body: 'Timed against a port that actually costs something.' },
-    })
-    const elapsedMs = Date.now() - startedAt
+    // ═══════════════════════════════════════════════════════════════════════════════════════
+    // **THE BOUND SUBTRACTS FIXED OVERHEAD, BECAUSE THE FIRST VERSION DID NOT AND FAILED ON A
+    // LOADED RUNNER WHILE THE PROPERTY IT GUARDS STILL HELD.**
+    //
+    // It asserted `elapsed < DEVICES × DELAY_MS / 2` — an absolute 80ms against a request whose
+    // own overhead (route, session, insert, subscription lookup) is most of that on a busy CI
+    // machine. It failed at `expected 86 to be less than 80` on a run where sequential would
+    // have been 160ms, so the concurrency was never in question; the threshold had simply sunk
+    // to the overhead floor. Its header claimed "neither timing noise nor a slow machine decides
+    // the result", and on that run both did.
+    //
+    // A *latency* assertion and a *concurrency* assertion are not the same test. This measures
+    // the same route to a recipient with **no devices**, which walks every step except the
+    // fan-out, and compares the difference. What remains is the fan-out's own cost, which is one
+    // delay when concurrent and DEVICES delays when sequential — so the bound now scales with
+    // the machine instead of pretending the machine is free.
+    //
+    // The baseline is the **minimum of three samples**: overhead is bounded below by real work
+    // and above by whatever else the runner is doing, and only the floor is a property of this
+    // code. Taking the minimum makes a noisy sample widen the margin rather than fake one.
+    // ═══════════════════════════════════════════════════════════════════════════════════════
+    const timeSend = async (cookie: string, to: string, body: string): Promise<number> => {
+      const startedAt = Date.now()
+      const sent = await app.inject({
+        method: 'POST',
+        url: `/conversations/${to}/messages`,
+        headers: { cookie: cookieHeader(cookie) },
+        payload: { body },
+      })
+      const elapsed = Date.now() - startedAt
+      expect(sent.statusCode).toBe(201)
+      return elapsed
+    }
 
-    expect(response.statusCode).toBe(201)
+    // Grace → Ada. Ada registered no devices in this fixture, so the fan-out is empty and what is
+    // left is exactly the cost this test must not charge to concurrency.
+    const baselineSamples = [
+      await timeSend(graceCookie, conversationId, 'Baseline: no devices on the other side.'),
+      await timeSend(graceCookie, conversationId, 'Baseline again.'),
+      await timeSend(graceCookie, conversationId, 'Baseline once more.'),
+    ]
+    const overheadMs = Math.min(...baselineSamples)
+    expect(push.delivered(), 'the baseline must fan out to nobody').toHaveLength(0)
+
+    const elapsedMs = await timeSend(
+      adaCookie,
+      conversationId,
+      'Timed against a port that actually costs something.',
+    )
+
     expect(push.delivered(), 'every device took delivery').toHaveLength(DEVICES)
 
-    // Sequential would be DEVICES × DELAY_MS. Concurrent is one delay plus overhead. The bound
-    // sits well between the two, so neither timing noise nor a slow machine decides the result.
+    // Sequential would be DEVICES × DELAY_MS of fan-out. Concurrent is one delay. The bound sits
+    // between the two and is measured against the same machine's own overhead.
     const sequentialWouldBe = DEVICES * DELAY_MS
+    const fanOutMs = elapsedMs - overheadMs
 
     expect(
-      elapsedMs,
-      `${DEVICES} devices at ${DELAY_MS}ms each took ${elapsedMs}ms. Sequential would be about ` +
-        `${sequentialWouldBe}ms — if this fails, \`dispatchToDevices\` has stopped using ` +
+      fanOutMs,
+      `${DEVICES} devices at ${DELAY_MS}ms each cost ${fanOutMs}ms of fan-out ` +
+        `(${elapsedMs}ms total less ${overheadMs}ms of measured overhead). Sequential would be ` +
+        `about ${sequentialWouldBe}ms — if this fails, \`dispatchToDevices\` has stopped using ` +
         'Promise.all and SC-503 now scales with how many devices somebody owns.',
     ).toBeLessThan(sequentialWouldBe / 2)
   }, 120_000)

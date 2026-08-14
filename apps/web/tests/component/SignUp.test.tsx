@@ -87,6 +87,9 @@ describe('creating an account', () => {
     await user.type(screen.getByLabelText(/email address/i), 'new@example.com')
     await user.type(screen.getByLabelText(/display name/i), 'New Person')
     await user.type(screen.getByLabelText(/^password$/i), 'correct-horse-battery-staple')
+    // 016 — sign-up now carries a confirmation field (FR-1017), and submission is
+    // disabled until the two agree (FR-1018).
+    await user.type(screen.getByLabelText(/confirm password/i), 'correct-horse-battery-staple')
 
     expect(confirm()).toBeEnabled()
     // Nothing left to say, so nothing is said. A permanent status line would be noise.
@@ -114,6 +117,9 @@ describe('creating an account', () => {
     await user.type(screen.getByLabelText(/email address/i), 'new@example.com')
     await user.type(screen.getByLabelText(/display name/i), 'New Person')
     await user.type(screen.getByLabelText(/^password$/i), 'correct-horse-battery-staple')
+    // 016 — sign-up now carries a confirmation field (FR-1017), and submission is
+    // disabled until the two agree (FR-1018).
+    await user.type(screen.getByLabelText(/confirm password/i), 'correct-horse-battery-staple')
     await user.click(confirm())
 
     await waitFor(() =>
@@ -136,6 +142,9 @@ describe('creating an account', () => {
     await user.type(screen.getByLabelText(/email address/i), 'ada@example.com')
     await user.type(screen.getByLabelText(/display name/i), 'Ada')
     await user.type(screen.getByLabelText(/^password$/i), 'correct-horse-battery-staple')
+    // 016 — sign-up now carries a confirmation field (FR-1017), and submission is
+    // disabled until the two agree (FR-1018).
+    await user.type(screen.getByLabelText(/confirm password/i), 'correct-horse-battery-staple')
     await user.click(confirm())
 
     await waitFor(() => expect(signUp).toHaveBeenCalled())

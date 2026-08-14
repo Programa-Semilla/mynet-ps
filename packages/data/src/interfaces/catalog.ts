@@ -16,7 +16,7 @@
  *
  * It used to read *"a write path would be organizer administration, which Principle III places
  * out of scope"*. Constitution v4.0.0 brought organizer administration **into** scope and
- * v4.2.0 gave it a write path into the catalog — so that justification no longer holds, and it
+ * v5.2.0 gave it a write path into the catalog — so that justification no longer holds, and it
  * is corrected here rather than left to be believed.
  *
  * What replaces it is stronger for this interface specifically: **the write path exists, and it

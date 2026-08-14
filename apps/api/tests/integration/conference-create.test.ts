@@ -21,7 +21,7 @@ import { ADA, clearThrottle, SEED_PASSWORD, setupTestApp, teardown } from './hel
  * (FR-1007, FR-1008, FR-1010).
  *
  * ═════════════════════════════════════════════════════════════════════════════════════════════
- * **THIS IS THE ONLY PRODUCT-WIDE CAPABILITY A CONFERENCE ORGANIZER HOLDS, AND v4.2.0 STATES IT
+ * **THIS IS THE ONLY PRODUCT-WIDE CAPABILITY A CONFERENCE ORGANIZER HOLDS, AND v5.2.0 STATES IT
  * RATHER THAN INFERRING IT.**
  *
  * Decision 32 says an organizer's *"authority reaches only the conferences they are assigned"*,
@@ -37,7 +37,7 @@ import { ADA, clearThrottle, SEED_PASSWORD, setupTestApp, teardown } from './hel
  *     is platform-tier only precisely because that is the boundary that must not be crossable
  *     from below.
  *
- * **Nothing bounds how many conferences an organizer may create**, which v4.2.0 records as
+ * **Nothing bounds how many conferences an organizer may create**, which v5.2.0 records as
  * accepted rather than overlooked: it is bounded by trust, since promotion is itself platform-only.
  * The throttle is a rate limit, not a quota, and this file does not assert otherwise.
  *
@@ -94,14 +94,14 @@ describe('creating a conference (T079, T080, FR-1007, FR-1008, FR-1010)', () => 
     expect(row?.timezone).toBe('Europe/Madrid')
   })
 
-  it('lets a CONFERENCE ORGANIZER create one (FR-1008, decision 42)', async () => {
+  it('lets a CONFERENCE ORGANIZER create one (FR-1008, decision 47)', async () => {
     const cookie = await organizerSession(app, ADA, SEED_PASSWORD)
     const response = await create(cookie, 'An Organizer-Created Conference')
 
     expect(
       response.statusCode,
       'An organizer could not create a conference. This is the ONE product-wide capability the ' +
-        'tier holds (decision 42), stated explicitly because decision 32’s "authority reaches ' +
+        'tier holds (decision 47), stated explicitly because decision 32’s "authority reaches ' +
         'only the conferences they are assigned" cannot describe creating one.',
     ).toBe(201)
   })
@@ -192,7 +192,7 @@ describe('creating a conference (T079, T080, FR-1007, FR-1008, FR-1010)', () => 
    * that reads the tier from something other than the operator record.
    * ═══════════════════════════════════════════════════════════════════════════════════════════
    */
-  it('grants NO authority over any other conference (FR-1010, decision 42)', async () => {
+  it('grants NO authority over any other conference (FR-1010, decision 47)', async () => {
     const cookie = await organizerSession(app, ADA, SEED_PASSWORD)
     await create(cookie, 'A Conference That Grants Nothing')
 
@@ -207,7 +207,7 @@ describe('creating a conference (T079, T080, FR-1007, FR-1008, FR-1010)', () => 
     expect(
       other.statusCode,
       'Creating a conference widened the organizer’s reach. Authority over a conference they ' +
-        'did NOT create still comes only from assignment by a platform operator (decision 42).',
+        'did NOT create still comes only from assignment by a platform operator (decision 47).',
     ).toBe(404)
 
     const assignments = await getDb()

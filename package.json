@@ -34,7 +34,9 @@
     "admin:bootstrap": "pnpm --filter @mynet/api admin:bootstrap",
     "budget": "node scripts/asset-budget.mjs",
     "brand:audit": "node scripts/brand-audit.mjs",
-    "brand:generate": "node scripts/generate-brand-assets.mjs",
+    "brand:generate": "pnpm brand:generate:board && pnpm brand:generate:install",
+    "brand:generate:board": "node scripts/generate-brand-assets.mjs",
+    "brand:generate:install": "node scripts/generate-install-icons.mjs",
     "verify": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm test:unit && pnpm test:component && pnpm contract:check && pnpm test:integration && pnpm build && pnpm budget && pnpm brand:audit && pnpm test:e2e",
     "verify:clean": "node scripts/verify-clean.mjs"
   },

@@ -74,7 +74,7 @@ export const CancelledChip = () => (
  * T076 (014) — this saved session has changed since the attendee last looked (FR-1030).
  *
  * ─────────────────────────────────────────────────────────────────────────────────────────────
- * **PER-ROW, IN TEXT, AND NEVER A COUNT** (FR-1031, constitution v4.2.0 N2).
+ * **PER-ROW, IN TEXT, AND NEVER A COUNT** (FR-1031, constitution v5.2.0 N2).
  *
  * The marker's whole subject is *this one session*. There is no badge summing them, no list of
  * changed rows, and no surface anywhere in either product whose subject is "things that

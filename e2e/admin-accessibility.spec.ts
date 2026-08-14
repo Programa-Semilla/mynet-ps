@@ -46,7 +46,7 @@ test.describe('administrative accessibility', () => {
     for (const width of WIDTHS) {
       await page.setViewportSize({ width: width.px, height: 900 })
       await page.goto(`${ADMIN_ORIGIN}/`)
-      await expect(page.getByLabel(/password/i)).toBeVisible()
+      await expect(page.getByLabel('Password', { exact: true })).toBeVisible()
 
       const { violations } = await scan(page)
       expect(

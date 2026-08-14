@@ -27,7 +27,7 @@ import { rooms, sessions, sessionSpeakers, speakers, tracks } from '../schema/ca
  *
  * It read: *the catalog is seeded content; creating or editing it would be organizer
  * administration, which Principle III places out of scope.* Constitution v4.0.0 brought
- * administration into scope and v4.2.0 gave it a write path into these exact tables, so that
+ * administration into scope and v5.2.0 gave it a write path into these exact tables, so that
  * sentence no longer justifies anything — and it is corrected rather than deleted, because "the
  * comment stopped being true" and "the rule was withdrawn" look identical in a diff.
  *

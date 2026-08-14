@@ -45,7 +45,7 @@ export interface SavedSessions {
    *
    * Every consumer asks `changed.has(id)` about **one row**. Nothing exposes `changed.size`, and
    * `apps/web/tests/unit/authoring-absences.test.tsx` asserts that no component reads it — the
-   * moment a screen answers *how many things changed*, constitution v4.2.0's N2 is broken
+   * moment a screen answers *how many things changed*, constitution v5.2.0's N2 is broken
    * regardless of what the notification payload does (FR-1031, FR-1034a).
    *
    * A `Set` rather than an array for the same reason `ids` is one: the question is always

@@ -104,4 +104,74 @@ test.describe('the unread indicator', () => {
     await adaContext.close()
     await graceContext.close()
   })
+
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════════════════
+   * T014 (016) — **the list updates itself while somebody sits on it** (SC-1002, SC-1003).
+   *
+   * ═══════════════════════════════════════════════════════════════════════════════════════
+   * **THE READER NAVIGATES NOWHERE, AND THAT IS THE ENTIRE TEST.**
+   *
+   * Every other assertion about the conversation list in this suite reaches it with `goto` or a
+   * click, and a destination that reads once on mount passes all of them — which is how the
+   * defect survived to be found by the owner using the product. Ada opens Messages, and then
+   * **nothing touches her page again**: no reload, no navigation, no interaction. Whatever
+   * appears, appears because the list asked.
+   * ═══════════════════════════════════════════════════════════════════════════════════════
+   *
+   * **The timeout is SC-1002's fifteen seconds, and it is larger than the ten-second interval on
+   * purpose.** A poll of interval N has a worst case of N plus jitter plus the request, because
+   * a message can land immediately after a tick. A fifteen-second bound over a ten-second
+   * interval is arithmetic rather than slack — asserting the interval as the bound would fail
+   * intermittently, and the failures would look like flakiness rather than like a criterion that
+   * was never satisfiable.
+   */
+  test('T014 — a message reaches the conversation list without the reader navigating', async ({
+    browser,
+  }) => {
+    const adaContext = await browser.newContext()
+    const adaPage = await adaContext.newPage()
+    await adaPage.goto('/')
+    await signIn(adaPage, ADA)
+    await useConference(adaPage, SHARED_CONFERENCE)
+
+    // Ada arrives at Messages and stays there. This is the last thing done to her page.
+    await adaPage.goto('/messages')
+    await expect(adaPage.getByRole('region', { name: 'Messages' })).toBeVisible()
+
+    const graceContext = await browser.newContext()
+    const gracePage = await graceContext.newPage()
+    await gracePage.goto('/')
+    await signIn(gracePage, GRACE)
+    await useConference(gracePage, SHARED_CONFERENCE)
+
+    await gracePage.goto('/discover')
+    await gracePage
+      .getByRole('link', { name: new RegExp(ADA.displayName) })
+      .first()
+      .click()
+    await gracePage
+      .getByRole('dialog')
+      .getByRole('link', { name: new RegExp(`message ${ADA.displayName}`, 'i') })
+      .click()
+
+    const arriving = `Arriving while she watches, ${Date.now()}`
+    await gracePage.getByRole('textbox', { name: /message/i }).fill(arriving)
+    await gracePage.getByRole('button', { name: /send message/i }).click()
+    await expect(threadOf(gracePage)).toContainText(arriving)
+
+    // ─────────────────────────────────────────────────────────────────────────────────────
+    // Ada's list, unprompted. The preview is what the row shows (FR-509), so finding the text
+    // proves the row was re-read rather than merely that a row exists.
+    // ─────────────────────────────────────────────────────────────────────────────────────
+    await expect(
+      adaPage.getByText(arriving).first(),
+      'The message never reached the list. Ada did not navigate, so a destination that reads ' +
+        'once on mount shows her whatever was true when she arrived — which is the defect: a ' +
+        'live thread beside a frozen list of threads.',
+    ).toBeVisible({ timeout: 15_000 })
+
+    await adaContext.close()
+    await graceContext.close()
+  })
 })

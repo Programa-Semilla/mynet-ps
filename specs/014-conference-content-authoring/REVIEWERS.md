@@ -2,7 +2,7 @@
 
 **Generated**: 2026-08-12 | **Spec**: [spec.md](spec.md)
 
-> **Read this first.** This PR carries **constitution v4.2.0**, drafted for this feature and
+> **Read this first.** This PR carries **constitution v5.2.0**, drafted for this feature and
 > **ratified by the owner on 2026-08-12** before any code was written — the same arrangement 008,
 > 009 and 013 each shipped under. It is standing decisions **40–44**, and it is two decisions rather
 > than one: a second notification trigger, and an organizer's authority to create a conference.
@@ -149,12 +149,12 @@ foundation and the densest; Phase 5 is the part that needs the amendment most di
 
 ## Open Questions
 
-- **Register entry 27 — whether an attendee may suppress notification content.** Opened by v4.2.0,
+- **Register entry 29 — whether an attendee may suppress notification content.** Opened by v5.2.0,
   **promoted** from a deferral that has sat in prose since v3.1.0. A saved-session push carries a
   session title to a lock screen, so what somebody chose to attend is now visible alongside what
   somebody said to them. Accepted twice, never decided. Blocks nothing.
-- **Register entry 28 — speakers are personal data about people who are not attendees.** The rows
-  have existed since 002; v4.2.0 makes them organizer-authored, which moves responsibility from a
+- **Register entry 30 — speakers are personal data about people who are not attendees.** The rows
+  have existed since 002; v5.2.0 makes them organizer-authored, which moves responsibility from a
   reviewed commit to a promoted attendee typing into a form. Blocks nothing today; blocks any claim
   that Principle VIII's coverage is complete.
 - **Register entry 22 gets a second cause.** A cached conference could already outlive a withdrawn
@@ -166,7 +166,7 @@ foundation and the densest; Phase 5 is the part that needs the amendment most di
 
 ## Review Checklist
 
-- [ ] **The code matches v4.2.0 as ratified** — both decisions, not just the notification one
+- [ ] **The code matches v5.2.0 as ratified** — both decisions, not just the notification one
 - [ ] The trigger set is exactly three cases, and a session *starting* still dispatches nothing
 - [ ] The dispatch caller is **not** under `notifications/` (T020)
 - [ ] Act and audit entry commit together, and the act rolls back when the entry fails (T023–T025)

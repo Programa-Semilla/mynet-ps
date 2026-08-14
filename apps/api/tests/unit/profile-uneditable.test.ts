@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest'
 
 /**
  * **FR-1006 — no administrative route edits anybody's profile, and a speaker record is not a route
- * to one** (standing decision 33, register entry 28).
+ * to one** (standing decision 33, register entry 30).
  *
  * ═════════════════════════════════════════════════════════════════════════════════════════════
  * **THIS FILE WAS CITED BY TWO OTHERS BEFORE IT EXISTED, AND THAT IS WHY IT EXISTS NOW.**
@@ -134,7 +134,7 @@ describe("FR-1006 — no administrative tier edits anybody's profile", () => {
    *
    * `speakers` carries a name, a title and a company and has no reference to `attendees` — by
    * design, since 002. What FR-1006 forbids is *adding* one, or resolving a speaker to an attendee
-   * by matching on a name. Register entry 28 records the open question this leaves: a speaker is
+   * by matching on a name. register entry 30 records the open question this leaves: a speaker is
    * personal data about somebody who never signed up, and 014 moved responsibility for it from a
    * reviewed commit to a promoted attendee typing into a form.
    * ─────────────────────────────────────────────────────────────────────────────────────────

@@ -118,7 +118,7 @@ test.describe('conference content authoring, end to end', () => {
       await expect(adminPage.getByRole('heading', { name: CONFERENCE })).toBeVisible()
 
       // The empty state is the first screen of every new conference, and it says out loud that
-      // there is no draft to publish from (decision 43).
+      // there is no draft to publish from (decision 48).
       await expect(adminPage.getByText(/no sessions yet/i)).toBeVisible()
 
       // ─────────────────────────────────────────────────────────────────────────────────────
@@ -202,7 +202,7 @@ test.describe('conference content authoring, end to end', () => {
         'the authored session did not reach the attendee’s Agenda (SC-1001)',
       ).toBeVisible()
 
-      // 3. Saved, which is what makes the attendee a subscriber to changes (v4.2.0 N1).
+      // 3. Saved, which is what makes the attendee a subscriber to changes (v5.2.0 N1).
       await attendeePage
         .getByRole('button', { name: new RegExp(`Save ${SESSION} to your agenda`, 'i') })
         .click()

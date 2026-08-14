@@ -358,7 +358,7 @@ export interface AdminCatalogRepository {
  *   authorable, a person is not.*
  * - **Conference content authoring HAS LANDED — see `AdminCatalogRepository` above.** This entry
  *   used to read *"that is 012, and FR-974 keeps `catalog-read-only.test.ts` in force until it
- *   lands"*. It landed as **014**, on constitution v4.2.0, and `catalog-read-only.test.ts` is
+ *   lands"*. It landed as **014**, on constitution v5.2.0, and `catalog-read-only.test.ts` is
  *   **still in force**: research R1 found its two subjects are the attendee query module and
  *   `CatalogRepository`, and authoring is neither. FR-191 survives literally.
  * - **No join-code method.** That is 013, and FR-975 keeps `join-grants-nothing.test.ts` in force.

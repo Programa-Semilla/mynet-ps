@@ -23,7 +23,7 @@ import { buildApp } from '../../src/app.js'
  * "delete an empty conference" affordance, because the state that makes it safe today is one
  * attendee away from not being safe, and the control would be right there when it stopped being.
  * A conference that should not have existed is left alone; it is reachable only by its join code
- * (decision 43), so an unwanted one is already invisible to everybody who does not hold it.
+ * (decision 48), so an unwanted one is already invisible to everybody who does not hold it.
  *
  * **Not the same rule as the cascades being wrong.** They stay exactly as they are — correct for
  * the case deletion is still permitted (an untouched session). The protection is the absence of
@@ -79,7 +79,7 @@ describe('014 — a conference is never deleted (FR-1011)', () => {
       deleting,
       'A route deletes a conference. Every session cascades from it, and each session cascades ' +
         'to saved sessions, notes, questions and votes — so one request would destroy the ' +
-        'private writing of everybody at the conference, which is decision 44’s reasoning ' +
+        'private writing of everybody at the conference, which is decision 49’s reasoning ' +
         'multiplied by the whole programme (FR-1011).',
     ).toEqual([])
   })

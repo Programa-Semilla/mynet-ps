@@ -103,7 +103,7 @@ coalesced: { count, eventId, actId }
 - **One per attendee per act** (FR-1034), keyed on the audit entry id (R4).
 - **The acting principal is excluded** (FR-1028a).
 - **Activation lands on the session (single) or Agenda (coalesced)** — never on a list of changes
-  (FR-1034b), which is the surface v4.2.0's N2 forbids.
+  (FR-1034b), which is the surface v5.2.0's N2 forbids.
 - **A failed dispatch does not fail the act** — 007's precedent for report mail.
 - **`count` is the only aggregate over changes this feature produces**, permitted in the payload by
   N2 as amended and forbidden in every view.

@@ -20,7 +20,7 @@ test.describe('sign-in', () => {
     // FR-025 — the sign-in screen, not a workspace, and not a blank page.
     await expect(page.getByRole('heading', { name: 'MyNet' })).toBeVisible()
     await expect(page.getByLabel('Email address')).toBeVisible()
-    await expect(page.getByLabel('Password')).toBeVisible()
+    await expect(page.getByLabel('Password', { exact: true })).toBeVisible()
 
     await expect(page.getByText(ADA.displayName)).toHaveCount(0)
     for (const event of ADA.events) {
@@ -40,7 +40,7 @@ test.describe('sign-in', () => {
     await page.getByLabel('Email address').fill(ADA.email)
     await expect(submit).toBeDisabled()
 
-    await page.getByLabel('Password').fill(SEED_PASSWORD)
+    await page.getByLabel('Password', { exact: true }).fill(SEED_PASSWORD)
     await expect(submit).toBeEnabled()
   })
 
@@ -63,7 +63,7 @@ test.describe('sign-in', () => {
     await page.goto('/')
 
     await page.getByLabel('Email address').fill(ADA.email)
-    await page.getByLabel('Password').fill('not-the-right-password')
+    await page.getByLabel('Password', { exact: true }).fill('not-the-right-password')
     await page.getByRole('button', { name: 'Sign in' }).click()
 
     const wrongPassword = page.getByRole('alert')
@@ -74,7 +74,7 @@ test.describe('sign-in', () => {
     // these two messages ever differ, the sign-in form becomes an account-enumeration oracle.
     await page.reload()
     await page.getByLabel('Email address').fill('nobody-here@example.com')
-    await page.getByLabel('Password').fill('not-the-right-password')
+    await page.getByLabel('Password', { exact: true }).fill('not-the-right-password')
     await page.getByRole('button', { name: 'Sign in' }).click()
 
     const unknownAccount = page.getByRole('alert')
@@ -82,7 +82,7 @@ test.describe('sign-in', () => {
     expect((await unknownAccount.textContent())?.trim()).toBe(wrongPasswordText)
 
     // And neither attempt let anybody in.
-    await expect(page.getByLabel('Password')).toBeVisible()
+    await expect(page.getByLabel('Password', { exact: true })).toBeVisible()
   })
 
   test('a signed-in attendee sees their own name and their own events, and nobody else’s', async ({
@@ -164,7 +164,7 @@ test.describe('sign-in', () => {
       const stateWhileSignedIn = await context.storageState()
 
       await page.getByRole('button', { name: 'Sign out' }).click()
-      await expect(page.getByLabel('Password')).toBeVisible()
+      await expect(page.getByLabel('Password', { exact: true })).toBeVisible()
 
       // FR-027 — the token is revoked in the database, so replaying the cookie a browser
       // "forgot" gets nowhere. Merely clearing the cookie would leave a captured token working.
@@ -172,7 +172,7 @@ test.describe('sign-in', () => {
       try {
         const replayed = await replay.newPage()
         await replayed.goto('/')
-        await expect(replayed.getByLabel('Password')).toBeVisible()
+        await expect(replayed.getByLabel('Password', { exact: true })).toBeVisible()
         await expect(
           replayed.getByRole('heading', { name: `Hello, ${ADA.displayName}` }),
         ).toHaveCount(0)

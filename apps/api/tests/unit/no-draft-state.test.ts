@@ -9,7 +9,7 @@ import { buildApp } from '../../src/app.js'
 
 /**
  * T092 (014) — **conference content is live-edited; there is no draft/publish lifecycle**
- * (FR-1040, constitution v4.2.0, decision 43).
+ * (FR-1040, constitution v5.2.0, decision 48).
  *
  * ═════════════════════════════════════════════════════════════════════════════════════════════
  * **A LIFECYCLE WOULD BE A SECOND GATE OVER A GATE THAT ALREADY EXISTS.**
@@ -30,7 +30,7 @@ import { buildApp } from '../../src/app.js'
  *
  * Nobody would propose a lifecycle in a review. What happens instead is a `published boolean
  * NOT NULL DEFAULT true` column added "so we can hide a session while it is being written" — a
- * change that breaks nothing, passes every test, and quietly makes decision 43 false. A feature
+ * change that breaks nothing, passes every test, and quietly makes decision 48 false. A feature
  * MUST NOT add one without an amendment, so this reads the schema rather than trusting review.
  * ─────────────────────────────────────────────────────────────────────────────────────────────
  *
@@ -61,7 +61,7 @@ const migrationsDir = fileURLToPath(new URL('../../migrations/', import.meta.url
 const methodsOf = (route: RouteOptions): string[] =>
   Array.isArray(route.method) ? route.method : [route.method]
 
-describe('014 — no draft or publish lifecycle (FR-1040, decision 43)', () => {
+describe('014 — no draft or publish lifecycle (FR-1040, decision 48)', () => {
   let routes: RouteOptions[]
 
   beforeAll(async () => {
@@ -86,7 +86,7 @@ describe('014 — no draft or publish lifecycle (FR-1040, decision 43)', () => {
     expect(
       declaring,
       'A table declares lifecycle state. A conference is already private to whoever holds its ' +
-        'join code (decision 43), so this buys nothing — and costs a second state every read ' +
+        'join code (decision 48), so this buys nothing — and costs a second state every read ' +
         'path in the product must consult, each of them a place to forget it.',
     ).toEqual([])
   })
@@ -101,7 +101,7 @@ describe('014 — no draft or publish lifecycle (FR-1040, decision 43)', () => {
    * would have failed correct code and taught the next reader to weaken the pattern.
    *
    * On a session or a conference, though, a `status` column is exactly how a lifecycle arrives
-   * without being called one: `status: 'draft' | 'live'` breaches decision 43 while matching no
+   * without being called one: `status: 'draft' | 'live'` breaches decision 48 while matching no
    * pattern containing the word "published".
    */
   it('declares no status column on conference content (FR-1040)', () => {
@@ -115,7 +115,7 @@ describe('014 — no draft or publish lifecycle (FR-1040, decision 43)', () => {
     expect(
       declaring,
       'Conference content gained a status column. That is how a lifecycle arrives without being ' +
-        'called one — `status: draft | live` breaches decision 43 while matching no pattern ' +
+        'called one — `status: draft | live` breaches decision 48 while matching no pattern ' +
         'containing the word "published". Cancellation is a timestamp, deliberately.',
     ).toEqual([])
   })
@@ -127,7 +127,7 @@ describe('014 — no draft or publish lifecycle (FR-1040, decision 43)', () => {
 
     expect(
       publishing,
-      'A route publishes content. Live editing is decision 43: an organizer authors into a ' +
+      'A route publishes content. Live editing is decision 48: an organizer authors into a ' +
         'conference their attendees can already see, and that consequence is accepted rather ' +
         'than hidden (FR-1040).',
     ).toEqual([])

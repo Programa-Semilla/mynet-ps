@@ -1,9 +1,9 @@
 # Tasks: Conference Content Authoring
 
 **Feature**: 014 · **Branch**: `spec/014-conference-content-authoring` · **Migration**: `0011`
-**Spec**: [spec.md](./spec.md) · **Plan**: [plan.md](./plan.md) · **Constitution**: **v4.2.0 — RATIFIED 2026-08-12**
+**Spec**: [spec.md](./spec.md) · **Plan**: [plan.md](./plan.md) · **Constitution**: **v5.2.0 — RATIFIED 2026-08-12**
 
-> **T001 is unblocked.** v4.2.0 was ratified unchanged from the drafted text, so every requirement
+> **T001 is unblocked.** v5.2.0 was ratified unchanged from the drafted text, so every requirement
 > citing N1–N5 stands as written. The amendment gated the first line of code, as v3.1.0 gated 007's
 > Phase 7, v3.2.0 gated 008, v3.3.0 gated 009 and v4.0.0 gated 013.
 
@@ -32,7 +32,7 @@ looking.
 |---|---|
 | Migration number | **`0011`** — the only one this feature claims (013 holds `0009`, 012 reserves `0010`) |
 | Requirement range | FR-1001–FR-1044, SC-1001–SC-1012 |
-| Constitution | **v4.2.0**, N1–N5 |
+| Constitution | **v5.2.0**, N1–N5 |
 | New branded scope | `ConferenceAuthorityScope`, minted only by `requireConferenceAuthority` (R2) |
 | Material change set | **cancelled, start time, room** — and nothing else (N1, FR-1026) |
 | Dispatch caller | `routes/admin/catalog.ts` — **never `notifications/**`**, which the gate does not scan (R3) |
@@ -82,7 +82,7 @@ T074). No new repository member is added — that is the point of R7.
 
 **Purpose**: schema and generated artifacts. Nothing here is feature behaviour.
 
-- [X] T001 *(unblocked — v4.2.0 ratified)* Move `apps/api/migrations/meta/README.md` aside before any generation — `drizzle-kit generate` JSON-parses every file in `meta/`, and that README explains why the journal lists `0003` before `0004`. Restore it after
+- [X] T001 *(unblocked — v5.2.0 ratified)* Move `apps/api/migrations/meta/README.md` aside before any generation — `drizzle-kit generate` JSON-parses every file in `meta/`, and that README explains why the journal lists `0003` before `0004`. Restore it after
 - [X] T002 Add `cancelledAt`, `logisticsChangedAt` and `lastChangeActId` to `sessions` in `apps/api/src/db/schema/catalog.ts`, each with a header stating it is conference content and why it is stored rather than derived
 - [X] T003 [P] Add `viewedAt` (`NOT NULL DEFAULT now()`) to `savedSessions` in `apps/api/src/db/schema/agenda.ts`, with a header stating **why the default is the save instant** — there is no `created_at` to compare against
 - [X] T004 Add `sessions_event_cancelled_idx` and `saved_sessions_session_id_idx` in the same schema files, with a comment on the second naming the fan-out query it serves and the sequential scan it prevents
@@ -293,7 +293,7 @@ code registers an attendee, confirm no reach over any other conference.
 - [X] T100 Run `pnpm verify` — all ten gates green *(run as `pnpm verify:clean` against a fresh database: 13/13 gates, 162 e2e)*
 - [X] T101 Record deviations in `specs/014-conference-content-authoring/deviations.md`, including T021's no-change conclusion
 - [X] T102 Extend the reserved-migration table in `docs/superpowers/specs/2026-08-06-mynet-delivery-roadmap-design.md` to cover both in-flight programmes — **wrong for two features running**
-- [X] T103 Update `CLAUDE.md`: standing decisions 40–44, register entries 27 and 28, migrations run to `0011`, and the architectural invariants this feature establishes
+- [X] T103 Update `CLAUDE.md`: standing decisions 45–49, register entries 29 and 30, migrations run to `0011`, and the architectural invariants this feature establishes
 - [X] T104 Walk `quickstart.md` scenarios 1–5 (machine-checkable)
 - [ ] T105 Walk `quickstart.md` scenarios 6–9 **by hand, on a device** — notification, coalescing, denied permission, and the three widths plus a screen-reader pass. **Joins the outstanding walkthroughs from 007, 008, 009 and 013 rather than replacing them**
 
@@ -303,7 +303,7 @@ code registers an attendee, confirm no reach over any other conference.
 
 ### Phase dependencies
 
-- **Phase 1 (Setup)** → no dependencies. T001 blocked on v4.2.0's ratification
+- **Phase 1 (Setup)** → no dependencies. T001 blocked on v5.2.0's ratification
 - **Phase 2 (Foundational)** → depends on Phase 1. **Blocks every user story**
 - **Phase 3 (US1)** → depends on Phase 2
 - **Phase 4 (US2)** → depends on Phase 2, and **completes US1's route surface** (T051 adds the `DELETE` T033 held back)
@@ -365,7 +365,7 @@ mistake.
 ### Incremental delivery
 
 1. **Phases 1–4** — the first releasable slice. Authoring, and it cannot destroy anything.
-2. **Phase 5** — the attendee learns. This is what needs v4.2.0 most directly.
+2. **Phase 5** — the attendee learns. This is what needs v5.2.0 most directly.
 3. **Phase 6** — new conferences.
 4. **Phase 7** — the absences, the by-hand walk, and the documents that go stale otherwise.
 

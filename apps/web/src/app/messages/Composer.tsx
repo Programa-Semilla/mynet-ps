@@ -1,6 +1,14 @@
 import { MESSAGE_MAX_LENGTH, OfflineError } from '@mynet/data'
 import { Send } from 'lucide-react'
-import { useId, useState, type FormEvent, type KeyboardEvent, type ReactNode } from 'react'
+import {
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type FormEvent,
+  type KeyboardEvent,
+  type ReactNode,
+} from 'react'
 
 /**
  * T044 (007) — where a message is written (FR-511, FR-512, FR-517, FR-565, FR-584).
@@ -18,6 +26,24 @@ import { useId, useState, type FormEvent, type KeyboardEvent, type ReactNode } f
  * component is the half an integration test cannot see.
  * ═════════════════════════════════════════════════════════════════════════════════════════
  *
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ * **T008 (016) — IT GROWS TO A BOUND AND THEN STOPS, AND THE SEND CONTROL NEVER MOVES OUT OF
+ * REACH** (FR-1001–FR-1005).
+ *
+ * This composer shipped with `resize-y`, no maximum, and no growth at all — a combination that
+ * made a long message **unsendable on a phone**, which is the product's primary context. The
+ * owner found it by using the product, and it is the most severe of the six items in 016 because
+ * it removes a capability rather than degrading one.
+ *
+ * Three changes, and each closes a different half of it: the field now grows with its content,
+ * that growth is capped at a **proportion of the visible viewport** (`COMPOSER_MAX_HEIGHT`), and
+ * direct manipulation is gone so no drag can overrule the cap.
+ *
+ * **The reachability guarantee is structural, not arithmetic.** See the note on the flex row
+ * below: the send control is a sibling of the bounded field, so no composer height can displace
+ * it. That is why FR-1003 survives somebody changing the proportion.
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ *
  * ─────────────────────────────────────────────────────────────────────────────────────────
  * **The message stays in the composer when a send fails, and is never queued** (FR-565).
  *
@@ -30,6 +56,39 @@ import { useId, useState, type FormEvent, type KeyboardEvent, type ReactNode } f
 
 /** How close to the limit the counter appears. Earlier is noise on every message ever written. */
 const COUNTER_THRESHOLD = Math.floor(MESSAGE_MAX_LENGTH * 0.9)
+
+/**
+ * T008/T009 (016) — **the composer's ceiling, as a proportion of the visible viewport**
+ * (FR-1001, FR-1002).
+ *
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ * **THE *KIND* OF RULE IS CONSTITUTIONAL; THE NUMBER IS A PLANNING DECISION.**
+ *
+ * FR-1002 fixes that the bound is a **proportion** and forbids a fixed height or a line count.
+ * Both alternatives were considered and rejected in the specification's clarification round, and
+ * the reason is one configuration: a short viewport with a tall on-screen keyboard. Six lines is
+ * comfortable on a 6.7" phone and is the original defect returning under a different name on a
+ * 4.7" one, because a line count does not know how much room is left.
+ *
+ * **30% is chosen against the narrowest supported viewport with a keyboard raised.** At 390×844
+ * a keyboard takes roughly 45% of the height, leaving ~55dvh visible. A composer capped at 30dvh
+ * is then a little over half of what remains, which keeps acceptance scenario 4's promise — the
+ * thread above stays *partially visible* rather than being fully displaced — while still fitting
+ * about ten lines of what is being written.
+ *
+ * **`dvh` rather than `vh`, and that is not interchangeable.** `vh` is the viewport with browser
+ * chrome *retracted*, so on mobile Safari a `vh` bound is measured against a viewport taller than
+ * the one the attendee is looking at — which would make the composer larger than its share
+ * exactly when room is scarcest.
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ *
+ * **This is what makes FR-1003 structural rather than a value somebody must keep true.** The send
+ * control is a *sibling* of the bounded field, never inside it, so growth moves the field's own
+ * bottom edge and nothing else. A composer that can never exceed 30% of the visible viewport
+ * cannot displace a control that sits outside it, however the viewport shrinks — so the guarantee
+ * survives a future change to this number, which a hand-tuned height would not.
+ */
+const COMPOSER_MAX_HEIGHT = 'max-h-[30dvh]'
 
 export interface ComposerProps {
   /**
@@ -56,12 +115,44 @@ export const Composer = ({ onSend, unavailable }: ComposerProps) => {
   const [sending, setSending] = useState(false)
   const [failure, setFailure] = useState<string | null>(null)
 
+  const fieldRef = useRef<HTMLTextAreaElement>(null)
+
+  /**
+   * ───────────────────────────────────────────────────────────────────────────────────────
+   * **Growth is measured here; the ceiling is enforced in CSS** (FR-1001, FR-1004).
+   *
+   * A textarea does not grow with its content on its own — it scrolls — so FR-1001's "grows to
+   * fit" has to be driven from the content's measured height. `max-height` then clamps it, which
+   * is what keeps the *bound* declarative: this effect never compares against a number, so it
+   * cannot disagree with `COMPOSER_MAX_HEIGHT`, and changing the proportion needs no change here.
+   * Past the clamp the field's own `overflow-y-auto` takes over, which is FR-1004.
+   *
+   * **Reset to `auto` before measuring, or the composer can only ever get taller.** `scrollHeight`
+   * includes the height already set, so measuring without clearing it first reports the current
+   * height whenever content shrinks — deleting a long message would leave the box tall and empty.
+   *
+   * `field-sizing: content` expresses this in CSS alone and is deliberately not used: Safari does
+   * not support it, and an iPhone is the viewport this whole story is about.
+   * ───────────────────────────────────────────────────────────────────────────────────────
+   */
+  useEffect(() => {
+    const field = fieldRef.current
+    if (!field) return
+
+    field.style.height = 'auto'
+    // jsdom lays nothing out and reports 0, which would collapse the field to nothing in the
+    // component tests. A real browser never reports 0 for a rendered textarea.
+    if (field.scrollHeight > 0) field.style.height = `${field.scrollHeight}px`
+  }, [draft])
+
   if (unavailable) return <>{unavailable}</>
 
   // Trimmed, so whitespace is not a message. The server trims before insert for the same reason,
   // which is what makes the lower bound structural rather than a rule two layers both remember.
   const length = draft.trim().length
-  // **Both bounds disable rather than one**, though FR-512 names only the lower one. An
+  // **Both bounds disable rather than one**, though FR-512 names only the lower one (FR-1006
+  // restates it for 016, unchanged — this feature altered how the composer GROWS, never what it
+  // accepts). An
   // over-length message refused after submission is the same defect the empty one would be, and
   // the counter below has already told the attendee why the control is off.
   const sendable = length > 0 && length <= MESSAGE_MAX_LENGTH && !sending
@@ -124,9 +215,25 @@ export const Composer = ({ onSend, unavailable }: ComposerProps) => {
         Message
       </label>
 
+      {/*
+        ─────────────────────────────────────────────────────────────────────────────────────
+        **The send control is a SIBLING of the bounded field, and that is the whole of FR-1003.**
+
+        `COMPOSER_MAX_HEIGHT` is on the textarea alone, so growth moves that element's bottom
+        edge and nothing else; the button is laid out beside it and cannot be pushed anywhere by
+        it. Putting the control *inside* the bounded region — or making the bound a property of
+        this row — would make reachability depend on the number staying correct, which is the
+        arrangement FR-1002 exists to avoid.
+
+        `items-end` keeps the control on the baseline of a grown field rather than centred
+        against it, and `shrink-0` on the button stops a long first line squeezing it to nothing
+        at 320px, which is the horizontal-overflow failure FR-586 forbids.
+        ─────────────────────────────────────────────────────────────────────────────────────
+      */}
       <div className="flex items-end gap-2">
         <textarea
           id={fieldId}
+          ref={fieldRef}
           value={draft}
           onChange={(event) => setDraft(event.target.value)}
           onKeyDown={onKeyDown}
@@ -137,7 +244,22 @@ export const Composer = ({ onSend, unavailable }: ComposerProps) => {
           maxLength={MESSAGE_MAX_LENGTH * 2}
           placeholder="Write a message"
           aria-describedby={showCounter ? counterId : undefined}
-          className="focus-ring min-h-11 w-full resize-y rounded-sm border border-border-subtle bg-surface px-3 py-2 text-sm text-text-primary"
+          className={[
+            'focus-ring min-h-11 w-full rounded-sm border border-border-subtle bg-surface px-3 py-2 text-sm text-text-primary',
+            // ═══════════════════════════════════════════════════════════════════════════════
+            // **`resize-none`, and its absence was half the defect** (FR-1005).
+            //
+            // This was `resize-y`. A reader-chosen height can violate FR-1003 no matter what
+            // the bound says — dragging the handle past the ceiling put the send control off
+            // screen with every other rule still satisfied. A bound that a drag can overrule is
+            // not a bound, so direct manipulation goes rather than being clamped.
+            // ═══════════════════════════════════════════════════════════════════════════════
+            'resize-none',
+            // The ceiling (FR-1001) and what happens at it (FR-1004): content scrolls inside
+            // the composer rather than the composer continuing to grow.
+            COMPOSER_MAX_HEIGHT,
+            'overflow-y-auto',
+          ].join(' ')}
         />
 
         <button

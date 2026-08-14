@@ -26,7 +26,7 @@ import fp from 'fastify-plugin'
  * There is no persistence, no retry, no schedule and no timer. A task is a promise that started
  * **because a request arrived**, and the only thing tracked is whether it has finished. That
  * boundary is load-bearing: `tests/unit/no-session-start-trigger.test.ts` asserts that nothing
- * time-driven can dispatch, because a reminder needs a scheduler and v4.2.0 N1 forbids a session
+ * time-driven can dispatch, because a reminder needs a scheduler and v5.2.0 N1 forbids a session
  * *starting* from reaching anybody. A `setInterval` or a durable queue here would be the
  * mechanism that guard exists to keep out, so this file deliberately has neither and a reviewer
  * should refuse one.

@@ -109,7 +109,7 @@ const NextSavedSessionCard = ({ event }: EventCardProps) => {
  * A saved session plus whether it has materially changed since this attendee last looked.
  *
  * One boolean per session, and deliberately nothing else — no total, no list, no "3 changes"
- * anywhere (FR-1031, v4.2.0 N2). The count that FR-1034a permits exists only in a push payload.
+ * anywhere (FR-1031, v5.2.0 N2). The count that FR-1034a permits exists only in a push payload.
  */
 type MarkedSession = Session & { readonly changed: boolean }
 

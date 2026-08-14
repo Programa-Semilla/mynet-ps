@@ -9,7 +9,7 @@ import { buildApp } from '../../src/app.js'
 
 /**
  * T066 (014) — **the server half: the count exists in exactly one place, and no route offers a
- * change list** (FR-1031, SC-1009, constitution v4.2.0 N2).
+ * change list** (FR-1031, SC-1009, constitution v5.2.0 N2).
  *
  * ═════════════════════════════════════════════════════════════════════════════════════════════
  * **A CLIENT CANNOT RENDER A COUNT IT IS NEVER SENT, AND THAT IS THE POINT OF ASSERTING IT
@@ -21,7 +21,7 @@ import { buildApp } from '../../src/app.js'
  * `{ count, sessions }` would make the client-side absence one commit away from ending, and the
  * commit that ended it would look like plumbing rather than like a governance change.
  *
- * **v4.2.0 N2 permits the count in the payload and forbids it everywhere else.** The payload is
+ * **v5.2.0 N2 permits the count in the payload and forbids it everywhere else.** The payload is
  * `payloadFor` in `routes/admin/catalog.ts`, guarded by `coalesced-payload.test.ts`. Everywhere
  * else means: not in an HTTP response, not in a route address, not as a stored column somebody
  * could later read cheaply.
@@ -90,7 +90,7 @@ describe('014 — the count lives only in the payload (FR-1031, SC-1009)', () =>
       offering,
       'A route addresses "what changed". Activating a coalesced notification must land on the ' +
         'destination carrying the per-row markers and never on a list of changes (FR-1034b) — ' +
-        'and a route offering that list is the surface v4.2.0 N2 forbids, whether or not a ' +
+        'and a route offering that list is the surface v5.2.0 N2 forbids, whether or not a ' +
         'notification points at it.',
     ).toEqual([])
   })
@@ -193,7 +193,7 @@ describe('014 — the count lives only in the payload (FR-1031, SC-1009)', () =>
    * The files permitted to build a `count:`, each with what the count is *of*.
    *
    * **DO NOT ADD A FILE HERE TO MAKE A FAILURE GO AWAY.** The question is whether the number
-   * counts *changed saved sessions* — the aggregate v4.2.0 N2 permits in a notification payload
+   * counts *changed saved sessions* — the aggregate v5.2.0 N2 permits in a notification payload
    * and forbids everywhere it could become something to look at. Any other aggregate needs its
    * own line here saying what it counts, and one that does count changes needs an amendment.
    *
@@ -203,7 +203,7 @@ describe('014 — the count lives only in the payload (FR-1031, SC-1009)', () =>
    */
   const PERMITTED: Record<string, string> = {
     'routes/admin/catalog.ts':
-      'payloadFor — the one place v4.2.0 N2 grants the count, guarded by coalesced-payload.test.ts',
+      'payloadFor — the one place v5.2.0 N2 grants the count, guarded by coalesced-payload.test.ts',
     'db/queries/directory.ts':
       "006's shared-interest count and its keyset cursor. Counts interests on a card the reader " +
       'can already see, and ranks by it (FR-411, FR-412)',
@@ -225,7 +225,7 @@ describe('014 — the count lives only in the payload (FR-1031, SC-1009)', () =>
   it('builds a count only where a reason is written down (FR-1034a)', () => {
     expect(
       buildingACount().filter((path) => !(path in PERMITTED)),
-      'A count is built outside the files permitted to build one. v4.2.0 N2 permits the count of ' +
+      'A count is built outside the files permitted to build one. v5.2.0 N2 permits the count of ' +
         'changed saved sessions in the notification payload and forbids it everywhere it could ' +
         'become something to look at. If this is a different aggregate entirely, add it to ' +
         'PERMITTED in this test WITH what it counts — do not narrow the search until it passes, ' +
@@ -248,10 +248,10 @@ describe('014 — the count lives only in the payload (FR-1031, SC-1009)', () =>
    * **A session starting still dispatches nothing**, re-asserted where the trigger set widened.
    *
    * T091 asserts this over the whole source; here it is stated against the material set itself,
-   * because v4.2.0's distinction is the load-bearing one: a reminder is something an attendee can
+   * because v5.2.0's distinction is the load-bearing one: a reminder is something an attendee can
    * set themselves, and a change is information only the product holds.
    */
-  it('keeps the material set to exactly three changes (v4.2.0 N1, FR-1026)', () => {
+  it('keeps the material set to exactly three changes (v5.2.0 N1, FR-1026)', () => {
     const changes = codeOnly(join(apiSrc, 'db', 'queries', 'session-changes.ts'))
     const union = /MaterialChange\s*=\s*([^\n]+)/.exec(changes)?.[1] ?? ''
 
@@ -260,7 +260,7 @@ describe('014 — the count lives only in the payload (FR-1031, SC-1009)', () =>
     expect(union).toMatch(/'room'/)
     expect(
       /'start(ing|ed)?'|'begins?'|'soon'|'reminder'/.test(union),
-      'The material set gained a session-starting trigger. v4.2.0 forbids it explicitly and the ' +
+      'The material set gained a session-starting trigger. v5.2.0 forbids it explicitly and the ' +
         'distinction is load-bearing: a session STARTING is a reminder an attendee could set ' +
         'themselves; a session MOVING is information only the product holds (FR-1033).',
     ).toBe(false)

@@ -55,7 +55,7 @@ import type { StoredSubscription } from '../../notifications/service.js'
  *
  * ═════════════════════════════════════════════════════════════════════════════════════════════
  * **THIS MODULE IS THE SECOND ENTRY IN `DISPATCH_CALLERS`, AND ITS PLACEMENT IS A REQUIREMENT
- * RATHER THAN A CONVENIENCE** (research R3, constitution v4.2.0 N1).
+ * RATHER THAN A CONVENIENCE** (research R3, constitution v5.2.0 N1).
  *
  * `tests/unit/notification-triggers.test.ts` excludes `notifications/**` from its scan entirely,
  * because that directory *is* the dispatcher. So a second trigger implemented as
@@ -590,7 +590,7 @@ export const adminCatalogRoutes = async (app: FastifyInstance): Promise<void> =>
         description:
           'Conference content describing a real person who may or may not hold an attendee ' +
           'account. **No route leads from here to a profile, at any tier** (FR-1006): ' +
-          'conference content is authorable, a person is not (decision 33). Register entry 28 ' +
+          'conference content is authorable, a person is not (decision 33). register entry 30 ' +
           'records the open question — a speaker is personal data about somebody who never ' +
           'signed up, and 014 moves responsibility for it from a reviewed commit to a form.',
         params: eventParams,
@@ -931,7 +931,7 @@ export const adminCatalogRoutes = async (app: FastifyInstance): Promise<void> =>
         description:
           'Refuses a date range that would orphan an existing session, **naming them** ' +
           '(FR-1014), and refuses a timezone change once any session exists (FR-1015). There is ' +
-          'no draft or published state and no lifecycle gate (FR-1040, v4.2.0 N4): a conference ' +
+          'no draft or published state and no lifecycle gate (FR-1040, v5.2.0 N4): a conference ' +
           'is reachable only by its join code, so an unfinished one is already private to ' +
           'whoever holds it.',
         params: eventParams,

@@ -30,7 +30,7 @@ import type { SeedContext, SeedModule } from './index.js'
  * this file.* CLAUDE.md names this header among the five code-level guards enforcing the
  * reversed prohibition, so it is corrected in place rather than deleted.
  *
- * **What is permitted now, and to whom** (v4.2.0, FR-1001, FR-1002, FR-1007):
+ * **What is permitted now, and to whom** (v5.2.0, FR-1001, FR-1002, FR-1007):
  *
  *   - A **conference organizer** may create, edit and delete tracks, rooms, speakers and
  *     sessions in a conference they are **assigned to**, and may create a conference (and is

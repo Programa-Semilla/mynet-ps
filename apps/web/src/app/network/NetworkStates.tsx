@@ -143,6 +143,20 @@ export const NetworkFailed = ({
  * This is also the **first** thing a new account sees in Network — nothing here is seeded, by
  * design — which is what makes it worth more than a grey sentence.
  * ═════════════════════════════════════════════════════════════════════════════════════════
+ *
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ * **T042 (016) — THE SECOND SENTENCE USED TO ASK THE READER TO WAIT** (FR-1021, FR-1052,
+ * FR-1055 — the requirement added because FR-1052 never reached user-facing copy).
+ *
+ * It read *"theirs will arrive here when they share back"*, which was the one-directional model
+ * constitution **v5.0.0 (C1)** retracts. Under mutual exchange there is nothing to wait for:
+ * one act writes both rows (FR-1022), so the contact appears on the reader's next visit here
+ * and the instruction was telling them to expect a step that no longer exists.
+ *
+ * The next step it offers is unchanged — Discover — because that is still the only place a
+ * relationship starts. What changed is that the step **completes** the relationship rather than
+ * opening half of one.
+ * ─────────────────────────────────────────────────────────────────────────────────────────
  */
 export const NoContacts = () => (
   <Panel>
@@ -150,8 +164,8 @@ export const NoContacts = () => (
       Your contacts will appear here
     </h2>
     <p className="mb-4 text-sm text-text-body">
-      Someone becomes a contact when they share their card with you. Find people at your conference
-      in Discover, share your own card, and theirs will arrive here when they share back.
+      Sharing a card is an exchange: share yours with someone and you each hold the other&apos;s.
+      Find people at your conference in Discover, share your card, and they will appear here.
     </p>
     <Link
       to="/discover"

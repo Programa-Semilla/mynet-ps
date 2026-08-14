@@ -278,7 +278,7 @@ describe('the authoring bounds (T022, FR-1039)', () => {
 
   /**
    * `conference_create` is the **only product-wide capability a conference organizer holds**
-   * (v4.2.0 N3), and the amendment accepts in writing that nothing bounds how many they may
+   * (v5.2.0 N3), and the amendment accepts in writing that nothing bounds how many they may
    * make. That is a statement about authorisation; this is the one about rate, and the two are
    * deliberately not the same thing.
    */

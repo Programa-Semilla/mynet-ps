@@ -5,12 +5,12 @@ import { fileURLToPath, URL } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 /**
- * T091 (014) — **a session STARTING dispatches nothing** (FR-1033, constitution v4.2.0 N1).
+ * T091 (014) — **a session STARTING dispatches nothing** (FR-1033, constitution v5.2.0 N1).
  *
  * ═════════════════════════════════════════════════════════════════════════════════════════════
  * **THE DISTINCTION IS LOAD-BEARING AND IT IS ONE SENTENCE WIDE.**
  *
- * v4.2.0 widened the trigger set for the first time since v3.1.0 created it, and bounded the
+ * v5.2.0 widened the trigger set for the first time since v3.1.0 created it, and bounded the
  * widening to three named changes: cancelled, start time, room. The principle that generated the
  * set is *a notification is raised when a change affects **where or whether** the attendee must
  * be somewhere*.
@@ -152,9 +152,9 @@ describe('014 — a session starting dispatches nothing (FR-1033)', () => {
    * **The trigger set is exactly two**, which is the positive statement of the same rule.
    *
    * `notification-triggers.test.ts` names the permitted callers; this asserts what causes them.
-   * A third entry here is a constitution amendment, as v4.2.0 was for the second.
+   * A third entry here is a constitution amendment, as v5.2.0 was for the second.
    */
-  it('keeps the dispatch causes at two, both request-driven (v3.1.0, v4.2.0 N1)', () => {
+  it('keeps the dispatch causes at two, both request-driven (v3.1.0, v5.2.0 N1)', () => {
     const triggers = codeOnly(join(apiSrc, '../tests/unit/notification-triggers.test.ts'))
     const declared = /DISPATCH_CALLERS[^=]*=\s*\[([\s\S]*?)\]/.exec(triggers)?.[1] ?? ''
 
@@ -164,7 +164,7 @@ describe('014 — a session starting dispatches nothing (FR-1033)', () => {
     expect(
       callers,
       'The permitted dispatch callers changed. Two triggers exist: a received message (v3.1.0) ' +
-        'and a material change to a saved session (v4.2.0 N1). A third needs an amendment — ' +
+        'and a material change to a saved session (v5.2.0 N1). A third needs an amendment — ' +
         'that is what v3.1.0 built the rule for and what 014 was the first to take up.',
     ).toHaveLength(2)
 

@@ -99,7 +99,7 @@ clientsClaim()
  * ═════════════════════════════════════════════════════════════════════════════════════════
  * **T073 (014) — A SECOND PAYLOAD SHAPE, AND THE DEFAULTS BECOME SHAPE-DEPENDENT.**
  *
- * v4.2.0 admits a second trigger: a material change to a session the attendee **saved**. Its
+ * v5.2.0 admits a second trigger: a material change to a session the attendee **saved**. Its
  * payload carries `kind: 'session-change'` and either a `sessionId` (one session changed) or a
  * `count` (several did, in one organizer act — FR-1034).
  *

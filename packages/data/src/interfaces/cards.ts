@@ -1,13 +1,21 @@
 /**
- * T030 (008) — digital business cards, in domain terms (Principle V, FR-601–FR-618, FR-650).
+ * T030 (008), T042 (016) — digital business cards, in domain terms (Principle V,
+ * FR-601–FR-618, FR-650, FR-1021–FR-1030, FR-1052).
  *
  * ═════════════════════════════════════════════════════════════════════════════════════════
  * **A CONTACT IS SOMEBODY WHOSE CARD YOU HOLD** (constitution v3.2.0, N1).
  *
  * There is no connect verb here, no request, and no acceptance step, because none appears in
  * `requirements.md` or in the approved prototype. Sharing is the only relationship-forming act
- * in the product, and it is **one-directional**: `share` gives the recipient your card and gives
- * you nothing. You hold theirs when, and only when, they share back.
+ * in the product, and since constitution **v5.0.0 (C1)** it is a **mutual exchange**: `share`
+ * gives the recipient your card and gives you theirs, in one act the recipient is not asked
+ * about (FR-1021, FR-1023). Both records are written in one transaction or neither is
+ * (FR-1022), so a contact is mutual or absent and never one-sided.
+ *
+ * **This file said the reverse until 016** — *"`share` gives the recipient your card and gives
+ * you nothing; you hold theirs when, and only when, they share back"* — citing the FR-602 that
+ * C1 retracts along with v3.2.0 (N2). The server was rewritten before this package was, which
+ * is the whole reason `apps/web/tests/unit/card-model-record.test.ts` exists.
  *
  * **Contacts are never derived from conversations**, and that is a prohibition rather than an
  * omission. 007's open send makes a conversation unilateral — anyone sharing an event may start
@@ -88,10 +96,17 @@ export interface HeldCard {
 /**
  * A card the attendee has **given away** (FR-618's read side).
  *
- * Deliberately thinner than `HeldCard`: this is a record of something you did, not a person you
- * may now read. It carries the recipient's display name so the list is legible, and nothing
- * further — sharing your card does not entitle you to the recipient's profile, which is what
- * "one-directional" means in practice.
+ * Deliberately thinner than `HeldCard`: this is a record of something you **did**, not a person
+ * you may read. It carries the recipient's display name so the list is legible, and nothing
+ * further.
+ *
+ * **The thinness outlived the reason first given for it, and the replacement matters.** It used
+ * to be that giving your card entitled you to nothing in return; constitution **v5.0.0 (C1)**
+ * retracts that, and the same act now writes a `HeldCard` for you as well. The two shapes are
+ * still different because they answer different questions — *what did I give away, and when* is
+ * a record of your own act, while *whose profile may I read* is a live resolution of somebody
+ * else's data (FR-611). Fattening this one into a second profile view would duplicate `HeldCard`
+ * and give the outward list a read path it does not need.
  */
 export interface SharedCard {
   readonly attendeeId: string
@@ -120,20 +135,32 @@ export interface SharedCard {
  */
 export interface CardRepository {
   /**
-   * Give **your** card to another attendee (FR-601, FR-602).
+   * Exchange cards with another attendee (FR-601, FR-1021, FR-1022).
    *
-   * **Idempotent** (FR-604): sharing twice does not create a second record and **does not
-   * refresh** the original instant. That second half matters — a refreshing timestamp would turn
-   * re-sharing into a way to signal somebody repeatedly, which is notification-shaped behaviour
-   * in a feature that dispatches nothing (FR-643).
+   * **Mutual since constitution v5.0.0 (C1).** One call, and both parties hold the other's card;
+   * the recipient is neither asked nor able to decline, and there is no pending state (FR-1023).
+   * The two records commit together or not at all (FR-1022). Nothing is dispatched to tell them
+   * (FR-1029) — they find out on their next visit to Network.
    *
-   * Returns the record of the exchange, never the recipient's profile. Sharing gives; it does
-   * not take.
+   * **Idempotent** (FR-604, FR-1025): sharing twice does not create a second record and **does
+   * not refresh** the original instant. That second half matters — a refreshing timestamp would
+   * turn re-sharing into a way to signal somebody repeatedly, which is notification-shaped
+   * behaviour in a feature that dispatches nothing (FR-643).
+   *
+   * Returns the **outward** record — what you gave, and where — never the counterpart's profile.
+   * That is a shape decision rather than the retracted one-directional rule: the card you now
+   * hold is read through `listHeld`/`getHeld`, where resolution is live (FR-611), so returning a
+   * snapshot here would be a second and immediately stale copy of somebody else's data.
    *
    * Refused when the two share no current conference, when the recipient does not exist, when
    * they are not discoverable, and when the identifier is malformed — **all four
    * indistinguishably** (FR-607), inheriting the property 006 established. Refused with no
    * reason at all when either party has blocked the other (FR-608).
+   *
+   * The discoverability condition is **load-bearing for C1 rather than inherited convention**
+   * (FR-1053): the amendment licenses taking somebody's card without asking on the ground that a
+   * card resolves only what its owner already published to co-attendees, and against a recipient
+   * who published nothing that ground does not exist. See `apps/api/src/db/queries/cards.ts`.
    */
   share(attendeeId: string): Promise<SharedCard>
 
@@ -145,6 +172,11 @@ export interface CardRepository {
    * three absences are the standing consent constitution v3.2.0 (N2) established: sharing a card
    * is a decision to be remembered by that person, and it outlives both the conference and the
    * discoverability toggle.
+   *
+   * **v5.0.0 (C1) retracts N2's one-directional half and leaves the standing consent standing.**
+   * Both rows of an exchange rest on it identically, and what makes that defensible for the row
+   * the counterpart did not ask for is FR-1053's guard at the moment of sharing, not anything
+   * read here.
    *
    * Pairs with a block in either direction are excluded, read-side — so lifting a block restores
    * the contact with no write anywhere (FR-608, FR-637a).

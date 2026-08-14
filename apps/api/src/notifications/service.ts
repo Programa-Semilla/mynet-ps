@@ -56,7 +56,7 @@ interface PushPayloadBase {
    *
    * **014 accepts the same cost a second time and does not solve it either.** A saved-session
    * notification carries a session **title**, so what somebody chose to attend is now on their
-   * locked device alongside what somebody said to them. That is register entry 27, promoted from
+   * locked device alongside what somebody said to them. That is register entry 29, promoted from
    * a deferral that had sat in prose since v3.1.0 precisely because a consequence recorded twice
    * in the same words is one nobody acts on.
    */
@@ -70,7 +70,7 @@ export interface MessagePushPayload extends PushPayloadBase {
 }
 
 /**
- * T072 (014) — what the **second** trigger delivers (v4.2.0 N1, FR-1029, FR-1034, FR-1034b).
+ * T072 (014) — what the **second** trigger delivers (v5.2.0 N1, FR-1029, FR-1034, FR-1034b).
  *
  * ═════════════════════════════════════════════════════════════════════════════════════════════
  * **TWO SHAPES, AND WHICH ONE ARRIVES IS THE WHOLE OF THE COALESCING RULE.**
@@ -84,7 +84,7 @@ export interface MessagePushPayload extends PushPayloadBase {
  *
  * ─────────────────────────────────────────────────────────────────────────────────────────────
  * **`count` IS THE ONLY AGGREGATE OVER CHANGES THIS PRODUCT MAY PRODUCE, AND IT MAY EXIST HERE
- * AND NOWHERE ELSE** (FR-1034a, v4.2.0 N2).
+ * AND NOWHERE ELSE** (FR-1034a, v5.2.0 N2).
  *
  * N2's prohibition governs **in-app surfaces**, where an aggregate becomes the notification
  * centre v3.1.0 forbids. A notification is a single interruption by nature, and twelve

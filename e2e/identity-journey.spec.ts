@@ -56,6 +56,9 @@ test.describe('a person becomes an attendee', () => {
     await expect(confirm, 'a password below the policy must not be submittable').toBeDisabled()
 
     await page.getByLabel(/^password$/i).fill(attendee.password)
+    // 016 — sign-up carries a confirmation field, and submission is disabled until the two agree
+    // (FR-1017, FR-1018). A mistyped password here creates an account nobody can reach.
+    await page.getByLabel(/confirm password/i).fill(attendee.password)
     await expect(confirm).toBeEnabled()
     await confirm.click()
 
@@ -146,7 +149,7 @@ test.describe('a person becomes an attendee', () => {
     await expect(page.getByRole('button', { name: 'Sign in' })).toBeVisible()
 
     await page.getByLabel('Email address').fill(attendee.email)
-    await page.getByLabel('Password').fill(attendee.password)
+    await page.getByLabel('Password', { exact: true }).fill(attendee.password)
     await page.getByRole('button', { name: 'Sign in' }).click()
 
     await expect(page.getByRole('alert')).toContainText(/did not match/i)

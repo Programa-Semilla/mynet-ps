@@ -35,7 +35,7 @@ import {
  * ═════════════════════════════════════════════════════════════════════════════════════════════
  * **THE SAVED SET IS THE SUBSCRIPTION, AND THIS IS THE TEST THAT SAYS SO.**
  *
- * Constitution v4.2.0's N1 admits the second notification trigger for *a material change to a
+ * Constitution v5.2.0's N1 admits the second notification trigger for *a material change to a
  * session the attendee has **SAVED***, and the emphasis is the requirement. A conference has a
  * whole programme; an attendee has saved a handful of it. Dispatching on the programme rather
  * than on the saved set would turn one organizer fixing a room number into an interruption for
@@ -146,7 +146,7 @@ describe('a material change nobody saved (T064, FR-1028)', () => {
     expect(
       push.delivered(),
       'A material change to a session nobody saved produced a notification. The saved set IS ' +
-        'the subscription (v4.2.0 N1): dispatching on the programme instead would make one room ' +
+        'the subscription (v5.2.0 N1): dispatching on the programme instead would make one room ' +
         'change an interruption for every registrant.',
     ).toHaveLength(0)
   })
@@ -215,7 +215,7 @@ describe('a material change nobody saved (T064, FR-1028)', () => {
     expect(
       push.delivered(),
       'A title change notified a saver. The material set is exactly three — cancelled, start ' +
-        'time, room (v4.2.0 N1) — because a title does not strand anybody in the wrong corridor.',
+        'time, room (v5.2.0 N1) — because a title does not strand anybody in the wrong corridor.',
     ).toHaveLength(0)
   })
 })

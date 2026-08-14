@@ -134,7 +134,7 @@ protection is the refusal plus the lock (R6), not a change to the referential ru
   put the surface one small ask away (R7).
 - **No per-attendee delivery record.** The fan-out reads `saved_sessions` and dispatches; nothing
   records that it did. A delivery log is a read surface FR-1031 forbids.
-- **No draft or published column** (FR-1040, v4.2.0 N4). The join code is already the gate.
+- **No draft or published column** (FR-1040, v5.2.0 N4). The join code is already the gate.
 - **No `cancelled_by` column.** The audit entry records who acted, and duplicating it on the row
   would be a second source of truth for a fact the trail already answers — 009's reasoning for
   refusing a denormalised vote counter.
