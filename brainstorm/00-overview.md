@@ -188,6 +188,14 @@ taxonomy waits on the client, and it waits on a *list*, not a decision.
 two programmes writing the same conference-content tables is the implicit-coupling failure this
 project has already fixed twice. Splitting 014 would have recreated it.
 
+**Tranche 1 is held un-integrated, and holding has a standing cost that must be paid down.** PR #23
+was opened on 2026-08-14, passed all eleven CI jobs, and was **closed unmerged** by the same
+decision: 014 is whole, so nothing lands until tranche 2 is built. The branch stays on the remote and
+must not be deleted. Between now and then it will keep diverging from `develop` — it already did once,
+and re-merging 016 cost a session and collided on five numbering tables. **`develop` must be merged
+into `spec/014-conference-content-authoring` on every merge to `develop`.** The alternative is one
+enormous reconciliation at an unknown future date, against a base nobody remembers.
+
 **Numbered 011–013 when #09 ran, and delivered as 013–015.** The UAT deployment work took 011 from a
 parallel branch while this programme was in flight, so it shifted rather than renumbering a phase
 already on `develop`. The same thing happened to this session's constitution amendment, which was
