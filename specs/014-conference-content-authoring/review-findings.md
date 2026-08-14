@@ -164,7 +164,7 @@ the only two tests in the repository that shell out to git, so no precedent make
 only because a local `develop` ref exists.
 
 **Why it matters more than a red build:** these are the diff-aware FR-1003 re-assertion and the
-"`substitution.test.ts` is unchanged" proof that no eighth device capability was added — 014's two
+"`substitution.test.ts` is unchanged" proof that no device capability was added — 014's two
 most feature-specific guards. The cheapest repair when `test-unit` goes red on an unrelated PR is
 `try { … } catch { return [] }` or `it.skipIf`, which reproduces **exactly** the 010 defect this
 project records as its worst: a guard that skipped on every CI run while appearing to pass.

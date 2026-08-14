@@ -4,7 +4,7 @@ What implementation changed, found, or decided that the spec, plan or data model
 Written as it happened rather than at the end, so the reasoning is the reasoning that was
 available at the time.
 
-**Status: implementation complete except the by-hand walk.** Phases 1–7 are done; T105 —
+**Status: implementation complete except the by-hand walk; `develop` merged 2026-08-14 (D22).** Phases 1–7 are done; T105 —
 `quickstart.md` scenarios 6–9, which need a person and a phone — is outstanding and joins the
 same unwalked scenarios from 007, 008, 009 and 013. `tasks.md` carries the per-task state.
 
@@ -271,11 +271,11 @@ member is added"*; `markViewed` is one, deliberately, with the reasoning in
 
 `marker-not-cached.test.ts` therefore asserts the accurate invariant — the repository gains exactly
 one member, it is a write, and **the reads are unchanged at one** — plus the three things R7 rules
-out entirely: no eighth device capability, no new repository, and no `passThrough` on a write.
+out entirely: no device capability, no new repository, and no `passThrough` on a write.
 
 It also asserts `packages/platform/tests/substitution.test.ts` is **untouched since the branch
 point**, which is the cheapest possible proof that no capability was added: that file constructs a
-double for every one of them, so an eighth would not compile against it.
+double for every one of them, so a new one would not compile against it.
 
 ---
 
@@ -658,3 +658,93 @@ files), **1129 integration** (138 files, real `postgres:17`), contract, producti
 full run and passed in isolation and on re-run: the assertion reads "Conferences unavailable", which
 is the events read racing the API restart that test performs on purpose. Noted rather than fixed,
 and it is a different shape from D19's residual.
+
+---
+
+## D22 — merging `develop` collided on five numbering tables, and broke one guard
+
+**2026-08-14, after implementation was complete and the deep review had passed.** `develop` had
+moved two commits: **016** (app fixes, mutual card exchange, the install icon) and a shell fix.
+Both were authored in parallel with this feature from the same base, so almost nothing here was
+code to integrate. It was five independent claims on the same numbers.
+
+**Only three files conflicted, and all three were documentation.** Fifteen code files auto-merged
+without a conflict, which is the part worth distrusting rather than the part worth trusting: an
+auto-merge is a textual result, not a semantic one. Each was read, and the generated contract was
+**regenerated rather than accepted** — a three-way merge of a generated artifact is a guess.
+
+**The five collisions, and how each was resolved:**
+
+| Table | This branch | `develop` | Resolution |
+|---|---|---|---|
+| Constitution version | 4.2.0 | 5.0.0, 5.1.0 | this rebases to **5.2.0** |
+| Standing decisions | 40–44 | 40–44 | this rebases to **45–49** |
+| Register entries | 27, 28 | 27, 28 | this rebases to **29, 30** |
+| Brainstorm session | 10 | 10 | **both keep 10**; the duplicate is recorded |
+| Migration number | `0011` | none added | no collision |
+
+The rule applied throughout is the one this project already had: **merged first keeps the number.**
+It was set when 009 and the brand mark were both drafted as 3.3.0, and again when 013 took the next
+free feature number rather than the next in its own programme. The brainstorm number is the one
+exception, and deliberately: a constitution amendment, a specification and a review-findings
+document already cite `brainstorm/10-conference-content-authoring.md` by name, so renumbering the
+file would break citations to buy tidiness.
+
+**Substance survived the collision intact, which was not guaranteed.** 5.0.0 is a MAJOR that
+retracts two shipped guarantees, and it explicitly declined two candidate notification triggers —
+REQ-095 (a Q&A document is published) and REQ-112 (a session is about to start). Neither is this
+feature's, and **REQ-112 is refused here too and by name**. 5.0.0 also restates the mechanism this
+amendment used — *"'Notification delivery' already requires an amendment per trigger"* — so the two
+branches were applying the same rule on the same day without either knowing it.
+
+One sentence in 5.1.0 is now false: *"a received message remains the only thing that dispatches"*.
+It is **left standing in its own sync report**, because a prior report records what was decided
+when, and editing one to agree with a later decision destroys the only evidence that the two were
+taken independently. `CLAUDE.md` — which states current truth rather than history — annotates it.
+
+### The guard that broke, and why it was rewritten rather than patched
+
+`marker-not-cached.test.ts` asserted `expect(members.length).toBe(7)` over `DeviceServices`, with
+the seven names spelled out. **016 ratified an eighth** (`InstallService`, constitution 5.1.0), and
+the test failed on merge — correctly reporting a real change, and blaming the wrong feature.
+
+The tempting repair is to edit the literal to eight. It would have been green in one character and
+wrong in principle: **a guard asserting a product-wide count fails whenever any feature legitimately
+changes that count**, so its next maintainer is whoever merges next, forever, and the file records
+nothing about who changed what. The property 014 actually owes is narrower and does not expire —
+*the capability set is whatever it was at this branch's own base* — so that is what it asserts now.
+A feature adding a capability must still edit this file to pass, which is the conversation the guard
+exists to force.
+
+**Resolving that base exposed a second defect, latent since the guard was written.** `branchPoint`
+returned the **first** candidate ref that resolved, and its order put a local `develop` ahead of
+`origin/develop`. This clone's local `develop` was two commits stale, so every diff-aware guard in
+the gate was comparing against a two-feature-old base: one failed loudly, and
+`changedSinceBranchPoint` silently *widened*, reporting another feature's files as this feature's.
+It now keeps the **descendant-most** resolvable base. Every candidate is a merge base of the same
+HEAD, so they lie on one ancestry line and the newest is by definition the closest true divergence
+point — after which a stale ref can only make the answer older, never wrong.
+
+### Two obligations arrived with the merge and are discharged here
+
+- **5.0.0's C3 — every feature declares its administrative counterpart.** A Principle IX obligation
+  and a Feature Declarations row that did not exist when this spec was written, so 014 would
+  otherwise have been the one feature that never answered it. Declared: this feature's single
+  attendee-facing capability is the marker, and its counterpart is **explicitly none**, because the
+  marker is not something an attendee does — it is the product reporting what an organizer already
+  did, and the organizer's side of it is this feature's other three user stories.
+- **Comment accuracy.** Two headers said "seven device capabilities" and were quietly wrong the
+  moment 016 landed, while every test in their files passed, because nothing counted anything. Both
+  now name the list and assert *none* rather than *none of seven* — the property no amendment can
+  falsify. This is 013's most transferable finding arriving from a third direction: a header is a
+  claim that needs a guard like any other.
+
+**Gates after the merge, on `verify:clean` — a database that had never existed, migrated from zero
+and then migrated again:** install, typecheck, lint, format, **883 unit** (92 files), **745
+component** (82 files), contract, both migration passes, **1145 integration** (141 files, real
+`postgres:17`), build, budget and **164 e2e** — thirteen of thirteen, all green. The budget step
+declines to judge a development bundle by design, so the production shell was measured separately:
+**98.6 KB gzipped against a 150 KB budget**, up 1.4 KB from the pre-merge 97.2 KB.
+
+**T105 is unaffected and still outstanding.** The merge changes nothing about what a person and a
+phone still have to walk.

@@ -61,7 +61,7 @@ refused. The attendee product gains no new cached read
 | **II. Prototype is reference only** | PASS — the prototype has no authoring surface and no changed-session state | PASS |
 | **III. Attendee experience first** | PASS — authoring is confined to the second product under v4.0.0's four conditions | PASS — **with one thing to watch**: 014 is the first feature since 013 to change MyNet, so FR-1003's absence must be re-asserted rather than assumed still true |
 | **IV. Accessibility & responsiveness** | PASS — FR declarations bind both products | PASS, **with a flagged risk**: see Complexity Tracking |
-| **V. Abstraction before platform/data APIs** | PASS | PASS — **no eighth device capability**. The marker is server-computed state on an existing payload, so `substitution.test.ts` is untouched (R7) |
+| **V. Abstraction before platform/data APIs** | PASS | PASS — **no device capability**. The marker is server-computed state on an existing payload, so `substitution.test.ts` is untouched (R7) |
 | **VI. Web-first delivery** | PASS | PASS — admin stays non-installable; no new cached read in the attendee client (R7) |
 | **VII. Verified on Linux CI** | PASS — every gate binds both products | PASS — three guards are amended deliberately (R1, R3, R11) and one is added (R5) |
 | **VIII. Attendee data is personal data** | PASS — no new privacy exception is needed; the coalesced payload is bounded by N2 as amended | PASS — one new attendee-data column, with its deletion and export answer stated (data-model.md) |

@@ -9,13 +9,19 @@ import { describe, expect, it } from 'vitest'
  * (research R9).
  *
  * ═════════════════════════════════════════════════════════════════════════════════════════════
- * **THE ADMINISTRATIVE CLIENT NEEDS NONE OF THE SEVEN DEVICE CAPABILITIES, SO IT TAKES NO
- * DEPENDENCY ON `@mynet/platform` AT ALL — AND MUST NOT ADD AN EIGHTH.**
+ * **THE ADMINISTRATIVE CLIENT NEEDS NONE OF THE DEVICE CAPABILITIES, SO IT TAKES NO DEPENDENCY
+ * ON `@mynet/platform` AT ALL — AND MUST NOT ADD ONE.**
  *
  * Principle V mandates two abstraction layers, and the device-capability half exists so that
- * feature code never calls a browser API directly. `packages/platform` holds seven:
+ * feature code never calls a browser API directly. `packages/platform` holds
  * `NotificationService`, `CalendarService`, `CameraService`, `ContactShareService`,
- * `SecureStorage`, `ConnectivityService` and — added by 007 — `VisibilityService`.
+ * `SecureStorage`, `ConnectivityService`, `VisibilityService` (007) and `InstallService` (016).
+ *
+ * **The list is named and the count is not, deliberately.** This header said "seven" from 013
+ * until 016 ratified the eighth, and in between it was simply wrong — while every test in the
+ * file passed, because nothing here counts anything. A header is a claim that needs a guard like
+ * any other, and the cheapest guard for this one is to assert a property no amendment can
+ * falsify: *none*, not *none of seven*.
  *
  * This product needs zero of them. It does not notify (FR-935), does not go offline (FR-923),
  * takes no photograph, shares no contact, stores nothing on the device, and polls nothing that
@@ -25,12 +31,13 @@ import { describe, expect, it } from 'vitest'
  * It was added by an *implementation* rather than by a product decision — a poll had to stop
  * while the tab was hidden, and the only way to ask was a browser API feature code may not call.
  * `substitution.test.ts` is what forced it to be declared rather than added quietly, and
- * constitution v3.1.0 then had to ratify it into Principle V as standing decision 22.
+ * constitution v3.1.0 then had to ratify it into Principle V as standing decision 22. 016 paid
+ * the same price again for `InstallService` at v5.1.0, which is the precedent holding.
  *
- * So an eighth capability added for administration would be a governance change, not a
- * convenience. This test makes that conversation happen at the point somebody reaches for it,
- * rather than at ratification time — and it keeps `substitution.test.ts` untouched, which is the
- * plan's stated outcome for Principle V.
+ * So a capability added for administration would be a governance change, not a convenience. This
+ * test makes that conversation happen at the point somebody reaches for it, rather than at
+ * ratification time — and it keeps `substitution.test.ts` untouched, which is the plan's stated
+ * outcome for Principle V.
  * ═════════════════════════════════════════════════════════════════════════════════════════════
  */
 
@@ -69,7 +76,7 @@ describe('011 — the administrative client declares no platform dependency', ()
 
     expect(
       declared.filter((name) => name.startsWith('@mynet/platform')),
-      'The administrative client depends on `@mynet/platform`. It needs none of the seven device ' +
+      'The administrative client depends on `@mynet/platform`. It needs none of the device ' +
         'capabilities, and adding an eighth for administration is a Principle V governance ' +
         'change — `VisibilityService` is the precedent, and constitution v3.1.0 had to ratify it.',
     ).toEqual([])

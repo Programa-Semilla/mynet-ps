@@ -19,16 +19,21 @@ import type {
  * **THIS IS A MUCH SMALLER FILE THAN `apps/web/src/app/services.ts`, AND EVERY DIFFERENCE IS A
  * REQUIREMENT RATHER THAN AN ECONOMY.**
  *
- * The attendee client's root wires seventeen repositories, seven device capabilities, a local
+ * The attendee client's root wires seventeen repositories, every device capability, a local
  * cache and a freshness registry. This one wires an HTTP client and three repositories, and it
  * wires:
  *
- *   - **no device capabilities** — research R9. This product needs none of the seven, so
+ *   - **no device capabilities** — research R9. This product needs none of them, so
  *     `@mynet/platform` is absent from its dependencies entirely and
  *     `no-platform-dependency.test.ts` asserts it. Principle V is satisfied here by
- *     *subtraction*, `substitution.test.ts` is untouched, and no eighth capability is added —
- *     which would have been a governance change, since `VisibilityService` needed constitution
- *     v3.1.0 to ratify it.
+ *     *subtraction*, `substitution.test.ts` is untouched, and no capability is added — which
+ *     would have been a governance change, since `VisibilityService` needed constitution v3.1.0
+ *     to ratify it and `InstallService` needed v5.1.0.
+ *
+ *     **The count is deliberately not written here.** It said "seven" until 016 ratified an
+ *     eighth, at which point this header was quietly wrong — and a header that misstates a fact
+ *     is the defect class 013's review named as its most transferable finding. What this file
+ *     needs to say is *none*, which no amendment can falsify.
  *
  *   - **no caching decorator** — 009's answer rather than 008's. An operator acting on stale
  *     state resolves a report twice or removes a question that is already gone, and an

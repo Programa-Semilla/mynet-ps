@@ -243,7 +243,7 @@ that activating it opens the session, and that the row carries a marker until vi
 - [X] T074 [US3] Compute the marker in the agenda read as `logistics_changed_at > viewed_at`, **on the existing payload** — no new repository member, no new cached read (R7, FR-1030)
 - [X] T075 [US3] Update `viewed_at` when the attendee opens the session; declare the write in the caching decorator's composition root, since a write purges the conference prefix
 - [X] T076 [P] [US3] Render the marker on the Agenda row and Home, **as text and not by colour alone**
-- [X] T077 [P] [US3] Add `apps/web/tests/unit/marker-not-cached.test.ts` — no repository member is added and `substitution.test.ts` is untouched; **no eighth device capability**
+- [X] T077 [P] [US3] Add `apps/web/tests/unit/marker-not-cached.test.ts` — no repository member is added and `substitution.test.ts` is untouched; **no device capability**
 - [X] T078 [US3] Add a timing assertion to `e2e/authoring.spec.ts` (T095) — a material change reaches a subscribed attendee **within one minute** (SC-1004). Measured against the sink adapter, so it needs no real push service
 
 **Checkpoint**: the attendee half is complete.

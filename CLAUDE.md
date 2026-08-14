@@ -462,9 +462,12 @@ message would have passed, because every one of them did. Two of them.
   "starting" can be renamed around. `DISPATCH_CALLERS` now has two entries and both are route
   modules; a third is another amendment.
 - **The marker is per-row state and the count exists only in the payload.** It rides on the existing
-  `listSaved` read (research R7), so 014 declares **no new cached read**, adds **no eighth device
+  `listSaved` read (research R7), so 014 declares **no new cached read**, adds **no device
   capability**, and leaves `substitution.test.ts` untouched — asserted as an unchanged file against
-  the branch point, which is the cheapest proof a capability was not added. The one member added is
+  the branch point, which is the cheapest proof a capability was not added. *That guard originally
+  froze the count at seven and broke when 016 ratified an eighth; it now compares the set against
+  this branch's own base, which is the property 014 owes and which no later amendment can falsify.*
+  The one member added is
   `markViewed`, a **write**, whose cache purge is correct rather than tolerated: the programme it
   clears is the one that just changed. *"No view in either product may present that count"* is
   asserted over both clients.
