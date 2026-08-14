@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react'
 
 import { ADMIN_PRODUCT_NAME } from '../branding.js'
-import { classify, describe } from '../errors.js'
+import { classify, describe, detailOf } from '../errors.js'
 import { useAdminSession } from '../session.js'
 
 /**
@@ -50,7 +50,7 @@ export const SignIn = () => {
     } catch (error) {
       // Classified on `error.code`, never on the class — 008's defect, and the reason
       // `error-classification.test.ts` requires all seven outcomes to differ.
-      setFailure(describe(classify(error)))
+      setFailure(describe(classify(error), detailOf(error)))
     } finally {
       setSubmitting(false)
     }

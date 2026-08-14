@@ -46,6 +46,35 @@ const apiSrc = fileURLToPath(new URL('../../src/', import.meta.url))
 
 const read = (path: string): string => readFileSync(path, 'utf8')
 
+/**
+ * ═════════════════════════════════════════════════════════════════════════════════════════════
+ * **T-review (014) — THE SAME FILE, WITH ITS COMMENTS REMOVED, BECAUSE THIS GUARD WAS
+ * SATISFIABLE BY DOCUMENTATION.**
+ *
+ * Every assertion below matched the **raw text** of the guard it audits — and each of those
+ * guards explains its own absences at length in a header. So `qa-absences.test.ts` with every
+ * assertion deleted and its prose intact still contained the words "answered", "pinned",
+ * "downvote", "voter" and "bell", and this file reported it as in force. The audit of the audits
+ * could be satisfied by a comment.
+ *
+ * That is the defect 009 recorded about its own absence guards, in those words: *"both guards
+ * strip comments before matching, because every pattern also appears in the prose explaining the
+ * absence — matching raw text fails on a correct implementation, and the natural repair is to
+ * weaken the pattern until it checks nothing."* This file is where that lesson had not been
+ * applied, which matters more here than anywhere: it is the guard whose whole subject is guards
+ * that have stopped guarding.
+ *
+ * **Stripping cuts both ways and both are corrections.** A presence assertion becomes strictly
+ * stronger — the pattern has to be in executable code. An absence assertion becomes strictly more
+ * honest: a header explaining *why* promotion must never notify anybody would otherwise fail a
+ * check that promotion is not wired up.
+ * ═════════════════════════════════════════════════════════════════════════════════════════════
+ */
+const codeOnly = (path: string): string =>
+  read(path)
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')
+    .replace(/^\s*\/\/.*$/gm, ' ')
+
 describe('011 — the guards this feature did not touch are still in force', () => {
   /**
    * **FR-974 — conference content stays read-only. That is 012's, not this feature's.**
@@ -55,7 +84,7 @@ describe('011 — the guards this feature did not touch are still in force', () 
    * over the administrative route table.
    */
   it('keeps the catalog read-only guard checking writes (FR-974)', () => {
-    const guard = read(join(unitDir, 'catalog-read-only.test.ts'))
+    const guard = codeOnly(join(unitDir, 'catalog-read-only.test.ts'))
 
     expect(
       guard.length,
@@ -98,7 +127,7 @@ describe('011 — the guards this feature did not touch are still in force', () 
    * conference organizer comes into being, and it acts on somebody **already registered**.
    */
   it('keeps the join-grants-nothing guard in force (FR-975)', () => {
-    const guard = read(join(integrationDir, 'join-grants-nothing.test.ts'))
+    const guard = codeOnly(join(integrationDir, 'join-grants-nothing.test.ts'))
     expect(
       guard.length,
       '`join-grants-nothing.test.ts` is missing or empty (FR-975).',
@@ -149,7 +178,7 @@ describe('011 — the guards this feature did not touch are still in force', () 
    * ═══════════════════════════════════════════════════════════════════════════════════════════
    */
   it('keeps the notification trigger audit at exactly the two triggers admitted (FR-935, N1)', () => {
-    const guard = read(join(unitDir, 'notification-triggers.test.ts'))
+    const guard = codeOnly(join(unitDir, 'notification-triggers.test.ts'))
 
     expect(
       guard.length,
@@ -202,7 +231,7 @@ describe('011 — the guards this feature did not touch are still in force', () 
    * diff and check nothing in practice, which is exactly what FR-976 forbids.
    */
   it('keeps the two amended guards refusing everything they always refused (FR-976)', () => {
-    const qa = read(join(unitDir, 'qa-absences.test.ts'))
+    const qa = codeOnly(join(unitDir, 'qa-absences.test.ts'))
     for (const forbidden of ['answered', 'pinned', 'downvote', 'voter', 'bell']) {
       expect(
         qa.toLowerCase(),
@@ -211,7 +240,7 @@ describe('011 — the guards this feature did not touch are still in force', () 
       ).toContain(forbidden)
     }
 
-    const reports = read(join(unitDir, 'no-report-read-surface.test.ts'))
+    const reports = codeOnly(join(unitDir, 'no-report-read-surface.test.ts'))
     expect(
       reports,
       'no-report-read-surface no longer names FR-548. It is narrowed to `apps/web` and the ' +

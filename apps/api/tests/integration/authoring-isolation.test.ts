@@ -42,13 +42,13 @@ describe('conference isolation in authoring (T028, FR-1005)', () => {
   afterAll(async () => {
     // Nothing cascades to `events`, so a fixture conference left behind blocks the NEXT file's
     // `seed()` — and the symptom lands there rather than here. See `clearAuthoringFixture`.
-    await clearAuthoringFixture()
+    await clearAuthoringFixture(app)
     await teardown(app)
   })
 
   beforeEach(async () => {
     await clearThrottle()
-    fixture = await buildAuthoringFixture(ADA)
+    fixture = await buildAuthoringFixture(ADA, app)
     cookie = await organizerSession(app, ADA, SEED_PASSWORD)
   })
 

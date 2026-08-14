@@ -1,4 +1,6 @@
-import type { FastifyInstance, FastifyRequest } from 'fastify'
+import { randomUUID } from 'node:crypto'
+
+import type { FastifyBaseLogger, FastifyInstance, FastifyRequest } from 'fastify'
 
 import {
   conferenceAuthorityOf,
@@ -39,13 +41,14 @@ import {
   type WriteResult,
 } from '../../db/queries/admin-catalog.js'
 import {
-  subscriptionsFor,
+  subscriptionsForMany,
   discardSubscriptions,
   recordDelivery,
 } from '../../db/queries/push-subscriptions.js'
 import { attendeesToNotify, type MaterialChange } from '../../db/queries/session-changes.js'
 import { AppError, notFound, tooManyAttempts } from '../../errors.js'
 import { dispatchToDevices, truncateForPush } from '../../notifications/dispatch.js'
+import type { StoredSubscription } from '../../notifications/service.js'
 
 /**
  * T033, T051, T071, T085 (014) — **conference content authoring** (FR-1001–FR-1039).
@@ -174,20 +177,49 @@ const throttled = {
  * The identifier is `operatorId ?? attendeeId`, so an organizer and a platform operator are
  * counted as themselves rather than sharing a bucket.
  */
+type ThrottleKey = {
+  identifierHash: string
+  sourceHash: string
+  action: ThrottleAction
+}
+
+/**
+ * The throttle key for the acting principal.
+ *
+ * Extracted so the notify bound (`fanOut`) and the act bounds (`throttle`) key on the same
+ * identity by construction rather than by two copies agreeing. `operatorId ?? attendeeId` so an
+ * organizer and a platform operator are counted as themselves rather than sharing a bucket.
+ */
+const throttleKeyFor = (
+  request: FastifyRequest,
+  action: ThrottleAction,
+  /**
+   * Narrows the bucket to one subject as well as one principal.
+   *
+   * Only `session_notify` uses it, and only because the thing being bounded there is repeated
+   * interruption **about one session** rather than the principal's rate of work. Every act bound
+   * stays keyed on the principal alone, which is what makes `mayDeny: true` legitimate for them:
+   * a refusal can only inconvenience the person authoring.
+   */
+  subject?: string,
+): ThrottleKey => {
+  const operator = operatorScopeOf(request)
+  const principal = operator.operatorId ?? operator.attendeeId
+  if (!principal) throw notFound()
+
+  return {
+    identifierHash: hashAttemptValue(subject ? `${principal}:${subject}` : principal),
+    sourceHash: hashAttemptValue(request.ip),
+    action,
+  }
+}
+
 const throttle = async (
   request: FastifyRequest,
   action: ThrottleAction,
   what: string,
 ): Promise<void> => {
-  const operator = operatorScopeOf(request)
-  const principal = operator.operatorId ?? operator.attendeeId
-  if (!principal) throw notFound()
-
-  const key = {
-    identifierHash: hashAttemptValue(principal),
-    sourceHash: hashAttemptValue(request.ip),
-    action,
-  }
+  const key = throttleKeyFor(request, action)
 
   // 010 T017 — recorded before it is judged (FR-804); excluded from its own count (FR-805).
   const attemptId = await beginAttempt(key)
@@ -205,6 +237,21 @@ const throttle = async (
  * one that carries nothing, and it is the answer to everything the caller has no authority over
  * — indistinguishable from a conference or a session that does not exist (FR-1036).
  * ─────────────────────────────────────────────────────────────────────────────────────────────
+ *
+ * ═════════════════════════════════════════════════════════════════════════════════════════════
+ * **EVERY EXPLAINED REFUSAL CARRIES ITS OWN CODE, AND THEY DID NOT UNTIL T094 ASKED.**
+ *
+ * These six were written as four `refused` 409s and two `validation_failed` 400s, each with a
+ * different `publicMessage`. The administrative client classifies on the **code** — which is the
+ * rule 008's defect produced — so four distinct explanations rendered *"That could not be
+ * completed."* and two rendered *"Something went wrong."* The routes were right and the client
+ * could not tell them apart.
+ *
+ * `contracts/authoring.md` requires all of them to render **differently from each other**, and
+ * `apps/admin/tests/unit/error-classification.test.ts` is where that is enforced. Distinct codes
+ * are what make it satisfiable: *"classify on `error.code`"* is worth nothing unless the code
+ * says which refusal it is. `question_has_votes` and `own_question` are 009's precedent.
+ * ═════════════════════════════════════════════════════════════════════════════════════════════
  */
 const refuse = (result: Extract<WriteResult<unknown>, { ok: false }>): AppError => {
   switch (result.refusal) {
@@ -212,13 +259,13 @@ const refuse = (result: Extract<WriteResult<unknown>, { ok: false }>): AppError 
       return notFound()
     case 'still-referenced':
       return new AppError(
-        'refused',
+        'still_referenced',
         409,
         'A session still uses this. Move those sessions to another one first, then remove it.',
       )
     case 'has-engagement':
       return new AppError(
-        'refused',
+        'session_has_engagement',
         409,
         'Attendees have already saved, noted, questioned or voted on this session, so it cannot ' +
           'be deleted. Cancel it instead — everything they wrote stays where it is.',
@@ -226,27 +273,43 @@ const refuse = (result: Extract<WriteResult<unknown>, { ok: false }>): AppError 
       )
     case 'outside-conference-days':
       return new AppError(
-        'validation_failed',
+        'outside_conference_days',
         400,
         "That time falls outside the conference's dates, in the venue's own timezone.",
       )
     case 'ends-before-start':
-      return new AppError('validation_failed', 400, 'The end must be after the start.')
+      return new AppError('ends_before_start', 400, 'The end must be after the start.')
     case 'would-orphan-sessions':
       return new AppError(
-        'refused',
+        'would_orphan_sessions',
         409,
         'Those dates would leave sessions outside the conference. Move or cancel them first.',
         { sessions: result.sessions },
       )
     case 'timezone-frozen':
       return new AppError(
-        'refused',
+        'timezone_frozen',
         409,
         'The timezone can only be changed while the conference has no sessions. Every session ' +
           'time is stored as an absolute instant, so changing it now would move what everybody ' +
           'sees without moving anything.',
       )
+    case 'unknown-timezone':
+      return new AppError(
+        'unknown_timezone',
+        400,
+        'That is not a timezone this server recognises. Use an IANA name such as ' +
+          '`America/Costa_Rica` or `Europe/Madrid`.',
+      )
+    case 'conference-ends-before-start':
+      return new AppError(
+        'conference_ends_before_start',
+        400,
+        'The last day cannot be before the first. A one-day conference has the same date for ' +
+          'both.',
+      )
+    case 'malformed-time':
+      return new AppError('malformed_time', 400, 'That is not a time this server can read.')
   }
 }
 
@@ -733,7 +796,7 @@ export const adminCatalogRoutes = async (app: FastifyInstance): Promise<void> =>
       const result = await getDb().transaction((tx) => updateSession(scope, id, input, tx))
       if (!result.ok) throw refuse(result)
 
-      await notifySavers(app, request, result.value)
+      notifySavers(app, request, result.value)
 
       const overlaps = await overlappingInRoom(scope, {
         roomId: input.roomId,
@@ -775,7 +838,7 @@ export const adminCatalogRoutes = async (app: FastifyInstance): Promise<void> =>
       const result = await getDb().transaction((tx) => cancelSession(scope, id, tx))
       if (!result.ok) throw refuse(result)
 
-      await notifySavers(app, request, result.value)
+      notifySavers(app, request, result.value)
 
       return result.value.session
     },
@@ -893,7 +956,10 @@ export const adminCatalogRoutes = async (app: FastifyInstance): Promise<void> =>
       },
     },
     async (request) => {
-      await throttle(request, 'catalog_write', 'changes')
+      // `conference_write`, not `catalog_write` — that bucket is named for tracks, rooms and
+      // speakers, and this act moves the date range and gates the timezone freeze. See the
+      // threshold's own header.
+      await throttle(request, 'conference_write', 'changes')
       const result = await getDb().transaction((tx) =>
         patchConference(conferenceAuthorityOf(request), request.body as never, tx),
       )
@@ -985,48 +1051,203 @@ const warningsFor = (
  * session they just changed.
  * ═════════════════════════════════════════════════════════════════════════════════════════════
  */
-const notifySavers = async (
-  app: FastifyInstance,
-  request: FastifyRequest,
-  act: SessionAct,
-): Promise<void> => {
+const notifySavers = (app: FastifyInstance, request: FastifyRequest, act: SessionAct): void => {
   // FR-1027 — a title, summary, track or speaker edit reaches nobody. The one branch, and it is
   // decided by `materialChangeOf` rather than restated here.
   if (act.change === null) return
 
-  try {
-    const scope = conferenceAuthorityOf(request)
-    const recipients = await attendeesToNotify(act.actId, scope.attendeeId)
+  // The scope is read **now**, on the request, rather than inside the task: `request` is being
+  // handed to a function that outlives the response, and reaching for request state after the
+  // reply has been sent is how a background task comes to read something that has been recycled.
+  const scope = conferenceAuthorityOf(request)
+  const log = request.log
 
-    for (const recipient of recipients) {
-      const subscriptions = await subscriptionsFor(recipient.attendeeId)
-      if (subscriptions.length === 0) continue
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // **KEYED ON THE PRINCIPAL *AND THE SESSION*, WHICH IS THE SHAPE THE ABUSE ACTUALLY HAS.**
+  //
+  // Keyed on the principal alone this bound was wrong in both directions at once. Ten material
+  // changes an hour is nothing for legitimate authoring — moving a room across a forty-session
+  // programme is forty of them — and the integration suite proved it immediately by exhausting the
+  // bucket across a run and silently dropping dispatches the dispatch tests were asserting.
+  //
+  // The amplification it exists to stop is **one session toggled repeatedly**: that is what puts a
+  // dozen notifications about the same thing on the same saver's lock screen. Per session, ten an
+  // hour is generous for a real correction and tight against a loop — and an organizer legitimately
+  // editing forty different sessions is never touched, because each has its own bucket.
+  //
+  // Built on the request, for the same reason the scope is: `request.ip` must be read before the
+  // reply is sent, not from inside a task that outlives it.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  const notifyKey = throttleKeyFor(request, 'session_notify', act.session.id)
 
-      const { deliveredEndpoints, failedEndpoints, goneEndpoints } = await dispatchToDevices(
-        app.push,
-        subscriptions,
-        payloadFor(act, recipient.sessionIds, scope.eventId),
-        request.log,
-      )
+  app.background.run('saved-session-fan-out', () =>
+    fanOut(app, log, act, scope.eventId, scope.attendeeId, notifyKey),
+  )
+}
 
-      await discardSubscriptions(goneEndpoints)
-      await recordDelivery(deliveredEndpoints)
+/**
+ * How many recipients are dispatched to at once.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────────────────────
+ * Sequential was the original shape and it made the fan-out `recipients × push RTT`: a thousand
+ * savers against a *healthy* push service is several minutes. Unbounded `Promise.all` is the
+ * other extreme and is worse in a different way — a thousand simultaneous outbound HTTPS requests
+ * from a two-vCPU VM that also runs PostgreSQL, and a thousand sockets against one push host,
+ * which is the shape that gets an origin rate-limited.
+ *
+ * Twenty keeps the worst case bounded by the per-delivery timeout rather than by the recipient
+ * count: with `dispatchPush` capping each attempt, a wholly unreachable push service costs
+ * `ceil(recipients / 20) × timeout` instead of `recipients × timeout`.
+ * ─────────────────────────────────────────────────────────────────────────────────────────────
+ */
+const FAN_OUT_CONCURRENCY = 20
 
-      request.log.info(
-        {
-          actId: act.actId,
-          delivered: deliveredEndpoints.length,
-          failed: failedEndpoints.length,
-          gone: goneEndpoints.length,
-        },
-        'saved-session change fan-out complete',
-      )
-    }
-  } catch (error) {
-    // Logged rather than swallowed silently, and never rethrown: the act is committed and the
-    // organizer is owed their response.
-    request.log.error({ err: error, actId: act.actId }, 'push dispatch failed after an edit')
+/**
+ * The fan-out proper (FR-1026, FR-1028, FR-1028a, FR-1034).
+ *
+ * ═════════════════════════════════════════════════════════════════════════════════════════════
+ * **EVERY FAILURE BOUNDARY HERE IS PER RECIPIENT, AND IT USED TO BE PER FAN-OUT.**
+ *
+ * One `try` wrapped the whole loop, so a transient pool error on the first recipient silently
+ * abandoned every remaining one — at a keynote, 999 attendees never told their session was
+ * cancelled, recorded as a single log line. `dispatch.ts` holds the same invariant one level down
+ * in capitals (*"ONE DEVICE'S FAILURE MUST NOT AFFECT ANOTHER'S"*); this is that property for the
+ * boundary 014 introduced, where the failing operations are database calls that genuinely throw.
+ * ═════════════════════════════════════════════════════════════════════════════════════════════
+ *
+ * **The two subscription writes are batched once at the end**, not per recipient. They are keyed
+ * on endpoints and neither is scoped to an attendee, so N calls were N round trips computing the
+ * same two statements.
+ */
+const fanOut = async (
+  app: FastifyInstance,
+  log: FastifyBaseLogger,
+  act: SessionAct,
+  eventId: string,
+  actorAttendeeId: string | null,
+  notifyKey: ThrottleKey,
+): Promise<void> => {
+  // =========================================================================================
+  // **THE INTERRUPTION IS THROTTLED SEPARATELY FROM THE ACT, AND EXHAUSTING IT SKIPS THE PUSH
+  // RATHER THAN FAILING ANYTHING** (FR-1039; see `session_notify` in `auth/throttle.ts`).
+  //
+  // A session edit dispatches exactly as a cancellation does, and it was charged `session_write`
+  // at 120 an hour against `session_cancel`'s 10 — so an organizer toggling a room could put 120
+  // notifications on every saver's lock screen, each titled with the session's own name.
+  // Coalescing does not help: it bounds one act to one notification per attendee, and there were
+  // 120 acts.
+  //
+  // Consulted here rather than at the route because materiality is only knowable after the write,
+  // and charged **without serving the delay**: the act is already committed, so there is nothing
+  // to refuse. Past the bound the attendees still get the in-app marker and lose only the
+  // interruption, which is the degradation FR-1032 already describes for a denied permission.
+  // =========================================================================================
+  const attemptId = await beginAttempt(notifyKey)
+  const throttledFor = await failureDelayMs(notifyKey, attemptId)
+
+  if (throttledFor > 0) {
+    log.warn(
+      { actId: act.actId, eventId, sessionId: act.session.id, throttledForMs: throttledFor },
+      'saved-session change not dispatched: the notify bound for this principal is exhausted. ' +
+        'The act stands and the in-app marker is unaffected.',
+    )
+    return
   }
+
+  const recipients = await attendeesToNotify(act.actId, actorAttendeeId, eventId)
+  const devices = await subscriptionsForMany(recipients.map((one) => one.attendeeId))
+
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // **ONE OPAQUE IDENTIFIER PER FAN-OUT, AND IT IS DELIBERATELY NOT `act.actId`** (FR-1028b,
+  // FR-999, FR-1003).
+  //
+  // The service worker uses a notification `tag` to decide whether a new notification **replaces**
+  // one already on screen. A coalesced payload names no session, so it was tagged
+  // `agenda-<eventId>` — which meant **two coalesced acts at one conference replaced each other**.
+  // The delivery layer was correct throughout (two notifications were sent, and
+  // `dispatch-coalescing.test.ts` asserts it); the collapse happened in the browser, below where
+  // anything was looking. FR-1028b names that failure as its own reason for existing: *"a
+  // time-window rule would suppress a cancellation because a room moved earlier"*, and a shared
+  // tag is a time-window rule whose window never closes.
+  //
+  // **`act.actId` is the obvious identifier and it must not leave the server.** It is a primary
+  // key of `admin_audit_entries`, and FR-999 forbids a read path over the trail in either product
+  // — M7 removed exactly this leak from `readProgramme`, and `no-admin-surface.test.ts` fails any
+  // file in MyNet that so much as names it (FR-1003). Sending it in a push payload would put an
+  // audit key on every attendee's device.
+  //
+  // So the tag needs only to be **distinct per act**, which a nonce satisfies exactly. It is
+  // minted here, used once, and stored nowhere: it identifies nothing, survives nothing, and
+  // cannot be correlated with anything an operator did.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  const dispatchId = randomUUID()
+
+  const gone: string[] = []
+  const delivered: string[] = []
+  let failed = 0
+  let reached = 0
+
+  // An attendee absent from the map has no registration — they get the in-app marker and nothing
+  // else, which is FR-1032 rather than a failure.
+  const withDevices = recipients.filter((one) => (devices.get(one.attendeeId)?.length ?? 0) > 0)
+
+  for (let from = 0; from < withDevices.length; from += FAN_OUT_CONCURRENCY) {
+    const batch = withDevices.slice(from, from + FAN_OUT_CONCURRENCY)
+
+    await Promise.all(
+      batch.map(async (recipient) => {
+        try {
+          const results = await dispatchToDevices(
+            app.push,
+            devices.get(recipient.attendeeId) as StoredSubscription[],
+            payloadFor(act, recipient.sessionIds, eventId, dispatchId),
+            log,
+          )
+
+          gone.push(...results.goneEndpoints)
+          delivered.push(...results.deliveredEndpoints)
+          failed += results.failedEndpoints.length
+          if (results.deliveredEndpoints.length > 0) reached += 1
+        } catch (error) {
+          // This recipient only. Nothing above rethrows, so the batch and every later batch
+          // continue — which is the requirement the file name of
+          // `dispatch-failure-isolation.test.ts` claims and did not previously pin.
+          log.error(
+            { err: error, actId: act.actId, attendeeId: recipient.attendeeId },
+            'push dispatch failed for one recipient; the fan-out continues',
+          )
+        }
+      }),
+    )
+  }
+
+  await discardSubscriptions(gone)
+  await recordDelivery(delivered)
+
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // **ONE LINE PER ACT, INCLUDING THE ACT THAT REACHED NOBODY.**
+  //
+  // This used to log inside the loop, once per recipient, each line saying the fan-out was
+  // "complete" — so a thousand savers wrote a thousand claims that the whole thing had finished,
+  // and an act with no savers wrote nothing at all. That made the correct case (FR-1028: nobody
+  // saved it, so nobody is owed anything) **indistinguishable in the logs** from the broken one
+  // where the stamp was missing or the fan-out never ran.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  log.info(
+    {
+      actId: act.actId,
+      eventId,
+      sessionId: act.session.id,
+      change: act.change,
+      recipients: recipients.length,
+      withDevices: withDevices.length,
+      reached,
+      delivered: delivered.length,
+      failed,
+      gone: gone.length,
+    },
+    'saved-session change fan-out complete',
+  )
 }
 
 /**
@@ -1047,11 +1268,13 @@ export const payloadFor = (
   act: SessionAct,
   sessionIds: readonly string[],
   eventId: string,
+  dispatchId: string,
 ): {
   kind: 'session-change'
   title: string
   body: string
   eventId: string
+  dispatchId: string
   sessionId?: string
   count?: number
 } => {
@@ -1061,6 +1284,7 @@ export const payloadFor = (
       title: truncateForPush(act.session.title),
       body: bodyFor(act.change),
       eventId,
+      dispatchId,
       sessionId: sessionIds[0] as string,
     }
   }
@@ -1070,6 +1294,7 @@ export const payloadFor = (
     title: 'Your agenda changed',
     body: `${sessionIds.length} of your saved sessions changed.`,
     eventId,
+    dispatchId,
     count: sessionIds.length,
   }
 }

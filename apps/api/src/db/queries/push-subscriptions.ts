@@ -106,6 +106,60 @@ export const subscriptionsFor = async (attendeeId: string): Promise<StoredSubscr
 }
 
 /**
+ * T-review (014) — every device for **many** attendees, in one query.
+ *
+ * ═════════════════════════════════════════════════════════════════════════════════════════════
+ * **THE SINGULAR VERSION IN A LOOP IS ONE QUERY PER RECIPIENT, AND 014's FAN-OUT HAS AS MANY
+ * RECIPIENTS AS THE SESSION HAS SAVERS.**
+ *
+ * 007's send path reaches one attendee, so `subscriptionsFor` was exactly right and still is —
+ * it remains the function the message path uses. A saved-session change reaches everybody who
+ * saved the session, and at a keynote that is hundreds of round trips before a single
+ * notification is sent.
+ *
+ * Grouped into a `Map` here rather than returned flat, because the caller dispatches **per
+ * attendee** — one coalesced notification each (FR-1034) — and a flat list would put the grouping
+ * in the caller, where a second caller could get it wrong. `attendeesToNotify` groups for the
+ * same reason and says so.
+ *
+ * An attendee with no registration is **absent from the map rather than present with an empty
+ * array**, which is what lets the caller distinguish "has no device" from "has devices" without
+ * a second check. That distinction is the whole of FR-1032: an attendee who denied permission
+ * still gets the in-app marker, and the dispatcher must simply skip them.
+ * ═════════════════════════════════════════════════════════════════════════════════════════════
+ */
+export const subscriptionsForMany = async (
+  attendeeIds: readonly string[],
+): Promise<Map<string, StoredSubscription[]>> => {
+  const byAttendee = new Map<string, StoredSubscription[]>()
+  if (attendeeIds.length === 0) return byAttendee
+
+  const rows = await getDb().execute<{
+    attendee_id: string
+    endpoint: string
+    p256dh_key: string
+    auth_key: string
+  }>(sql`
+    SELECT attendee_id, endpoint, p256dh_key, auth_key
+    FROM push_subscriptions
+    WHERE attendee_id = ANY(${sql.param([...attendeeIds])}::uuid[])
+    ORDER BY attendee_id, created_at
+  `)
+
+  for (const row of rows) {
+    const devices = byAttendee.get(row.attendee_id) ?? []
+    devices.push({
+      endpoint: row.endpoint,
+      p256dhKey: row.p256dh_key,
+      authKey: row.auth_key,
+    })
+    byAttendee.set(row.attendee_id, devices)
+  }
+
+  return byAttendee
+}
+
+/**
  * Discard subscriptions the push service reported as permanently gone (FR-557).
  *
  * ─────────────────────────────────────────────────────────────────────────────────────────

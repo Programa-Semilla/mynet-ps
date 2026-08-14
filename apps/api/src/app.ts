@@ -16,6 +16,7 @@ import Fastify, { type FastifyInstance, type FastifyRequest, type RouteOptions }
 import { loadConfig } from './config.js'
 import { closeDb } from './db/client.js'
 import maintenance from './maintenance.js'
+import backgroundWork from './notifications/background.js'
 import authContext from './plugins/auth-context.js'
 import requireConferenceAuthorityPlugin from './admin/require-conference-authority.js'
 import requireOperatorPlugin from './admin/require-operator.js'
@@ -272,6 +273,16 @@ export const buildApp = async (options: BuildAppOptions = {}): Promise<FastifyIn
   //     first position that disturbs no existing ordering. Overridable so a test can substitute
   //     an adapter without reaching past the interface.
   await app.register(ports, options.ports ?? {})
+
+  // 5c. 014 — work that outlives the response (`notifications/background.ts`). Registered after
+  //     the ports because every task so far dispatches through `push`, and before the routes
+  //     because a route handler is what starts one.
+  //
+  //     **It deliberately registers no `onClose` hook.** Step 7 below closes the database pool,
+  //     and every background task needs it; leaving the two to Fastify's hook ordering means the
+  //     drain could run against a closed pool, which fails exactly the deliveries it protects.
+  //     `server.ts` drains explicitly before `app.close()` instead.
+  await app.register(backgroundWork)
 
   // 6. Retention sweeps. Registered here rather than in `server.ts` so that the integration
   //    harness tears the timers down with the app rather than leaking them between suites.

@@ -365,11 +365,14 @@ tests; three helpers named callers that were inlined copies. In a codebase whose
 the comment is the record, a header is a claim that needs a guard like any other — and **three of
 the four already had the executor parameter**, so what looked like design work was wiring.
 
-**Migrations claimed so far run to `0009`** (`0009_administrative_foundation.sql`; 010 added no
-schema). **012 reserves `0010` and 014 reserves `0011`.** That is the **third** collision between
-parallel branches over a reservation, and the roadmap's reserved-number table still stops at the
-shipped attendee programme — it covers neither programme now in flight and must be extended rather
-than corrected. The journal lists `0003` before `0004` while carrying a
+**Migrations claimed so far run to `0011`** (`0011_conference_authoring.sql`, applied; `0009` is
+013's and 010 added no schema). **012 still reserves `0010`, unclaimed — it adds no schema — and 015
+reserves `0012`.** That numbering was the **third** collision between parallel branches over a
+reservation, and **014 extended the roadmap's reserved-number table rather than correcting it**
+(T102): it stopped at the shipped attendee programme and covered neither programme in flight, so a
+feature reserving a number had nothing to read. The rule it gained is that a phase in a *parallel*
+programme must extend that table in the same change, because the branch it would otherwise collide
+with is one nobody can see from its own. The journal lists `0003` before `0004` while carrying a
 later timestamp — `apps/api/migrations/meta/README.md` explains why both halves are load-bearing and
 what a regenerating feature must not "fix". Anyone regenerating must move that README aside first,
 because `drizzle-kit generate` JSON-parses every file in `meta/`.
@@ -381,6 +384,76 @@ and a later `when`. **`lock_timeout` went into `migrate.ts`, not the SQL** — a
 generated file is erased by the next regeneration, and putting it on a dedicated migration
 connection covers *every* migration, including `0003`, whose missing timeout was a recorded
 unclaimed defect from 004's review.
+
+**014 (Conference content authoring) is implemented**, on constitution **v4.2.0** — the amendment
+that gated its first line of code, as v3.1.0 gated 007's Phase 7, v3.2.0 gated 008, v3.3.0 gated 009
+and v4.0.0 gated 013. It delivers standing decisions 40–44 and is the **second** administrative
+feature: an organizer authors tracks, rooms, speakers and sessions in a conference they are assigned
+to, a platform operator does so in every conference, and either tier may create one.
+
+**The split is the opposite of the one anyone would guess.** Authoring looks like the big new thing
+and is mostly wiring — 013 built the site, the shell, the session, the audit trail and the tier
+model. The genuinely new mechanisms are both small and both on the **attendee** side: a second
+notification trigger, and a marker that must not become an inbox.
+
+**Its by-hand validation is outstanding, and it is the only thing outstanding.** T105 —
+`quickstart.md` scenarios 6–9, which need a person and a phone: the notification, the coalescing,
+the denied permission, and the three widths plus a screen-reader pass. It **joins** the unwalked
+scenarios from 007, 008, 009 and 013 rather than replacing them. Everything a machine can check is
+checked and green, including an end-to-end journey in two browser profiles across two origins.
+
+**The most transferable thing it produced is a defect the client had already been taught to
+avoid, arriving from the other end.** 008 classified refusals on the **class** — `ApiError extends
+RequestRefusedError`, every non-2xx throws `ApiError` — and swallowed every message its routes wrote
+to be read. The rule that came out of it was *classify on `error.code`, never on the class*. 014
+obeyed that rule and reproduced the outcome anyway: its routes were written with **four distinct 409
+explanations all carrying `refused`** and two distinct 400s all carrying `validation_failed`, so six
+carefully-written refusals rendered as two sentences. The one that mattered most —
+*"cancel it instead, everything they wrote stays where it is"*, which teaches decision 44's whole
+rule at the moment an organizer meets it — was unreachable. **The rule needed its other half
+stated: classifying on the code is worth nothing unless the code says which refusal it is.** Six
+codes were added, following `question_has_votes` and `own_question`. Found by the
+**mutual-difference** assertion and by nothing else — a test checking that each code maps to *a*
+message would have passed, because every one of them did. Two of them.
+
+**Three further invariants this feature establishes:**
+
+- **A second notification trigger exists, and it is bounded by three named changes** — cancelled,
+  start time, room (v4.2.0 N1). A session **starting** is still forbidden, and the distinction is
+  load-bearing: a reminder is something an attendee can set themselves, a change is information only
+  the product holds. `no-session-start-trigger.test.ts` asserts the **mechanism** rather than the
+  word — nothing time-driven may dispatch, because a reminder needs a scheduler and a grep for
+  "starting" can be renamed around. `DISPATCH_CALLERS` now has two entries and both are route
+  modules; a third is another amendment.
+- **The marker is per-row state and the count exists only in the payload.** It rides on the existing
+  `listSaved` read (research R7), so 014 declares **no new cached read**, adds **no eighth device
+  capability**, and leaves `substitution.test.ts` untouched — asserted as an unchanged file against
+  the branch point, which is the cheapest proof a capability was not added. The one member added is
+  `markViewed`, a **write**, whose cache purge is correct rather than tolerated: the programme it
+  clears is the one that just changed. *"No view in either product may present that count"* is
+  asserted over both clients.
+- **A session anybody has engaged with may be cancelled and must not be deleted** (decision 44),
+  checked under `SELECT … FOR UPDATE` **inside** the deleting transaction. The four cascades from
+  `sessions.id` are **not removed** — they stay correct for the case deletion is still permitted —
+  so the protection is the refusal plus the lock rather than a change to the referential rules.
+  Cancellation is **stored state**, unlike 008's derived `lapsed`, because it is an organizer's act
+  rather than a function of the clock.
+
+**One asymmetry is worth reading twice, because it is one condition wide.** FR-1022 marks a
+cancelled session everywhere — the programme, the Agenda row, the panel, the rest-of-day timeline —
+and FR-1022a **omits** it from exactly one surface: "Up next", which answers *where do I go now*.
+`nextSession()` is the single change point serving both Home cards that ask it; `restOfVenueDay`
+deliberately does not inherit the filter. The two functions sit six lines apart and the difference
+between them is one condition, so it is asserted at the unit layer **and** at the component layer,
+where two Home cards read the same programme and disagree about it on purpose.
+
+**Three absence guards were written too broadly and caught correct code**, each corrected by
+narrowing to the population the requirement is actually about — the same class of correction 009
+made to the event audit's conference-content predicate. Filtering by an identity the caller already
+holds is not disclosing it (a `WHERE` is not a `SELECT`); 013's report queue reads reported messages
+under its own recorded exception; and `appointments.status` is a negotiation between two attendees,
+not a content lifecycle. All three are recorded in `deviations.md` D14, because "scoped deliberately"
+and "weakened until it passed" are indistinguishable in a diff.
 
 ## Architectural invariants
 

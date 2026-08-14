@@ -171,7 +171,7 @@ destroys attendee state — the reason this story is an increment rather than a 
 - [X] T037 [P] [US1] Add `apps/admin/src/app/conferences/SessionForm.tsx` with client-side validation mirroring the server's, and the server's explanation surfaced on refusal
 - [X] T038 [P] [US1] Add `apps/admin/src/app/conferences/CatalogForms.tsx` for tracks, rooms and speakers — **track colour is a token picker, never a free colour input**
 - [X] T039 [US1] Wire the programme editor into the admin shell's navigation from `ConferenceList.tsx`
-- [ ] T040 [P] [US1] Add `apps/admin/tests/component/programme-editor.test.tsx` — empty, loading and failure states, and the token-only colour control
+- [X] T040 [P] [US1] Add `apps/admin/tests/component/programme-editor.test.tsx` — empty, loading and failure states, and the token-only colour control
 - [X] T041 [US1] Same-room overlap **warns and does not refuse** (FR-1016): server returns the warning, client confirms
 - [X] T042 [P] [US1] Add `apps/api/tests/unit/profile-uneditable.test.ts` — no administrative route edits a profile, and **no route leads from a speaker record to one** (FR-1006), comments stripped before matching
 
@@ -207,8 +207,8 @@ it; confirm every record survives and the session reads as cancelled rather than
 - [X] T055 [P] [US2] Confirm `RestOfDay` still lists cancelled sessions, marked — it renders the full list and must not inherit the skip
 - [X] T056 [P] [US2] Let an attendee remove a cancelled session from their saved list (FR-1023)
 - [X] T057 [P] [US2] Close the Q&A composer on a cancelled session; existing questions stay readable
-- [ ] T058 [P] [US2] Add `apps/web/tests/component/cancelled-session.test.tsx` — Agenda, panel and the Up-next skip (SC-1002)
-- [ ] T059 [P] [US2] Add `apps/api/tests/unit/no-attendee-state-disclosure.test.ts` — no administrative route reads a note, a message, or the identity of anyone who saved, questioned or voted (FR-1042)
+- [X] T058 [P] [US2] Add `apps/web/tests/component/cancelled-session.test.tsx` — Agenda, panel and the Up-next skip (SC-1002)
+- [X] T059 [P] [US2] Add `apps/api/tests/unit/no-attendee-state-disclosure.test.ts` — no administrative route reads a note, a message, or the identity of anyone who saved, questioned or voted (FR-1042)
 
 **Checkpoint**: authoring is safe. **US1 + US2 is the first releasable slice.**
 
@@ -227,10 +227,10 @@ that activating it opens the session, and that the row carries a marker until vi
 - [X] T061 [P] [US3] Add `apps/api/tests/integration/dispatch-coalescing.test.ts` — one act changing four of one attendee's saved sessions produces **exactly one** notification carrying the count (FR-1034, FR-1034a, SC-1012)
 - [X] T062 [US3] Add to that same file: two separate acts produce **two** notifications, never one (FR-1028b). **Serial — same file as T061**
 - [X] T063 [P] [US3] Add `apps/api/tests/integration/dispatch-excludes-actor.test.ts` — an organizer who saved the session they are changing is not notified (FR-1028a)
-- [ ] T064 [P] [US3] Add `apps/api/tests/integration/dispatch-no-savers.test.ts` — a material change to a session **nobody saved** dispatches nothing (FR-1028). This is the boundary of the fan-out
-- [ ] T065 [P] [US3] Add `apps/api/tests/integration/dispatch-failure-isolation.test.ts` — a failing push leaves the act and its audit entry committed (007's precedent)
-- [ ] T066 [P] [US3] Add `apps/web/tests/unit/authoring-absences.test.tsx` and `apps/api/tests/unit/authoring-absences.test.ts` — no bell, no notification centre, **no aggregate count and no change list in either client** (FR-1031, SC-1009), comments stripped before matching
-- [ ] T067 [P] [US3] Add `apps/web/tests/component/push-denied-marker.test.tsx` — permission denied still shows the marker and leaves every other surface unchanged (FR-1032, SC-1005)
+- [X] T064 [P] [US3] Add `apps/api/tests/integration/dispatch-no-savers.test.ts` — a material change to a session **nobody saved** dispatches nothing (FR-1028). This is the boundary of the fan-out
+- [X] T065 [P] [US3] Add `apps/api/tests/integration/dispatch-failure-isolation.test.ts` — a failing push leaves the act and its audit entry committed (007's precedent)
+- [X] T066 [P] [US3] Add `apps/web/tests/unit/authoring-absences.test.tsx` and `apps/api/tests/unit/authoring-absences.test.ts` — no bell, no notification centre, **no aggregate count and no change list in either client** (FR-1031, SC-1009), comments stripped before matching
+- [X] T067 [P] [US3] Add `apps/web/tests/component/push-denied-marker.test.tsx` — permission denied still shows the marker and leaves every other surface unchanged (FR-1032, SC-1005)
 
 ### Implementation for User Story 3
 
@@ -243,8 +243,8 @@ that activating it opens the session, and that the row carries a marker until vi
 - [X] T074 [US3] Compute the marker in the agenda read as `logistics_changed_at > viewed_at`, **on the existing payload** — no new repository member, no new cached read (R7, FR-1030)
 - [X] T075 [US3] Update `viewed_at` when the attendee opens the session; declare the write in the caching decorator's composition root, since a write purges the conference prefix
 - [X] T076 [P] [US3] Render the marker on the Agenda row and Home, **as text and not by colour alone**
-- [ ] T077 [P] [US3] Add `apps/web/tests/unit/marker-not-cached.test.ts` — no repository member is added and `substitution.test.ts` is untouched; **no eighth device capability**
-- [ ] T078 [US3] Add a timing assertion to `e2e/authoring.spec.ts` (T095) — a material change reaches a subscribed attendee **within one minute** (SC-1004). Measured against the sink adapter, so it needs no real push service
+- [X] T077 [P] [US3] Add `apps/web/tests/unit/marker-not-cached.test.ts` — no repository member is added and `substitution.test.ts` is untouched; **no eighth device capability**
+- [X] T078 [US3] Add a timing assertion to `e2e/authoring.spec.ts` (T095) — a material change reaches a subscribed attendee **within one minute** (SC-1004). Measured against the sink adapter, so it needs no real push service
 
 **Checkpoint**: the attendee half is complete.
 
@@ -259,10 +259,10 @@ code registers an attendee, confirm no reach over any other conference.
 
 ### Tests for User Story 4
 
-- [ ] T079 [P] [US4] Add `apps/api/tests/integration/conference-create.test.ts` — creation by **both tiers** (FR-1007, FR-1008); the organizer is assigned in the **same transaction**
-- [ ] T080 [P] [US4] Add to that file: creating grants **no** authority over any other conference and **no** platform capability (FR-1010)
-- [ ] T081 [P] [US4] Add `apps/api/tests/integration/join-code-mint.test.ts` — the minted code is unique product-wide and works through MyNet's existing join flow (FR-1009, SC-1011)
-- [ ] T082 [P] [US4] Add `apps/api/tests/unit/no-conference-delete.test.ts` — no route deletes a conference at any tier (FR-1011)
+- [X] T079 [P] [US4] Add `apps/api/tests/integration/conference-create.test.ts` — creation by **both tiers** (FR-1007, FR-1008); the organizer is assigned in the **same transaction**
+- [X] T080 [P] [US4] Add to that file: creating grants **no** authority over any other conference and **no** platform capability (FR-1010)
+- [X] T081 [P] [US4] Add `apps/api/tests/integration/join-code-mint.test.ts` — the minted code is unique product-wide and works through MyNet's existing join flow (FR-1009, SC-1011)
+- [X] T082 [P] [US4] Add `apps/api/tests/unit/no-conference-delete.test.ts` — no route deletes a conference at any tier (FR-1011)
 
 ### Implementation for User Story 4
 
@@ -271,7 +271,7 @@ code registers an attendee, confirm no reach over any other conference.
 - [X] T085 [US4] Add `POST /admin/conferences` behind `requireOperator` — **not** `requireConferenceAuthority`, because there is no conference yet
 - [X] T086 [P] [US4] Add `apps/admin/src/app/conferences/CreateConferenceDialog.tsx`, centred by the base rule, Escape-dismissible, focus restored
 - [X] T087 [P] [US4] Show the join code after creation so the organizer can distribute it
-- [ ] T088 [P] [US4] Add `apps/admin/tests/component/create-conference.test.tsx` — validation, failure state, and the code displayed on success
+- [X] T088 [P] [US4] Add `apps/admin/tests/component/create-conference.test.tsx` — validation, failure state, and the code displayed on success
 
 **Checkpoint**: all four stories complete.
 
@@ -279,22 +279,22 @@ code registers an attendee, confirm no reach over any other conference.
 
 ## Phase 7: Polish & Cross-Cutting Concerns
 
-- [ ] T089 [P] Add `apps/web/tests/unit/no-admin-surface.test.ts` — re-assert FR-1003 and SC-1008 now that MyNet has changed for the first time since 013. **The absence must be re-proved, not assumed still true**
-- [ ] T090 [P] Add `apps/api/tests/unit/no-derived-relationships.test.ts` — no contact, conversation or appointment derives from an authoring act (FR-1044)
-- [ ] T091 [P] Add `apps/api/tests/unit/no-session-start-trigger.test.ts` — nothing dispatches on a session starting (FR-1033)
-- [ ] T092 [P] Add `apps/api/tests/unit/no-draft-state.test.ts` — no draft or published column, no lifecycle gate (FR-1040)
-- [ ] T093 [P] Add `apps/api/tests/unit/no-attendee-restriction.test.ts` — no route suspends, removes or restricts an attendee (FR-1041)
-- [ ] T094 Add `apps/web/tests/unit/error-classification.test.ts` — every explained refusal renders **differently from the others** and from the reasonless 404. Branch on `error.code`, **never on the class**: `ApiError extends RequestRefusedError`, which is how 008 swallowed every message its routes wrote to be read
-- [ ] T095 [P] Add `e2e/authoring.spec.ts` — an organizer edits a programme in one browser profile while an attendee sees the result in another (host for T078's timing assertion)
-- [ ] T096 [P] Add dialog position assertions to `e2e/responsive.spec.ts` for `CancelDialog` and `CreateConferenceDialog` — measure the gap on either side. **A width assertion never looks at position**, which is how two dialogs shipped in the top-left corner
-- [ ] T097 [P] Run the accessibility gate over the programme editor and both new dialogs
-- [ ] T098 Re-run `pnpm db:seed` and confirm `assertDisjoint`'s two disjoint programmes and the deliberately empty third conference survive (FR-1043)
-- [ ] T099 Regenerate and commit the OpenAPI contract in `contracts/` now every route exists
-- [ ] T100 Run `pnpm verify` — all ten gates green
-- [ ] T101 Record deviations in `specs/014-conference-content-authoring/deviations.md`, including T021's no-change conclusion
-- [ ] T102 Extend the reserved-migration table in `docs/superpowers/specs/2026-08-06-mynet-delivery-roadmap-design.md` to cover both in-flight programmes — **wrong for two features running**
-- [ ] T103 Update `CLAUDE.md`: standing decisions 40–44, register entries 27 and 28, migrations run to `0011`, and the architectural invariants this feature establishes
-- [ ] T104 Walk `quickstart.md` scenarios 1–5 (machine-checkable)
+- [X] T089 [P] Add `apps/web/tests/unit/no-admin-surface.test.ts` — re-assert FR-1003 and SC-1008 now that MyNet has changed for the first time since 013. **The absence must be re-proved, not assumed still true**
+- [X] T090 [P] Add `apps/api/tests/unit/no-derived-relationships.test.ts` — no contact, conversation or appointment derives from an authoring act (FR-1044)
+- [X] T091 [P] Add `apps/api/tests/unit/no-session-start-trigger.test.ts` — nothing dispatches on a session starting (FR-1033)
+- [X] T092 [P] Add `apps/api/tests/unit/no-draft-state.test.ts` — no draft or published column, no lifecycle gate (FR-1040)
+- [X] T093 [P] Add `apps/api/tests/unit/no-attendee-restriction.test.ts` — no route suspends, removes or restricts an attendee (FR-1041)
+- [X] T094 Add `apps/web/tests/unit/error-classification.test.ts` — every explained refusal renders **differently from the others** and from the reasonless 404. Branch on `error.code`, **never on the class**: `ApiError extends RequestRefusedError`, which is how 008 swallowed every message its routes wrote to be read
+- [X] T095 [P] Add `e2e/authoring.spec.ts` — an organizer edits a programme in one browser profile while an attendee sees the result in another (host for T078's timing assertion)
+- [X] T096 [P] Add dialog position assertions to `e2e/responsive.spec.ts` for `CancelDialog` and `CreateConferenceDialog` — measure the gap on either side. **A width assertion never looks at position**, which is how two dialogs shipped in the top-left corner
+- [X] T097 [P] Run the accessibility gate over the programme editor and both new dialogs
+- [X] T098 Re-run `pnpm db:seed` and confirm `assertDisjoint`'s two disjoint programmes and the deliberately empty third conference survive (FR-1043)
+- [X] T099 Regenerate and commit the OpenAPI contract in `contracts/` now every route exists
+- [X] T100 Run `pnpm verify` — all ten gates green *(run as `pnpm verify:clean` against a fresh database: 13/13 gates, 162 e2e)*
+- [X] T101 Record deviations in `specs/014-conference-content-authoring/deviations.md`, including T021's no-change conclusion
+- [X] T102 Extend the reserved-migration table in `docs/superpowers/specs/2026-08-06-mynet-delivery-roadmap-design.md` to cover both in-flight programmes — **wrong for two features running**
+- [X] T103 Update `CLAUDE.md`: standing decisions 40–44, register entries 27 and 28, migrations run to `0011`, and the architectural invariants this feature establishes
+- [X] T104 Walk `quickstart.md` scenarios 1–5 (machine-checkable)
 - [ ] T105 Walk `quickstart.md` scenarios 6–9 **by hand, on a device** — notification, coalescing, denied permission, and the three widths plus a screen-reader pass. **Joins the outstanding walkthroughs from 007, 008, 009 and 013 rather than replacing them**
 
 ---
@@ -387,3 +387,20 @@ not a merge schedule — which is what 011's collapsed split turned out to be wo
 - **T024 exists because this project has already shipped that defect once.** An audit entry that can
   fail without undoing its act is accountability theatre
 - **T105 needs a person and a phone.** Everything else a machine can check
+
+### Outcome
+
+**104 of 105 done. T105 is outstanding** and joins the unwalked by-hand scenarios from 007, 008, 009
+and 013 rather than replacing them.
+
+**T094 was the task that earned its place**, and it was predicted to be routine. It found six
+explained refusals sharing two error codes — 008's swallowed-message defect reproduced from the
+opposite direction, by code that was obeying the rule 008 produced. See `deviations.md` D10.
+
+**Three tasks were completed against a different file or client than the one they name**, each
+recorded rather than quietly redirected: T094 (`apps/admin`, where 014's refusals are), T077 (asserts
+*no new read* rather than *no member*), and T078 (times the attendee-visible arrival, because nothing
+exposes the sink over HTTP). D11, D12 and D13.
+
+**T100 found a gap older than this feature**: the local clean-verify runner has never been able to
+pass the administrative end-to-end specs, because it supplies no `ADMIN_ORIGIN` and CI does. D16.

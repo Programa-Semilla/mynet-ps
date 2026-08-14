@@ -7,6 +7,7 @@ import { savedSessions } from '../../src/db/schema/agenda.js'
 import { SinkPushService } from '../../src/notifications/sink-adapter.js'
 import { anEndpoint, registerDevice } from '../support/push.js'
 import {
+  afterDispatch,
   buildAuthoringFixture,
   clearAuthoringFixture,
   organizerSession,
@@ -52,13 +53,14 @@ describe('what a material change is (T060, FR-1026, FR-1027)', () => {
   let cookie: string
   let sessionId: string
   let graceId: string
+  let graceCookie: string
 
   beforeAll(async () => {
     app = await setupTestApp({ push })
   })
 
   afterAll(async () => {
-    await clearAuthoringFixture()
+    await clearAuthoringFixture(app)
     await teardown(app)
   })
 
@@ -66,7 +68,7 @@ describe('what a material change is (T060, FR-1026, FR-1027)', () => {
     await clearThrottle()
     push.clear()
 
-    fixture = await buildAuthoringFixture(ADA)
+    fixture = await buildAuthoringFixture(ADA, app)
     cookie = await organizerSession(app, ADA, SEED_PASSWORD)
 
     const created = await app.inject({
@@ -92,22 +94,39 @@ describe('what a material change is (T060, FR-1026, FR-1027)', () => {
       url: '/auth/sign-in',
       payload: { email: GRACE, password: SEED_PASSWORD },
     })
-    await registerDevice(app, sessionCookieFrom(signIn) as string, anEndpoint('grace-phone'))
+    // Held rather than discarded: the marker assertions below read Grace's own agenda, and
+    // signing her in a second time inside a nested `beforeEach` does not produce a usable
+    // session — one sign-in per attendee per test is the shape the rest of this suite uses.
+    graceCookie = sessionCookieFrom(signIn) as string
+    await registerDevice(app, graceCookie, anEndpoint('grace-phone'))
     push.clear()
   })
 
   const at = (rest: string): string => `/admin/conferences/${fixture.assigned.eventId}${rest}`
 
-  const edit = (overrides: Record<string, unknown>) =>
-    app.inject({
+  // Both helpers drain the fan-out before returning. It outlives the response deliberately —
+  // `afterDispatch` records why — so asserting on the sink straight after `inject` would be a
+  // race rather than an assertion, and a flaky pass is worse than a failure.
+  const edit = async (overrides: Record<string, unknown>) => {
+    const response = await app.inject({
       method: 'PATCH',
       url: at(`/sessions/${sessionId}`),
       headers: { cookie },
       payload: sessionBody(fixture.assigned, overrides),
     })
+    await afterDispatch(app)
+    return response
+  }
 
-  const cancel = () =>
-    app.inject({ method: 'POST', url: at(`/sessions/${sessionId}/cancel`), headers: { cookie } })
+  const cancel = async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: at(`/sessions/${sessionId}/cancel`),
+      headers: { cookie },
+    })
+    await afterDispatch(app)
+    return response
+  }
 
   it('dispatches on CANCELLATION', async () => {
     expect((await cancel()).statusCode).toBe(200)
@@ -232,5 +251,165 @@ describe('what a material change is (T060, FR-1026, FR-1027)', () => {
     await cancel()
 
     expect(push.delivered()[0]?.payload.body).toMatch(/cancelled/i)
+  })
+
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════════════════════
+   * **T-review (014) — THE MARKER, ASSERTED IN THE POSITIVE. NOTHING DID.**
+   *
+   * A deep review found that **no test anywhere observed `changedSinceViewed: true`.** The only
+   * two assertions in the repository were `false`, and `POST …/viewed` was exercised once, for
+   * its status code alone. So the marker's entire read-side mechanism —
+   * `coalesce(logistics_changed_at > viewed_at, false)` — and `markSessionViewed`'s clearing
+   * effect were pinned only by their own absence.
+   *
+   * Everything that could go wrong stayed green under that: an inverted comparison, a `coalesce`
+   * swallowing a correct result, an `UPDATE` whose `WHERE` matched no row. FR-1030 and US3
+   * scenario 2 had **no positive server-side assertion at all**, and the marker is the half of
+   * this feature an attendee who denied notification permission is left with — FR-1032 makes it
+   * the complete outcome rather than a degraded one, so it is the half that must not be broken
+   * silently.
+   *
+   * Read as **Grace**, who saved the session, rather than as the acting organizer: FR-1028a
+   * stamps the actor's own row viewed in the same transaction, so asserting as Ada would assert
+   * the exclusion and call it the marker.
+   * ═══════════════════════════════════════════════════════════════════════════════════════════
+   */
+  describe('the in-app marker, in the positive (FR-1030, FR-1032, US3)', () => {
+    const savedOf = async (): Promise<{ sessionId: string; changedSinceViewed: boolean }[]> => {
+      const response = await app.inject({
+        method: 'GET',
+        url: `/events/${fixture.assigned.eventId}/agenda/saved`,
+        headers: { cookie: `mynet_session=${graceCookie}` },
+      })
+      expect(response.statusCode).toBe(200)
+      return response.json().sessions as { sessionId: string; changedSinceViewed: boolean }[]
+    }
+
+    const markerOf = async (): Promise<boolean | undefined> =>
+      (await savedOf()).find((one) => one.sessionId === sessionId)?.changedSinceViewed
+
+    it('is false before anything has changed', async () => {
+      // The baseline the positive cases are measured against. `viewed_at` defaults to the save
+      // instant precisely so a freshly saved session carries no marker — there is no `created_at`
+      // to compare against, which is why the default is what it is.
+      expect(await markerOf()).toBe(false)
+    })
+
+    it('SETS on a cancellation', async () => {
+      await cancel()
+      expect(
+        await markerOf(),
+        'The marker did not appear after a cancellation. This is the surface an attendee who ' +
+          'denied notification permission is left with (FR-1032), so it failing silently means ' +
+          'they learn nothing at all.',
+      ).toBe(true)
+    })
+
+    it('SETS on a start-time change', async () => {
+      await edit({
+        startsAt: '2027-03-01T14:00:00.000Z',
+        endsAt: '2027-03-01T15:00:00.000Z',
+      })
+      expect(await markerOf()).toBe(true)
+    })
+
+    it('SETS on a room change', async () => {
+      const room = await app.inject({
+        method: 'POST',
+        url: at('/rooms'),
+        headers: { cookie },
+        payload: { name: 'Yet Another Room' },
+      })
+
+      await edit({ roomId: room.json().id as string })
+      expect(await markerOf()).toBe(true)
+    })
+
+    it('stays false for a content edit (FR-1027)', async () => {
+      // The mirror of the dispatch cases above, and it has to be here as well as there: the
+      // marker and the notification are two mechanisms over one predicate, and a title edit
+      // setting the marker would put a "Changed" chip on a row nothing changed about.
+      await edit({ title: 'A Retitled Session' })
+      expect(await markerOf()).toBe(false)
+    })
+
+    it('CLEARS when the attendee views the session, and stays cleared', async () => {
+      await cancel()
+      expect(await markerOf()).toBe(true)
+
+      const viewed = await app.inject({
+        method: 'POST',
+        url: `/events/${fixture.assigned.eventId}/agenda/saved/${sessionId}/viewed`,
+        headers: { cookie: `mynet_session=${graceCookie}` },
+      })
+      expect(viewed.statusCode).toBe(204)
+
+      expect(
+        await markerOf(),
+        'Viewing the session did not clear the marker. `markSessionViewed` writes `viewed_at`, ' +
+          'and an UPDATE whose WHERE matches no row returns success while changing nothing — ' +
+          'which is indistinguishable from working until somebody asserts this.',
+      ).toBe(false)
+
+      // Cleared by an act, never by time passing: a second read must not resurrect it.
+      expect(await markerOf()).toBe(false)
+    })
+
+    it('RE-SETS on a second change after being cleared', async () => {
+      // The property a one-shot flag would fail. `viewed_at` is a timestamp rather than a boolean
+      // precisely so a later change is newer than the last look, and an implementation that
+      // cleared a flag permanently would pass every case above.
+      await cancel()
+      await app.inject({
+        method: 'POST',
+        url: `/events/${fixture.assigned.eventId}/agenda/saved/${sessionId}/viewed`,
+        headers: { cookie: `mynet_session=${graceCookie}` },
+      })
+      expect(await markerOf()).toBe(false)
+
+      const reinstated = await app.inject({
+        method: 'POST',
+        url: at(`/sessions/${sessionId}/reinstate`),
+        headers: { cookie },
+      })
+      expect(reinstated.statusCode).toBe(200)
+      await afterDispatch(app)
+
+      const room = await app.inject({
+        method: 'POST',
+        url: at('/rooms'),
+        headers: { cookie },
+        payload: { name: 'A Later Room' },
+      })
+      await edit({ roomId: room.json().id as string })
+
+      expect(await markerOf()).toBe(true)
+    })
+
+    it('marks only the attendee who saved it, and only the session that changed', async () => {
+      // Two isolations in one: the marker is per-row state about one saved session, so a second
+      // saved session must not inherit it — and it is per attendee, which is what stops it ever
+      // being a product-wide "something changed" signal (FR-1031, v4.2.0 N2).
+      const other = await app.inject({
+        method: 'POST',
+        url: at('/sessions'),
+        headers: { cookie },
+        payload: sessionBody(fixture.assigned, { title: 'An Unaffected Session' }),
+      })
+      const otherId = other.json().id as string
+      await getDb().insert(savedSessions).values({ attendeeId: graceId, sessionId: otherId })
+
+      await cancel()
+
+      const rows = await savedOf()
+      expect(rows.find((one) => one.sessionId === sessionId)?.changedSinceViewed).toBe(true)
+      expect(
+        rows.find((one) => one.sessionId === otherId)?.changedSinceViewed,
+        'A session nothing happened to carries a marker. The marker is per-row state about one ' +
+          'saved session; a second row inheriting it is the first step towards it meaning ' +
+          '"something changed somewhere", which is the inbox v4.2.0 N2 forbids.',
+      ).toBe(false)
+    })
   })
 })

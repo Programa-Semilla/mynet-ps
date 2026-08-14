@@ -56,13 +56,13 @@ describe('deletion is refused by any engagement (T045, FR-1018, FR-1019)', () =>
   afterAll(async () => {
     // Nothing cascades to `events`, so a fixture conference left behind blocks the NEXT file's
     // `seed()` — and the symptom lands there rather than here. See `clearAuthoringFixture`.
-    await clearAuthoringFixture()
+    await clearAuthoringFixture(app)
     await teardown(app)
   })
 
   beforeEach(async () => {
     await clearThrottle()
-    fixture = await buildAuthoringFixture(ADA)
+    fixture = await buildAuthoringFixture(ADA, app)
     cookie = await organizerSession(app, ADA, SEED_PASSWORD)
 
     const created = await app.inject({

@@ -154,9 +154,27 @@ export const SessionPanel = () => {
    */
   const { markViewed } = context
   useEffect(() => {
-    if (!sessionId) return
-    markViewed(sessionId)
-  }, [markViewed, sessionId])
+    // ═══════════════════════════════════════════════════════════════════════════════════════
+    // **ONLY WHEN THE PANEL ACTUALLY SHOWED THE SESSION.**
+    //
+    // This fired on every `sessionId` change regardless of what was on screen: while the
+    // programme was still loading, while it had **failed**, and when the address named a session
+    // that is not in this conference at all. In each of those the attendee is looking at
+    // "This session could not be loaded" or "not available to you" — and the write succeeded
+    // anyway, because it touches only `saved_sessions`.
+    //
+    // So the marker for a change they demonstrably had not seen was cleared, both on the server
+    // and locally. FR-1030 says the marker clears once the attendee has **viewed** it, and this
+    // file's own header asserts the panel is "the only surface on which 'they have seen it' is
+    // true" — which is false whenever the panel is showing a failure instead.
+    //
+    // Keyed on the resolved session rather than the address, so the effect cannot run before the
+    // thing it is acknowledging exists.
+    // ═══════════════════════════════════════════════════════════════════════════════════════
+    if (context.status !== 'ready') return
+    if (!session) return
+    markViewed(session.id)
+  }, [markViewed, context.status, session])
 
   return (
     <dialog

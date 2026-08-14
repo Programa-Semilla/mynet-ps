@@ -9,6 +9,7 @@ import { attendeesToNotify } from '../../src/db/queries/session-changes.js'
 import { SinkPushService } from '../../src/notifications/sink-adapter.js'
 import { anEndpoint, registerDevice } from '../support/push.js'
 import {
+  afterDispatch,
   buildAuthoringFixture,
   clearAuthoringFixture,
   organizerSession,
@@ -77,7 +78,7 @@ describe('one act, one notification (T061, T062, FR-1034, SC-1012)', () => {
   })
 
   afterAll(async () => {
-    await clearAuthoringFixture()
+    await clearAuthoringFixture(app)
     await teardown(app)
   })
 
@@ -85,7 +86,7 @@ describe('one act, one notification (T061, T062, FR-1034, SC-1012)', () => {
     await clearThrottle()
     push.clear()
 
-    fixture = await buildAuthoringFixture(ADA)
+    fixture = await buildAuthoringFixture(ADA, app)
     cookie = await organizerSession(app, ADA, SEED_PASSWORD)
 
     sessionIds = []
@@ -125,8 +126,17 @@ describe('one act, one notification (T061, T062, FR-1034, SC-1012)', () => {
 
   const at = (rest: string): string => `/admin/conferences/${fixture.assigned.eventId}${rest}`
 
-  const cancel = (sessionId: string) =>
-    app.inject({ method: 'POST', url: at(`/sessions/${sessionId}/cancel`), headers: { cookie } })
+  const cancel = async (sessionId: string) => {
+    const response = await app.inject({
+      method: 'POST',
+      url: at(`/sessions/${sessionId}/cancel`),
+      headers: { cookie },
+    })
+    // The fan-out outlives the response — see `afterDispatch`. Counting dispatches is the whole
+    // point of this file, so racing it would make the count meaningless.
+    await afterDispatch(app)
+    return response
+  }
 
   /** Puts several sessions under one act, which is the state a bulk act would leave. */
   const stampAll = async (ids: readonly string[], actId: string): Promise<void> => {
@@ -168,7 +178,7 @@ describe('one act, one notification (T061, T062, FR-1034, SC-1012)', () => {
     // fragment as a parameter tuple, which PostgreSQL cannot cast to `uuid[]`.
     await stampAll(sessionIds, actId)
 
-    const recipients = await attendeesToNotify(actId, null)
+    const recipients = await attendeesToNotify(actId, null, fixture.assigned.eventId)
 
     expect(
       recipients,
@@ -188,7 +198,7 @@ describe('one act, one notification (T061, T062, FR-1034, SC-1012)', () => {
 
     await stampAll(sessionIds, actId)
 
-    const recipients = await attendeesToNotify(actId, null)
+    const recipients = await attendeesToNotify(actId, null, fixture.assigned.eventId)
     expect(recipients[0]?.sessionIds).toHaveLength(4)
   })
 

@@ -66,8 +66,20 @@ export interface AuthoringFixture {
  * operator row. 008 recorded the same trap for `shared_cards`, and the constitution predicted
  * this feature would meet it.
  */
-export const buildAuthoringFixture = async (organizerEmail: string): Promise<AuthoringFixture> => {
-  await clearAuthoringFixture()
+export const buildAuthoringFixture = async (
+  organizerEmail: string,
+  /**
+   * The application, so the reset below drains background work first.
+   *
+   * Optional only because a caller may genuinely have no app yet. **Every test caller should pass
+   * it**: this is the reset that runs at the start of each test, so it is the one most likely to
+   * race a fan-out started by the previous one — and a rebuild that deletes `operators` and
+   * `events` while a dispatch is reading them produces a prerequisite failure in *this* file that
+   * looks like a defect in the behaviour under test.
+   */
+  app?: FastifyInstance,
+): Promise<AuthoringFixture> => {
+  await clearAuthoringFixture(app)
 
   const db = getDb()
   const [operator] = await db
@@ -124,7 +136,25 @@ export const buildAuthoringFixture = async (organizerEmail: string): Promise<Aut
  * cleaning up afterwards is a requirement rather than tidiness.
  * ═════════════════════════════════════════════════════════════════════════════════════════════
  */
-export const clearAuthoringFixture = async (): Promise<void> => {
+export const clearAuthoringFixture = async (app?: FastifyInstance): Promise<void> => {
+  // ═════════════════════════════════════════════════════════════════════════════════════════════
+  // **THE FAN-OUT FROM THE PREVIOUS TEST DRAINS BEFORE THIS DELETES WHAT IT IS READING.**
+  //
+  // 014's saved-session dispatch outlives the response by design (see `afterDispatch`), so work
+  // started by test N can still be running when test N+1's `beforeEach` calls this — and this
+  // deletes `push_subscriptions`, `admin_audit_entries`, `operators` and the fixture's own
+  // sessions, which are exactly the rows a fan-out reads and writes.
+  //
+  // The failure is not the fan-out's: it logs and gives up, as it must. The failure is the *state*
+  // the next test then observes, and the symptom is a rotating set of files failing in a full
+  // sequential run while every one of them passes in isolation. It cost several full runs to see.
+  //
+  // `app` is optional so the call in the fixture *builder* — which runs before any app exists —
+  // stays valid. Every per-test and per-suite caller passes it, and that is the point: a reset that
+  // does not wait for the writes it is undoing is not a reset.
+  // ═════════════════════════════════════════════════════════════════════════════════════════════
+  if (app) await app.background.drain()
+
   const db = getDb()
 
   await db.delete(questionVotes)
@@ -249,6 +279,32 @@ export const sessionBody = (
 })
 
 /** Signs in as the seeded platform operator and returns a cookie header. */
+/**
+ * T-review (014) — waits for the saved-session fan-out that the response no longer waits for.
+ *
+ * ═════════════════════════════════════════════════════════════════════════════════════════════
+ * **THE DISPATCH OUTLIVES THE REQUEST ON PURPOSE, SO AN ASSERTION ABOUT THE SINK HAS TO SAY SO.**
+ *
+ * A material change reaches **every attendee who saved the session**. Awaited inside the
+ * organizer's request that is `recipients × push RTT` against a 10s `connectionTimeout`, so a
+ * keynote cancellation answered the organizer with a network failure for an act that had
+ * succeeded — and their retry got the 404 for an already-cancelled session. The act now commits,
+ * the organizer is answered, and the fan-out continues in `app.background`.
+ *
+ * That makes `expect(push.delivered())` immediately after `inject` a **race**, not an assertion.
+ * This is the drain, and it is the same call `server.ts` makes before `app.close()` on SIGTERM —
+ * so a test awaiting it is exercising the production shutdown path rather than a test-only hook.
+ * `notifications/background.ts` records why the drain is not an `onClose` hook.
+ *
+ * **Not a sleep and not a poll.** It resolves when the tracked promises settle, so a test that
+ * passes here cannot pass by being slow, and one that would fail cannot be rescued by a longer
+ * timeout.
+ * ═════════════════════════════════════════════════════════════════════════════════════════════
+ */
+export const afterDispatch = async (app: FastifyInstance): Promise<void> => {
+  await app.background.drain()
+}
+
 export const platformSession = async (app: FastifyInstance): Promise<string> =>
   adminSession(app, OPERATOR_EMAIL, OPERATOR_PASSWORD)
 

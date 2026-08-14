@@ -20,7 +20,7 @@ import { questionVotes, sessionQuestions } from '../schema/questions.js'
  *
  * That last distinction is FR-1042 and is the reason the fan-out lives here rather than in
  * `admin-catalog.ts`: **no function in the write layer may return an attendee identity**, and the
- * cheapest way to keep that true is for the write layer not to have one. `engagementCountsFor` —
+ * cheapest way to keep that true is for the write layer not to have one. `countEngagement` —
  * the only engagement figure an operator ever sees — is in `admin-catalog.ts` and returns counts
  * with no identity attached (FR-1025).
  * ═════════════════════════════════════════════════════════════════════════════════════════════
@@ -179,9 +179,17 @@ export interface NotifiableAttendee {
  * **KEYED ON THE AUDIT ENTRY ID, WHICH IS WHY NOTHING NEW IS STORED TO MAKE COALESCING WORK.**
  *
  * `sessions.last_change_act_id` was stamped with the act's audit entry id inside the act's
- * transaction, so "every session this act materially changed" is a single indexed read. Every
- * alternative shape invents an identifier — a batch id, a time bucket, a request id — and the
- * audit entry is already all three.
+ * transaction, so "every session this act materially changed" is one read. Every alternative shape
+ * invents an identifier — a batch id, a time bucket, a request id — and the audit entry is already
+ * all three.
+ *
+ * **This used to claim "a single indexed read", and there is no index on `last_change_act_id`.**
+ * Rather than add one — a column that is null for almost every row, on the product's hottest
+ * edit-time table — the query is **scoped to the conference**, which the caller already holds. That
+ * turns a product-wide scan of `sessions` into a lookup inside one conference's programme, served
+ * by `sessions_event_room_starts_at_idx`'s leading column, and it is a correctness improvement as
+ * well: an act id is unique, so the conference bound cannot exclude a row that should match, and a
+ * fan-out that could never reach outside its own conference is a narrower thing to reason about.
  *
  * **Grouped by attendee, not by session**, and that grouping *is* FR-1034: one row out per
  * attendee however many of their saved sessions moved, so the caller cannot accidentally send
@@ -209,6 +217,7 @@ export interface NotifiableAttendee {
 export const attendeesToNotify = async (
   actId: string,
   actorAttendeeId: string | null,
+  eventId: string,
 ): Promise<NotifiableAttendee[]> => {
   const rows = await getDb()
     .select({ attendeeId: savedSessions.attendeeId, sessionId: savedSessions.sessionId })
@@ -216,6 +225,7 @@ export const attendeesToNotify = async (
     .innerJoin(sessions, eq(sessions.id, savedSessions.sessionId))
     .where(
       and(
+        eq(sessions.eventId, eventId),
         eq(sessions.lastChangeActId, actId),
         actorAttendeeId === null
           ? undefined

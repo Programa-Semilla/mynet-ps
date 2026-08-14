@@ -139,8 +139,81 @@ test.describe('administrative accessibility', () => {
       await page.getByLabel(/operator identifier/i).fill('00000000-0000-4000-8000-000000000000')
       await page.getByRole('button', { name: /end their access/i }).click()
       await scanOpenDialog('the operator-deactivation confirmation')
+
+      // T097 (014) — the two dialogs this feature adds. Neither confirms: the suite seeds once
+      // for the whole run, so cancelling a seeded session here would change the programme every
+      // later spec reads.
+      await page.goto(`${ADMIN_ORIGIN}/conferences`)
+      await page.getByRole('button', { name: 'Create a conference' }).click()
+      await scanOpenDialog('the create-conference dialog')
+
+      await page.getByRole('link', { name: 'Product & Design Summit' }).first().click()
+      await expect(
+        page.getByRole('heading', { name: 'Product & Design Summit', level: 1 }),
+      ).toBeVisible()
+      await page
+        .getByRole('button', { name: /cancel or delete/i })
+        .first()
+        .click()
+      await scanOpenDialog('the session cancel-or-delete dialog')
     } finally {
       await context.close()
     }
   })
+
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════════════════════
+   * T097 (014) — **the programme editor, at all three widths.**
+   *
+   * It is not in `ADMIN_DESTINATIONS` and cannot be: it is a nested address under a conference,
+   * so it has no fixed path and the loop above cannot reach it. That is exactly why it needs its
+   * own test rather than an entry — a surface a destination loop cannot address is a surface a
+   * destination loop does not cover, and this is the **largest new administrative surface built
+   * since 013** (plan.md's first tracked risk).
+   *
+   * All three widths, unlike the dialogs above. Its accessibility genuinely does vary by
+   * viewport: it is a reflowing single column of forms, sections and per-session controls, and
+   * the mobile arrangement is the one nobody looks at. Register entry 4 — the unvalidated
+   * desktop and tablet layouts — is open, and this is the automated half of what can be said
+   * about it without a person.
+   * ═══════════════════════════════════════════════════════════════════════════════════════════
+   */
+  for (const width of WIDTHS) {
+    test(`the programme editor is clean at ${width.px}px (${width.layout})`, async ({
+      browser,
+    }) => {
+      const context = await browser.newContext({ viewport: { width: width.px, height: 900 } })
+      const page = await context.newPage()
+
+      try {
+        await signInAsOperator(page)
+
+        // Reached the way an organizer reaches it, from the list — the address carries a
+        // conference id this test has no other way to know.
+        await page.goto(`${ADMIN_ORIGIN}/conferences`)
+        await page.getByRole('link', { name: 'Product & Design Summit' }).first().click()
+        await expect(
+          page.getByRole('heading', { name: 'Product & Design Summit', level: 1 }),
+        ).toBeVisible()
+
+        // With the session form open, which is where most of the editor's controls live and the
+        // part a scan of the list behind it would say nothing about.
+        //
+        // Scoped to the Sessions region: the Speakers section also has a `Title` field — a
+        // speaker's job title — so an unscoped match resolves to both.
+        await page.getByRole('button', { name: /add a session/i }).click()
+        await expect(
+          page.getByRole('region', { name: 'Sessions' }).getByLabel('Title'),
+        ).toBeVisible()
+
+        const { violations } = await scan(page)
+        expect(
+          blocking(violations),
+          `the programme editor at ${width.px}px:\n${describeViolations(blocking(violations))}`,
+        ).toEqual([])
+      } finally {
+        await context.close()
+      }
+    })
+  }
 })

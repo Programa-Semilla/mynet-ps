@@ -2,7 +2,7 @@ import type { AdminConference } from '@mynet/data'
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router'
 
-import { classify, describe } from '../errors.js'
+import { classify, describe, detailOf } from '../errors.js'
 import { useAdminSession } from '../session.js'
 import { CreateConferenceDialog } from './CreateConferenceDialog.js'
 import { PromoteDialog } from './PromoteDialog.js'
@@ -43,7 +43,7 @@ export const ConferenceList = () => {
     try {
       setConferences(await services.conferences.list())
     } catch (error) {
-      setFailure(describe(classify(error)))
+      setFailure(describe(classify(error), detailOf(error)))
     }
   }, [services])
 
@@ -57,7 +57,7 @@ export const ConferenceList = () => {
       await services.conferences.demote({ eventId, attendeeId })
       await load()
     } catch (error) {
-      setFailure(describe(classify(error)))
+      setFailure(describe(classify(error), detailOf(error)))
     }
   }
 

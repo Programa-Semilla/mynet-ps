@@ -136,6 +136,26 @@ export const adminAuditEntries = pgTable(
     /** What kind of thing `subject_resource_id` names, since it has no constraint to say. */
     subjectKind: text('subject_kind'),
 
+    /**
+     * T-review (014) — **the conference this act was performed in** (FR-1038).
+     *
+     * ─────────────────────────────────────────────────────────────────────────────────────────
+     * FR-1038 requires an entry to record "the principal, **the conference**, the act, the entity
+     * acted on and the instant", and this column was missing. Six of 014's eight authoring actions
+     * left the conference recoverable only by joining `subject_resource_id` back to the content
+     * table — and for `delete_catalog` and `delete_session` that row is gone, so those entries were
+     * permanently unattributable.
+     *
+     * **Nullable and with no foreign key**, for two reasons rather than one. 013's six platform-tier
+     * acts (promotion, demotion, report resolution, question removal, operator deactivation, content
+     * disclosure) are product-wide and have no conference, so null is a real state rather than a
+     * gap. And the trail outlives what it describes: `abuse_reports.message_ids` and
+     * `sessions.last_change_act_id` both take the same shape, because an accountability record that
+     * a cascade could delete is not one.
+     * ─────────────────────────────────────────────────────────────────────────────────────────
+     */
+    subjectEventId: uuid('subject_event_id'),
+
     occurredAt: timestamp('occurred_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
@@ -149,10 +169,18 @@ export const adminAuditEntries = pgTable(
     // Pseudonymisation is `WHERE subject_attendee_id = $1` inside a deletion transaction that is
     // already holding locks; without this it scans the whole table on every account deletion.
     index('admin_audit_entries_subject_attendee_idx').on(table.subjectAttendeeId),
-    // T004 (014) — pseudonymisation now clears two columns in one statement, and the retention
-    // sweep's predicate reads both. Same reasoning as the index above it: an account deletion
-    // holds locks while it runs, and an unindexed `WHERE actor_attendee_id = $1` would scan the
-    // fastest-growing table this product has.
+    // T004 (014) — pseudonymisation now clears two columns, in **two** statements, and the
+    // retention sweep's predicate reads both.
+    //
+    // "One statement" is what this said, and `pseudonymiseAuditEntriesFor` explains at length why
+    // one would be wrong: a single `SET` under `WHERE (subject_attendee_id = $1 OR
+    // actor_attendee_id = $1)` clears the *subject* on an entry where only the *actor* matched —
+    // data loss wearing the costume of a simplification. Corrected here because two comments on
+    // one mechanism asserting opposite things is how somebody comes to "tidy" it back.
+    //
+    // Same reasoning as the index above it: an account deletion holds locks while it runs, and an
+    // unindexed `WHERE actor_attendee_id = $1` would scan the fastest-growing table this product
+    // has.
     index('admin_audit_entries_actor_attendee_idx').on(table.actorAttendeeId),
     // ─────────────────────────────────────────────────────────────────────────────────────────
     // **The covering index for `operator_id`'s foreign key.** Postgres creates one for a primary

@@ -4,8 +4,9 @@ What implementation changed, found, or decided that the spec, plan or data model
 Written as it happened rather than at the end, so the reasoning is the reasoning that was
 available at the time.
 
-**Status: implementation in progress.** Phases 1–6 are substantially complete; Phase 7 is
-outstanding. `tasks.md` carries the per-task state.
+**Status: implementation complete except the by-hand walk.** Phases 1–7 are done; T105 —
+`quickstart.md` scenarios 6–9, which need a person and a phone — is outstanding and joins the
+same unwalked scenarios from 007, 008, 009 and 013. `tasks.md` carries the per-task state.
 
 ---
 
@@ -204,3 +205,456 @@ content will meet this."*
 `push_subscriptions` joined the same clear list: `anEndpoint` mints a fresh endpoint per call —
 deliberately, so a re-registration test exercises a real second device — which made a delivery count
 count every phone a previous test in the file had registered.
+
+---
+
+## D10 — six explained refusals shared two error codes, and the client rendered two sentences for all of them
+
+**T094. The most consequential defect this feature produced, and the gate written to catch it found
+it on the first run.**
+
+`contracts/authoring.md` requires every explained refusal to render **differently from each other**,
+and names the reason: 008 classified on the **class**, `ApiError extends RequestRefusedError`, every
+non-2xx throws `ApiError`, and one deliberately-reasonless sentence was rendered for 400, 404, 409
+and 429 alike — swallowing every message the routes had written to be read.
+
+014 obeyed the resulting rule — *classify on `error.code`, never on the class* — and reproduced the
+outcome anyway, from the other end. The authoring routes were written with **four distinct 409
+explanations all carrying `refused`** and **two distinct 400 explanations all carrying
+`validation_failed`**. `classify` read the code, correctly, and therefore returned two outcomes for
+six situations: four rendered *"That could not be completed."* and two rendered *"Something went
+wrong."*
+
+The one that mattered most was `has-engagement` — *"cancel it instead, everything they wrote stays
+where it is"* — which is the sentence that teaches decision 44's whole rule at the moment an
+organizer meets it. It was unreachable.
+
+**The rule needed its other half stated**: *classify on `error.code`* is worth nothing unless the
+code says **which** refusal it is. The project already had the pattern — `question_has_votes`,
+`own_question`, `conversation_closed` and `report_already_resolved` are each their own `ErrorCode`
+for exactly this reason — and 014 had not followed it. Six codes added: `still_referenced`,
+`session_has_engagement`, `would_orphan_sessions`, `timezone_frozen`, `outside_conference_days`,
+`ends_before_start`.
+
+**Found by the mutual-difference assertion, and by nothing else.** A test checking that each code
+maps to *a* message would have passed: every one of them did map to a message. Two of them. That
+property is why 013 wrote the assertion the way it did, and this is the first time it has caught
+something.
+
+**No contract regeneration followed**, which is worth noting because it looks like an omission: the
+response schemas declare a refusal as `{ code, message }` and never enumerate the codes, so
+`contracts/openapi.json` is byte-identical. The codes are a client-facing vocabulary the schema does
+not constrain.
+
+---
+
+## D11 — T094's file path names the wrong client, and the test lives where the refusals are
+
+**T094.** tasks.md says `apps/web/tests/unit/error-classification.test.ts`. Every refusal 014 adds
+is produced by an **administrative** route and rendered by the **administrative** client; the
+attendee half of this feature (the cancelled presentation, the marker, removing a cancelled saved
+session) adds no new refusal code at all.
+
+So the assertion was added to `apps/admin/tests/unit/error-classification.test.ts` — 013's file,
+extended from nine cases to nineteen — rather than written into a new one. **Extending it is the
+stronger choice rather than the convenient one**: the property that matters is that all nineteen
+outcomes differ from **each other**, and a separate 014-only file could only have compared six
+outcomes among themselves while remaining green against a collision with one of 013's.
+
+---
+
+## D12 — T077's "no repository member" is asserted as "no new READ"
+
+**T077**, and the same reading D7 records for research R7. The task's wording is *"no repository
+member is added"*; `markViewed` is one, deliberately, with the reasoning in
+`SavedSessionRepository`'s own header and in the spec's Feature Declarations.
+
+`marker-not-cached.test.ts` therefore asserts the accurate invariant — the repository gains exactly
+one member, it is a write, and **the reads are unchanged at one** — plus the three things R7 rules
+out entirely: no eighth device capability, no new repository, and no `passThrough` on a write.
+
+It also asserts `packages/platform/tests/substitution.test.ts` is **untouched since the branch
+point**, which is the cheapest possible proof that no capability was added: that file constructs a
+double for every one of them, so an eighth would not compile against it.
+
+---
+
+## D13 — SC-1004 is timed against the attendee's product, not against the sink
+
+**T078.** The task says the one-minute bound is *"measured against the sink adapter, so it needs no
+real push service"*. The sink is an in-process object inside the API and **nothing exposes it over
+HTTP** — deliberately: a route that read it would be a test-only endpoint living in production code,
+which this project has consistently refused.
+
+Adding one to time an assertion would be a worse trade than the assertion is worth, so
+`e2e/authoring.spec.ts` measures the thing SC-1004 is actually about — within a minute of the
+organizer acting, an attendee who looks sees the change — and the **dispatch** is asserted against
+the sink where the sink lives, in `dispatch-coalescing`, `dispatch-no-savers`,
+`dispatch-excludes-actor` and `dispatch-failure-isolation`.
+
+---
+
+## D14 — three absence guards were written too broadly and caught correct code
+
+Each was corrected by narrowing to the population the requirement is actually about, and each
+narrowing is recorded because "the guard was scoped deliberately" and "the guard was weakened until
+it passed" are indistinguishable in a diff. This is the same class of correction 009 made to the
+event audit's conference-content predicate and D4 records for `notification-triggers`.
+
+- **`no-attendee-state-disclosure.test.ts` (T059)** flagged `admin-catalog.ts` and
+  `admin-reports.ts` for naming `attendeeId` on an engagement table. Both are correct: the first
+  filters `saved_sessions` by the **acting principal's own** id to clear their marker (FR-1028a, and
+  D5's finding), the second filters reported questions by the **reported** attendee's id under
+  v4.1.0's third Principle VIII exception. Both use it in a `WHERE`; a disclosure needs it in a
+  `SELECT`. The rule now matches **projections**, and the one permitted `WHERE` is pinned to the
+  `update(savedSessions)` statement that is allowed to have it.
+- **`no-derived-relationships.test.ts` (T090)** flagged `routes/admin/reports.ts` for reaching the
+  message schema — 013's report queue, again under its recorded exception. Scoped to 014's own
+  authoring modules.
+- **`no-draft-state.test.ts` (T092)** flagged `appointments.status` — 008's
+  proposed/accepted/declined/cancelled, a **relationship between two attendees**, not a visibility
+  gate on content. The generic-`status` rule now applies to **conference content only**, where
+  `status: 'draft' | 'live'` is exactly how a lifecycle arrives without using the word "published".
+
+**T059's guard was mutation-tested rather than trusted**: a projection naming
+`savedSessions.attendeeId` was injected into `admin-catalog.ts`, the guard failed, and the injection
+was reverted. T018 established that a gate that cannot fail is not a gate; this is the same check
+applied to a gate written later.
+
+---
+
+## D15 — a component test's repository override was silently ignored, and only `tsc` saw it
+
+**T058.** `cancelled-session.test.tsx` passed `overrides: { sessionQuestions: … }` where the
+registry member is `questions`. The suite went **green**: the override matched no member, so the
+panel used the default stub, and the Q&A assertions passed against a repository the test had not
+configured.
+
+Caught by `pnpm typecheck` — `Partial<Repositories>` has no `sessionQuestions` — and not by the test
+run, which is the point worth recording. The harness is deliberately typed against the real registry
+(`repository-casts.test.ts` exists to keep the unchecked casts gone), and that typing is what turned
+a silently-vacuous assertion into a build failure. A test double reached through an untyped bag of
+overrides would have shipped green.
+
+---
+
+## D16 — the local clean-verify runner could not pass the administrative end-to-end specs, and had
+not been able to since 013
+
+**T100. Found by running `pnpm verify` locally for the first time on this branch, and it is not
+014's defect — it is 014's discovery.**
+
+Twelve end-to-end tests failed, every one of them administrative and every one of them on the same
+timeout waiting for `POST /admin/session`. Four were **untouched specs from 013**
+(`admin-sessions`, `admin-moderation`, `admin-accessibility`), which is what made it clear the cause
+was environmental rather than a regression.
+
+`app.ts` allows CORS on administrative routes from `config.adminOrigin ?? false`. Unset means
+`false`, so **the browser** refuses every request the admin client makes: nothing fails server-side,
+the API answers `/ready` perfectly, and the specs wait for a response that never comes. It is the
+same shape as decision 19's original failure — a cookie that was never sent — and it fails just as
+silently.
+
+CI has supplied `ADMIN_ORIGIN` since 013, with a comment explaining exactly this and adding *"it
+passed locally only because `pnpm start` writes `ADMIN_ORIGIN` into `.env.local`"*. **That sentence
+was false.** `.env.local` carries `WEB_ORIGIN` and has never carried this one, and
+`scripts/verify-clean.mjs` — the runner whose whole purpose is to mirror the pipeline — allocated a
+web port and an API port and did not know a second application existed.
+
+Fixed rather than worked around, because a local runner that cannot reproduce CI is a gate nobody
+can use before pushing: `verify-clean` now allocates an admin port in its own band, adds it to the
+collision check, and sets **both** `MYNET_ADMIN_PORT` (what Vite serves on) and `ADMIN_ORIGIN` (what
+the API allows). The CI comment is corrected in place rather than deleted — CLAUDE.md names that
+class of stale claim as 013's most transferable defect, *four functions whose emphatic headers
+described call relationships that did not exist*, and a comment asserting a behaviour the script
+does not have is the same fault in a different file.
+
+**The lesson survives its own correction and gets sharper**: a value the pipeline supplies by hand
+is a value the local runner must supply too, or the two verify different things and the difference
+is invisible until somebody runs both.
+
+**A second environmental failure hid behind the first, and it is the reason `verify:clean` exists.**
+With `ADMIN_ORIGIN` supplied, a re-run still failed twelve specs — now with *"neither the
+bootstrapped nor the chosen administrative password was accepted"*, and this time an **attendee**
+spec (`agenda-saved-scoping`) failed too. Cause: 375 accumulated rows in `sign_in_attempts`. That
+table is **deliberately not cleared by the seed** — an attacker must not be able to wipe their own
+trail by registering and deleting (FR-382) — and it expires on a two-hour sweep, so running the
+suite repeatedly against one database inside that window throttles the addresses it signs in with.
+Throttled is neither accepted nor cleanly rejected, which is why the symptom looked like a
+credential fault.
+
+Nothing to fix: the behaviour is correct and the runner that avoids it already exists. **T100 was
+therefore satisfied with `pnpm verify:clean`** — which drops and recreates the database per run —
+rather than with a repeated `pnpm verify`. **13/13 gates, 162 end-to-end tests, 754s.**
+
+---
+
+## D17 — the deep review's three Criticals, and the two guards that had to change with them
+
+**Post-implementation deep review** (`review-findings.md`, 52 findings). Recorded here because two
+of these fixes **edited existing guards**, and this file exists so that "the guard was updated
+deliberately" and "the guard was weakened until it passed" are distinguishable in a diff.
+
+**C1 — `SessionForm` was rendered without a `key`.** All seven fields initialise from
+`useState(session?.… ?? default)`, which runs only on mount, and the session list stays rendered
+above the form — so clicking Edit on a second session, or "Add a session", reused the instance and
+kept the first session's values while `editing.id` was already the second's. Editing one session
+wrote another, and because the start time and room had "changed", every attendee who saved the
+overwritten session was told it had moved. **One line.** 009 fixed the same class the same way by
+keying `PanelNotes` and `PanelQuestions` on the session id. `programme-editor.test.tsx` never
+opened the form twice, which is why nothing caught it.
+
+**C2 — the fan-out was awaited inside the organizer's request, one recipient at a time.** Four
+round trips per recipient, so `recipients × push RTT`: a thousand savers against a *healthy* push
+service is several minutes, against a 10s `connectionTimeout`. The organizer saw a network failure
+for a cancellation that had succeeded, and their retry got the 404 `cancelSession` returns for an
+already-cancelled session. Five changes, and the first is the only architectural one:
+
+- **`notifications/background.ts`** — work that outlives the response, with a drain. **Not a job
+  queue and it must not become one**: no persistence, no retry, no timer. A task exists because a
+  request arrived, which is what keeps `no-session-start-trigger.test.ts` true — a scheduler here
+  would be the exact mechanism that guard exists to keep out.
+- **The drain is called from `server.ts`, not an `onClose` hook.** `buildApp` registers an
+  `onClose` that closes the pool and every task needs it; two hooks at the same level leave the
+  order to Fastify rather than to anything a reader can check, and backwards means the drain runs
+  against a closed pool.
+- `subscriptionsForMany` — one query instead of one per recipient.
+- Bounded concurrency of 20, and the two subscription writes batched once at the end.
+- `web-push` is now passed `timeout`. `dispatchPush` raced every delivery already, but losing a
+  race discards the *promise*: the socket had no timeout at all, so every timed-out delivery leaked
+  one, and this feature's fan-out is the first that could accumulate hundreds.
+
+**C3 — two guards shelled out to `git merge-base HEAD develop` and could not run in CI.** No
+`fetch-depth` anywhere in `verify.yml`, so a PR checkout has no `develop` ref and `execSync` throws;
+on a push to `develop` the ref resolves to `HEAD` and the non-vacuity assertions fail instead. The
+branch had never been pushed, so **neither guard had ever executed in CI** — they passed locally
+because a local `develop` exists. Resolution moved to `tests/support/branch-point.ts`, shared by
+both, which tries the PR base then `develop` then `origin/develop`, uses `HEAD~1` when the base
+resolves to `HEAD`, and **throws** rather than degrading to an empty diff. That last point is the
+requirement: a resolution failure that returned `[]` would make both absence guards pass forever,
+which is 010's precache defect exactly.
+
+**The two guards that changed, and why neither is weaker:**
+
+- **`notification-triggers.test.ts`** — `DISPATCH_HELPER` now matches `fanOut` as well as
+  `notify\w*`. The dispatch moved out of `notifySavers`, so the extracted region no longer contained
+  `dispatchToDevices` and **the positive assertion failed** — the guard working, not failing. The
+  region got *bigger*, so every forbidden-trigger pattern is scanned over more code than before.
+  D4's rule is unchanged: the population is the body of every dispatching helper, never the whole
+  module, because a whole-module scan fails on a correct implementation here.
+- **`no-attendee-state-disclosure.test.ts`** — it read `const notifySavers … ): Promise<void>` to
+  prove the fan-out answers with nothing. `notifySavers` now returns `void` and `fanOut` returns
+  `Promise<void>`, and **both are audited** rather than the one. Auditing only the starter would
+  have left the function that actually reads attendee identifiers unchecked.
+
+**Five integration files gained `afterDispatch(app)`.** The fan-out no longer completes before the
+response, so `expect(push.delivered())` straight after `inject` was a race. `afterDispatch` is the
+same drain `server.ts` calls on SIGTERM — a test awaiting it exercises the production shutdown path
+rather than a test-only hook, which is why no test-only endpoint was added. It resolves on settled
+promises rather than sleeping, so a passing test cannot pass by being slow.
+
+**Gates after this stage:** typecheck, lint, format, **796 unit**, **650 component**, **1121
+integration** — all green.
+
+---
+
+## D18 — the deep review's Important fixes, and the throttle bucket that was wrong twice
+
+**Post-review Stage B/C.** 21 of 26 Important findings and 12 Minors. The full list is in
+`review-findings.md`; recorded here are the four that changed a guard, a threshold or a claim.
+
+**`0011` was regenerated a second time, deliberately.** FR-1038 needs the conference on every audit
+entry (`admin_audit_entries.subject_event_id`), `session_notes` needed an index on `session_id` —
+its three siblings all had one — and `sessions_event_cancelled_idx` served no query and was replaced
+by `(event_id, room_id, starts_at)`, which is what `overlappingInRoom` actually filters on.
+Regenerating rather than claiming `0012` follows `0009`'s precedent: **`0011` has reached no deployed
+database**, nothing is deployed, and `0012` is reserved by 015. The documented procedure was followed
+exactly — README moved aside, journal entry removed, regenerate, tag renamed back to
+`0011_conference_authoring` with `idx: 10` untouched. The diff against the old file is three lines
+and a later `when`.
+
+**`session_notify` was keyed wrongly twice, and the second one is a production fact rather than a
+test artefact.** The finding was that a session edit dispatches exactly as a cancellation does while
+being charged `session_write` at 120 an hour against `session_cancel`'s 10. The fix bounds the
+**interruption** rather than the act, because materiality is only knowable after the write — and
+exhausting it skips the push, leaving the act and the in-app marker untouched, which is FR-1032's
+existing degradation.
+
+- **Keyed on the principal alone** it was absurdly tight: ten logistics changes an hour is one room
+  moved across ten sessions. It is now **(principal, session)**, which is the abuse shape — one
+  session toggled repeatedly — and never touches an organizer editing forty different ones.
+- **The source dimension at 60** starved. It aggregates every principal and every session behind one
+  IP, so ~60 material changes into a suite run every later dispatch was **silently skipped**. A
+  conference team behind one venue address would have hit the same thing, and the symptom is
+  "notifications randomly stopped" with nothing reproducible. Now 600, as `session_write`'s is.
+
+**Two guards were widened and both are stronger for it.** `no-notification-surface.test.ts` had to
+admit `app/NotificationTarget.tsx`, so the allowance is paid for: the new file must **return null**
+and must contain no `map(`/`<ul`/`<li`, which is a stronger statement than the old list made about
+`NotificationPrompt`. `service-worker.test.ts` asserted that the source *contained* two substrings;
+it now **extracts and evaluates** the target expression, and a mutation making the worker always take
+the session branch fails it — which the substring version could not see.
+
+**Two new guards, both mutation-tested before being trusted.** `profile-uneditable.test.ts` (cited by
+two files, never existed) fails when a profile write is injected into an administrative module; the
+engagement-count coverage assertion fails when a table is dropped from the aggregate.
+
+---
+
+## D19 — the integration suite has a cross-file isolation weakness, and it is NOT attributed
+
+**Found while verifying the above, and stated as unresolved rather than fixed.**
+
+Across roughly ten full runs, **exactly one file fails per run, all of its tests, always a different
+file, and every one passes in isolation.** The failure is in `beforeAll`, reading a seeded attendee
+or operator that is absent — `admin-remove-question`, `conference-authority`, `admin-report-silence`
+and `delete-refusal` have each taken a turn. 138 files share one database, run sequentially
+(`fileParallelism: false`), and several delete `attendees`/`operators` and re-seed.
+
+`helpers.ts`'s own `assertSeededAttendee` already describes this exact situation — *"a neighbouring
+file's `resetDatabase()` (or a partially-applied seed) can remove it … if it recurs, the suite
+ordering is the thing to investigate, not this file"* — so the weakness predates this work. What
+014's backgrounded fan-out adds is asynchrony that outlives a request, which makes a latent race
+likelier to surface. Three places where it could race are now closed:
+
+- `teardown(app)` drains before `app.close()`.
+- `clearAuthoringFixture(app)` drains before deleting the rows a fan-out reads and writes.
+- `buildAuthoringFixture(email, app)` threads the app through, because that reset is the one that
+  runs at the *start* of each test and is therefore likeliest to race the previous one.
+
+**Frequency dropped and the failure did not disappear**, and the residual does not fit the timing
+hypothesis: a run against a fresh database failed on a 013 file that dispatches nothing, while an
+immediately-repeated run against the same database passed.
+
+**Whether this work caused the residual or merely exposed it is NOT established.** Attributing it
+needs a baseline: the suite run several times at the branch point. That measurement has not been
+made, and asserting either answer without it would be the kind of claim this file exists to prevent.
+
+**The files observed failing, kept here so they can be checked again rather than rediscovered:**
+`admin-remove-question.test.ts`, `conference-authority.test.ts`, `admin-report-silence.test.ts`,
+`delete-refusal.test.ts`, `dispatch-excludes-actor.test.ts` — plus `authoring-audit-rollback.test.ts` and the four `dispatch-*.test.ts`
+files, which failed only while the `session_notify` source bound was starving dispatches and have
+been green since that was corrected. Each failure is the whole file, in `beforeAll`, reading a
+seeded attendee or operator that is absent. **The baseline measurement is still owed.**
+
+---
+
+## D20 — FR-1001's update verb, and the refusal detail that never reached a reader
+
+**Two requirements were satisfied server-side and unreachable from the product.** Both are now
+delivered, and both needed a fix in a layer below the one the finding named.
+
+**FR-1001's update verb had no surface.** `updateTrack`, `updateRoom` and `updateSpeaker` were
+declared, routed and tested — and `apps/admin/tests/support/services.tsx` marked all three
+`unexpected(...)`, so *calling one failed a test*. The cost was concrete: **a mistyped room name was
+uncorrectable**, because renaming was unreachable and FR-1017 refuses deletion while any session
+references the room. An `InlineEdit` control now serves all three, and
+`tests/component/catalog-rename.test.tsx` drives each path to the repository rather than merely
+finding a button — a control that opens an editor and saves nothing is the same gap one layer up.
+
+**Writing that test immediately found a repeat of the sentinel defect.** `onRename` went through
+`write`, which catches every error and resolves, so `.then(close)` fired on a refusal: the editor
+closed over an edit the server had rejected, with the explanation appearing elsewhere and the
+organizer's typing gone. It now reports acceptance, like `onCreate`. The same defect in three
+places in one feature is the argument for the discriminated result rather than a sentinel.
+
+**FR-1014's *"the refusal MUST name the sessions concerned"* was being discarded twice.**
+`ApiError` kept only `code`, `message`, `status` and `retryAfterSeconds`, so the detail died at the
+**transport** boundary; and `describe` mapped an outcome to a fixed sentence, so even had it
+survived, nothing read it. Meanwhile the route declares both fields in its response schema — after a
+45-line comment about Fastify stripping what a schema does not name — and `patchConference` runs an
+extra ordered query solely to build the list.
+
+`ApiErrorBody` now carries arbitrary detail and `ApiError` keeps it, **opaquely**: the transport
+must not learn the shape of any one feature's refusal, so the client that understands `sessions` is
+the one that renders it. `describe` takes the detail and **appends** to the fixed sentence rather
+than replacing it — a message assembled wholly from server text would have no guarantee it was
+written for a reader rather than a log, which is the property this client exists to keep. The
+engagement counts on a refused deletion come from the **server** rather than the programme on
+screen, because FR-1019a means a save can arrive between the render and the request.
+
+---
+
+## D21 — the deep review's last eleven findings, and the two defects found while closing them
+
+**Post-review Stage D.** D17 fixed the three Criticals, D18 twenty-one Importants and twelve Minors,
+D20 the two compliance gaps. Eleven findings remained; all are now closed. Recorded here are the
+ones that changed a guard, a threshold or a payload — and the two defects that were **found by the
+fixes rather than by the review**.
+
+**`session_notify` was not the only throttle bucket that was wrong.** `PATCH /admin/conferences/:eventId`
+was charged `catalog_write` — the bucket whose own comment says it is for *"writing tracks, rooms and
+speakers"* — while being the only write that moves the conference's date range (FR-1014's refusal
+names every session it would orphan) and the gate on FR-1015's timezone freeze. It now has
+`conference_write`, at 30/180.
+
+**The finding underneath it mattered more: nothing bound a WRITE route to its action.** Three
+throttle guards existed and none could see this. `throttle-thresholds` asserts the table,
+`throttle-actions` asserts which actions may deny, and `throttle-route-audit` binds routes to actions
+for **GET routes only** — it was written for FR-803a, which is about polls. So every write route in
+the feature could charge any action with all three green. `authoring-throttle-binding.test.ts` closes
+it, and the change it exists to stop is not the one that happened: moving `/cancel` from
+`session_cancel` to `session_write` collapses the tightest bound in the feature into the loosest and
+is **a one-word diff that reads as tidying**. Mutation-tested by reinstating the wrong bucket.
+
+**A defect the fix for M16 uncovered, which the review had classified as a test weakness.**
+`service-worker.test.ts` never asserted the notification `tag`, and the value it held was
+`agenda-${eventId}` for every coalesced payload — so **two coalesced acts at one conference replaced
+each other on screen.** The delivery layer was correct throughout and `dispatch-coalescing.test.ts`
+asserts two notifications are sent; the collapse happened in the browser, below where anything was
+looking. FR-1028b names that exact failure as its own justification — *"a time-window rule would
+suppress a cancellation because a room moved earlier"* — and a shared tag is a time-window rule whose
+window never closes.
+
+**The obvious fix was wrong and a guard caught it.** Tagging with `act.actId` groups one act
+correctly and ships an `admin_audit_entries` primary key to every attendee's device — which is M7's
+leak, from the other end, and `no-admin-surface.test.ts` failed on it immediately (FR-999, FR-1003).
+The tag needs only to be *distinct per act*, so it is now an opaque `dispatchId` minted per fan-out,
+used once and stored nowhere. **The single-session tag stays `session-<id>` deliberately**: two acts
+on one session replacing each other is correct, because the later one is the current truth about it.
+
+**Two guards were satisfiable by documentation, and both are the defect 009 already named.**
+`guards-still-in-force.test.ts` — the audit *of the audits* — matched the **raw text** of each guard
+it checks, and every one of those guards explains its own absences at length in a header. So
+`qa-absences.test.ts` with every assertion deleted and its prose intact still contained "answered",
+"pinned", "downvote", "voter" and "bell". It strips comments now, and a gutted-but-documented guard
+fails it. Separately, `authoring-absences`' FR-1034a check ended with a filter that discarded every
+offender outside three path substrings, applied *after* the exemptions — so a `count:` anywhere else
+was thrown away rather than reported. It is an allow-list with reasons now, and **broadening it found
+two files nothing had ever examined** (`auth/throttle.ts`, `db/seed/operators.ts`); both count
+something else, and both say so.
+
+**`error-classification.test.ts` had the right property over the wrong population.** The
+mutual-difference assertion ran on a hand-maintained array, so a fourteenth server code would
+classify as `unknown`, render "Something went wrong", and leave every assertion passing. The
+population is derived from `apps/api/src/errors.ts` now — a new code fails the admin build until
+somebody classifies it or records why an operator never meets it. Writing it surfaced a deliberate
+many-to-one that had never been stated: `session_expired` and `not_authenticated` are one sentence
+by FR-917, so a merge is permitted only when recorded with the requirement that asks for it.
+
+**Three more, briefly.** The admin programme list rendered **raw UTC instants** while the form three
+lines away rendered venue-local wall time with the zone named — and FR-1012 and FR-1014 are both
+evaluated in venue-local time, so an organizer told a session fell outside the conference's dates was
+reading a clock that could not show them why; `venue-time.ts` now holds the conversion for both.
+`CancelDialog` had **no test of any kind**, and its load-bearing rule — "Delete it permanently"
+renders only when engagement is zero — was asserted nowhere; the four engagement kinds are now cased
+separately, because a single fixture setting all four would pass against a dialog that summed only
+`saved`. And `TRACK_TOKENS` was a third hand-written copy of the closed colour set with
+`AdminTrack.colorToken` typed `string`; it is `Record<TrackColorToken, string>` now, derived from the
+generated contract, which fails in **both** directions. Fixing it exposed that the rename path — added
+by D20 — rendered the colour token as **free text**, reachable around the picker FR-1004 exists to
+require.
+
+**Two e2e defects, and the second was a real gap rather than a selector.** D20's inline-edit control
+made `getByText(TRACK)` ambiguous against "Edit Authoring Track". Behind it, the attendee journey
+navigated away **while the join request was still in flight** — `click()` resolves when the event is
+dispatched, not when the request finishes — so the join was cancelled and the failure surfaced eighty
+lines later as "the conference switcher is not visible". Nothing in that journey asserted the join had
+worked; it now waits for the redirect FR-315 produces.
+
+**Gates after this stage:** typecheck, lint, format, **840 unit** (86 files), **670 component** (70
+files), **1129 integration** (138 files, real `postgres:17`), contract, production build, budget
+(97.2 KB of 150 KB), brand audit, and **162 e2e** — all green. `durability.spec.ts` failed once on a
+full run and passed in isolation and on re-run: the assertion reads "Conferences unavailable", which
+is the events read racing the API restart that test performs on purpose. Noted rather than fixed,
+and it is a different shape from D19's residual.

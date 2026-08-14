@@ -204,18 +204,37 @@ export const THROTTLE_ACTIONS = [
   // requires in those words. Two of them matter for reasons the other three do not have, and a
   // shared counter would let either be spent by the others: `conference_create` is the only
   // product-wide act an organizer holds and nothing else bounds how many conferences they may
-  // make (v4.2.0 N3 accepts that as bounded by trust), and `session_cancel` is the only
-  // authoring act that reaches attendees' phones — an unthrottled cancel loop is a push
-  // amplifier pointed at every attendee who saved anything.
+  // make (v4.2.0 N3 accepts that as bounded by trust), and `session_cancel` bounds an act that
+  // reaches attendees' phones — an unthrottled cancel loop is a push amplifier pointed at every
+  // attendee who saved anything.
+  //
+  // **`session_notify` is a sixth, added by the deep review, and it exists because the sentence
+  // above used to say `session_cancel` was the *only* act that reaches a phone.** It is not: a
+  // start-time or room change is material too (v4.2.0 N1), and that path is charged
+  // `session_write` at twelve times the allowance. Materiality is only knowable after the write,
+  // so the **interruption** is bounded on its own rather than the edit being charged the tighter
+  // bound — a title edit must not cost what a cancellation costs. Exhausting it skips the push
+  // and leaves the act and the in-app marker untouched.
+  //
+  // **`conference_write` is a seventh, and it is the second finding of the same shape as
+  // `session_notify`'s.** `PATCH /admin/conferences/:eventId` was charged `catalog_write` — the
+  // bucket named, in its own comment, for "writing tracks, rooms and speakers". It is not one of
+  // those: it moves the conference's date range, which is the only write in the feature that can
+  // refuse by naming forty sessions, and it is the gate on FR-1015's timezone freeze. Sharing a
+  // counter meant a setup burst of rooms and speakers could spend the allowance for editing the
+  // conference itself, and `throttle-route-audit.test.ts` now binds each route to its action so a
+  // future route cannot rejoin the wrong bucket silently.
   //
   // **NO MIGRATION.** `action` is a `text` column carrying a TypeScript union, so adding
   // members changes types and nothing else — the same note 010 records above.
   // ───────────────────────────────────────────────────────────────────────────────────────
   'conference_create',
+  'conference_write',
   'session_write',
   'session_cancel',
   'session_delete',
   'catalog_write',
+  'session_notify',
 ] as const
 
 export type ThrottleAction = (typeof THROTTLE_ACTIONS)[number]

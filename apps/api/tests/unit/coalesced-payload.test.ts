@@ -40,7 +40,7 @@ const act = (change: SessionAct['change']): SessionAct => ({
 
 describe('the notification payload (T072, FR-1029, FR-1034)', () => {
   it('names the session, and carries no count, when ONE changed (FR-1029)', () => {
-    const payload = payloadFor(act('cancelled'), ['session-1'], 'event-1')
+    const payload = payloadFor(act('cancelled'), ['session-1'], 'event-1', 'dispatch-1')
 
     expect(payload.kind).toBe('session-change')
     expect(payload.sessionId).toBe('session-1')
@@ -56,13 +56,15 @@ describe('the notification payload (T072, FR-1029, FR-1034)', () => {
   it('says WHAT changed, in the body, for each of the three material changes', () => {
     // The three v4.2.0's N1 enumerates. An attendee reading a lock screen needs to know whether
     // to go somewhere else or not to go at all, and "a session changed" answers neither.
-    expect(payloadFor(act('cancelled'), ['session-1'], 'event-1').body).toMatch(/cancelled/i)
-    expect(payloadFor(act('time'), ['session-1'], 'event-1').body).toMatch(/time/i)
-    expect(payloadFor(act('room'), ['session-1'], 'event-1').body).toMatch(/room/i)
+    expect(payloadFor(act('cancelled'), ['session-1'], 'event-1', 'dispatch-1').body).toMatch(
+      /cancelled/i,
+    )
+    expect(payloadFor(act('time'), ['session-1'], 'event-1', 'dispatch-1').body).toMatch(/time/i)
+    expect(payloadFor(act('room'), ['session-1'], 'event-1', 'dispatch-1').body).toMatch(/room/i)
   })
 
   it('carries a COUNT and NO session when several changed (FR-1034, FR-1034b)', () => {
-    const payload = payloadFor(act('time'), ['a', 'b', 'c', 'd'], 'event-1')
+    const payload = payloadFor(act('time'), ['a', 'b', 'c', 'd'], 'event-1', 'dispatch-1')
 
     expect(payload.count).toBe(4)
     expect(
@@ -76,16 +78,18 @@ describe('the notification payload (T072, FR-1029, FR-1034)', () => {
   })
 
   it('carries the conference on both shapes, so activation can find the right Agenda', () => {
-    expect(payloadFor(act('room'), ['session-1'], 'event-1').eventId).toBe('event-1')
-    expect(payloadFor(act('room'), ['a', 'b'], 'event-1').eventId).toBe('event-1')
+    expect(payloadFor(act('room'), ['session-1'], 'event-1', 'dispatch-1').eventId).toBe('event-1')
+    expect(payloadFor(act('room'), ['a', 'b'], 'event-1', 'dispatch-1').eventId).toBe('event-1')
   })
 
   it('names no attendee, on either shape (FR-1042)', () => {
     // The payload leaves the product for a surface nobody here controls. Principle VIII's
     // collect-only-what-a-requirement-names applied to a notification: there is no field that
     // could hold an identity, and this is what notices if one appears.
-    const single = JSON.stringify(payloadFor(act('cancelled'), ['session-1'], 'event-1'))
-    const coalesced = JSON.stringify(payloadFor(act('time'), ['a', 'b'], 'event-1'))
+    const single = JSON.stringify(
+      payloadFor(act('cancelled'), ['session-1'], 'event-1', 'dispatch-1'),
+    )
+    const coalesced = JSON.stringify(payloadFor(act('time'), ['a', 'b'], 'event-1', 'dispatch-1'))
 
     for (const body of [single, coalesced]) {
       expect(body).not.toMatch(/attendee/i)

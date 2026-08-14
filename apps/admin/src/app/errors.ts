@@ -26,7 +26,27 @@ import { RequestRefusedError } from '@mynet/data'
  * ═════════════════════════════════════════════════════════════════════════════════════════════
  */
 
-/** The outcomes this client distinguishes. `unknown` is the honest catch-all, not a default. */
+/**
+ * The outcomes this client distinguishes. `unknown` is the honest catch-all, not a default.
+ *
+ * ═════════════════════════════════════════════════════════════════════════════════════════════
+ * **014 ADDED SIX, AND THEY ARRIVED AS TWO.**
+ *
+ * The authoring routes were written with four distinct 409 explanations all carrying `refused`
+ * and two distinct 400 explanations all carrying `validation_failed`. This file classified them
+ * correctly — on the code — and so rendered *"That could not be completed."* for four different
+ * situations and *"Something went wrong."* for two more.
+ *
+ * That is 008's defect arriving from the other direction: 008 classified on the **class** and
+ * collapsed codes that differed; here the classification was right and the **codes** were not
+ * distinct. Both produce the same outcome, which is the one this product refuses to ship: the
+ * server writes an explanation and the reader never sees it.
+ *
+ * The fix was on the server — six `ErrorCode`s, following `question_has_votes` and
+ * `own_question` — and these six are their counterparts. Each says something actionable about
+ * the **caller's own conference**, which is the test every explained refusal here must pass.
+ * ═════════════════════════════════════════════════════════════════════════════════════════════
+ */
 export type AdminFailure =
   | 'not_authenticated'
   | 'invalid_credentials'
@@ -35,6 +55,17 @@ export type AdminFailure =
   | 'report_already_resolved'
   | 'refused'
   | 'too_many_attempts'
+  // 014 — the six authoring refusals (contracts/authoring.md).
+  | 'still_referenced'
+  | 'session_has_engagement'
+  | 'would_orphan_sessions'
+  | 'timezone_frozen'
+  | 'outside_conference_days'
+  | 'ends_before_start'
+  // Added by the deep review: three more refusals that would otherwise render as `unknown`.
+  | 'unknown_timezone'
+  | 'conference_ends_before_start'
+  | 'malformed_time'
   | 'unreachable'
   | 'unknown'
 
@@ -63,6 +94,25 @@ export const classify = (error: unknown): AdminFailure => {
         return 'refused'
       case 'too_many_attempts':
         return 'too_many_attempts'
+      // 014's six. Each is its own code precisely so this switch can tell them apart.
+      case 'still_referenced':
+        return 'still_referenced'
+      case 'session_has_engagement':
+        return 'session_has_engagement'
+      case 'would_orphan_sessions':
+        return 'would_orphan_sessions'
+      case 'timezone_frozen':
+        return 'timezone_frozen'
+      case 'outside_conference_days':
+        return 'outside_conference_days'
+      case 'ends_before_start':
+        return 'ends_before_start'
+      case 'unknown_timezone':
+        return 'unknown_timezone'
+      case 'conference_ends_before_start':
+        return 'conference_ends_before_start'
+      case 'malformed_time':
+        return 'malformed_time'
       default:
         return 'unknown'
     }
@@ -81,7 +131,58 @@ export const classify = (error: unknown): AdminFailure => {
  * pass the test every explained refusal in this product must pass: *the follow-up question is
  * about the reader.* Everything else says as little as the server did.
  */
-export const describe = (failure: AdminFailure): string => {
+/**
+ * The structured detail a refusal carried, if this client knows what to do with it.
+ *
+ * ═════════════════════════════════════════════════════════════════════════════════════════════
+ * **FR-1014 SAYS THE REFUSAL "MUST NAME THE SESSIONS CONCERNED", AND IT WAS NAMING NONE.**
+ *
+ * `classify` reduces a refusal to an enum and `describe` maps it to a fixed sentence, so the two
+ * fields the API works to produce — the engagement counts behind a refused deletion, and the
+ * sessions a date-range change would orphan — were discarded at this boundary even after the
+ * transport stopped dropping them. An organizer was told "Move or cancel them first" about forty
+ * sessions they would then have to find by eye.
+ *
+ * Read here rather than in each screen, so that a caller cannot forget the refusal has more to
+ * say, and so the shape is understood in exactly one place.
+ * ═════════════════════════════════════════════════════════════════════════════════════════════
+ */
+export interface RefusalDetail {
+  /** Named sessions a date-range change would orphan (FR-1014). The caller's own content. */
+  readonly sessions?: readonly { readonly id: string; readonly title: string }[]
+  /** Counts behind a refused deletion (FR-1019, FR-1025). Counts only — nobody is identified. */
+  readonly engagement?: {
+    readonly saved: number
+    readonly notes: number
+    readonly questions: number
+    readonly votes: number
+  }
+}
+
+export const detailOf = (error: unknown): RefusalDetail => {
+  if (!(error instanceof RequestRefusedError) || !('details' in error)) return {}
+
+  const details = (error as { details?: Record<string, unknown> }).details ?? {}
+  const sessions = Array.isArray(details.sessions)
+    ? (details.sessions as RefusalDetail['sessions'])
+    : undefined
+  const engagement =
+    details.engagement && typeof details.engagement === 'object'
+      ? (details.engagement as RefusalDetail['engagement'])
+      : undefined
+
+  return { ...(sessions ? { sessions } : {}), ...(engagement ? { engagement } : {}) }
+}
+
+/**
+ * The sentence to show, given an outcome and whatever detail accompanied it.
+ *
+ * The detail is **appended to** the fixed sentence rather than replacing it: the sentence says what
+ * happened and what to do, and the detail says which things it happened to. A message assembled
+ * wholly from server text would have no guarantee it was written for a reader rather than a log,
+ * which is the property this file exists to keep.
+ */
+export const describe = (failure: AdminFailure, detail: RefusalDetail = {}): string => {
   switch (failure) {
     case 'not_authenticated':
       return 'Your administrative session has ended. Sign in again to continue.'
@@ -97,6 +198,51 @@ export const describe = (failure: AdminFailure): string => {
       return 'That could not be completed.'
     case 'too_many_attempts':
       return 'Too many attempts. Wait a moment and try again.'
+
+    // ─────────────────────────────────────────────────────────────────────────────────────────
+    // 014's six. Each names the caller's own content and what to do about it — the server's
+    // wording is not rendered directly, because a client that echoed server text would have no
+    // way to be sure the text was written for a reader rather than for a log.
+    // ─────────────────────────────────────────────────────────────────────────────────────────
+    case 'still_referenced':
+      return 'A session still uses this. Move those sessions to another track or room first, then remove it.'
+    case 'session_has_engagement': {
+      // FR-1025 — counts only, nobody identified. The server's counts rather than the programme's,
+      // which may be stale: FR-1019a means a save can arrive between the render and the request.
+      const counts = detail.engagement
+      const detailed = counts
+        ? ` (${counts.saved} saved, ${counts.notes} notes, ${counts.questions} questions, ${counts.votes} votes)`
+        : ''
+
+      return `Attendees have already saved, noted, questioned or voted on this session${detailed}, so it cannot be deleted. Cancel it instead — everything they wrote stays where it is.`
+    }
+    case 'would_orphan_sessions': {
+      const named = detail.sessions ?? []
+      // FR-1014 — named, because an organizer told only "no" has to guess which of forty sessions
+      // is in the way. Bounded at five so a badly-chosen range does not produce a wall of text;
+      // the remainder is counted rather than hidden.
+      const shown = named
+        .slice(0, 5)
+        .map((one) => one.title)
+        .join(', ')
+      const rest = named.length > 5 ? ` and ${named.length - 5} more` : ''
+
+      return named.length === 0
+        ? 'Those dates would leave sessions outside the conference. Move or cancel them first.'
+        : `Those dates would leave these outside the conference: ${shown}${rest}. Move or cancel them first.`
+    }
+    case 'timezone_frozen':
+      return 'The timezone can only be changed while the conference has no sessions. Session times are stored as absolute instants, so changing it now would move what everybody sees.'
+    case 'outside_conference_days':
+      return 'That time falls outside the conference’s dates, in the venue’s own timezone.'
+    case 'ends_before_start':
+      return 'The end must be after the start.'
+    case 'unknown_timezone':
+      return 'That is not a timezone this server recognises. Use an IANA name such as “America/Costa_Rica”.'
+    case 'conference_ends_before_start':
+      return 'The last day cannot be before the first. A one-day conference has the same date for both.'
+    case 'malformed_time':
+      return 'That is not a time this server can read. Check the date and time you entered.'
     case 'unreachable':
       return 'MyNet could not be reached. Nothing was changed — try again when you have a connection.'
     case 'unknown':

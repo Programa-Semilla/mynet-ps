@@ -3,6 +3,7 @@ import type { FastifyReply, FastifyRequest } from 'fastify'
 
 import type { ConferenceAuthorityScope } from '../admin/require-conference-authority.js'
 import type { OperatorScope, PlatformScope } from '../admin/scope.js'
+import type { BackgroundWork } from '../notifications/background.js'
 import type { MailService } from '../mail/service.js'
 import type { PushService } from '../notifications/service.js'
 import type { CardScope } from '../plugins/card-access.js'
@@ -209,5 +210,19 @@ declare module 'fastify' {
      * — the same property `mail` above relies on.
      */
     push: PushService
+    /**
+     * 014 — work that outlives the response, and the drain that makes it safe.
+     *
+     * A saved-session change fans out to **every attendee who saved the session**, which at a
+     * keynote is hundreds. Awaited in the organizer's request that is `recipients × push RTT`
+     * against a 10s `connectionTimeout`, so the organizer saw a network failure for a
+     * cancellation that had succeeded. The act commits, the organizer is answered, the fan-out
+     * continues here.
+     *
+     * **Not a job queue**: no persistence, no retry, no timer. A task exists because a request
+     * arrived, which is what keeps `no-session-start-trigger.test.ts` true. See
+     * `notifications/background.ts`.
+     */
+    background: BackgroundWork
   }
 }

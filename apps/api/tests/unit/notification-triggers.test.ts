@@ -89,7 +89,7 @@ const PLATFORM = (name: string): boolean => name.startsWith('notifications/')
  * caller was the message-send path, whose subject matter is messages and nothing else.
  *
  * It is the wrong population for a **catalog** module. `routes/admin/catalog.ts` legitimately
- * names questions — `engagementCountsFor` returns how many questions a session has, which is
+ * names questions — the engagement counts report how many questions a session has, which is
  * what an organizer needs to choose between deleting and cancelling (FR-1025). A whole-module
  * scan would fail on a correct implementation, and the natural repair is to drop `question` from
  * the pattern — which would stop the assertion checking anything at all, in exactly the way this
@@ -107,7 +107,28 @@ const PLATFORM = (name: string): boolean => name.startsWith('notifications/')
  * vacuously. `admin-audit-completeness.test.ts` counts parentheses for the same reason.
  * ═════════════════════════════════════════════════════════════════════════════════════════
  */
-const DISPATCH_HELPER = /const\s+(notify\w*)\s*=/g
+/*
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ * **`fanOut` JOINED `notify…`, AND THE POPULATION GREW RATHER THAN NARROWED.**
+ *
+ * 014's fan-out originally lived wholly inside `notifySavers`, so matching `notify\w*` caught all
+ * of it. It no longer does: a saved-session change reaches every attendee who saved the session,
+ * which awaited in the organizer's request is `recipients × push RTT` against a 10s
+ * `connectionTimeout` — so the dispatch now runs **after** the response, and the body that touches
+ * `dispatchToDevices` moved into `fanOut`.
+ *
+ * Adding the name here is what keeps this guard honest, and the direction matters: the region got
+ * **bigger**, so every forbidden-trigger pattern below is now scanned over more code than before,
+ * not less. Had the name not been added, the positive assertion at the foot of this file would
+ * have failed — which is exactly what happened, and is why this comment exists rather than a
+ * silently widened regex.
+ *
+ * The rule stays what D4 made it: the population is *the body of every helper that dispatches*,
+ * never the whole module. A whole-module scan fails on a correct implementation here, because
+ * `routes/admin/catalog.ts` legitimately names questions (an engagement count, FR-1025).
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ */
+const DISPATCH_HELPER = /const\s+(notify\w*|fanOut)\s*=/g
 
 const dispatchRegionOf = (code: string): string => {
   const regions: string[] = []

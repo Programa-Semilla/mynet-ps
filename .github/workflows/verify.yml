@@ -159,7 +159,20 @@ jobs:
     name: test-unit
     runs-on: ubuntu-latest
     steps:
+      # `fetch-depth: 0` because two guards in this gate compare against the BRANCH POINT.
+      #
+      # `no-admin-surface.test.ts` re-asserts FR-1003 over the files this feature actually
+      # touched, and `marker-not-cached.test.ts` proves no eighth device capability was added by
+      # showing `substitution.test.ts` is unchanged since the branch point. Both resolve that
+      # point with `git merge-base` (see `tests/support/branch-point.ts`).
+      #
+      # The default depth-1 checkout has no `develop` ref and no history, so `merge-base` exits
+      # non-zero and both guards error. They are the only tests in this repository that consult
+      # git, so nothing else here needed history and the omission was invisible: the branch they
+      # were written on had a local `develop`, and CI had never run them.
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v5
         with:
@@ -485,9 +498,17 @@ jobs:
       # admin client makes. Nothing fails server-side; the specs simply wait for a response that
       # never comes, which is what they did on this branch's first CI run.
       #
-      # It passed locally only because `pnpm start` writes `ADMIN_ORIGIN` into `.env.local` —
-      # a **gitignored** file that CI does not have. That gap is the whole lesson: a value the
-      # local runner supplies is not a value the pipeline has.
+      # This was recorded as "it passed locally only because `pnpm start` writes `ADMIN_ORIGIN`
+      # into `.env.local`". **014 found that to be untrue** — `.env.local` carries `WEB_ORIGIN`
+      # and never carried this one — so the local runner could not reproduce a green CI run for
+      # as long as the administrative specs have existed, and a full local `pnpm verify` failed
+      # twelve of them. `scripts/verify-clean.mjs` now allocates an admin port and sets both
+      # `MYNET_ADMIN_PORT` and `ADMIN_ORIGIN`, which makes the sentence true of the runner that
+      # is actually meant to mirror this job.
+      #
+      # The lesson survives its own correction, and is now the sharper one: a value the pipeline
+      # supplies by hand is a value the local runner must supply too, or the two verify different
+      # things and the difference is invisible until somebody runs both.
       #
       # Deployed environments set nothing here, because Caddy serves `admin.<host>` and proxies
       # `/api/*` beneath it, so administrative requests are same-origin. Local and CI are the
@@ -580,9 +601,17 @@ jobs:
       # admin client makes. Nothing fails server-side; the specs simply wait for a response that
       # never comes, which is what they did on this branch's first CI run.
       #
-      # It passed locally only because `pnpm start` writes `ADMIN_ORIGIN` into `.env.local` —
-      # a **gitignored** file that CI does not have. That gap is the whole lesson: a value the
-      # local runner supplies is not a value the pipeline has.
+      # This was recorded as "it passed locally only because `pnpm start` writes `ADMIN_ORIGIN`
+      # into `.env.local`". **014 found that to be untrue** — `.env.local` carries `WEB_ORIGIN`
+      # and never carried this one — so the local runner could not reproduce a green CI run for
+      # as long as the administrative specs have existed, and a full local `pnpm verify` failed
+      # twelve of them. `scripts/verify-clean.mjs` now allocates an admin port and sets both
+      # `MYNET_ADMIN_PORT` and `ADMIN_ORIGIN`, which makes the sentence true of the runner that
+      # is actually meant to mirror this job.
+      #
+      # The lesson survives its own correction, and is now the sharper one: a value the pipeline
+      # supplies by hand is a value the local runner must supply too, or the two verify different
+      # things and the difference is invisible until somebody runs both.
       #
       # Deployed environments set nothing here, because Caddy serves `admin.<host>` and proxies
       # `/api/*` beneath it, so administrative requests are same-origin. Local and CI are the

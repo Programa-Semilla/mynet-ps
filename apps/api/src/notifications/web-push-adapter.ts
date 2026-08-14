@@ -1,6 +1,7 @@
 import type { FastifyBaseLogger } from 'fastify'
 import webPush, { WebPushError } from 'web-push'
 
+import { loadConfig } from '../config.js'
 import type { PushPayload, PushResult, PushService, StoredSubscription } from './service.js'
 
 /**
@@ -171,6 +172,22 @@ export class WebPushService implements PushService {
             privateKey: this.#privateKey,
           },
           TTL: TTL_SECONDS,
+          // ─────────────────────────────────────────────────────────────────────────────────
+          // **THE SOCKET TIMEOUT, AND WITHOUT IT `dispatchPush`'s BOUND ABANDONS RATHER THAN
+          // CANCELS.**
+          //
+          // `dispatch.ts` races every attempt against `push.dispatchTimeoutMs` — which is what
+          // stops a hanging push service holding a request open — but losing that race only
+          // discards the *promise*. `web-push` passes this option through as the request's socket
+          // timeout, and with it unset the underlying connection has none at all: every timed-out
+          // delivery left a live socket to a third-party host, and 014's fan-out reaches every
+          // attendee who saved a session, so one unreachable push service could accumulate
+          // hundreds of them.
+          //
+          // Read from the same config value as the race, deliberately: two bounds that could
+          // disagree would be a second source of truth for one number.
+          // ─────────────────────────────────────────────────────────────────────────────────
+          timeout: loadConfig().push.dispatchTimeoutMs,
         },
       )
 

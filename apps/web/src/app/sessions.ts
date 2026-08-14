@@ -82,11 +82,11 @@ export const venueDayLabelOf = (iso: string, timezone: string): string =>
  * resolve to the same one on every read and on every device rather than to whichever the
  * iteration happened to reach first.
  */
-export const nextSession = (
-  sessions: readonly Session[],
+export const nextSession = <T extends Session>(
+  sessions: readonly T[],
   now: Date,
   timezone: string,
-): Session | null => {
+): T | null => {
   const today = venueDateOf(now, timezone)
 
   const upcoming = sessions.filter(
@@ -125,6 +125,15 @@ export const nextSession = (
   )
 }
 
+/*
+ * Generic over the session type, so a caller that has attached per-attendee state to its rows gets
+ * that state back rather than a widened `Session`. Home's saved-session card needs it for exactly
+ * one field — FR-1030's change marker — and the alternative was looking the flag back up by id
+ * after this returned, which is a second source of truth for a fact the row already carries.
+ *
+ * Behaviour is unchanged: the filter and the ordering never read anything outside `Session`.
+ */
+
 /**
  * What is left of the venue's today, after the session already named as "up next".
  *
@@ -145,12 +154,12 @@ export const nextSession = (
  * six lines apart and the difference between them is one condition.
  * ─────────────────────────────────────────────────────────────────────────────────────────
  */
-export const restOfVenueDay = (
-  sessions: readonly Session[],
+export const restOfVenueDay = <T extends Session>(
+  sessions: readonly T[],
   now: Date,
   timezone: string,
   excludeId?: string,
-): Session[] => {
+): T[] => {
   const today = venueDateOf(now, timezone)
 
   return sessions

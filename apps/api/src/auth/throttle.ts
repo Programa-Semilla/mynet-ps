@@ -635,6 +635,36 @@ export const THRESHOLDS: Record<ThrottleAction, ActionThreshold> = {
   },
 
   /**
+   * T-review (014) — **editing the conference itself** (FR-1039).
+   *
+   * ═════════════════════════════════════════════════════════════════════════════════════════
+   * **THIS RODE `catalog_write`, WHOSE OWN COMMENT SAYS IT IS FOR "TRACKS, ROOMS AND SPEAKERS".**
+   *
+   * `PATCH /admin/conferences/:eventId` is not one of those acts. It moves the conference's date
+   * range — the only write in this feature whose refusal has to *name* forty sessions (FR-1014) —
+   * and it is the gate on FR-1015's timezone freeze. Charging it to the catalog bucket meant an
+   * organizer creating every room and speaker in one sitting could spend the allowance for
+   * editing the conference itself, and the reverse: neither is what either bound was chosen for.
+   *
+   * FR-1039 asks for the authoring actions to be named individually rather than covered by one
+   * bucket, and this was the entry that had been folded in by accident of it being a PATCH in the
+   * same file.
+   * ═════════════════════════════════════════════════════════════════════════════════════════
+   *
+   * **Tighter than `catalog_write`, looser than `conference_create`.** Editing a conference is a
+   * deliberate act somebody does a handful of times while setting up and rarely afterwards; it is
+   * not the dozens-in-one-sitting shape that makes the catalog bucket generous. Thirty an hour is
+   * far beyond any real sequence and far below what a loop probing the orphan refusal would want —
+   * and that refusal runs an ordered query over every session in the conference to build its list,
+   * so an unbounded caller is an unbounded scan.
+   */
+  conference_write: {
+    identifier: { freeAttempts: 30, ceilingMs: IDENTIFIER_MAX_DELAY_MS },
+    source: { freeAttempts: 180, ceilingMs: SOURCE_MAX_DELAY_MS },
+    mayDeny: true,
+  },
+
+  /**
    * T022 (014) — editing sessions (FR-1039).
    *
    * The ordinary authoring action, and the loosest of this feature's five: building a programme
@@ -653,7 +683,13 @@ export const THRESHOLDS: Record<ThrottleAction, ActionThreshold> = {
   },
 
   /**
-   * T022 (014) — **cancelling a session: the only authoring act that reaches attendees' phones**
+   * T022 (014) — **cancelling a session: the authoring act most likely to reach attendees' phones**
+   *
+   * **A session EDIT reaches them too** -- a start-time or room change is material, and that
+   * path is charged `session_write` at 120 an hour. The interruption itself is bounded by
+   * `session_notify` below, which is where that correction lives.
+   * (Original claim, now false: this was "the only authoring act that reaches phones".)
+   *
    * (FR-1039, FR-1026, research R10).
    *
    * ═════════════════════════════════════════════════════════════════════════════════════════
@@ -679,6 +715,63 @@ export const THRESHOLDS: Record<ThrottleAction, ActionThreshold> = {
   session_cancel: {
     identifier: { freeAttempts: 10, ceilingMs: IDENTIFIER_MAX_DELAY_MS },
     source: { freeAttempts: 60, ceilingMs: SOURCE_MAX_DELAY_MS },
+    mayDeny: true,
+  },
+
+  /**
+   * T-review (014) — **the INTERRUPTION, bounded separately from the act that causes it.**
+   *
+   * =========================================================================================
+   * **`session_cancel`'s COMMENT CLAIMED CANCELLATION WAS "THE ONLY AUTHORING ACT THAT REACHES
+   * ATTENDEES' PHONES". IT IS NOT, AND THE OTHER ONE HAD TWELVE TIMES THE ALLOWANCE.**
+   *
+   * A start-time change and a room change are both material (v4.2.0 N1), so
+   * `PATCH .../sessions/:id` fans out exactly as cancellation does -- and it is charged
+   * `session_write`, at **120 an hour**. An organizer toggling a room back and forth could put
+   * 120 notifications on every saver's lock screen in an hour, each titled with the session's own
+   * name, and coalescing does not help: FR-1034 bounds one *act* to one notification per attendee,
+   * and there were 120 acts available.
+   *
+   * **Why this is a separate bucket rather than charging `session_cancel` on the PATCH route.**
+   * Whether an edit is material is only knowable by comparing the row before and after, which
+   * happens inside the write. Charging the tighter bound up front would throttle **content**
+   * edits -- a title, a summary, a speaker -- at ten an hour, and setting up a programme is dozens
+   * of those. So the edit stays cheap and the *interruption* is what is bounded.
+   *
+   * **Keyed on the principal AND the session**, not the principal alone — see `throttleKeyFor`.
+   * The amplification being bounded is one session toggled repeatedly; an organizer legitimately
+   * editing forty different sessions must not be throttled for it, and the first version of this
+   * was, which the integration suite demonstrated by exhausting the bucket across one run.
+   *
+   * The `source` counter stays per IP and is deliberately looser, since it aggregates every
+   * session a host touches.
+   *
+   * **Exhausting it skips the dispatch; it never fails the act.** The act is committed by the time
+   * this is consulted, and rolling it back would be absurd -- so an organizer past the bound gets
+   * their edit and the attendees get the **in-app marker** rather than a push. That is exactly the
+   * degradation FR-1032 already describes for somebody who denied permission: every surface still
+   * behaves, the interruption is what is missing.
+   * =========================================================================================
+   */
+  session_notify: {
+    identifier: { freeAttempts: 10, ceilingMs: IDENTIFIER_MAX_DELAY_MS },
+    /**
+     * **As generous as `session_write`'s, and the asymmetry with the identifier bound is the
+     * design rather than an oversight.**
+     *
+     * The identifier bound above is keyed on **(principal, session)**, so it already bounds the
+     * abuse precisely: ten interruptions an hour about one session. This dimension is keyed on the
+     * source IP alone and therefore aggregates **every principal and every session behind it** — a
+     * conference team in one venue office is one address, and so is a whole suite of integration
+     * tests. At 60 it starved: roughly sixty material changes into a run, every later dispatch was
+     * silently skipped, and the symptom was a rotating set of dispatch files failing in a full run
+     * while each passed in isolation. It took several runs to attribute.
+     *
+     * That is worth recording as a production fact and not only a test one: a bound that punishes
+     * a shared address for volume it did not individually cause is the shape that produces
+     * "notifications randomly stopped working" reports nobody can reproduce.
+     */
+    source: { freeAttempts: 600, ceilingMs: SOURCE_MAX_DELAY_MS },
     mayDeny: true,
   },
 

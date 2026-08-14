@@ -1,6 +1,6 @@
 import { useId, useState } from 'react'
 
-import { classify, describe } from '../errors.js'
+import { classify, describe, detailOf } from '../errors.js'
 import { useAdminSession } from '../session.js'
 import { AdminDialog } from '../shell/AdminDialog.js'
 
@@ -75,6 +75,39 @@ export const CreateConferenceDialog = ({
     endsOn < startsOn ||
     timezone.trim().length === 0
 
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════════════════════
+   * **ONE DISMISSAL, BECAUSE THREE CLOSE PATHS RESET THREE DIFFERENT THINGS.**
+   *
+   * `AdminDialog` renders its children whether or not it is open and **never unmounts**, so every
+   * piece of state here survives a close and is still there on the next open. There were three
+   * ways out and each cleared a different subset:
+   *
+   *   - the dialog's own `onClose` cleared `joinCode` and `failure`,
+   *   - the "Done" button cleared `joinCode` alone, so a refusal that had since been recovered
+   *     from still announced itself through `role="alert"` the next time the dialog opened,
+   *   - "Cancel" cleared nothing at all.
+   *
+   * And **none of the three cleared the fields**, so after creating "Spring Summit" the dialog
+   * reopened pre-filled with it — one more press away from a duplicate conference, on the one act
+   * in this feature that mints a join code and an organizer assignment.
+   *
+   * A component that unmounted would need none of this. This one cannot, because `AdminDialog`
+   * owns the `<dialog>` element whose `showModal()` is what gives the whole product its focus
+   * trap — so the reset is explicit and there is exactly one of it.
+   * ═══════════════════════════════════════════════════════════════════════════════════════════
+   */
+  const dismiss = () => {
+    setName('')
+    setLocation('')
+    setStartsOn('')
+    setEndsOn('')
+    setTimezone('UTC')
+    setFailure(null)
+    setJoinCode(null)
+    onClose()
+  }
+
   const create = async () => {
     setBusy(true)
     setFailure(null)
@@ -89,7 +122,7 @@ export const CreateConferenceDialog = ({
       setJoinCode(created.joinCode)
       onCreated()
     } catch (error) {
-      setFailure(describe(classify(error)))
+      setFailure(describe(classify(error), detailOf(error)))
     } finally {
       setBusy(false)
     }
@@ -99,11 +132,7 @@ export const CreateConferenceDialog = ({
     <AdminDialog
       open={open}
       title={joinCode ? 'Conference created' : 'Create a conference'}
-      onClose={() => {
-        setJoinCode(null)
-        setFailure(null)
-        onClose()
-      }}
+      onClose={dismiss}
     >
       {joinCode ? (
         <>
@@ -116,10 +145,7 @@ export const CreateConferenceDialog = ({
           </p>
           <button
             type="button"
-            onClick={() => {
-              setJoinCode(null)
-              onClose()
-            }}
+            onClick={dismiss}
             className="mt-5 min-h-11 rounded-lg bg-coral-600 px-3 text-sm font-medium text-text-inverse hover:bg-coral-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-coral-500"
           >
             Done
@@ -225,7 +251,7 @@ export const CreateConferenceDialog = ({
             </button>
             <button
               type="button"
-              onClick={onClose}
+              onClick={dismiss}
               className="min-h-11 rounded-lg px-3 text-sm font-medium text-text-body hover:bg-cream-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-coral-500"
             >
               Cancel

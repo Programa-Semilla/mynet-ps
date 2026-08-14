@@ -1,5 +1,5 @@
 {
-  "id": "87a38bcf-6234-4233-adc6-d2ff23c6e7c8",
+  "id": "3ae9b462-daac-4e8b-82a3-0613904b487a",
   "prevId": "3a0f28be-40bb-47db-b2be-bad076460964",
   "version": "7",
   "dialect": "postgresql",
@@ -109,6 +109,12 @@
         "subject_kind": {
           "name": "subject_kind",
           "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "subject_event_id": {
+          "name": "subject_event_id",
+          "type": "uuid",
           "primaryKey": false,
           "notNull": false
         },
@@ -328,7 +334,23 @@
           "default": "now()"
         }
       },
-      "indexes": {},
+      "indexes": {
+        "session_notes_session_id_idx": {
+          "name": "session_notes_session_id_idx",
+          "columns": [
+            {
+              "expression": "session_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {
         "session_notes_attendee_id_attendees_id_fk": {
           "name": "session_notes_attendee_id_attendees_id_fk",
@@ -1349,8 +1371,8 @@
           "method": "btree",
           "with": {}
         },
-        "sessions_event_cancelled_idx": {
-          "name": "sessions_event_cancelled_idx",
+        "sessions_event_room_starts_at_idx": {
+          "name": "sessions_event_room_starts_at_idx",
           "columns": [
             {
               "expression": "event_id",
@@ -1359,7 +1381,13 @@
               "nulls": "last"
             },
             {
-              "expression": "cancelled_at",
+              "expression": "room_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "starts_at",
               "isExpression": false,
               "asc": true,
               "nulls": "last"

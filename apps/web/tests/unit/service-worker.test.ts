@@ -114,8 +114,47 @@ describe('the service worker keeps what the generated one did (FR-051)', () => {
    * ═══════════════════════════════════════════════════════════════════════════════════════════
    */
   it('opens the SESSION for one change and AGENDA for several (FR-1029, FR-1034b)', () => {
-    expect(code).toContain('/agenda/${data.sessionId}')
-    expect(code).toContain("'/agenda'")
+    // ═════════════════════════════════════════════════════════════════════════════════════════
+    // **THE TERNARY IS EVALUATED, NOT MATCHED AS A SUBSTRING.**
+    //
+    // This used to assert that the source *contained* `'/agenda/${data.sessionId}'` and `'/agenda'`.
+    // Two problems, both found by the deep review: a worker that always took the first branch
+    // would pass as long as both strings appeared somewhere, and the assertion broke the moment
+    // the expression gained the conference parameter it needs — which is a test that fails on a
+    // correct change and passes on a wrong one, the wrong way round on both counts.
+    //
+    // Extracted and run instead, so the assertion is about the address that would actually open.
+    // ═════════════════════════════════════════════════════════════════════════════════════════
+    // Both declarations, because the target expression is built from `conference`. Extracting only
+    // the second one and evaluating it is how this assertion first failed — the guard has to take
+    // the whole computation or it is testing a fragment.
+    const computation = /(const conference = [\s\S]*?const target =[\s\S]*?)\n\n/.exec(code)?.[1]
+
+    expect(
+      computation,
+      'the notification target computation could not be extracted, so this assertion checks nothing',
+    ).toBeTruthy()
+
+    const targetFor = (data: Record<string, string> | undefined): string =>
+      new Function('data', `${computation as string}\nreturn target`)(data) as string
+
+    const single = targetFor({ kind: 'session-change', sessionId: 'S1', eventId: 'E1' })
+    const coalesced = targetFor({ kind: 'session-change', eventId: 'E1' })
+    const message = targetFor({ conversationId: 'C1' })
+
+    // FR-1029 — one changed session opens that session.
+    expect(single).toContain('/agenda/S1')
+    // FR-1034b — several open Agenda, never a list.
+    expect(coalesced.startsWith('/agenda?')).toBe(true)
+    expect(coalesced).not.toContain('/agenda/')
+    // 007's path is untouched by any of this.
+    expect(message).toBe('/messages/C1')
+
+    // The conference travels on both saved-session shapes. Without it the address resolves
+    // against whichever conference happens to be active, which for an attendee registered for two
+    // is the panel refusing to find the session at all.
+    expect(single).toContain('event=E1')
+    expect(coalesced).toContain('event=E1')
 
     // And no address that could be a list of changes. A route named for them would be the
     // notification centre arriving through the service worker.
@@ -126,6 +165,105 @@ describe('the service worker keeps what the generated one did (FR-051)', () => {
           'on Agenda, where the changed rows carry their own markers — never on a list of ' +
           'changes, which is the surface FR-1031 forbids (FR-1034b).',
       ).not.toContain(forbidden)
+    }
+  })
+
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════════════════════
+   * **T-review (014) — THE REPLACEMENT TAG, WHICH NOTHING ASSERTED AND WHICH WAS UNDOING
+   * FR-1028b.**
+   *
+   * `tag` decides whether a new notification **replaces** one already on screen. Nothing in this
+   * file looked at it, and the value it held was `agenda-${eventId}` for every coalesced payload
+   * — so two organizer acts at one conference produced two deliveries and **one notification**.
+   *
+   * The delivery layer was never wrong. `dispatch-coalescing.test.ts` drives two separate acts
+   * and asserts two notifications are sent, and it passes. The collapse happened in the browser,
+   * one layer below where any test was looking, which is why a correct integration suite and a
+   * correct route could sit above a requirement that was not being met.
+   *
+   * FR-1028b names this exact failure as its own justification: *"a time-window rule would
+   * suppress a cancellation because a room moved earlier, which is the failure this whole trigger
+   * exists to prevent."* A shared tag is a time-window rule whose window never closes.
+   *
+   * Evaluated rather than matched, for the reason the assertion above records: a substring check
+   * would pass against a worker that always took one branch.
+   * ═══════════════════════════════════════════════════════════════════════════════════════════
+   */
+  it('never lets two separate acts replace each other on screen (FR-1028b)', () => {
+    const expression = /\n\s*tag:\n([\s\S]*?),\n\s*data:/.exec(code)?.[1]
+
+    expect(
+      expression,
+      'the notification tag expression could not be extracted, so this assertion checks nothing',
+    ).toBeTruthy()
+
+    const tagFor = (fields: {
+      kind?: string
+      sessionId?: string
+      eventId?: string
+      dispatchId?: string
+      conversationId?: string
+    }): string =>
+      new Function(
+        'kind',
+        'sessionId',
+        'eventId',
+        'dispatchId',
+        'conversationId',
+        `return (${expression as string})`,
+      )(
+        fields.kind,
+        fields.sessionId,
+        fields.eventId,
+        fields.dispatchId,
+        fields.conversationId,
+      ) as string
+
+    const coalesced = (dispatchId: string): string =>
+      tagFor({ kind: 'session-change', eventId: 'E1', dispatchId })
+
+    // ── FR-1028b: two acts, two notifications, at the layer that decides whether one survives.
+    expect(
+      coalesced('act-1'),
+      'Two coalesced organizer acts share a notification tag, so the second REPLACES the first ' +
+        'and the attendee sees one notification for two acts. The acts describe different ' +
+        'sessions — act one may have cancelled two of them — so this is the suppression ' +
+        'FR-1028b names as the failure the whole trigger exists to prevent.',
+    ).not.toBe(coalesced('act-2'))
+
+    // ── FR-1034: within ONE act, the tag still replaces. This is the half that must not regress
+    //    while fixing the half above — an act retried or redelivered must not stack.
+    expect(coalesced('act-1')).toBe(coalesced('act-1'))
+
+    // ── The single-session tag replaces deliberately, and that is correct: two acts on ONE
+    //    session mean the later is the current truth about it, so a cancellation supersedes an
+    //    earlier room move rather than queueing behind it.
+    const single = (dispatchId: string): string =>
+      tagFor({ kind: 'session-change', sessionId: 'S1', eventId: 'E1', dispatchId })
+
+    expect(single('act-1')).toBe(single('act-2'))
+
+    // ── A change to a DIFFERENT session must never replace one about another session.
+    expect(single('act-1')).not.toBe(
+      tagFor({ kind: 'session-change', sessionId: 'S2', eventId: 'E1', dispatchId: 'act-1' }),
+    )
+
+    // ── A saved-session notification and a message must never collide, whatever the identifiers.
+    expect(single('act-1')).not.toBe(tagFor({ conversationId: 'S1' }))
+
+    // ── 007's rule, untouched: one notification per conversation, replaced rather than stacked.
+    expect(tagFor({ conversationId: 'C1' })).toBe(tagFor({ conversationId: 'C1' }))
+    expect(tagFor({ conversationId: 'C1' })).not.toBe(tagFor({ conversationId: 'C2' }))
+
+    // ── A tag is always produced. An undefined tag means "never replace anything", which would
+    //    stack five messages from one person — 007's stated reason for having a tag at all.
+    for (const shape of [
+      { kind: 'session-change' },
+      { kind: 'session-change', eventId: 'E1' },
+      {},
+    ]) {
+      expect(typeof tagFor(shape), 'a payload shape produced no tag at all').toBe('string')
     }
   })
 

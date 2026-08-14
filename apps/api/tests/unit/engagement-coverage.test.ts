@@ -1,4 +1,4 @@
-import { readdirSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath, URL } from 'node:url'
 
@@ -186,6 +186,60 @@ describe('engagement coverage (T017, FR-1018a)', () => {
     for (const [name, reason] of Object.entries(NOT_ENGAGEMENT)) {
       expect(names.has(name), `${name} is excluded from engagement but no longer exists`).toBe(true)
       expect(reason.length, `${name} is excluded without a written reason`).toBeGreaterThan(80)
+    }
+  })
+
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════════════════════
+   * **THE COUNTS MUST COVER THE SAME TABLES AS THE BOOLEAN, AND THIS GUARD USED TO CHECK ONLY
+   * THE BOOLEAN.**
+   *
+   * Added by the deep review. `hasEngagement` in `session-changes.ts` is one expression of the
+   * table set; `admin-catalog.ts` had **two more** — a count keyed to a literal id for the delete
+   * refusal, and a correlated one for the programme read — and neither was covered here. So a
+   * later feature adding an attendee-state table would get a correctly-refusing delete and two
+   * count queries that silently under-report.
+   *
+   * That is not cosmetic. `CancelDialog` decides whether to offer "Delete it permanently" from
+   * these counts: a count reading zero for a session the server refuses to delete is a control
+   * that exists only to produce a 409, which is the precise outcome FR-1019's *"the refusal MUST
+   * explain why and MUST offer cancellation"* was written to avoid.
+   *
+   * The counts are now composed from **one** `engagementCountsFor` fragment in `admin-catalog.ts`,
+   * so this reads that source and requires every table in `ENGAGEMENT_TABLES` to appear in it.
+   * Reading the file rather than importing the fragment is deliberate: the fragment is a private
+   * SQL builder, and exporting it to be asserted would widen the surface to satisfy a test.
+   * ═══════════════════════════════════════════════════════════════════════════════════════════
+   */
+  it('counts the same tables the predicate does (FR-1018a)', () => {
+    const source = readFileSync(
+      fileURLToPath(new URL('../../src/db/queries/admin-catalog.ts', import.meta.url)),
+      'utf8',
+    )
+
+    const fragment = /const engagementCountsFor = \(session: SQL\) => sql`([\s\S]*?)`/.exec(source)
+
+    expect(
+      fragment?.[1],
+      'the engagement count fragment could not be located in `admin-catalog.ts`. If it was ' +
+        'renamed or inlined, this guard stopped checking anything — which is the failure mode ' +
+        'FR-1018a exists to prevent, arriving in the guard rather than in the predicate.',
+    ).toBeTruthy()
+
+    const counted = fragment?.[1] ?? ''
+
+    for (const table of ENGAGEMENT_TABLES) {
+      expect(
+        // The fragment references Drizzle table objects, whose variable names are camelCase
+        // versions of the table names. Both spellings are accepted so this does not depend on
+        // which one the query happens to use.
+        new RegExp(`${table}|${table.replace(/_(.)/g, (_, c: string) => c.toUpperCase())}`).test(
+          counted,
+        ),
+        `${table} is in the engagement predicate but not in the engagement COUNTS. The delete ` +
+          'refusal and the programme read would both under-report it, so an organizer would be ' +
+          'offered a delete the server refuses (FR-1019).',
+      ).toBe(true)
     }
   })
 

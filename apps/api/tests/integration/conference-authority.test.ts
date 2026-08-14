@@ -42,13 +42,13 @@ describe('authority over a conference (T012, FR-1035, FR-1036)', () => {
   afterAll(async () => {
     // Nothing cascades to `events`, so a fixture conference left behind blocks the NEXT file's
     // `seed()` — and the symptom lands there rather than here. See `clearAuthoringFixture`.
-    await clearAuthoringFixture()
+    await clearAuthoringFixture(app)
     await teardown(app)
   })
 
   beforeEach(async () => {
     await clearThrottle()
-    fixture = await buildAuthoringFixture(ADA)
+    fixture = await buildAuthoringFixture(ADA, app)
   })
 
   const asOrganizer = (): Promise<string> => organizerSession(app, ADA, SEED_PASSWORD)

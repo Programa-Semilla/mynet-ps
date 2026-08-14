@@ -1,11 +1,11 @@
-import { and, asc, eq, inArray, ne, sql } from 'drizzle-orm'
+import { and, asc, eq, inArray, ne, sql, type SQL } from 'drizzle-orm'
 
 import {
   assertVerifiedConferenceAuthority,
   auditPrincipalOf,
   type ConferenceAuthorityScope,
 } from '../../admin/require-conference-authority.js'
-import type { OperatorScope } from '../../admin/scope.js'
+import { assertVerifiedOperator, type OperatorScope } from '../../admin/scope.js'
 import { getDb } from '../client.js'
 import { savedSessions, sessionNotes } from '../schema/agenda.js'
 import { rooms, sessions, sessionSpeakers, speakers, tracks } from '../schema/catalog.js'
@@ -13,7 +13,7 @@ import { events } from '../schema/events.js'
 import { organizerAssignments } from '../schema/organizer-assignments.js'
 import { questionVotes, sessionQuestions } from '../schema/questions.js'
 import { appendAuditEntry } from './admin-audit.js'
-import { hasEngagement, materialChangeOf, type MaterialChange } from './session-changes.js'
+import { materialChangeOf, type MaterialChange } from './session-changes.js'
 
 /**
  * T013 (014) — **the administrative write path into the conference catalog** (FR-1001, FR-1002,
@@ -68,15 +68,34 @@ import { hasEngagement, materialChangeOf, type MaterialChange } from './session-
  *
  * The `tx` parameter is therefore **required, not defaulted**. A default would make the unsafe
  * call the shorter one to write, which is how the defect happened the first time.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────────────────────
+ * **"EVERY FUNCTION" MEANS EVERY FUNCTION THAT WRITES. THREE READS DELIBERATELY DO NOT.**
+ *
+ * The claim above used to be unqualified and was false for `readProgramme`, `overlappingInRoom`
+ * and `countEngagement`. The first two take no executor at all and call `getDb()` directly, which
+ * is correct: `readProgramme` is a read with no act to record, and `overlappingInRoom` computes an
+ * **advisory warning** that the route deliberately runs outside the transaction, because holding
+ * one open for advice would make a warning cost what a lock costs. `countEngagement` takes only
+ * `Pick<…, 'execute'>`, so a caller may pass either a transaction or the pool — and the delete
+ * path passes its transaction, because reading outside its own `FOR UPDATE` could report a count
+ * that had already changed.
+ *
+ * `authoring-audit-transactional.test.ts` guards the `appendAuditEntry` call sites and the absence
+ * of a defaulted `tx`, which is the property that matters — so the strongest sentence in this
+ * header was the one nothing checked. Narrowed rather than deleted, because the rule it states is
+ * real for the writes it is about.
+ * ─────────────────────────────────────────────────────────────────────────────────────────────
  * ─────────────────────────────────────────────────────────────────────────────────────────────
  *
  * ─────────────────────────────────────────────────────────────────────────────────────────────
  * **NOTHING HERE RETURNS AN ATTENDEE IDENTITY** (FR-1025, FR-1042).
  *
- * `engagementCountsFor` returns four integers. There is no function in this module that can name
- * who saved a session, who wrote a note, who asked a question or who voted — and the fan-out that
- * genuinely needs those identifiers lives in `session-changes.ts`, where nothing administrative
- * reads it. `tests/unit/no-attendee-state-disclosure.test.ts` asserts it over the source.
+ * `countEngagement` returns four integers, and `readProgramme` returns four per session. There is
+ * no function in this module that can name who saved a session, who wrote a note, who asked a
+ * question or who voted — and the fan-out that genuinely needs those identifiers lives in
+ * `session-changes.ts`, where nothing administrative reads it.
+ * `tests/unit/no-attendee-state-disclosure.test.ts` asserts it over the source.
  * ─────────────────────────────────────────────────────────────────────────────────────────────
  */
 
@@ -122,8 +141,8 @@ export const isTrackColorToken = (value: string): value is TrackColorToken =>
  * ─────────────────────────────────────────────────────────────────────────────────────────────
  * **COUNTS ONLY. NO IDENTITY, NO CONTENT, AND THE TYPE IS WHERE THAT IS ENFORCED.**
  *
- * There is no field here that could hold a name, and `engagementCountsFor` has no parameter that
- * could ask for one. The spec records that the aggregate is thin at small scale — at a conference
+ * There is no field here that could hold a name, and neither `countEngagement` nor the programme
+ * read has a parameter that could ask for one. The spec records that the aggregate is thin at small scale — at a conference
  * with three registrants, "1 attendee wrote a note on this" is close to a name — and states the
  * mitigation available without an owner decision: present a **threshold** rather than a count.
  * That is the shape to reach for if FR-1025 is ever read as a disclosure; it is a change to this
@@ -214,6 +233,24 @@ export type WriteRefusal =
   | 'would-orphan-sessions'
   /** A timezone change with sessions already scheduled (FR-1015). */
   | 'timezone-frozen'
+  /**
+   * A timezone that is not an IANA zone PostgreSQL knows (FR-1007).
+   *
+   * Separate from `'timezone-frozen'` because it is a different fact about a different input, and
+   * the two would otherwise render as one sentence — D10's lesson, which this feature learned once
+   * already: classifying on the code is worth nothing unless the code says which refusal it is.
+   */
+  | 'unknown-timezone'
+  /**
+   * A conference whose last day precedes its first (FR-1007).
+   *
+   * Deliberately **not** `'ends-before-start'`, whose message ("The end must be after the start")
+   * is about a session: a single-day conference where `startsOn === endsOn` is perfectly legal, and
+   * that message says it is not.
+   */
+  | 'conference-ends-before-start'
+  /** A start or end that is not a parseable instant. */
+  | 'malformed-time'
 
 export type WriteResult<T> =
   | { readonly ok: true; readonly value: T }
@@ -631,8 +668,24 @@ export const deleteSession = async (
 
   if (locked.length === 0) return refused('not-found')
 
-  if (await hasEngagement(id, tx)) {
-    return refused('has-engagement', { engagement: await countEngagement(id, tx) })
+  // ─────────────────────────────────────────────────────────────────────────────────────────
+  // **ONE AGGREGATE, NOT A BOOLEAN PROBE FOLLOWED BY A COUNT.**
+  //
+  // This ran `hasEngagement` (four `EXISTS`) and then, on the refusal path, `countEngagement`
+  // (four `count(*)`) — eight subqueries over the same four tables, the second executed only to
+  // build a message. Both were inside the `FOR UPDATE` above, so every statement was queue time
+  // for attendees trying to save this session, and the **refusal path is the common one** for any
+  // session worth deleting: a popular session normally has engagement, so the expensive branch
+  // held the lock longest.
+  //
+  // The counts answer the boolean, so the boolean is derived rather than asked for.
+  // `hasEngagement` remains the predicate of record in `session-changes.ts` — it is what
+  // `engagement-coverage.test.ts` derives its table set from, and what a caller with no need for
+  // counts should still use.
+  // ─────────────────────────────────────────────────────────────────────────────────────────
+  const engagement = await countEngagement(id, tx)
+  if (engagement.saved + engagement.notes + engagement.questions + engagement.votes > 0) {
+    return refused('has-engagement', { engagement })
   }
 
   await tx.delete(sessions).where(eq(sessions.id, id))
@@ -702,7 +755,28 @@ export const reinstateSession = async (
 
   const [after] = await tx
     .update(sessions)
-    .set({ cancelledAt: null })
+    .set({
+      cancelledAt: null,
+      // ═══════════════════════════════════════════════════════════════════════════════════════
+      // **CLEARED, AND LEAVING THEM SET WAS A MARKER ON A SESSION THAT WAS BACK TO NORMAL.**
+      //
+      // This used to leave both columns alone, with a comment claiming that meant "no marker
+      // appears". The opposite was true, and only for the path that actually reaches here:
+      // reinstatement requires a prior cancellation, and cancelling **stamps**
+      // `logistics_changed_at`. So every saver who had not opened the session still satisfied
+      // `logistics_changed_at > viewed_at` and carried a "Changed" chip on a session identical to
+      // the one they saved. `SessionRow` suppresses the chip while a session is cancelled, so the
+      // marker was hidden during the cancellation and **appeared on reinstatement** — precisely
+      // backwards, and it left the marker meaning "something happened and we will not say what".
+      //
+      // FR-1024 forbids **dispatching** on reinstatement, and nothing here dispatches:
+      // `materialChangeOf` returns null for a cancellation being lifted, and clearing
+      // `last_change_act_id` also unlinks this session from the cancelling act, so a re-read of
+      // `attendeesToNotify` for that act can no longer find it.
+      // ═══════════════════════════════════════════════════════════════════════════════════════
+      logisticsChangedAt: null,
+      lastChangeActId: null,
+    })
     .where(
       and(
         eq(sessions.id, id),
@@ -714,31 +788,44 @@ export const reinstateSession = async (
 
   if (!after) return refused('not-found')
 
-  // Audited like every other act, and **not stamped**: `logistics_changed_at` is left alone, so
-  // no marker appears and `attendeesToNotify` finds nothing pointing at this entry (FR-1024).
+  // Audited like every other act, and **dispatches nothing** (FR-1024).
   await recordCatalogAct(scope, 'reinstate_session', id, 'session', tx)
   return ok(after)
 }
 
 /**
- * T049 (014) — how many attendees have engaged with this session (FR-1025).
+ * The four engagement counts, as a `SELECT` list keyed on whatever names the session.
  *
- * **Four counts, no identity, no content.** This is the only figure any administrative surface
- * ever sees about attendee state, and there is deliberately no variant of it that takes a
- * `limit`, returns rows, or names anybody.
+ * ═════════════════════════════════════════════════════════════════════════════════════════════
+ * **ONE EXPRESSION, BECAUSE THERE WERE THREE AND ONLY ONE WAS GUARDED.**
  *
- * Takes an executor because the refusal path calls it inside the deleting transaction, where the
- * session row is already locked — reading on the pool there would read outside the lock and could
- * report a count that had already changed.
+ * This aggregate was written twice in this file — once keyed to a literal id for the delete
+ * refusal, once correlated to `s.id` for the programme read — and a third time as
+ * `hasEngagement`'s four `EXISTS` in `session-changes.ts`. FR-1018a exists because *"an enumerated
+ * list is a list that ages, and the failure mode is silent"*, and `engagement-coverage.test.ts`
+ * derives `ENGAGEMENT_TABLES` from the schema — but it was written for `hasEngagement`, so a later
+ * feature adding an attendee-state table got a correctly-refusing delete and **two count queries
+ * that under-report**.
+ *
+ * That is not a cosmetic divergence. `CancelDialog` decides whether to offer "Delete it
+ * permanently" from these counts: a count that says zero for a session the server will refuse to
+ * delete is a control that exists only to produce a 409.
+ *
+ * Composed rather than copied, so the table set has one home in this file.
+ * `engagement-coverage.test.ts` now checks this expression as well as `hasEngagement`.
+ * ═════════════════════════════════════════════════════════════════════════════════════════════
  */
-export const engagementCountsFor = async (
-  unverified: ConferenceAuthorityScope,
-  id: string,
-  tx: Pick<ReturnType<typeof getDb>, 'execute'>,
-): Promise<EngagementCounts> => {
-  assertVerifiedConferenceAuthority(unverified)
-  return countEngagement(id, tx)
-}
+const engagementCountsFor = (session: SQL) => sql`
+  (SELECT count(*)::int FROM ${savedSessions}
+    WHERE ${savedSessions.sessionId} = ${session}) AS saved,
+  (SELECT count(*)::int FROM ${sessionNotes}
+    WHERE ${sessionNotes.sessionId} = ${session}) AS notes,
+  (SELECT count(*)::int FROM ${sessionQuestions}
+    WHERE ${sessionQuestions.sessionId} = ${session}) AS questions,
+  (SELECT count(*)::int FROM ${questionVotes}
+    JOIN ${sessionQuestions} ON ${sessionQuestions.id} = ${questionVotes.questionId}
+    WHERE ${sessionQuestions.sessionId} = ${session}) AS votes
+`
 
 const countEngagement = async (
   id: string,
@@ -749,18 +836,7 @@ const countEngagement = async (
     notes: number
     questions: number
     votes: number
-  }>(sql`
-    SELECT
-      (SELECT count(*)::int FROM ${savedSessions}
-        WHERE ${savedSessions.sessionId} = ${id}::uuid) AS saved,
-      (SELECT count(*)::int FROM ${sessionNotes}
-        WHERE ${sessionNotes.sessionId} = ${id}::uuid) AS notes,
-      (SELECT count(*)::int FROM ${sessionQuestions}
-        WHERE ${sessionQuestions.sessionId} = ${id}::uuid) AS questions,
-      (SELECT count(*)::int FROM ${questionVotes}
-        JOIN ${sessionQuestions} ON ${sessionQuestions.id} = ${questionVotes.questionId}
-        WHERE ${sessionQuestions.sessionId} = ${id}::uuid) AS votes
-  `)
+  }>(sql`SELECT ${engagementCountsFor(sql`${id}::uuid`)}`)
 
   const row = rows[0]
   return {
@@ -774,15 +850,26 @@ const countEngagement = async (
 /**
  * T069 (014) — stamps a material change onto the session and names the act that made it.
  *
- * Called by the route **inside the act's transaction**, after the write and after the audit entry
- * that produced `actId`. Two columns, one statement: `logistics_changed_at` is half the marker
+ * ─────────────────────────────────────────────────────────────────────────────────────────────
+ * **NOT EXPORTED, AND ITS HEADER USED TO NAME THE WRONG CALLER.**
+ *
+ * It said *"called by the route"*. It never was: the only callers are `updateSession` and
+ * `cancelSession`, in this file. That inverted the module's own architecture — the R3 division is
+ * that the query layer stamps and the route dispatches — and the unnecessary export mattered,
+ * because any module holding a `ConferenceAuthorityScope` could stamp `logistics_changed_at` and
+ * point `last_change_act_id` at an audit entry describing something else, setting every saver's
+ * marker with no audit entry of its own.
+ * ─────────────────────────────────────────────────────────────────────────────────────────────
+ *
+ * Called by `updateSession` and `cancelSession`, **inside the act's transaction**, after the write
+ * and after the audit entry that produced `actId`. Two columns, one statement: `logistics_changed_at` is half the marker
  * predicate (the other half is `saved_sessions.viewed_at`), and `last_change_act_id` is what the
  * fan-out coalesces on.
  *
  * **Not set by a title, summary, track or speaker edit** (FR-1027) — the caller only reaches here
  * when `materialChangeOf` returned something.
  */
-export const stampMaterialChange = async (
+const stampMaterialChange = async (
   unverified: ConferenceAuthorityScope,
   id: string,
   actId: string,
@@ -790,9 +877,25 @@ export const stampMaterialChange = async (
 ): Promise<void> => {
   const scope = assertVerifiedConferenceAuthority(unverified)
 
+  // ─────────────────────────────────────────────────────────────────────────────────────────
+  // **`now()` RATHER THAN `new Date()`, BECAUSE THE COMPARISON IS EVALUATED BY POSTGRESQL.**
+  //
+  // The marker is `logistics_changed_at > viewed_at`, and `viewed_at` is written by
+  // `markSessionViewed` as `now()` — the database's clock. Stamping this half from Node's made the
+  // predicate a comparison between two machines' opinions about the present, which is the exact
+  // defect `auth/throttle.ts` was rewritten to eliminate and documents at length.
+  //
+  // The dangerous direction is Node running **behind**: a cancellation at T stamped `T − δ`, and
+  // an attendee who opened the session at `T − ε` for `ε < δ` gets **no marker for a real
+  // cancellation** — the one piece of information FR-1030 exists to deliver, silently suppressed.
+  // Ahead, the marker becomes unclearable.
+  //
+  // Both statements are in one transaction, so `now()` is the transaction timestamp for both and
+  // the actor's own row below can never be stamped *earlier* than the change it is acknowledging.
+  // ─────────────────────────────────────────────────────────────────────────────────────────
   await tx
     .update(sessions)
-    .set({ logisticsChangedAt: new Date(), lastChangeActId: actId })
+    .set({ logisticsChangedAt: sql`now()`, lastChangeActId: actId })
     .where(and(eq(sessions.id, id), eq(sessions.eventId, scope.eventId)))
 
   // ═══════════════════════════════════════════════════════════════════════════════════════════
@@ -814,7 +917,7 @@ export const stampMaterialChange = async (
   if (scope.attendeeId !== null) {
     await tx
       .update(savedSessions)
-      .set({ viewedAt: new Date() })
+      .set({ viewedAt: sql`now()` })
       .where(and(eq(savedSessions.sessionId, id), eq(savedSessions.attendeeId, scope.attendeeId)))
   }
 }
@@ -867,6 +970,22 @@ export const patchConference = async (
   const endsOn = patch.endsOn ?? current.endsOn
   const timezone = patch.timezone ?? current.timezone
 
+  // ─────────────────────────────────────────────────────────────────────────────────────────
+  // **THE SAME RANGE CHECK `createConference` MAKES, AND ITS ABSENCE HERE WAS A 500.**
+  //
+  // `events_ends_on_after_starts_on` has been a check constraint since 002, so an inverted range
+  // was caught — as an unhandled constraint violation. On a conference with no sessions the
+  // orphan query below finds nothing, control reached the `UPDATE`, and the organizer got
+  // "Something went wrong" for input that returns an actionable 400 on the create path. With
+  // sessions present it was worse in a different way: `BETWEEN startsOn AND endsOn` is false for
+  // every row when the range is inverted, so all forty sessions were reported as orphaned and
+  // the organizer was told to move them rather than that their dates were backwards.
+  //
+  // Evaluated against the **patched** values, like the orphan check, because either field may be
+  // absent from the patch.
+  // ─────────────────────────────────────────────────────────────────────────────────────────
+  if (endsOn < startsOn) return refused('conference-ends-before-start')
+
   if (timezone !== current.timezone) {
     const existing = await tx
       .select({ id: sessions.id })
@@ -875,17 +994,38 @@ export const patchConference = async (
       .limit(1)
 
     if (existing.length > 0) return refused('timezone-frozen')
+
+    // FR-1015 freezes the zone once a session exists, so this is only reachable while the
+    // conference is empty — but a bogus zone is stored just as permanently either way, and every
+    // later `AT TIME ZONE` against it raises. See `timezoneKnown`.
+    if (!(await timezoneKnown(timezone, tx))) return refused('unknown-timezone')
   }
 
   if (startsOn !== current.startsOn || endsOn !== current.endsOn) {
-    // Evaluated in the conference's timezone, exactly as `withinConferenceDays` evaluates the
-    // forward rule — the two must agree, and they agree by being the same expression.
+    // ─────────────────────────────────────────────────────────────────────────────────────
+    // **BOTH ENDS, BECAUSE `withinConferenceDays` CHECKS BOTH — AND THIS ONE CHECKED ONLY THE
+    // START.**
+    //
+    // The comment here used to claim the two "agree by being the same expression". They did not:
+    // the forward rule (FR-1012) requires `starts_at` **and** `ends_at` to fall inside the
+    // conference's days, and this one asked only about `starts_at`. A session crossing
+    // venue-local midnight into the final day is legal when written — `schema/catalog.ts` says a
+    // session belongs to the date it starts — so shrinking the range by a day left its **end**
+    // outside the conference, which is exactly the state FR-1012 forbids and FR-1014 exists to
+    // prevent. `date-range-orphan.test.ts` used only same-day sessions, so nothing caught it.
+    //
+    // They now genuinely are one rule expressed twice, in the same direction.
+    // ─────────────────────────────────────────────────────────────────────────────────────
     const orphans = await tx.execute<{ id: string; title: string }>(sql`
       SELECT ${sessions.id} AS id, ${sessions.title} AS title
       FROM ${sessions}
       WHERE ${sessions.eventId} = ${scope.eventId}::uuid
-        AND (${sessions.startsAt} AT TIME ZONE ${timezone})::date
-            NOT BETWEEN ${startsOn}::date AND ${endsOn}::date
+        AND (
+          (${sessions.startsAt} AT TIME ZONE ${timezone})::date
+              NOT BETWEEN ${startsOn}::date AND ${endsOn}::date
+          OR (${sessions.endsAt} AT TIME ZONE ${timezone})::date
+              NOT BETWEEN ${startsOn}::date AND ${endsOn}::date
+        )
       ORDER BY ${sessions.startsAt}
     `)
 
@@ -959,11 +1099,30 @@ export interface ConferenceInput {
  * ─────────────────────────────────────────────────────────────────────────────────────────────
  */
 export const createConference = async (
-  operator: OperatorScope,
+  unverified: OperatorScope,
   input: ConferenceInput,
   tx: Tx,
 ): Promise<WriteResult<{ id: string; joinCode: string }>> => {
-  if (input.endsOn < input.startsOn) return refused('ends-before-start')
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // **MEMBERSHIP, NOT MERELY SHAPE — AND THIS WAS THE ONE FUNCTION IN THE FILE WITHOUT IT.**
+  //
+  // Nineteen functions here open with `assertVerifiedConferenceAuthority`; this one takes an
+  // `OperatorScope` instead, because there is no conference to hold authority over yet — and it
+  // asserted nothing at all. `admin/scope.ts` records what the `WeakSet` is for: a private-field
+  // class was defeated five separate ways by `Object.assign` in both directions,
+  // `structuredClone`, `Object.create` and reconstruction through the prototype's own
+  // constructor, every one of which compiled cleanly and passed lint.
+  //
+  // This is the **worst** write in the feature to leave unchecked, because the
+  // `organizer_assignments` row it inserts is what `requireOperator` subsequently reads to decide
+  // that somebody is an administrator at all. A value that merely satisfies the type would mint a
+  // conference and standing administrative authority with it.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  const operator = assertVerifiedOperator(unverified)
+
+  if (input.endsOn < input.startsOn) return refused('conference-ends-before-start')
+
+  if (!(await timezoneKnown(input.timezone, tx))) return refused('unknown-timezone')
 
   const created = await insertWithMintedCode(input, tx)
   if (!created) return refused('not-found')
@@ -997,6 +1156,10 @@ export const createConference = async (
       action: 'create_conference',
       subjectResourceId: created.id,
       subjectKind: 'conference',
+      // The subject *is* the conference here, and it is recorded in both columns anyway: "which
+      // conference was this act performed in" must be answerable from one column for all eight
+      // authoring actions, not from `subject_resource_id` for two of them and a join for the rest.
+      subjectEventId: created.id,
     },
     tx,
   )
@@ -1105,14 +1268,7 @@ export const readProgramme = async (
     questions: number
     votes: number
   }>(sql`
-    SELECT s.id AS session_id,
-      (SELECT count(*)::int FROM ${savedSessions} WHERE ${savedSessions.sessionId} = s.id) AS saved,
-      (SELECT count(*)::int FROM ${sessionNotes} WHERE ${sessionNotes.sessionId} = s.id) AS notes,
-      (SELECT count(*)::int FROM ${sessionQuestions}
-        WHERE ${sessionQuestions.sessionId} = s.id) AS questions,
-      (SELECT count(*)::int FROM ${questionVotes}
-        JOIN ${sessionQuestions} ON ${sessionQuestions.id} = ${questionVotes.questionId}
-        WHERE ${sessionQuestions.sessionId} = s.id) AS votes
+    SELECT s.id AS session_id, ${engagementCountsFor(sql`s.id`)}
     FROM ${sessions} s
     WHERE s.event_id = ${scope.eventId}::uuid
   `)
@@ -1142,8 +1298,30 @@ export const readProgramme = async (
     tracks: trackRows,
     rooms: roomRows,
     speakers: speakerRows,
+    // ─────────────────────────────────────────────────────────────────────────────────────
+    // **PROJECTED FIELD BY FIELD, NOT SPREAD.**
+    //
+    // `...row` shipped the whole session row, and the route declares
+    // `additionalProperties: true`, so Fastify stripped nothing: `logisticsChangedAt` and
+    // `lastChangeActId` went out on the wire. The second is a primary key of
+    // `admin_audit_entries`, and FR-1038 requires that **no read path over the audit trail** exist
+    // in either product — handing out entry identifiers is a partial one, invisible because the
+    // response schema names no fields.
+    //
+    // The attendee-facing read one file over does the same thing deliberately, reducing this whole
+    // lifecycle to `cancelled: row.cancelledAt !== null`. A new column now has to be added here on
+    // purpose to reach a client.
+    // ─────────────────────────────────────────────────────────────────────────────────────
     sessions: sessionRows.map((row) => ({
-      ...row,
+      id: row.id,
+      eventId: row.eventId,
+      title: row.title,
+      summary: row.summary,
+      startsAt: row.startsAt,
+      endsAt: row.endsAt,
+      trackId: row.trackId,
+      roomId: row.roomId,
+      cancelledAt: row.cancelledAt,
       speakerIds: bySession.get(row.id) ?? [],
       engagement: engagementBySession.get(row.id) ?? zero,
     })),
@@ -1216,6 +1394,9 @@ const recordCatalogAct = async (
       action,
       subjectResourceId: resourceId,
       subjectKind: kind,
+      // FR-1038 names the conference. The value is in hand at every call site and was being
+      // dropped — see `AuditEntryDraft.subjectEventId` for what that cost.
+      subjectEventId: scope.eventId,
     },
     tx,
   )
@@ -1234,7 +1415,12 @@ type AuthoringAction =
 const validateTimes = (input: SessionInput): WriteRefusal | null => {
   const starts = new Date(input.startsAt)
   const ends = new Date(input.endsAt)
-  if (Number.isNaN(starts.getTime()) || Number.isNaN(ends.getTime())) return 'not-found'
+  // An unparseable instant is a fact about the request body, not about whether the session
+  // exists. It used to return `'not-found'`, which `refuse()` renders as "That is no longer
+  // available. Reload to see the current state." — an answer to a question nobody asked. The route
+  // schema's `format: 'date-time'` makes this hard to reach today; the branch exists for the case
+  // it is relaxed or bypassed, which is exactly when the refusal has to be honest.
+  if (Number.isNaN(starts.getTime()) || Number.isNaN(ends.getTime())) return 'malformed-time'
   return ends > starts ? null : 'ends-before-start'
 }
 
@@ -1265,6 +1451,39 @@ const belongsToConference = async (
   `)
 
   return rows[0]?.valid === true
+}
+
+/**
+ * Whether PostgreSQL recognises this timezone (FR-1007, FR-1015).
+ *
+ * ═════════════════════════════════════════════════════════════════════════════════════════════
+ * **THE SEED VALIDATED THIS TWICE AND THE AUTHORING PATH INHERITED NEITHER CHECK.**
+ *
+ * `events.timezone` has no `CHECK` — `schema/events.ts` says so and states that validity is
+ * enforced "at the seed boundary", which was true while a reviewed commit was the only writer.
+ * v4.2.0 made it a form. The route schema asks for a string of 1–80 characters and the admin dialog
+ * is a bare text input, so `Europe/Madridd` was enough.
+ *
+ * What that cost, in two places, neither of them recoverable — **there is no conference-delete
+ * route at any tier** (FR-1011):
+ *
+ *   - **Server**: `withinConferenceDays` and the orphan query both evaluate `AT TIME ZONE`, which
+ *     raises `time zone "…" not recognized`. That is not an `AppError`, so **every** attempt to add
+ *     a session to the conference answers 500 and the programme can never be populated.
+ *   - **Client**: the zone reaches every attendee who joins with the minted code, where
+ *     `sessions.ts` hands it to `new Intl.DateTimeFormat`, which throws `RangeError` **during
+ *     render** — so a typo by an organizer is an uncaught error on somebody else's Home.
+ *
+ * Asked of `pg_timezone_names` rather than of `Intl`, because PostgreSQL is the engine that raises:
+ * the two zone databases are close but not identical, and the check must agree with the thing that
+ * fails. The seed's `Intl` probe stays where it is — it runs before any connection exists.
+ * ═════════════════════════════════════════════════════════════════════════════════════════════
+ */
+const timezoneKnown = async (timezone: string, tx: Tx): Promise<boolean> => {
+  const rows = await tx.execute<{ known: boolean }>(
+    sql`SELECT EXISTS (SELECT 1 FROM pg_timezone_names WHERE name = ${timezone}) AS known`,
+  )
+  return rows[0]?.known === true
 }
 
 /** FR-1012, evaluated by PostgreSQL in the conference's own timezone. See `createSession`. */
@@ -1358,10 +1577,42 @@ const readSession = async (
 const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'
 const CODE_LENGTH = 8
 
+/**
+ * The largest multiple of the alphabet length that fits in a byte.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────────────────────
+ * **`byte % 31` IS BIASED, AND REJECTION SAMPLING IS THE FIX.**
+ *
+ * `256 mod 31 = 8`, so a bare modulo makes the first eight characters of the alphabet — `A`–`H` —
+ * about 12.5% likelier than the other twenty-three. The practical exposure on a *join code* is
+ * negligible: eight characters over 31 symbols is ~39.6 bits, the bias costs well under a bit, and
+ * `join_code` is throttled at five attempts an hour per identifier, so guessing is not the threat.
+ *
+ * It is corrected anyway for one reason: **015 is chartered to rotate and revoke these**, and this
+ * is the helper somebody reaches for when they next need an unpredictable value. A biased mapping
+ * copied into a context where the value *is* a credential is where the cost would land.
+ * ─────────────────────────────────────────────────────────────────────────────────────────────
+ */
+const CODE_UNBIASED_CEILING = 256 - (256 % CODE_ALPHABET.length)
+
 const mintJoinCode = (): string => {
-  const bytes = new Uint8Array(CODE_LENGTH)
-  globalThis.crypto.getRandomValues(bytes)
-  return [...bytes].map((byte) => CODE_ALPHABET[byte % CODE_ALPHABET.length]).join('')
+  const code: string[] = []
+
+  while (code.length < CODE_LENGTH) {
+    // Drawn a buffer at a time rather than a byte at a time: rejection is rare (8 values in 256),
+    // and one `getRandomValues` per code is the common case.
+    const bytes = new Uint8Array(CODE_LENGTH)
+    globalThis.crypto.getRandomValues(bytes)
+
+    for (const byte of bytes) {
+      if (code.length === CODE_LENGTH) break
+      // Discard the values that would wrap and skew the distribution, rather than folding them in.
+      if (byte >= CODE_UNBIASED_CEILING) continue
+      code.push(CODE_ALPHABET[byte % CODE_ALPHABET.length] as string)
+    }
+  }
+
+  return code.join('')
 }
 
 /**

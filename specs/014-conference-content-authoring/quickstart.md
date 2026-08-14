@@ -8,6 +8,31 @@ looks at where a thing is.
 **T-numbers for scenarios 6–9 join the outstanding by-hand walkthroughs from 007, 008, 009 and 013
 rather than replacing them.**
 
+---
+
+## Walk record
+
+**Scenarios 1–5: WALKED (T104), 2026-08-12.** Each was walked by running the checks it names rather
+than by clicking through, because every one of them is machine-checkable — which is what puts them
+in this half of the document. What was executed, and what it proved:
+
+| Scenario | Evidence | Result |
+|---|---|---|
+| 1 — author a programme | `authoring-programme`, `authoring-isolation` (integration); `profile-uneditable` (unit); `e2e/authoring.spec.ts` — an organizer authors in one browser profile and an attendee reads it in another | pass |
+| 1 — the seed survives (FR-1043) | `pnpm db:seed` re-run **twice**; two disjoint programmes (6 and 4 sessions) and the deliberately empty third conference intact | pass |
+| 2 — delete only while untouched | `delete-refusal` — 409 with a reason, for each of the four engagement kinds independently, counts only | pass |
+| 3 — cancellation preserves everything | `cancel-preserves-state`; `cancelled-session.test.tsx` for the panel, the closed composer and removal from the saved list | pass |
+| 3 — reinstatement is silent (FR-1024) | `material-change-dispatch` | pass |
+| 4 — Up next skips a cancelled session | `sessions.test.ts` for the asymmetry; `cancelled-session.test.tsx` for both Home cards skipping and `RestOfDay` still listing it marked | pass |
+| 5 — the FR-1019a race | `delete-engagement-race` against a real `postgres:17` | pass |
+
+**Scenario 1's "no free colour input" was checked as an absence in two places**, not by looking: the
+picker offers exactly the four tokens (`programme-editor.test.tsx`) and no `input[type="color"]`
+exists anywhere in the rendered editor.
+
+**Scenarios 6–9 are NOT walked.** They need a person and a phone, and they carry forward — see
+T105 and the note at the head of this file.
+
 ## Prerequisites
 
 ```bash

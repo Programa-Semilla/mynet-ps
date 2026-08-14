@@ -116,6 +116,7 @@ self.addEventListener('push', (event: PushEvent) => {
     let conversationId: string | undefined
     let sessionId: string | undefined
     let eventId: string | undefined
+    let dispatchId: string | undefined
     let kind: 'message' | 'session-change' = 'message'
 
     try {
@@ -127,6 +128,7 @@ self.addEventListener('push', (event: PushEvent) => {
             conversationId?: string
             sessionId?: string
             eventId?: string
+            dispatchId?: string
             count?: number
           }
         | undefined
@@ -144,6 +146,7 @@ self.addEventListener('push', (event: PushEvent) => {
       if (payload?.conversationId) conversationId = payload.conversationId
       if (payload?.sessionId) sessionId = payload.sessionId
       if (payload?.eventId) eventId = payload.eventId
+      if (payload?.dispatchId) dispatchId = payload.dispatchId
     } catch {
       // Malformed or absent payload. The defaults above stand — see the header for why showing
       // nothing is not an option.
@@ -156,17 +159,36 @@ self.addEventListener('push', (event: PushEvent) => {
       // thing, not five to dismiss.
       //
       // 014 — the same reasoning, keyed on the session. Two material changes to one saved session
-      // replace each other, because the second is the current truth about it. **A coalesced
-      // payload names no session and therefore takes the conference tag**, which is what stops
-      // two organizer acts in a row producing two agenda notifications to dismiss — and it is
-      // deliberately NOT a running total: the tag replaces, it does not accumulate.
+      // replace each other, because the second is the current truth about it: a cancellation
+      // superseding an earlier room move is what anybody would want.
+      //
+      // ═══════════════════════════════════════════════════════════════════════════════════════
+      // **A COALESCED PAYLOAD IS TAGGED WITH THE ACT, NOT THE CONFERENCE, AND THE DIFFERENCE
+      // IS FR-1028b.**
+      //
+      // This used to read `agenda-${eventId}`, so **two coalesced acts at one conference
+      // replaced each other on screen.** The delivery layer was correct — two notifications were
+      // sent, and `dispatch-coalescing.test.ts` asserts it — and the collapse happened here,
+      // one layer below where anything was looking.
+      //
+      // FR-1028b names this failure as its own reason for existing: *"a time-window rule would
+      // suppress a cancellation because a room moved earlier, which is the failure this whole
+      // trigger exists to prevent."* A shared tag is a time-window rule whose window is forever.
+      // Act one cancels two of somebody's saved sessions; act two moves a room on two others;
+      // the attendee sees a single notification saying two sessions changed and never learns
+      // about the cancellation.
+      //
+      // The act id is what the server already coalesces on (`last_change_act_id`), so the
+      // identifier that groups one act is the one that separates two, and nothing new is stored
+      // to obtain it. Still not a running total: within one act the tag replaces.
+      // ═══════════════════════════════════════════════════════════════════════════════════════
       // ───────────────────────────────────────────────────────────────────────────────────────
       body,
       tag:
         kind === 'session-change'
           ? sessionId
             ? `session-${sessionId}`
-            : `agenda-${eventId ?? 'changed'}`
+            : `agenda-${dispatchId ?? eventId ?? 'changed'}`
           : conversationId
             ? `conversation-${conversationId}`
             : 'message',
@@ -199,7 +221,7 @@ self.addEventListener('notificationclick', (event: NotificationEvent) => {
   event.notification.close()
 
   const data = event.notification.data as
-    { kind?: string; conversationId?: string; sessionId?: string } | undefined
+    { kind?: string; conversationId?: string; sessionId?: string; eventId?: string } | undefined
 
   /**
    * ═════════════════════════════════════════════════════════════════════════════════════════
@@ -215,11 +237,31 @@ self.addEventListener('notificationclick', (event: NotificationEvent) => {
    * changed (FR-1029). Several → Agenda. Neither address is a list.
    * ═════════════════════════════════════════════════════════════════════════════════════════
    */
+  /*
+   * ─────────────────────────────────────────────────────────────────────────────────────────
+   * **THE CONFERENCE TRAVELS IN THE ADDRESS, AND WITHOUT IT THE ADDRESS DOES NOT RESOLVE.**
+   *
+   * Every attendee address resolves against the **active** conference, which is server-side state
+   * changed only through the event switcher — so this used to discard `eventId` and send a
+   * notification about conference A to A's session id interpreted inside B's programme, where the
+   * panel renders "That session is not available to you". Multi-conference membership is ordinary,
+   * not an edge case.
+   *
+   * The worker cannot switch the conference itself: that is a server write behind a repository.
+   * So it names the conference and `app/NotificationTarget.tsx` acts on it, then removes the
+   * parameter so a reload cannot replay it.
+   *
+   * A message needs none of this — a conversation is cross-event by 007's design (FR-507), which
+   * is why the pattern does not simply transfer.
+   * ─────────────────────────────────────────────────────────────────────────────────────────
+   */
+  const conference = data?.eventId ? `?event=${encodeURIComponent(data.eventId)}` : ''
+
   const target =
     data?.kind === 'session-change'
       ? data.sessionId
-        ? `/agenda/${data.sessionId}`
-        : '/agenda'
+        ? `/agenda/${data.sessionId}${conference}`
+        : `/agenda${conference}`
       : data?.conversationId
         ? `/messages/${data.conversationId}`
         : '/messages'

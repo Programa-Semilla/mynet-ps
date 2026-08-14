@@ -151,6 +151,28 @@ export const useSavedSessions = (eventId: string): SavedSessions => {
             else next.delete(sessionId)
             return next
           })
+
+          // ───────────────────────────────────────────────────────────────────────────────
+          // **UNSAVING CLEARS THE MARKER, AND FORGETTING THAT LEFT A CHIP ON A DISOWNED ROW.**
+          //
+          // FR-1030 scopes the marker to a materially changed **saved** session. `changed` was
+          // maintained only by the initial read, so removing a marked session from the agenda —
+          // which the attendee does from that very row — dropped it from `ids` and left it in
+          // `changed`. In the "All" view the row kept rendering "Changed", because `Agenda.tsx`
+          // asks `changed.has(id)` without consulting `ids`, and it persisted until the next
+          // successful `listSaved` on remount.
+          //
+          // The server was already consistent: the `saved_sessions` row is gone, so the marker
+          // cannot come back. This was purely the local set drifting from it.
+          // ───────────────────────────────────────────────────────────────────────────────
+          if (!saving) {
+            setChanged((current) => {
+              if (!current.has(sessionId)) return current
+              const next = new Set(current)
+              next.delete(sessionId)
+              return next
+            })
+          }
         })
         .catch((cause: unknown) => {
           setRefusal(refusalFor(cause, saving))
@@ -175,6 +197,26 @@ export const useSavedSessions = (eventId: string): SavedSessions => {
       // about, which reads as broken. A failed write means it comes back on the next read, which
       // is the correct outcome rather than a rollback.
       // ───────────────────────────────────────────────────────────────────────────────────────
+      // ═════════════════════════════════════════════════════════════════════════════════════
+      // **NOTHING IS WRITTEN FOR A SESSION THAT CARRIES NO MARKER, AND THAT GUARD IS THE POINT.**
+      //
+      // The panel calls this on **every** open, and almost every open is ordinary browsing. Each
+      // call was a request plus — because `markViewed` is a write to a decorated repository — a
+      // purge of the whole conference cache prefix: the programme, the saved set, the notes and
+      // the appointments, all of it. An attendee browsing ten sessions issued ten writes and ten
+      // full purges of their offline cache, nine or ten of them for sessions that never changed.
+      //
+      // The header on `services.ts` justifies the purge with *"the programme it purges alongside
+      // is the one that just changed — the attendee is opening a session precisely because it
+      // moved"*. That is true for the marker case and false for browsing, which is the
+      // overwhelming majority. This is 008's `slots` defect from the other side: a legitimate
+      // write firing far more often than the state it invalidates changes.
+      //
+      // Gated here rather than in the panel because this hook owns the marker; asking the panel
+      // to know would be a second reader of the same fact.
+      // ═════════════════════════════════════════════════════════════════════════════════════
+      if (!changed.has(sessionId)) return
+
       setChanged((current) => {
         if (!current.has(sessionId)) return current
         const next = new Set(current)
@@ -187,7 +229,7 @@ export const useSavedSessions = (eventId: string): SavedSessions => {
         // write is refused rather than queued like every other write in this product.
       })
     },
-    [repository, eventId],
+    [repository, eventId, changed],
   )
 
   const retry = useCallback(() => {

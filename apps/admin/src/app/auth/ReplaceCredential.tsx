@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 
-import { classify, describe } from '../errors.js'
+import { classify, describe, detailOf } from '../errors.js'
 import { useAdminSession } from '../session.js'
 
 /** The floor the server enforces too. Stated here so the control is disabled rather than refused. */
@@ -57,7 +57,7 @@ export const ReplaceCredential = () => {
       // clears `credentialIsInitial` and lets the shell render.
       await refresh()
     } catch (error) {
-      setFailure(describe(classify(error)))
+      setFailure(describe(classify(error), detailOf(error)))
     } finally {
       setSubmitting(false)
     }

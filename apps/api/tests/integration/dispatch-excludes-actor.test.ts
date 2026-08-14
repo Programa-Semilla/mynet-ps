@@ -7,6 +7,7 @@ import { savedSessions } from '../../src/db/schema/agenda.js'
 import { SinkPushService } from '../../src/notifications/sink-adapter.js'
 import { anEndpoint, registerDevice } from '../support/push.js'
 import {
+  afterDispatch,
   buildAuthoringFixture,
   clearAuthoringFixture,
   organizerSession,
@@ -56,7 +57,7 @@ describe('the acting principal is not notified (T063, FR-1028a)', () => {
   })
 
   afterAll(async () => {
-    await clearAuthoringFixture()
+    await clearAuthoringFixture(app)
     await teardown(app)
   })
 
@@ -64,7 +65,7 @@ describe('the acting principal is not notified (T063, FR-1028a)', () => {
     await clearThrottle()
     push.clear()
 
-    fixture = await buildAuthoringFixture(ADA)
+    fixture = await buildAuthoringFixture(ADA, app)
     cookie = await organizerSession(app, ADA, SEED_PASSWORD)
 
     const created = await app.inject({
@@ -89,12 +90,18 @@ describe('the acting principal is not notified (T063, FR-1028a)', () => {
     push.clear()
   })
 
-  const cancel = () =>
-    app.inject({
+  const cancel = async () => {
+    const response = await app.inject({
       method: 'POST',
       url: `/admin/conferences/${fixture.assigned.eventId}/sessions/${sessionId}/cancel`,
       headers: { cookie },
     })
+    // The fan-out outlives the response — see `afterDispatch`. This file asserts an ABSENCE for
+    // the actor, and an absence asserted before the work has run is the easiest false pass there
+    // is: it would hold even if the exclusion were deleted.
+    await afterDispatch(app)
+    return response
+  }
 
   it('delivers nothing to the organizer who cancelled it', async () => {
     expect((await cancel()).statusCode).toBe(200)

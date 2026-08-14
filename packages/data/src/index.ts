@@ -131,3 +131,7 @@ export type {
   AdminSessionRepository,
   OperatorTier,
 } from './interfaces/administration.js'
+
+// T-review (014) — the closed track colour set, derived from the generated contract so the
+// administrative form cannot hold a fourth hand-maintained copy of it. See `contract.ts`.
+export type { TrackColorToken } from './contract.js'

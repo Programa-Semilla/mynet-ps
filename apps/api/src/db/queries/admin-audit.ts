@@ -66,6 +66,30 @@ export type AuditEntryDraft = AuditPrincipal & {
   readonly subjectAttendeeId?: string | undefined
   readonly subjectResourceId?: string | undefined
   readonly subjectKind?: string | undefined
+  /**
+   * The conference the act was performed in (FR-1038).
+   *
+   * ═════════════════════════════════════════════════════════════════════════════════════════
+   * **FR-1038 NAMES THE CONFERENCE AND THE ENTRY DID NOT CARRY IT.**
+   *
+   * The requirement is *"the principal, **the conference**, the act, the entity acted on and the
+   * instant"*. Only `create_conference` and `update_conference` recorded it, incidentally, because
+   * for those the subject **is** the event. For the other six authoring actions the conference was
+   * recoverable only by joining `subject_resource_id` back to `tracks`/`rooms`/`speakers`/
+   * `sessions` — and for `delete_catalog` and `delete_session` that row is gone by definition, so
+   * those entries were **permanently unattributable to a conference**.
+   *
+   * The trail could not answer "what was authored in conference X", which is the first question
+   * anybody would ask of it. FR-999 forbids a read path, so nothing surfaced the gap: it would
+   * have appeared the first time somebody needed the record.
+   *
+   * **No foreign key**, following `abuse_reports.message_ids` and `sessions.last_change_act_id`:
+   * the trail outlives what it describes, and a conference that no longer exists must not take its
+   * accountability record with it. 013's six platform-tier acts are product-wide rather than
+   * per-conference, so this is absent from them by nature rather than by omission.
+   * ═════════════════════════════════════════════════════════════════════════════════════════
+   */
+  readonly subjectEventId?: string | undefined
 }
 
 /**
@@ -119,6 +143,7 @@ export const appendAuditEntry = async (
       subjectAttendeeId: entry.subjectAttendeeId ?? null,
       subjectResourceId: entry.subjectResourceId ?? null,
       subjectKind: entry.subjectKind ?? null,
+      subjectEventId: entry.subjectEventId ?? null,
     })
     .returning({ id: adminAuditEntries.id })
 

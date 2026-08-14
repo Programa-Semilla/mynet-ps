@@ -1,6 +1,8 @@
 import type { AdminProgramme, AdminSession, AdminSessionInput } from '@mynet/data'
 import { useId, useState } from 'react'
 
+import { instantOf, wallTimeOf } from './venue-time.js'
+
 /**
  * T037 (014) — the session form (FR-1001, FR-1005, FR-1012, FR-1013, FR-1016).
  *
@@ -33,61 +35,11 @@ import { useId, useState } from 'react'
 const field =
   'mt-1 w-full rounded-lg border border-border-subtle bg-surface-card px-3 py-2 text-sm text-text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-coral-500'
 
-/**
- * The offset a timezone is at on a given instant, in minutes.
- *
- * `Intl` is the only way to ask without a timezone library, and this is the standard shape: format
- * the instant in the target zone, read it back as if it were UTC, and take the difference. It
- * handles daylight saving correctly because the answer is computed **at the instant in question**
- * rather than from a fixed offset — which is exactly the mistake a stored offset would make for a
- * conference spanning a transition.
+/*
+ * `instantOf` and `wallTimeOf` were private to this file, and that is what let the programme list
+ * one component over grow its own answer — it rendered the raw UTC instants. They live in
+ * `venue-time.ts` now, beside the display formatter the list needed.
  */
-const offsetMinutesAt = (instant: Date, timezone: string): number => {
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: timezone,
-    hour12: false,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-  }).formatToParts(instant)
-
-  const at = (type: string): number =>
-    Number(parts.find((part) => part.type === type)?.value ?? '0')
-  const asUtc = Date.UTC(
-    at('year'),
-    at('month') - 1,
-    at('day'),
-    at('hour'),
-    at('minute'),
-    at('second'),
-  )
-
-  return (asUtc - instant.getTime()) / 60_000
-}
-
-/**
- * A venue-local wall time (`2027-03-01T09:00`) as an absolute instant.
- *
- * Two passes, and the second is not redundant: the first guess uses the offset at the *UTC*
- * reading of the wall time, which is wrong for an instant that falls the other side of a daylight
- * transition. Re-computing the offset at the corrected instant converges for every real zone.
- */
-const instantOf = (wallTime: string, timezone: string): string => {
-  const naive = new Date(`${wallTime}:00Z`)
-  const firstGuess = new Date(naive.getTime() - offsetMinutesAt(naive, timezone) * 60_000)
-  const corrected = new Date(naive.getTime() - offsetMinutesAt(firstGuess, timezone) * 60_000)
-  return corrected.toISOString()
-}
-
-/** The inverse, for populating the form when editing. */
-const wallTimeOf = (iso: string, timezone: string): string => {
-  const instant = new Date(iso)
-  const local = new Date(instant.getTime() + offsetMinutesAt(instant, timezone) * 60_000)
-  return local.toISOString().slice(0, 16)
-}
 
 export interface SessionFormProps {
   readonly programme: AdminProgramme

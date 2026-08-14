@@ -180,6 +180,25 @@ export const sessionNotes = pgTable(
      * one note; no requirement suggests otherwise and the prototype has a single note field.
      */
     primaryKey({ columns: [table.attendeeId, table.sessionId] }),
+    /*
+     * T-review (014) — **the non-leading `session_id` needs its own index.**
+     *
+     * The composite primary key leads with `attendee_id`, and PostgreSQL 17 has no btree skip
+     * scan, so a predicate on `session_id` alone cannot use it. 014 added three such predicates —
+     * `hasEngagement`, the delete refusal's counts, and the programme read's per-session counts —
+     * and this table is **not event-scoped**: it holds every attendee's notes for every conference,
+     * so each probe was a full scan of all of it.
+     *
+     * The scalar subquery in the programme read is not decorrelated, so a 500-session conference
+     * re-executed it 500 times per read, and `ProgrammeEditor` re-reads the programme after every
+     * write. Two of the probes also run inside `deleteSession`'s `FOR UPDATE`, where the cost is
+     * paid by the attendees whose saves are blocked.
+     *
+     * Its three siblings were all covered — `saved_sessions_session_id_idx` by 014 itself,
+     * `session_questions_session_id_idx` by 009, and `question_votes`' primary key leads with
+     * `question_id` — which is what makes this an omission rather than a position.
+     */
+    index('session_notes_session_id_idx').on(table.sessionId),
 
     /**
      * ─────────────────────────────────────────────────────────────────────────────────────

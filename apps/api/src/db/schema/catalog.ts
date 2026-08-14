@@ -257,10 +257,22 @@ export const sessions = pgTable(
     // Every read is "this event's programme, in time order".
     index('sessions_event_starts_at_idx').on(table.eventId, table.startsAt),
     /**
-     * T004 (014) — the programme read now filters or flags on cancellation for every attendee
-     * surface, so the conference-wide read carries a second column.
+     * T-review (014) — **`(event_id, room_id, starts_at)`, replacing an index no query used.**
+     *
+     * ─────────────────────────────────────────────────────────────────────────────────────
+     * This was `sessions_event_cancelled_idx` on `(event_id, cancelled_at)`, justified as "the
+     * programme read now filters or flags on cancellation for every attendee surface". No read
+     * filters on it: `queries/catalog.ts` **selects** `cancelled_at` and never constrains it (an
+     * index cannot serve a projection), and "Up next"'s exclusion is applied in client code. So it
+     * was write cost on the product's hottest edit-time table, for a query that does not exist.
+     *
+     * The predicate that *does* exist is `overlappingInRoom`, which runs on every session create
+     * and update: `event_id`, `room_id`, a half-open time range, and `cancelled_at is null`. This
+     * covers the first three. `cancelled_at` is deliberately not a fourth column — it is very low
+     * selectivity, so it would widen the index without narrowing the scan.
+     * ─────────────────────────────────────────────────────────────────────────────────────
      */
-    index('sessions_event_cancelled_idx').on(table.eventId, table.cancelledAt),
+    index('sessions_event_room_starts_at_idx').on(table.eventId, table.roomId, table.startsAt),
   ],
 )
 

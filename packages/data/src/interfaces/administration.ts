@@ -28,6 +28,8 @@
  * no `reads` map to omit from and no `args[0]` to misread.
  */
 
+import type { TrackColorToken } from '../contract.js'
+
 /** Which tier the signed-in principal holds (FR-900, FR-924). */
 export type OperatorTier = 'platform' | 'organizer'
 
@@ -156,7 +158,15 @@ export interface AdminConferenceRepository {
 export interface AdminTrack {
   readonly id: string
   readonly name: string
-  readonly colorToken: string
+  /**
+   * A theme token NAME, never a colour value (FR-136, FR-1004).
+   *
+   * **Typed from the generated contract rather than as `string`.** It was `string`, which is what
+   * let `CatalogForms.tsx` carry a third hand-written copy of the closed set with nothing binding
+   * it to the server's — so adding a token server-side left the form unable to offer it, and
+   * removing one left the form offering a value every write refuses. See `contract.ts`.
+   */
+  readonly colorToken: TrackColorToken
 }
 
 export interface AdminRoom {
@@ -265,11 +275,11 @@ export interface AdminCatalogRepository {
   /** The whole programme, with engagement counts per session (FR-1025). */
   programme(eventId: string): Promise<AdminProgramme>
 
-  createTrack(eventId: string, input: { name: string; colorToken: string }): Promise<void>
+  createTrack(eventId: string, input: { name: string; colorToken: TrackColorToken }): Promise<void>
   updateTrack(
     eventId: string,
     id: string,
-    input: { name: string; colorToken: string },
+    input: { name: string; colorToken: TrackColorToken },
   ): Promise<void>
   /** Refused with a reason while any session references it (FR-1017). */
   deleteTrack(eventId: string, id: string): Promise<void>

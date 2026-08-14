@@ -380,6 +380,41 @@ test.describe('responsive layout', () => {
       await expectCentred(operator, 'the operator-deactivation confirmation')
       await operator.keyboard.press('Escape')
       await expect(operator.getByRole('dialog')).toBeHidden()
+
+      // ─────────────────────────────────────────────────────────────────────────────────────
+      // T096 (014) — **the two dialogs this feature adds, enumerated here for the reason the
+      // header gives: the class of mistake is forgetting the rule on the NEXT one.**
+      //
+      // 008 shipped two mispositioned dialogs while the two written before them were fine, and
+      // both passed every behavioural test — they opened, trapped focus, closed on Escape and
+      // read correctly. A width assertion never looks at position, which is how they survived.
+      //
+      // Neither confirms anything. The cancellation dialog in particular is opened on a seeded
+      // session and dismissed: this suite seeds once for the whole run, so cancelling here
+      // would change the programme every later spec reads.
+      // ─────────────────────────────────────────────────────────────────────────────────────
+      await operator.goto(`${ADMIN_ORIGIN}/conferences`)
+      await operator.getByRole('button', { name: 'Create a conference' }).click()
+      await expect(operator.getByRole('dialog')).toBeVisible()
+      await expectCentred(operator, 'the create-conference dialog')
+      await operator.keyboard.press('Escape')
+      await expect(operator.getByRole('dialog')).toBeHidden()
+
+      // The cancel-or-delete decision, reached through the programme editor. A platform
+      // operator holds authority over every conference (FR-1002), so no assignment is needed.
+      await operator.getByRole('link', { name: 'Product & Design Summit' }).first().click()
+      await expect(
+        operator.getByRole('heading', { name: 'Product & Design Summit', level: 1 }),
+      ).toBeVisible()
+
+      await operator
+        .getByRole('button', { name: /cancel or delete/i })
+        .first()
+        .click()
+      await expect(operator.getByRole('dialog')).toBeVisible()
+      await expectCentred(operator, 'the session cancel-or-delete dialog')
+      await operator.keyboard.press('Escape')
+      await expect(operator.getByRole('dialog')).toBeHidden()
     } finally {
       await context.close()
     }
