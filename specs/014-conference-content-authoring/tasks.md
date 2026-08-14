@@ -6,6 +6,19 @@
 > **T001 is unblocked.** v5.2.0 was ratified unchanged from the drafted text, so every requirement
 > citing N1–N5 stands as written. The amendment gated the first line of code, as v3.1.0 gated 007's
 > Phase 7, v3.2.0 gated 008, v3.3.0 gated 009 and v4.0.0 gated 013.
+>
+> ### T001–T105 are TRANCHE 1. This feature is open and has a second tranche with no tasks yet.
+>
+> Brainstorm #11 rescoped 014 on 2026-08-12 from a parallel branch, after this list was written and
+> largely executed. The owner decided on **2026-08-14** that 014 stays open and grows rather than
+> being closed and succeeded, so **104 of 105 complete is tranche 1 complete, not the feature
+> complete.** `spec.md`'s header carries the tranche-2 scope and what each part is blocked on.
+>
+> **No tranche-2 tasks are listed here, deliberately.** Two of its three outstanding rows are
+> unblocked and could be planned today; writing tasks for them from a brainstorm alone would skip
+> the requirements and the plan that every other phase of this project went through, and the third
+> row cannot be planned at all until the client supplies a list. Tranche 2 gets its own planning
+> pass, its own migration number, and its own discharge of the Feature Declarations rows.
 
 ## Format: `[ID] [P?] [Story] Description`
 

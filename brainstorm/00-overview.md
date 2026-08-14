@@ -127,7 +127,7 @@ requires reversing a Principle III **prohibition** rather than filling an omissi
 | 013 | Administrative foundation — second actor, admin site, **abuse-report queue** | **shipped** — squash-merged to `develop`; amendments ratified as **v4.0.0** and **v4.1.0**. Migration `0009` | ~~24, 25, 26~~ — **all three closed by v4.1.0** |
 | 016 | App fixes, mutual card exchange, install icon | **brainstormed** (#10). Amendment: reverses **v3.2.0 N2**, records the icon-upscale exception, ratifies the admin-counterpart rule. **No migration** | — |
 | 017 | **Q&A rebuilt** — moderation, identity, lifecycle, projection | **brainstormed** (#11). Amendment: reverses **v3.3.0** attribution and retracts shipped 009 FRs | 013 |
-| 014 | Conference content authoring — **rescoped and kept whole** | ⚠ **SPLIT IN FACT, AND THE SPLIT IS NOT YET A DECISION.** #10's scope is **implemented** on `spec/014-conference-content-authoring` (51 FRs, 105 tasks, migration `0011`, amendment **v5.2.0**), authored before #11 existed. #11 then rescoped 014 to also carry event types, optional sessions with capacity and enrolment, and the profile taxonomy — **none of which is built**. See the note below the table | 013 ✓; v5.2.0 ✓ for the built half. The #11 additions remain blocked on **the client's interest and subsector lists, which do not exist** |
+| 014 | Conference content authoring — **rescoped and kept whole** | **OPEN, AND DELIBERATELY SO** (decided 2026-08-14). #10's scope is **implemented and green** on `spec/014-conference-content-authoring` (51 FRs, 105 tasks, migration `0011`, amendment **v5.2.0**), authored before #11 existed. #11's additions — event types, optional sessions with capacity and enrolment, the profile taxonomy — are **in scope and not built**. The feature closes when both are done. See the note below the table | 013 ✓; v5.2.0 ✓. The profile taxonomy is blocked on **the client's interest, sector and subsector lists, which do not exist**; the rest is unblocked |
 | 015 | Registration and **invitations** — rescoped | **re-brainstormed** (#11). Completes standing decision 11 rather than reversing it | 013 |
 | ~~015~~ | ~~Registration and attendee management~~ | superseded by the row above; #09's scoping is read as replaced by #11's | — |
 | 018 | Profile QR | **brainstormed** (#11) | 014 |
@@ -143,7 +143,7 @@ now the third time this has happened (011 over the administrative programme, 013
 sequence, and now these). It is not worth correcting; parallel reservations cannot see each other
 and the number settles at merge.
 
-### 014 is built to #10's scope and rescoped by #11, and reconciling the two is an owner decision
+### 014 is built to #10's scope and rescoped by #11 — DECIDED 2026-08-14: it stays open and grows
 
 **This is the same collision as the numbering, arriving on scope instead**, and it is the one place
 in this merge where the honest answer was to record the conflict rather than resolve it.
@@ -158,19 +158,35 @@ also carries **event types, optional sessions with capacity and enrolment, and t
 (REQ-010–014, 027–042, 078–086, 113–115). None of that is built, and #11 itself records the blocker:
 the client's interest and subsector lists do not exist.
 
-**Three ways to reconcile, and choosing is not a planning inference:**
+**Three ways to reconcile were put to the owner on 2026-08-14, and the second was chosen:**
 
-1. **Ship what is built as 014 and move #11's additions to a new feature.** The built half is
-   independently useful and unblocked; the additions stay blocked on a client artifact either way.
-   Costs a number and makes #11's "kept whole" false.
-2. **Hold 014 open and grow it to #11's scope.** Honours "kept whole". Holds a complete, reviewed
-   feature behind a list nobody has, for an unknown period.
-3. **Ship as 014 phase 1, with #11's additions as 014 phase 2 on the same feature directory.** Keeps
-   the number and the narrative; needs the spec to carry two scopes and two gate records.
+1. Ship what is built as 014 and move #11's additions to a new feature.
+2. **Hold 014 open and grow it to #11's scope. — CHOSEN.**
+3. Ship as 014 phase 1, with #11's additions as 014 phase 2 in the same feature directory.
 
-**Nothing here may be settled by whoever merges next.** #11's own reasoning for absorbing rather than
-paralleling — that two programmes writing the same conference-content tables is the coupling failure
-this project has fixed twice — applies to all three options and does not choose between them.
+**What the decision means, stated so it is not softened later.** 014 is **not complete** and its
+specification must not claim to be. #11's "rescoped and kept whole" is honoured literally: this is
+one feature carrying both scopes, and it closes when both are built. The cost is accepted rather
+than hidden — a complete, reviewed, thirteen-gates-green body of work waits on a client artifact
+that does not exist, and the wait has no known end.
+
+**What remains, and what it is blocked on:**
+
+| Added by #11 | Requirements | Blocked on |
+|---|---|---|
+| Multiple event types; agenda items with base information; virtual sessions carrying an access link; presenters in the event model | REQ-010–014 | nothing |
+| The profile taxonomy — sector, subsector, short productive-activity description, networking interests chosen from predefined options, optional company name | REQ-027–042 | **the client's interest, sector and subsector lists (REQ-033, REQ-034, REQ-036), which do not exist** |
+| Optional sessions with a maximum capacity, explicit enrolment, and per-activity closing rules and deadlines | REQ-078–086 | nothing |
+| An administrative interface for creating events | REQ-113–115 | **already delivered by the built tranche** |
+
+**One row of that table is worth reading twice.** REQ-113–115 asks for exactly what this branch has
+already built, so #11's rescope is not four additions to an unbuilt feature — it is three additions
+to a feature whose original request is done. Two of the three are unblocked today; only the profile
+taxonomy waits on the client, and it waits on a *list*, not a decision.
+
+**#11's reasoning for absorbing rather than paralleling stands and is why this choice is coherent**:
+two programmes writing the same conference-content tables is the implicit-coupling failure this
+project has already fixed twice. Splitting 014 would have recreated it.
 
 **Numbered 011–013 when #09 ran, and delivered as 013–015.** The UAT deployment work took 011 from a
 parallel branch while this programme was in flight, so it shifted rather than renumbering a phase

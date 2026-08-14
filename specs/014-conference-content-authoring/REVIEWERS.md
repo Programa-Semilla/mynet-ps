@@ -1,12 +1,35 @@
 # Review Guide: Conference Content Authoring
 
-**Generated**: 2026-08-12 | **Spec**: [spec.md](spec.md)
+**Generated**: 2026-08-12 | **Updated**: 2026-08-14 (merge of `develop`) | **Spec**: [spec.md](spec.md)
 
 > **Read this first.** This PR carries **constitution v5.2.0**, drafted for this feature and
 > **ratified by the owner on 2026-08-12** before any code was written — the same arrangement 008,
-> 009 and 013 each shipped under. It is standing decisions **40–44**, and it is two decisions rather
+> 009 and 013 each shipped under. It is standing decisions **45–49**, and it is two decisions rather
 > than one: a second notification trigger, and an organizer's authority to create a conference.
 > Both are in Key Decisions below.
+>
+> ### Two things about the numbers, before you go looking for them
+>
+> **1. The amendment was drafted as v4.2.0 and its decisions as 40–44.** While this branch was open,
+> `develop` ran 4.1.0 → 5.0.0 → 5.1.0 from the same base (feature 016, authored in parallel and
+> merged first). 4.2.0 does not sort above 5.1.0, so on **2026-08-14** this rebased to **v5.2.0**,
+> its standing decisions to **45–49**, and its register entries — drafted as 27 and 28 — to **29 and
+> 30**, because 5.0.0 had already opened its own 27 and 28 on different subjects. **Nothing changed
+> in substance**; the merge commit and `deviations.md` **D22** carry the full account. If you are
+> reviewing against notes written before that date, subtract five from every decision number.
+>
+> **2. This PR is tranche 1 of an open feature, not a finished one.** Brainstorm #11 rescoped 014
+> from the same parallel branch, and the owner decided on 2026-08-14 that 014 **stays open and
+> grows** rather than closing here. Tranche 2 — event types, optional sessions with capacity and
+> enrolment, the profile taxonomy — is specified in `spec.md`'s header and **has no tasks and no
+> code**. Review this as a complete, self-contained body of work; do **not** review it as the whole
+> of 014, and do not expect the spec to claim completeness.
+>
+> **What to distrust in this diff.** Fifteen code files auto-merged from `develop` without a
+> conflict. One guard genuinely broke — `marker-not-cached.test.ts` froze the device-capability
+> count at seven and 016 ratified an eighth — and it was **rewritten rather than patched to eight**,
+> for reasons D22 gives. That fix exposed a latent defect in `branchPoint`, which preferred a stale
+> local `develop` over `origin/develop`. Both are worth a second reader.
 
 ## Why This Change
 

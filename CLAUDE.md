@@ -421,7 +421,16 @@ generated file is erased by the next regeneration, and putting it on a dedicated
 connection covers *every* migration, including `0003`, whose missing timeout was a recorded
 unclaimed defect from 004's review.
 
-**014 (Conference content authoring) is implemented**, on constitution **v5.2.0** — the amendment
+**014 (Conference content authoring) is OPEN, with its first tranche implemented and green.**
+Brainstorm #11 rescoped it from a parallel branch on 2026-08-12, and the owner decided on 2026-08-14
+that **014 stays open and grows** rather than closing at what was built — #11's *"rescoped and kept
+whole"*, honoured literally. Tranche 2 is event types, optional sessions with capacity and enrolment,
+and the profile taxonomy; **two of its three parts are unblocked today**, and only the taxonomy waits
+on the client's interest, sector and subsector lists, which do not exist. It has no tasks and no
+code, and `specs/014-conference-content-authoring/spec.md` carries the scope. Everything below
+describes **tranche 1**, which is complete.
+
+**Tranche 1 is implemented**, on constitution **v5.2.0** — the amendment
 that gated its first line of code, as v3.1.0 gated 007's Phase 7, v3.2.0 gated 008, v3.3.0 gated 009
 and v4.0.0 gated 013. It delivers standing decisions 45–49 and is the **second** administrative
 feature: an organizer authors tracks, rooms, speakers and sessions in a conference they are assigned
@@ -1569,8 +1578,8 @@ lesson about version numbers three times over. **A third strand now runs beside 
 feedback programme that v5.0.0 opened, of which **016 is delivered and 017 (the Q&A rebuild) is
 not startable**.
 
-**014 is in flight as of 2026-08-14, and that sentence replaces one written a day earlier saying
-nothing was.** This is the collision itself, recorded where it happened: 016 was authored on
+**014 is in flight as of 2026-08-14 and stays in flight after its first tranche lands, by decision.**
+That sentence replaces one written a day earlier saying nothing was in flight. This is the collision itself, recorded where it happened: 016 was authored on
 `develop` while 014 was authored on a branch taken before it, and each artifact honestly described a
 project in which the other did not exist. 014 is implemented and merged `develop` into itself on
 2026-08-14, taking the renumbering described under standing decision 45. **017 is blocked** —

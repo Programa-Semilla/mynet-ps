@@ -4,11 +4,41 @@
 
 **Created**: 2026-08-12
 
-**Status**: Ready for implementation — **constitution v5.2.0 RATIFIED 2026-08-12.**
+**Status**: **OPEN — tranche 1 of 2 implemented and green; tranche 2 specified below and not built.**
+Constitution v5.2.0 RATIFIED 2026-08-12. **This feature is not complete and this document does not
+claim it is.**
 
-**Input**: Brainstorm #10 (`brainstorm/10-conference-content-authoring.md`), decided 2026-08-12.
-Licensed in principle by constitution v4.0.0 standing decision 36, which names 014 as the second
-feature of the administrative programme.
+**Input**: Brainstorm #10 (`brainstorm/10-conference-content-authoring.md`), decided 2026-08-12,
+**and brainstorm #11** (`brainstorm/11-client-feedback-programme.md`), which rescoped this feature
+on 2026-08-12 from a parallel branch. Licensed in principle by constitution v4.0.0 standing decision
+36, which names 014 as the second feature of the administrative programme.
+
+> ### This feature carries two scopes, and the second arrived after the first was built
+>
+> Everything below the "Requirements" heading is **tranche 1** — brainstorm #10's scope, authored
+> before #11 existed, implemented in full and green on thirteen of thirteen gates. **Tranche 2 is
+> #11's rescope**, and the owner decided on **2026-08-14** that 014 stays open and grows to carry it
+> rather than being closed and succeeded. #11's own words are *"rescoped and kept whole"*, and that
+> is honoured literally: this feature closes when both tranches are built.
+>
+> **The cost is recorded rather than hidden.** A complete, reviewed body of work waits, and the wait
+> has no known end because part of what it waits for is a list only the client can supply.
+>
+> | Tranche 2 | Requirements | Blocked on |
+> |---|---|---|
+> | Multiple event types; agenda items with base information; virtual sessions carrying an access link; presenters in the event model | REQ-010–014 | nothing |
+> | The profile taxonomy — sector, subsector, short productive-activity description, networking interests from predefined options, optional company name | REQ-027–042 | **the client's interest, sector and subsector lists (REQ-033, REQ-034, REQ-036), which do not exist** |
+> | Optional sessions with a maximum capacity, explicit enrolment, and per-activity closing rules and deadlines | REQ-078–086 | nothing |
+> | An administrative interface for creating events | REQ-113–115 | **satisfied by tranche 1** |
+>
+> **Two of the three outstanding rows are unblocked today.** Only the profile taxonomy waits on the
+> client, and it waits on a *list* rather than on a decision — which is worth knowing before anybody
+> concludes the whole feature is stalled. Tranche 2 needs its own requirements, its own plan and its
+> own migration number; **none is claimed here**, and `0011` covers tranche 1 alone.
+>
+> **Tranche 2 must not be started by inference from this note.** It needs the same route every
+> feature takes — requirements written against the REQ ranges above, a plan, a task list, and the
+> Feature Declarations rows discharged a second time.
 
 > **v5.2.0 was ratified on 2026-08-12, unchanged from the drafted text**, so every requirement citing
 > N1–N5 stands as written. The amendment gated the first line of code, as v3.1.0 gated 007's Phase 7,
