@@ -272,12 +272,60 @@ export const Messages = () => {
     </div>
   )
 
+  /*
+   * `h-full` is what makes this destination fill the bounded shell rather than scroll inside it,
+   * and it is the reason `Thread.tsx`'s internal scroll finally resolves: `AppShell` now has a
+   * definite height (see its header), so 100% here is a real number and the `flex-1 min-h-0`
+   * chain below can shrink against it. Without this the section would size to its content and
+   * `main` would scroll — correct for the other four destinations, and the composer defect for
+   * this one, because the send control must stay on screen while the history moves behind it.
+   */
   return (
-    <section aria-labelledby={headingId} className="flex min-h-0 flex-col px-4 py-6 tablet:px-6">
-      <h1 id={headingId} className="mb-1 font-display text-2xl font-semibold text-text-primary">
+    <section
+      aria-labelledby={headingId}
+      className={`flex h-full min-h-0 flex-col px-4 tablet:px-6 tablet:py-6 ${
+        threadOpen ? 'py-3' : 'py-6'
+      }`}
+    >
+      {/*
+        ─────────────────────────────────────────────────────────────────────────────────────
+        **THE DESTINATION HEADING STANDS DOWN ON THE MOBILE THREAD VIEW, AND IT HAS TO.**
+
+        This file's header describes the mobile band as *two separate full-width views* — the
+        list, or the thread, never both — so a "Messages" title and a sentence explaining what
+        Messages are sit above a conversation the reader is already inside. They are ~88px of a
+        420px viewport, which is the height of a phone with its keyboard raised.
+
+        That is not a tidiness argument. With the shell bounded, everything on this screen has to
+        fit rather than push the page taller, and at 375×420 the thread's own header plus the
+        composer need about 50px more than what was left. Reclaiming the heading here is what
+        makes FR-1003 hold at the narrowest supported width instead of nearly holding.
+
+        **`sr-only` rather than `hidden`**, because the section is `aria-labelledby` this element:
+        removing it would leave the region unnamed for a screen reader, which trades a layout fix
+        for an accessibility regression. From tablet up both panes are on screen at once and the
+        heading names the whole workspace, so it returns.
+        ─────────────────────────────────────────────────────────────────────────────────────
+      */}
+      <h1
+        id={headingId}
+        className={`font-display text-2xl font-semibold text-text-primary tablet:not-sr-only tablet:mb-1 ${
+          threadOpen ? 'sr-only' : 'mb-1'
+        }`}
+      >
         Messages
       </h1>
-      <p className="mb-6 text-sm text-text-muted">
+      {/*
+        The orientation sentence goes at **every** band once a thread is open, not only on mobile.
+        It is what tipped the tablet band over: at 900px it wraps to two lines and at 1440px it
+        does not, which is the entire 10px difference between those two measuring +8.7px inside
+        the viewport and −1.3px outside it. A guarantee decided by where a sentence happens to
+        wrap is the same fragility as one decided by which font is installed.
+
+        The heading itself stays from tablet up, where both panes are on screen and it names the
+        workspace rather than repeating the conversation you are already reading.
+      */}
+      <p className={`text-sm text-text-muted ${threadOpen ? 'hidden' : 'mb-6'}`}>
         Your conversations with other attendees. They stay with you across every conference.
       </p>
 
@@ -292,8 +340,18 @@ export const Messages = () => {
       <div className="grid min-h-0 flex-1 gap-4 tablet:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
         {/* Mobile: the list is not rendered at all while a thread is open — see the header for
             why this is not a CSS `hidden`. From tablet up both panes are always present. */}
-        {/* `listPane` is what FR-1054's pause condition measures — see T017 above. */}
-        <div ref={listPane} className={threadOpen ? 'hidden min-w-0 tablet:block' : 'min-w-0'}>
+        {/* `listPane` is what FR-1054's pause condition measures — see T017 above. `min-h-0` and
+            the scroll are what stop a long list stretching the row it shares with the thread, now
+            that the row has a definite height to be stretched past. The `hidden`/visible split is
+            unchanged, because that is what `useDisplayed` reads. */}
+        <div
+          ref={listPane}
+          className={
+            threadOpen
+              ? 'hidden min-h-0 min-w-0 overflow-y-auto tablet:block'
+              : 'min-h-0 min-w-0 overflow-y-auto'
+          }
+        >
           {list}
         </div>
 
