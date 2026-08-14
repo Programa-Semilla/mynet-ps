@@ -78,4 +78,41 @@ describe('Messages renders nothing M5 puts out of scope', () => {
 
     expect(offending).toEqual([])
   })
+
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════════════════
+   * T019 (016) — **the conversation repository stays undecorated** (FR-1013).
+   *
+   * ═══════════════════════════════════════════════════════════════════════════════════════
+   * **A REFRESH LOOP IS THE CHANGE MOST LIKELY TO TEMPT SOMEBODY INTO CACHING THIS.**
+   *
+   * 016 gave the conversation list a ten-second poll. The obvious next thought is that a list
+   * being re-read every ten seconds should be cached so the first paint has something in it —
+   * and message content is the most sensitive data in the product, which is why 007 refused to
+   * cache Messages at all and said so per member at the composition root.
+   *
+   * Worse, the decorator's default is the wrong way round for this: it treats **every method not
+   * named in `reads` as a write**, and a write purges the whole conference prefix. That is the
+   * defect 008 shipped with `slots`. Not decorating removes the mechanism rather than
+   * configuring it — there is no `reads` map to omit from and no `args[0]` to misread.
+   * ═══════════════════════════════════════════════════════════════════════════════════════
+   */
+  it('T019 — leaves the conversation and message repositories uncached (FR-1013)', () => {
+    const services = readFileSync(join(import.meta.dirname, '../../src/app/services.ts'), 'utf8')
+
+    for (const member of ['conversations', 'messages']) {
+      expect(
+        new RegExp(`${member}: new Http[A-Za-z]+Repository\\(http\\)`).test(services),
+        `The ${member} repository is no longer constructed bare at the composition root. ` +
+          'Messages is uncached by decision (FR-1013): its content is the most sensitive data ' +
+          'in the product, and the decorator revokes on age alone.',
+      ).toBe(true)
+
+      expect(
+        new RegExp(`const ${member} = cached\\(`).test(services),
+        `The ${member} repository has been wrapped in \`cached\`. That is a change to what is ` +
+          'written to this device, and it needs a decision rather than a line.',
+      ).toBe(false)
+    }
+  })
 })

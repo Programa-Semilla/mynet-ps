@@ -89,29 +89,45 @@ const MARK_ASPECT = CROP.width / CROP.height
 /**
  * A maskable icon's guaranteed-visible region is a **circle** whose diameter is 80% of the
  * icon's smallest dimension.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ * **T062 (016) — THIS AND `STANDARD_FILL` NO LONGER SIZE ANY ASSET THIS SCRIPT WRITES.**
+ *
+ * MyNet's install icons moved to `generate-install-icons.mjs` and the second brand source, so
+ * the only plated outputs left here are the administrative favicons, which use `FAVICON_FILL`.
+ * Saying so matters: 013's review named "a header describing call relationships that do not
+ * exist" its most transferable finding, and *"every sizing below is expressed in terms of it"*
+ * had quietly stopped being true of the icons.
+ *
+ * **Kept rather than deleted, for two reasons.** They remain the correct geometry *for the
+ * board*, and `generate-brand-assets.test.mjs` is where the safe-zone reasoning is argued at
+ * length — including the wrong answer, asserted so a future edit that reintroduces
+ * `0.8 × size` fails on the line explaining why. 010's follow-ups book a vector redraw of the
+ * board, which is the change that would use these again.
+ * ─────────────────────────────────────────────────────────────────────────────────────────
  */
 const SAFE_CIRCLE_DIAMETER_FRACTION = 0.8
 
 /**
- * How much of a standard (non-maskable) icon the mark's height fills.
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ * **T062 (016) — `STANDARD_FILL` LIVED HERE AND IS GONE, BECAUSE ITS ONLY OUTPUTS MOVED.**
  *
- * No safe zone applies to these, so this is a design choice rather than a constraint: it reads
- * as a confident mark with breathing room rather than a glyph swimming in navy.
+ * It sized MyNet's standard install icons — `icon-192`, `icon-512` and `apple-touch-icon` —
+ * and every one of those is now built by `generate-install-icons.mjs` from the second brand
+ * source (constitution v5.0.0, C4). Nothing this script writes uses it, so keeping it would be
+ * a constant that looks like it governs something and governs nothing.
  *
- * **The ceiling is not a design choice, and it is why this is 0.58 rather than 0.62.** The larger
- * value put the mark 317px tall in the 512 icon, drawn from a 300px master — a 1.06× upscale, and
- * the only asset in this feature that was one. It was defensible on its own ("visually
- * indistinguishable") and indefensible against the written record: the spec, the icons README and
- * the constitution amendment all state that nothing here is upscaled, and one asset quietly
- * contradicting that is how a booked follow-up later gets read as evidence something shipped soft.
- *
- * At 0.58 the 512 icon's mark is 296.9px — under the master, so the claim is now true everywhere
- * rather than nearly everywhere. Keep any future value at or below `CROP.height / 512`.
+ * **The reasoning it carried is not lost and is worth finding again**, because it is the origin
+ * of the upscale rule 016 had to write an exception to. 010 set it to 0.58 rather than 0.62
+ * after discovering the larger value drew the mark 317px tall in the 512 icon from a 300px
+ * master — a 1.06× upscale, and the only one in that feature. It was fixed by capping the fill
+ * rather than by weakening the claim, and that decision is why `brand-audit.mjs` fails on any
+ * upscale at all. The new pipeline carries the same 0.58 and records why it matches.
+ * ─────────────────────────────────────────────────────────────────────────────────────────
  */
-const STANDARD_FILL = 0.58
 
 /**
- * The same, for the favicons — deliberately tighter.
+ * How much of a favicon the mark's height fills — deliberately tighter than an install icon.
  *
  * A favicon has no safe zone and no launcher mask, and tighter is *sharper*, because more of the
  * available pixels carry the shape. At 16px the mark is legible but soft (research R4); 32px is
@@ -350,24 +366,28 @@ export const buildAssets = async () => {
   const favicon16 = await plate(alpha, 16, 16 * FAVICON_FILL)
 
   const assets = [
-    // Install icons — replacing the provisional set at the same names and sizes (FR-810).
-    [`${web}/icons/icon-192.png`, await plate(alpha, 192, 192 * STANDARD_FILL)],
-    [`${web}/icons/icon-512.png`, await plate(alpha, 512, 512 * STANDARD_FILL)],
-    // The one asset with a geometric constraint rather than a design choice (FR-811).
-    [`${web}/icons/icon-maskable-512.png`, await plate(alpha, 512, maskableMarkHeight(512))],
-    // Opaque, because iOS renders transparency as black (FR-812).
-    [`${web}/apple-touch-icon.png`, await plate(alpha, 180, 180 * STANDARD_FILL)],
-
-    // Browser chrome — `index.html` had neither of these links before this feature (FR-816).
-    [`${web}/favicon-32.png`, favicon32],
-    [`${web}/favicon-16.png`, favicon16],
-    [
-      `${web}/favicon.ico`,
-      ico([
-        { size: 16, png: favicon16 },
-        { size: 32, png: favicon32 },
-      ]),
-    ],
+    /**
+     * ═══════════════════════════════════════════════════════════════════════════════════════
+     * T062 (016) — **MyNet's install icons and favicons are NO LONGER BUILT HERE** (FR-1038).
+     *
+     * They moved to `scripts/generate-install-icons.mjs`, which derives them from the owner's
+     * second source, `assets/brand/new-logo.png` (constitution v5.0.0, C4). This pipeline keeps
+     * the board, `assets/brand/logo.png`, and keeps everything the board is still the source of:
+     * **every in-app mark in both products** (FR-1039) and **every administrative asset**
+     * (FR-1040).
+     *
+     * **The split is by output, not by source-of-truth-for-the-brand**, and the difference
+     * matters: this is not a rebrand. Which of the two marks is MyNet's is **register entry 28**,
+     * open, and no feature may resolve it by quietly pointing one of these lists at the other's
+     * source.
+     *
+     * The two inventories are deliberately readable side by side, so a reviewer confirms the
+     * boundary by reading two lists rather than by following writes through code. Nothing below
+     * writes into `apps/web/public/icons`, `apps/web/apple-touch-icon.png` or MyNet's favicons;
+     * `brand-audit.mjs` checks both pipelines against disk and would report a collision as a
+     * mismatch.
+     * ═══════════════════════════════════════════════════════════════════════════════════════
+     */
 
     // In-app marks — **no plate**, so they take the surface behind them (FR-820a), and one matte
     // painted twice so the two colourways cannot drift apart in shape (FR-820b).

@@ -42,7 +42,12 @@ import { events } from './events.js'
  */
 
 /**
- * One attendee has given their card to another. **Directional**, and one row per direction.
+ * One attendee's card is held by another. **Directional**, and one row per direction.
+ *
+ * **Since 016 an exchange writes two of these rows in one transaction** (v5.0.0 C1, FR-1021,
+ * FR-1022), so a row no longer implies a deliberate act by its `sharer_id`: half of them arise
+ * from the other party sharing first. The column meanings survive that — `sharer_id` is still
+ * "whose card it is" — and the design below is why the reversal needed **no migration at all**.
  *
  * ═════════════════════════════════════════════════════════════════════════════════════════
  * **WHY THERE IS NO ORDERED-PAIR NORMALISATION HERE, UNLIKE `conversation_pairs`** (T007,
@@ -53,11 +58,17 @@ import { events } from './events.js'
  * without the ordering its unique index would permit both rows and the pair would have two
  * conversations.
  *
- * **A card is directional** (FR-602). A→B and B→A are two different, both-valid facts: each
- * person has shared with the other, and the second share is what makes an exchange *reciprocal*.
- * Copying the ordered-pair trick would therefore not be merely unnecessary — it would make a
- * reciprocal exchange **impossible**, collapsing the two facts into one and silently deciding
- * that holding somebody's card means they hold yours.
+ * **A card is directional.** A→B and B→A are two different, both-valid facts: each row says whose
+ * card is held by whom. Copying the ordered-pair trick would therefore not be merely unnecessary
+ * — it would make a reciprocal exchange **impossible**, collapsing the two facts into one.
+ *
+ * **016 is the case that proved this, and it arrived from the opposite direction to the one
+ * expected.** The original note warned that normalising would silently decide "holding somebody's
+ * card means they hold yours" — which is, as of v5.0.0 (C1), exactly what the product now does.
+ * The design survives the reversal intact and pays for it: because the constraint is
+ * `(sharer_id, recipient_id)` in that order, both rows of a mutual exchange coexist with no
+ * conflict, and making exchange mutual cost **no schema change**. Had the pair been normalised,
+ * this feature would have needed a migration and a rewrite of every read over the table.
  *
  * The neighbouring table looks like a precedent and is not. `attendee_blocks` sits one file over
  * with the *same* directional treatment for its own reasons, which is why each of the three says

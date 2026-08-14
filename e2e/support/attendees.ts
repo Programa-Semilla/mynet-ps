@@ -118,7 +118,7 @@ export const useConference = async (page: Page, name: string): Promise<void> => 
 /** Fills and submits the sign-in form, and waits until the workspace has rendered. */
 export const signIn = async (page: Page, attendee: SeededAttendee): Promise<void> => {
   await page.getByLabel('Email address').fill(attendee.email)
-  await page.getByLabel('Password').fill(SEED_PASSWORD)
+  await page.getByLabel('Password', { exact: true }).fill(SEED_PASSWORD)
   await page.getByRole('button', { name: 'Sign in' }).click()
 
   await expect(page.getByRole('heading', { name: `Hello, ${attendee.displayName}` })).toBeVisible()

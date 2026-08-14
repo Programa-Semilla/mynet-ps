@@ -35,7 +35,7 @@ test.describe('durability', () => {
     await signIn(page, ADA)
 
     await page.getByRole('button', { name: 'Sign out' }).click()
-    await expect(page.getByLabel('Password')).toBeVisible()
+    await expect(page.getByLabel('Password', { exact: true })).toBeVisible()
 
     await signIn(page, ADA)
 
@@ -67,7 +67,7 @@ test.describe('durability', () => {
     // Sessions are rows, not process memory (FR-026). A restart that signed everybody out would
     // mean every deployment logged the whole conference out mid-event.
     await expect(page.getByRole('heading', { name: `Hello, ${ADA.displayName}` })).toBeVisible()
-    await expect(page.getByLabel('Password')).toHaveCount(0)
+    await expect(page.getByLabel('Password', { exact: true })).toHaveCount(0)
   })
 
   /**
@@ -114,7 +114,7 @@ test.describe('durability', () => {
     await signIn(page, ADA)
 
     await page.getByRole('button', { name: 'Sign out' }).click()
-    await expect(page.getByLabel('Password')).toBeVisible()
+    await expect(page.getByLabel('Password', { exact: true })).toBeVisible()
 
     const residue = await page.evaluate(() => {
       const readAll = (store: Storage): string =>

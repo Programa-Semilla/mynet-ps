@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react'
 
 import { classify, describe } from '../errors.js'
 import { useAdminSession } from '../session.js'
+import { PasswordField } from '../ui/PasswordField.js'
 
 /** The floor the server enforces too. Stated here so the control is disabled rather than refused. */
 const MINIMUM_LENGTH = 12
@@ -43,6 +44,19 @@ export const ReplaceCredential = () => {
   // Disabled, never a post-submit error — the constitution's required-states constraint.
   const ready = currentPassword.length > 0 && longEnough && matches
 
+  /**
+   * T029 (016) — **the mismatch is DESCRIBED, not merely enforced** (FR-1018, FR-1050).
+   *
+   * This screen has disabled its submit on a mismatch since 013, which is half of the
+   * requirement and the half that is easy to notice. The other half is that the reader is told
+   * *why* the control is off: a disabled button beside two filled-in fields, with nothing
+   * explaining it, is a dead end somebody can sit in front of indefinitely.
+   *
+   * Shown only once there is something to compare, so it is not an error message greeting
+   * somebody who has typed one character of a password they are about to type correctly.
+   */
+  const mismatch = confirmation.length > 0 && !matches
+
   const submit = async (event: FormEvent) => {
     event.preventDefault()
     if (!ready || submitting) return
@@ -80,27 +94,29 @@ export const ReplaceCredential = () => {
           <label htmlFor="current-password" className="block text-sm font-medium text-text-primary">
             Current password
           </label>
-          <input
-            id="current-password"
-            type="password"
-            autoComplete="current-password"
-            value={currentPassword}
-            onChange={(event) => setCurrentPassword(event.target.value)}
-            className="mt-1 mb-4 block min-h-11 w-full rounded-lg border border-border-strong px-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-coral-500"
-          />
+          <div className="mt-1 mb-4">
+            <PasswordField
+              id="current-password"
+              autoComplete="current-password"
+              value={currentPassword}
+              onChange={setCurrentPassword}
+              className="block min-h-11 w-full rounded-lg border border-border-strong px-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-coral-500"
+            />
+          </div>
 
           <label htmlFor="new-password" className="block text-sm font-medium text-text-primary">
             New password
           </label>
-          <input
-            id="new-password"
-            type="password"
-            autoComplete="new-password"
-            value={newPassword}
-            onChange={(event) => setNewPassword(event.target.value)}
-            aria-describedby="new-password-hint"
-            className="mt-1 block min-h-11 w-full rounded-lg border border-border-strong px-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-coral-500"
-          />
+          <div className="mt-1">
+            <PasswordField
+              id="new-password"
+              autoComplete="new-password"
+              value={newPassword}
+              onChange={setNewPassword}
+              describedBy="new-password-hint"
+              className="block min-h-11 w-full rounded-lg border border-border-strong px-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-coral-500"
+            />
+          </div>
           {/* Stated before submission, and bound to the field, so the rule is never a surprise. */}
           <p id="new-password-hint" className="mt-1 mb-4 text-xs text-text-muted">
             At least {MINIMUM_LENGTH} characters.
@@ -109,14 +125,26 @@ export const ReplaceCredential = () => {
           <label htmlFor="confirm-password" className="block text-sm font-medium text-text-primary">
             Confirm new password
           </label>
-          <input
-            id="confirm-password"
-            type="password"
-            autoComplete="new-password"
-            value={confirmation}
-            onChange={(event) => setConfirmation(event.target.value)}
-            className="mt-1 mb-4 block min-h-11 w-full rounded-lg border border-border-strong px-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-coral-500"
-          />
+          <div className="mt-1">
+            <PasswordField
+              id="confirm-password"
+              autoComplete="new-password"
+              value={confirmation}
+              onChange={setConfirmation}
+              {...(mismatch ? { describedBy: 'confirm-password-mismatch', invalid: true } : {})}
+              className="block min-h-11 w-full rounded-lg border border-border-strong px-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-coral-500"
+            />
+          </div>
+          {/*
+            Bound to the field by `aria-describedby`, not merely rendered near it — a message a
+            sighted reader connects by proximity is unconnected to anything for a screen reader.
+          */}
+          <p
+            id="confirm-password-mismatch"
+            className={`mt-1 mb-4 text-xs ${mismatch ? 'text-danger-700' : 'sr-only'}`}
+          >
+            {mismatch ? 'Both passwords must be the same before you can continue.' : ''}
+          </p>
 
           {failure ? (
             <p

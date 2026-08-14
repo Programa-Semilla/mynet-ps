@@ -8,6 +8,8 @@ import type {
   DeviceServices,
   NotificationService,
   SecureStorage,
+  InstallService,
+  InstallState,
   VisibilityService,
 } from '../src/interfaces/index.js'
 import { webDevices } from '../src/web/devices.js'
@@ -114,6 +116,7 @@ const doubles = () => {
 
   const listeners = new Set<(online: boolean) => void>()
   const visibilityListeners = new Set<(visible: boolean) => void>()
+  const installListeners = new Set<(state: InstallState) => void>()
   const connectivity: ConnectivityService = {
     isOnline: () => {
       calls.push('connectivity.isOnline')
@@ -144,6 +147,36 @@ const doubles = () => {
     },
   }
 
+  /**
+   * T046 (016) — the eighth capability, and this file is what forced it to be **declared**.
+   *
+   * ═══════════════════════════════════════════════════════════════════════════════════════
+   * **THIS TEST DID NOT COMPILE UNTIL THE MEMBER WAS ADDED, WHICH IS THE GUARD WORKING.**
+   *
+   * `InstallService` reached `DeviceServices` and the typechecker immediately refused this
+   * object — *"Property 'install' is missing"* — before any behavioural test ran. That is the
+   * mechanism 007 recorded for `VisibilityService`: substituting the registry **whole** is what
+   * makes FR-047's claim testable in one object, and it means a capability cannot be added
+   * quietly. The compile error is the prompt to go and amend Principle V's list, which is why
+   * constitution v5.1.0 exists at all.
+   * ═══════════════════════════════════════════════════════════════════════════════════════
+   *
+   * The double reports **uninstalled, non-mobile, and no prompt available** — the desktop case,
+   * where FR-1031 renders nothing. `promptToInstall: null` is the half that matters: it is the
+   * iOS shape, and a caller that assumed a function would fail here rather than on a phone.
+   */
+  const install: InstallService = {
+    current: () => {
+      calls.push('install.current')
+      return { installed: false, mobile: false, promptToInstall: null }
+    },
+    subscribe: (listener) => {
+      calls.push('install.subscribe')
+      installListeners.add(listener)
+      return () => installListeners.delete(listener)
+    },
+  }
+
   const devices: DeviceServices = {
     notifications,
     calendar,
@@ -152,9 +185,10 @@ const doubles = () => {
     secureStorage,
     connectivity,
     visibility,
+    install,
   }
 
-  return { devices, calls, listeners, visibilityListeners }
+  return { devices, calls, listeners, visibilityListeners, installListeners }
 }
 
 /**
@@ -215,13 +249,30 @@ const CAPABILITIES = [
   'connectivity',
   // 007 — see the block above. Added with its reasoning, not merely added.
   'visibility',
+  // ═══════════════════════════════════════════════════════════════════════════════════════
+  // **016 — the EIGHTH, and this assertion is what sent somebody to amend the constitution.**
+  //
+  // `InstallService`: whether the application is running installed, and how it may be installed
+  // on this device. The second capability added by an implementation rather than by a product
+  // decision, and it followed `VisibilityService`'s path exactly — FR-1031 needs
+  // `matchMedia('(display-mode: standalone)')` and a `beforeinstallprompt` listener on `window`,
+  // `mynet/no-direct-platform-access` names both in its DOM set, so the choice was a capability
+  // or a lint exemption. An exemption would have traded a structural boundary for an install
+  // banner.
+  //
+  // **It is here because Principle V's list now says eight** (constitution v5.1.0). Editing this
+  // line before that amendment landed would have been the decision nobody recorded, which is the
+  // exact failure the note above describes.
+  // ═══════════════════════════════════════════════════════════════════════════════════════
+  'install',
 ] as const
 
 describe('device capability substitution', () => {
   it('names exactly the capabilities the constitution fixes, plus those declared since', () => {
-    // Principle V names six. Not pluralised, not suffixed with `Provider`. An **eighth** appearing
-    // here without a recorded decision is a decision nobody recorded — which is what this
-    // assertion caught when 007 added the seventh.
+    // Principle V named six, then seven (3.1.0), and now eight (5.1.0). Not pluralised, not
+    // suffixed with `Provider`. A **ninth** appearing here without a recorded decision is a
+    // decision nobody recorded — which is what this assertion caught when 007 added the seventh
+    // and again when 016 added the eighth.
     expect(Object.keys(webDevices()).sort()).toEqual([...CAPABILITIES].sort())
   })
 

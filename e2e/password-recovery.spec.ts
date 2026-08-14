@@ -37,6 +37,9 @@ test.describe('password recovery', () => {
     await page.getByLabel(/email address/i).fill(attendee.email)
     await page.getByLabel(/display name/i).fill(attendee.displayName)
     await page.getByLabel(/^password$/i).fill(attendee.password)
+    // 016 — sign-up carries a confirmation field (FR-1017), and submission stays
+    // disabled until the two agree (FR-1018).
+    await page.getByLabel(/confirm password/i).fill(attendee.password)
     await page.getByRole('button', { name: /create account/i }).click()
     await expect(page.getByText(/not registered for any conferences yet/i)).toBeVisible()
 
@@ -69,10 +72,17 @@ test.describe('password recovery', () => {
 
     // The same policy sign-up states, stated the same way (FR-304).
     const confirm = page.getByRole('button', { name: /set password/i })
-    await page.getByLabel(/new password/i).fill('short')
+    await page.getByLabel('New password', { exact: true }).fill('short')
+    // 016 — the reset form carries a confirmation field (FR-1017); submission is
+    // disabled until the two agree (FR-1018).
+    await page.getByLabel(/confirm new password/i).fill('short')
     await expect(confirm).toBeDisabled()
 
-    await page.getByLabel(/new password/i).fill(attendee.newPassword)
+    await page.getByLabel('New password', { exact: true }).fill(attendee.newPassword)
+
+    // 016 — the reset form carries a confirmation field (FR-1017); submission is
+    // disabled until the two agree (FR-1018).
+    await page.getByLabel(/confirm new password/i).fill(attendee.newPassword)
     await expect(confirm).toBeEnabled()
     await confirm.click()
 
@@ -83,7 +93,7 @@ test.describe('password recovery', () => {
     // Access regained, unaided.
     await page.getByRole('link', { name: /sign in/i }).click()
     await page.getByLabel('Email address').fill(attendee.email)
-    await page.getByLabel('Password').fill(attendee.newPassword)
+    await page.getByLabel('Password', { exact: true }).fill(attendee.newPassword)
     await page.getByRole('button', { name: 'Sign in' }).click()
 
     // Registered for no conference, so Home shows the invitation rather than the greeting —
@@ -100,6 +110,9 @@ test.describe('password recovery', () => {
     await page.getByLabel(/email address/i).fill(attendee.email)
     await page.getByLabel(/display name/i).fill(attendee.displayName)
     await page.getByLabel(/^password$/i).fill(attendee.password)
+    // 016 — sign-up carries a confirmation field (FR-1017), and submission stays
+    // disabled until the two agree (FR-1018).
+    await page.getByLabel(/confirm password/i).fill(attendee.password)
     await page.getByRole('button', { name: /create account/i }).click()
     await expect(page.getByText(/not registered for any conferences yet/i)).toBeVisible()
 
@@ -110,7 +123,10 @@ test.describe('password recovery', () => {
 
     const link = await waitForLink('password-reset', attendee.email)
     await page.goto(link)
-    await page.getByLabel(/new password/i).fill(attendee.newPassword)
+    await page.getByLabel('New password', { exact: true }).fill(attendee.newPassword)
+    // 016 — the reset form carries a confirmation field (FR-1017); submission is
+    // disabled until the two agree (FR-1018).
+    await page.getByLabel(/confirm new password/i).fill(attendee.newPassword)
     await page.getByRole('button', { name: /set password/i }).click()
     await expect(page.getByText(/your password is set/i)).toBeVisible()
 
@@ -126,14 +142,17 @@ test.describe('password recovery', () => {
     // is not.
     // ───────────────────────────────────────────────────────────────────────────────────────
     await page.goto(link)
-    await page.getByLabel(/new password/i).fill('another-different-passphrase')
+    await page.getByLabel('New password', { exact: true }).fill('another-different-passphrase')
+    // 016 — the reset form carries a confirmation field (FR-1017); submission is
+    // disabled until the two agree (FR-1018).
+    await page.getByLabel(/confirm new password/i).fill('another-different-passphrase')
     await page.getByRole('button', { name: /set password/i }).click()
     await expect(page.getByText(/no longer valid/i)).toBeVisible()
 
     // A reset REPLACES the credential rather than adding one.
     await page.goto('/')
     await page.getByLabel('Email address').fill(attendee.email)
-    await page.getByLabel('Password').fill(attendee.password)
+    await page.getByLabel('Password', { exact: true }).fill(attendee.password)
     await page.getByRole('button', { name: 'Sign in' }).click()
     await expect(page.getByRole('alert')).toContainText(/did not match/i)
   })

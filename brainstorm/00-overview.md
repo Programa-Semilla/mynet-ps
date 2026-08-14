@@ -1,6 +1,13 @@
 # Brainstorm Overview
 
-Last updated: 2026-08-12 (**the delivery roadmap is complete**. Two sessions numbered #08 ran in
+Last updated: 2026-08-12 — **#10 and #11 land a client feedback round that reverses two amendments
+ratified in the previous 72 hours** (v3.2.0's one-directional card, v3.3.0's Q&A attribution),
+decomposes `assets/feedback-1.md` — 118 requirements from a 52-minute client conversation — into
+five features, and **absorbs them into the administrative programme** rather than running a third
+track. A new standing rule arrives with them: every App capability must state its administrative
+counterpart, or state that it has none.
+
+Earlier that day (**the delivery roadmap is complete**. Two sessions numbered #08 ran in
 parallel and both shipped: the **brand mark and application icons**, ratified as constitution
 **v3.4.0**, closing register entry 2 — the oldest in the register; and **UAT deployment and
 pre-public hardening**, ratified as **v3.5.0**. MyNet is deployed and serving at
@@ -32,6 +39,8 @@ win and this is stale.
 | 08 | 2026-08-10 | brand-mark-and-app-icons | **specified, then implemented**; register entry 2 ratified in constitution **v3.4.0** | `specs/010-brand-mark-and-app-icons/` |
 | 08 | 2026-08-10 | uat-deployment-and-hardening | **shipped (PR #19)**; five owner decisions ratified in constitution **v3.5.0** | `brainstorm/08-uat-deployment-and-hardening.md` |
 | 09 | 2026-08-11 | administrative-product | **decided, and ratified as constitution v4.0.0** the same day — standing decisions 31–36. Opened entries 24, 25, 26; **all three closed by v4.1.0** as decisions 37–39. Delivered as **012** | `brainstorm/09-administrative-product.md` |
+| 10 | 2026-08-12 | app-fixes-and-install-icon | **active** — six owner items from using the running product. Two are not what they look like: mutual card exchange **reverses v3.2.0 N2**, and the new icon is a *different mark* rather than a new size. Feeds **016** | `brainstorm/10-app-fixes-and-install-icon.md` |
+| 11 | 2026-08-12 | client-feedback-programme | **active** — decomposes `assets/feedback-1.md` (118 requirements, 19 areas) into five features. **Absorbs into the administrative programme** rather than running beside it. Reverses **v3.3.0** 48 hours after ratification. Feeds **017, 014, 015, 018, 019** | `brainstorm/11-client-feedback-programme.md` |
 
 Session 05 has no document of its own: 006 was specified without one, and the row records the
 session rather than a file. 009 likewise — it went straight to specification, and its row is
@@ -100,8 +109,22 @@ requires reversing a Principle III **prohibition** rather than filling an omissi
 | # | Phase | Status | Blocked by |
 |---|-------|--------|------------|
 | 013 | Administrative foundation — second actor, admin site, **abuse-report queue** | **shipped** — squash-merged to `develop`; amendments ratified as **v4.0.0** and **v4.1.0**. Migration `0009` | ~~24, 25, 26~~ — **all three closed by v4.1.0** |
-| 014 | Conference content authoring | **brainstormed** (#09); licensed by v4.0.0 | 013 |
-| 015 | Registration and attendee management | **brainstormed** (#09); licensed by v4.0.0 | 013 |
+| 016 | App fixes, mutual card exchange, install icon | **brainstormed** (#10). Amendment: reverses **v3.2.0 N2**, records the icon-upscale exception, ratifies the admin-counterpart rule. **No migration** | — |
+| 017 | **Q&A rebuilt** — moderation, identity, lifecycle, projection | **brainstormed** (#11). Amendment: reverses **v3.3.0** attribution and retracts shipped 009 FRs | 013 |
+| 014 | Conference content authoring — **rescoped and kept whole** | **re-brainstormed** (#11); #09's scoping superseded. Now also carries event types, optional sessions with capacity and enrolment, and the profile taxonomy | 013; **the client's interest and subsector lists, which do not exist** |
+| 015 | Registration and **invitations** — rescoped | **re-brainstormed** (#11). Completes standing decision 11 rather than reversing it | 013 |
+| 018 | Profile QR | **brainstormed** (#11) | 014 |
+| 019 | Event lifecycle and post-event material | **brainstormed** (#11). Carries **notification triggers 2 and 3**, and the question of whether this product gains a job runner | 014, 017 |
+
+**#11 replaces #09's three-feature table.** The client conversation of 2026-08-12 arrived after the
+attendee roadmap completed, and most of what it asks for has an administrative half — so it absorbs
+into this programme rather than running beside it. Two programmes authoring the same
+conference-content tables is the implicit coupling this project has already had to fix twice.
+
+**016 and 017 take the next free numbers rather than the next numbers in this sequence**, which is
+now the third time this has happened (011 over the administrative programme, 013 over its own
+sequence, and now these). It is not worth correcting; parallel reservations cannot see each other
+and the number settles at merge.
 
 **Numbered 011–013 when #09 ran, and delivered as 013–015.** The UAT deployment work took 011 from a
 parallel branch while this programme was in flight, so it shifted rather than renumbering a phase
@@ -224,6 +247,49 @@ named them — a reminder that the inbox ages, and that an entry can be resolved
 does not cite it, exactly as register entry 7 was.
 
 ## Open Threads
+
+### Opened 2026-08-12 by #10 and #11 — the client feedback round
+
+These are new and none of them existed four days ago. Listed first because two of them reverse
+decisions ratified inside the last 72 hours, and a reader who meets those reversals in a spec
+without meeting them here will read them as drift.
+
+- **Mutual card exchange reverses v3.2.0 N2** (decision 25), ratified 2026-08-10. Decided by the
+  owner on 2026-08-12; the amendment is 016's. **The metaphor is not the argument** — the
+  defensible ground is that a card exposes only what its owner already published to co-attendees,
+  which the client states independently at REQ-046, and that 007's block already severs cards both
+  ways. Two consequences must reach the spec: the exchange writes two rows in one transaction or
+  none, and whether the *recipient's* discoverability gates a first acquisition is genuinely
+  undecided.
+- **The client's Q&A model replaces 009's in full**, reversing v3.3.0 (decision 27) **48 hours
+  after ratification**. Correct rather than embarrassing: v3.3.0 recorded a deliberate exception
+  after explicitly refusing to derive it, which is what made it cheap to find and revisit. But
+  **first-name-versus-full-name is not settled** — the client's own OPEN-002 says so, and the
+  transcript contains both positions. 017's spec must confirm with her rather than pick.
+- **`assets/brand/new-logo.png` is a different mark, not a new size.** A gradient disc with a
+  wordmark, 114×133 RGBA, against the board's 1254×1254 coral-N-on-navy. The owner's decision is
+  **icon only, not a rebrand**. Three costs are recorded in #10: a ~4× upscale that
+  `brand-audit.mjs` currently fails the build on and which needs a *measured recorded exception*
+  rather than a weakened check; a maskable plate colour that cannot be derived the way the board's
+  was, because this source has alpha; and a home-screen icon that visibly differs from the in-app
+  coral mark, **knowingly accepted** — recorded so nobody later "fixes" it.
+- **The admin-counterpart rule is new governance**, set by the owner in this round: anything
+  requested in the App must be checked for whether its administrative counterpart exists or must be
+  built. Ratified with 016. It paid for itself immediately — "add a confirm-password field" is five
+  screens across two products, and the naive reading was one.
+- **Notification triggers 2 and 3 are in the transcript** (REQ-095, REQ-112) and the source-level
+  audit that blocks them exists for exactly this moment. Each needs an amendment, and REQ-112 needs
+  a **job runner this product has never had**.
+- **014 is now blocked on an external input.** REQ-033 and REQ-036 have the client supplying the
+  interest list and the depurated subsector lists; neither exists. Mitigated by specifying the
+  taxonomy as authored or seeded data so the schema does not wait on the content.
+- **Networking outside events is blocked on the client's lawyers**, by her own note (REQ-049). It
+  contradicts decision 7's per-event Discover, and what is actually being asked for is a *discovery*
+  surface outside an event — relationships already persist.
+- **Layout was caught by a person for the second time.** The mobile composer grows without a bound
+  until its send button is unreachable. Same class as 008's top-left dialog: the control exists, is
+  labelled, is focusable and submits, so every behavioural gate passes it. This is now a pattern
+  with two data points rather than an anecdote, and it strengthens register entry 4.
 
 ### Client decisions
 

@@ -11,8 +11,21 @@ rather than being repeated here.
 ## Prerequisites
 
 **Two accounts, in two browser profiles.** Every guarantee in this feature is about two people who
-are not interchangeable — one-directional sharing, proposal and acceptance, blocking. A
-single-account walkthrough proves almost nothing, exactly as it did in 007.
+are not interchangeable — card sharing, proposal and acceptance, blocking. A single-account
+walkthrough proves almost nothing, exactly as it did in 007.
+
+> **SUPERSEDED IN PART — read before walking this.** This document described sharing as
+> **one-directional**, which was correct when 008 shipped and is no longer. Constitution **v5.0.0
+> (C1)**, ratified 2026-08-12, made a card exchange **mutual**: one act, and both parties hold each
+> other's card. Feature **016** delivered it.
+>
+> So wherever a scenario below expects the sharer to receive nothing until the recipient shares
+> back, **the current, correct behaviour is that both contacts appear immediately**. That is not a
+> defect and must not be reported as one. Everything else here — proposal and acceptance, slot
+> availability, blocking — is unchanged.
+>
+> Left annotated rather than rewritten: this file is also the record of what 008 shipped, and 008's
+> own walkthrough has never been completed.
 
 **A third account is needed for scenario 2 only**, to hold a card from someone who is not registered
 for the event you are looking at.

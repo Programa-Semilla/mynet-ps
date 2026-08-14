@@ -139,6 +139,32 @@ const noDirectPlatformAccess = {
      * are not the exempted composition root, and the rule could not see any of them. SC-009's
      * count read zero because the detector was narrow, not because the violations were absent —
      * the "gate that passes while not checking" this codebase warns about elsewhere.
+     *
+     * ═══════════════════════════════════════════════════════════════════════════════════════
+     * **016 (review finding A3) — THE OBSERVER AND LAYOUT GLOBALS, AND WHY LEAVING THEM OUT WAS
+     * THE SAME MISTAKE THIS COMMENT ALREADY DESCRIBES.**
+     *
+     * `getComputedStyle` and `MutationObserver` were reached by `useDisplayed.ts` and reported by
+     * nothing, while `window.getComputedStyle(element)` — the identical call, written the other
+     * way — already failed. The asymmetry inside one feature is what makes the point: US5 needed
+     * **constitution v5.1.0 and an eighth device capability** because `matchMedia` happens to be
+     * on this list, and the only difference between the two cases is which identifiers somebody
+     * thought to enumerate. SC-008's "zero direct platform calls" was a count of what this set
+     * knew rather than of what was true.
+     *
+     * `ResizeObserver`, `IntersectionObserver` and `requestAnimationFrame` are added in the same
+     * change although nothing reaches for the last two today. A list naming only the calls that
+     * have already been made is the boundary that keeps discovering itself one violation late —
+     * the same reasoning `mynet/vendor-boundary` records for listing Mailgun's package names
+     * before anybody imports them.
+     *
+     * **These are NOT all viewport access, and the rule deliberately does not try to tell the two
+     * apart.** Measuring a node the component itself rendered is legitimate — `Composer.tsx` and
+     * `Thread.tsx` do it with `scrollHeight`, which is a property access this rule never sees.
+     * The judgement belongs at the call site, written down, and `useDisplayed.ts` is the one
+     * place that currently makes it: three per-line exemptions, each argued in that file's
+     * header, rather than a config entry exempting the whole file from every DOM global forever.
+     * ═══════════════════════════════════════════════════════════════════════════════════════
      */
     const DOM = new Set([
       'document',
@@ -150,6 +176,11 @@ const noDirectPlatformAccess = {
       'alert',
       'confirm',
       'caches',
+      'getComputedStyle',
+      'MutationObserver',
+      'ResizeObserver',
+      'IntersectionObserver',
+      'requestAnimationFrame',
     ])
 
     /**

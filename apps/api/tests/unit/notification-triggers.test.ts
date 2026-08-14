@@ -117,4 +117,43 @@ describe('a received message is the only notification trigger (FR-561)', () => {
 
     expect(dispatchers).toEqual([])
   })
+
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════════════════
+   * T036 (016) — **the card exchange dispatches nothing** (FR-1029).
+   *
+   * The two structural cases above already make this impossible, since only
+   * `routes/conversations.ts` may import the dispatcher or reach `app.push`. This names the card
+   * path anyway, for a reason 016 supplies and 007 could not:
+   *
+   * **C1 made acquiring a contact PASSIVE.** Until v5.0.0 a card only ever arrived because the
+   * holder reciprocated, so there was nothing to announce and nobody was tempted to announce it.
+   * Now a card appears in somebody's Network from another person's act, and "tell them" becomes
+   * the obvious next thought — it is one line, it reads as a kindness, and it is a second
+   * notification trigger, which the constitution requires somebody to *decide*.
+   *
+   * The specification records this as the open question C1 creates (*"is 'found on your next
+   * visit to Network' enough?"*) and answers it for now with FR-1029 plus FR-1030's absent Home
+   * card. So the refusal is deliberate and needs a named guard rather than an incidental one.
+   * ═══════════════════════════════════════════════════════════════════════════════════════
+   */
+  it('T036 — nothing on the card write path can dispatch (FR-1029)', () => {
+    const cardPath = ['routes/cards.ts', 'db/queries/cards.ts']
+
+    const sources = sourcesUnder(SRC).filter(({ name }) => cardPath.includes(name))
+
+    // The files exist. Renaming one must fail this rather than silently checking nothing.
+    expect(sources.map(({ name }) => name).sort()).toEqual([...cardPath].sort())
+
+    for (const { name, text } of sources) {
+      const code = codeOf(text)
+
+      expect(code, `${name} imports the notification dispatcher`).not.toMatch(
+        /from '.*notifications\//,
+      )
+      expect(code, `${name} reaches the push port`).not.toMatch(
+        /\bapp\.push\b|\bfastify\.push\b|\brequest\.server\.push\b/,
+      )
+    }
+  })
 })

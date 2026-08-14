@@ -220,8 +220,12 @@ export const buildApp = async (options: BuildAppOptions = {}): Promise<FastifyIn
   //
   //     **A third sibling, and its predicate is the first with a DIRECTION.** Event scope proves
   //     a registration and participation proves a symmetric membership; this proves that the
-  //     reader holds a card *from* the named attendee, never the reverse — which is what stops
-  //     sharing your own card from granting you a read of somebody else's (FR-602).
+  //     reader holds a card *from* the named attendee, never the reverse.
+  //
+  //     **It stays directional although exchanges became mutual at constitution v5.0.0 (C1)**,
+  //     and the reason changed with it: the row is the authority, so a symmetric `OR` would grant
+  //     a read from a *single* row — the state of every card written before 016. The full
+  //     argument is in `plugins/card-access.ts`, which is where it belongs.
   //
   //     It needs a third guard for the same structural reason 007 needed a second: card routes
   //     name no conference, so `event-scope-audit` never examines them and reports success

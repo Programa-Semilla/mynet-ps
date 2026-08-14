@@ -40,9 +40,19 @@ test.describe('Network', () => {
    * The actions are counted rather than described: open the profile, share, and the contact
    * exists. Navigating to Network to *look* at it is not part of the journey — the criterion is
    * about how much work it takes to make the relationship, not to admire it.
+   *
+   * ─────────────────────────────────────────────────────────────────────────────────────
+   * **T042 (016) — THE CONFIRMATION ASSERTION HERE REQUIRED THE RETRACTED MODEL** (FR-1021,
+   * FR-1022). It demanded `/you will hold theirs/`, and constitution **v5.0.0 (C1)** retracts
+   * it: one act writes both rows, so that sentence was false as it was displayed. Two green
+   * tests — this one and its component sibling — are why the copy survived every gate, and the
+   * title said *"sharing a card"* where the act is now an exchange.
+   * ─────────────────────────────────────────────────────────────────────────────────────
    * ═══════════════════════════════════════════════════════════════════════════════════════
    */
-  test('T142 — SC-601: sharing a card takes at most three deliberate actions', async ({ page }) => {
+  test('T142 — SC-601: exchanging cards takes at most three deliberate actions', async ({
+    page,
+  }) => {
     await signedIn(page, ADA)
 
     const started = Date.now()
@@ -65,10 +75,17 @@ test.describe('Network', () => {
     await expect(share).toBeVisible()
     await share.click()
 
-    // The confirmation names both parties and the direction, and says plainly that nothing came
-    // back — which is the sentence that closes the misreading (FR-603).
-    await expect(profile.getByRole('status')).toContainText(/your card is now with/i)
-    await expect(profile.getByRole('status')).toContainText(/you will hold theirs/i)
+    // The confirmation names both parties and states the exchange in **both** directions
+    // (FR-1021, FR-1022). The apostrophe is `&apos;` in the source and a plain `'` in the DOM,
+    // so the pattern tolerates either rather than pinning which entity the component used.
+    await expect(profile.getByRole('status')).toContainText(
+      new RegExp(`you and ${GRACE.displayName} have exchanged cards`, 'i'),
+    )
+    await expect(profile.getByRole('status')).toContainText(/each see the other.s profile/i)
+
+    // The retracted sentence must be **absent**, not merely unasserted — a suite that adds the
+    // new claim beside the old one goes on making both, which is the state 016 found it in.
+    await expect(profile.getByRole('status')).not.toContainText(/hold theirs/i)
 
     expect(
       Date.now() - started,
@@ -77,31 +94,66 @@ test.describe('Network', () => {
     ).toBeLessThan(30_000)
   })
 
-  test('the recipient sees the contact, and the sharer’s own Network is unchanged (FR-602)', async ({
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════════════════
+   * T037 (016) — **SC-1006: one share, and BOTH parties hold the other's card.**
+   *
+   * Two browser profiles, because mutual exchange is a claim about **two people** and a
+   * single-account walkthrough proves almost nothing — the lesson `quickstart.md` records for
+   * this feature and 007 recorded before it.
+   *
+   * **This test asserted the opposite until 016.** Its title promised *"the sharer's own
+   * Network is unchanged (FR-602)"*, and constitution v5.0.0 (C1) retracts FR-602. Worth noting
+   * that the old body never actually checked the sharer's side at all — it only looked at
+   * Grace's — so it would have gone on passing against mutual exchange while its title said
+   * something false. Both halves are asserted now.
+   *
+   * **Grace does nothing.** She signs in and looks; she is never asked, and there is no pending
+   * state for her to resolve (FR-1023). That is the whole of SC-1006.
+   * ═══════════════════════════════════════════════════════════════════════════════════════
+   */
+  test('T037 — SC-1006: one share puts each attendee in the other’s contacts', async ({
     browser,
   }) => {
-    // A second browser context, because one-directionality is a claim about **two people** and a
-    // single-account walkthrough proves almost nothing — the lesson `quickstart.md` records for
-    // this feature and 007 recorded before it.
-    const graceContext = await browser.newContext()
-    const gracePage = await graceContext.newPage()
-
-    await signedIn(gracePage, GRACE)
-    await gracePage.getByRole('link', { name: 'Network' }).first().click()
-
     // ─────────────────────────────────────────────────────────────────────────────────────
     // **Scoped to the Contacts region, not to the page.** Both panes are on screen at desktop
     // widths and both name the counterpart, so an unscoped locator resolves to two elements and
     // fails on strict mode — reporting "not visible" for something that is visible twice.
     // ─────────────────────────────────────────────────────────────────────────────────────
-    const contacts = gracePage.getByRole('region', { name: 'Contacts' })
+    const contactsOf = async (page: Page) => {
+      await page.getByRole('link', { name: 'Network' }).first().click()
+      return page.getByRole('region', { name: 'Contacts' })
+    }
 
-    // Grace holds Ada's card from the journey above.
-    await expect(contacts.getByRole('heading', { name: ADA.displayName })).toBeVisible()
+    // The recipient's half. Grace has taken no action of any kind — Ada shared in the journey
+    // above, and this is Grace's first visit.
+    const graceContext = await browser.newContext()
+    const gracePage = await graceContext.newPage()
+    await signedIn(gracePage, GRACE)
+
+    const graceContacts = await contactsOf(gracePage)
+    await expect(graceContacts.getByRole('heading', { name: ADA.displayName })).toBeVisible()
     // …and it says where and when they met (FR-615).
-    await expect(contacts.getByText(/met at product & design summit/i).first()).toBeVisible()
+    await expect(graceContacts.getByText(/met at product & design summit/i).first()).toBeVisible()
 
     await graceContext.close()
+
+    // ─────────────────────────────────────────────────────────────────────────────────────
+    // **The sharer's half, which is the reversal.** Under the model this replaced, Ada's
+    // Contacts would be empty here and the feature would be working correctly.
+    // ─────────────────────────────────────────────────────────────────────────────────────
+    const adaContext = await browser.newContext()
+    const adaPage = await adaContext.newPage()
+    await signedIn(adaPage, ADA)
+
+    const adaContacts = await contactsOf(adaPage)
+    await expect(
+      adaContacts.getByRole('heading', { name: GRACE.displayName }),
+      'Ada shared her card with Grace, so Ada must now hold Grace’s card too (FR-1021, SC-1006).',
+    ).toBeVisible()
+    await expect(adaContacts.getByText(/met at product & design summit/i).first()).toBeVisible()
+
+    await adaContext.close()
   })
 
   /**

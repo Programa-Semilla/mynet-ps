@@ -28,6 +28,7 @@ import {
   MARK_ASPECT,
   PLATE,
   assertBoardDimensions,
+  buildAssets,
   cornerDistance,
   maskableMarkHeight,
   safeRadius,
@@ -106,56 +107,39 @@ describe('the source guard (FR-807)', () => {
 
 describe('generated assets', () => {
   /**
-   * **The geometry above is arithmetic; this is the artifact.**
+   * ═══════════════════════════════════════════════════════════════════════════════════════
+   * **T062 (016) — THESE ASSERT AGAINST THE ADMINISTRATIVE FILES NOW, NOT MyNet's.**
    *
-   * Every other assertion about the safe zone tests pure functions, and pure functions are not
-   * what ships. A regression in `main()` — sizing the maskable file with `STANDARD_FILL`, say —
-   * leaves every geometry case green, produces a 512×512 PNG that satisfies the declaration gate,
-   * passes the component and end-to-end suites, and is clipped on a real Android launcher.
+   * They used to read `apps/web/public/icons/*` and `apps/web/public/favicon-*`, which this
+   * pipeline no longer writes: MyNet's install icons and favicons come from the second brand
+   * source and are covered by `generate-install-icons.test.mjs` (constitution v5.0.0, C4).
+   *
+   * **Re-pointed rather than deleted, and that is the important half.** Every claim below is
+   * still true of what the board produces — the plate is still the brand navy, the resampling is
+   * still a real filter, nothing is still upscaled — and the administrative favicons are
+   * deliberately unchanged by 016 (FR-1040). Deleting these would have left the board pipeline's
+   * only remaining plated outputs with no artifact-level check at all, which is how a pipeline
+   * quietly stops producing what its constants say it produces.
+   * ═══════════════════════════════════════════════════════════════════════════════════════
    */
-  it('keeps every mark pixel of the SHIPPED maskable icon inside the safe circle (SC-802)', async () => {
-    const { data, info } = await sharp(fromRoot('apps/web/public/icons/icon-maskable-512.png'))
-      .raw()
-      .toBuffer({ resolveWithObject: true })
-
-    let furthest = 0
-    for (let y = 0; y < info.height; y += 1) {
-      for (let x = 0; x < info.width; x += 1) {
-        const offset = (y * info.width + x) * info.channels
-        const isPlate =
-          Math.abs(data[offset] - PLATE.r) <= 12 &&
-          Math.abs(data[offset + 1] - PLATE.g) <= 12 &&
-          Math.abs(data[offset + 2] - PLATE.b) <= 12
-        if (!isPlate) {
-          furthest = Math.max(furthest, Math.hypot(x + 0.5 - 256, y + 0.5 - 256))
-        }
-      }
-    }
-
-    expect(furthest).toBeLessThanOrEqual(safeRadius(512))
-  })
 
   /**
    * FR-809 — the plate is the brand's navy, and nothing asserted it against a file. Painting it
    * `navy-800` instead would be invisible to every other check and is exactly the token/brand
    * confusion the constant's own comment exists to prevent.
    */
-  it.each([
-    'icons/icon-192.png',
-    'icons/icon-512.png',
-    'icons/icon-maskable-512.png',
-    'apple-touch-icon.png',
-    'favicon-32.png',
-    'favicon-16.png',
-  ])('paints %s on the brand navy plate, not a design token', async (name) => {
-    const { data, info } = await sharp(fromRoot(`apps/web/public/${name}`))
-      .raw()
-      .toBuffer({ resolveWithObject: true })
+  it.each(['favicon-32.png', 'favicon-16.png'])(
+    'paints the administrative %s on the brand navy plate, not a design token',
+    async (name) => {
+      const { data, info } = await sharp(fromRoot(`apps/admin/public/${name}`))
+        .raw()
+        .toBuffer({ resolveWithObject: true })
 
-    // The corner of a centred mark is always plate.
-    expect([data[0], data[1], data[2]]).toEqual([PLATE.r, PLATE.g, PLATE.b])
-    expect(info.channels).toBeGreaterThanOrEqual(3)
-  })
+      // The corner of a centred mark is always plate.
+      expect([data[0], data[1], data[2]]).toEqual([PLATE.r, PLATE.g, PLATE.b])
+      expect(info.channels).toBeGreaterThanOrEqual(3)
+    },
+  )
 
   /**
    * FR-818 — "a resampling filter that preserves the round caps, **not** nearest-neighbour".
@@ -164,7 +148,7 @@ describe('generated assets', () => {
    * intermediate values; a real filter produces a ramp along every curved edge.
    */
   it('downscales the favicons with a real resampling filter, not nearest-neighbour', async () => {
-    const { data, info } = await sharp(fromRoot('apps/web/public/favicon-16.png'))
+    const { data, info } = await sharp(fromRoot('apps/admin/public/favicon-16.png'))
       .raw()
       .toBuffer({ resolveWithObject: true })
 
@@ -178,34 +162,97 @@ describe('generated assets', () => {
     expect(intermediate / total).toBeGreaterThan(0.05)
   })
 
-  /** Nothing this feature ships may exceed the board's native mark height (FR-842's premise). */
-  it('never upscales the mark beyond the 300px master', async () => {
-    for (const name of [
-      'icons/icon-512.png',
-      'icons/icon-192.png',
-      'apple-touch-icon.png',
-      'icons/icon-maskable-512.png',
-    ]) {
-      const { data, info } = await sharp(fromRoot(`apps/web/public/${name}`))
+  /**
+   * Nothing THIS pipeline ships may exceed the board's native mark height.
+   *
+   * **016's upscale exception is scoped to the other source and must not leak here** (FR-1045).
+   * The board is 1254×1254 with a 300px mark and there has never been a reason to enlarge it;
+   * `brand-audit.mjs` asserts the same thing about the shipped bytes.
+   *
+   * ═══════════════════════════════════════════════════════════════════════════════════════
+   * **THIS TEST WAS VACUOUS AND THE REPAIR IS WHAT IT MEASURES, NOT HOW STRICTLY** (T-m9).
+   *
+   * 016 re-pointed it from MyNet's icons — which this pipeline stopped writing — to the
+   * administrative **16 and 32px favicons**. Correct as a redirection and worthless as a check:
+   * a mark inside a 32px canvas cannot reach 33px, let alone 300, so **no implementation change
+   * could make it fail**. It reported green on a property it was no longer examining, which is
+   * the failure this repository has recorded against itself twice already.
+   *
+   * Two changes restore it. It now derives its subjects from `buildAssets()` rather than naming
+   * two of them, so **a new output is measured by existing** — the property
+   * `apps/api/tests/unit/deletion-coverage.test.ts` has over the Drizzle schema. And it asserts
+   * its own power: the tallest mark this pipeline draws must be a **material fraction of the
+   * master**, which fails if the subjects are ever narrowed back to something too small to
+   * approach the bound. The board's largest outputs are the four in-app marks at
+   * `IN_APP_MARK_HEIGHT` — 160px of a 300px master — so raising that constant past 300 fails
+   * here, and under the old subjects it would not have.
+   *
+   * The two families need different detectors and that is a fact about the assets rather than a
+   * concession: an in-app mark is **unplated**, so its ground is transparency; a favicon is
+   * plated in the brand navy, and `mark-navy.png` paints the mark in that very colour — so a
+   * single colour-based rule would find no ink in it at all.
+   * ═══════════════════════════════════════════════════════════════════════════════════════
+   */
+  it('never upscales the mark beyond the 300px master, on every asset it emits', async () => {
+    const inkHeight = async (bytes) => {
+      const { data, info } = await sharp(bytes)
+        .ensureAlpha()
         .raw()
         .toBuffer({ resolveWithObject: true })
+
+      // Unplated marks separate by alpha, plated ones by colour. Decided per asset from the
+      // bytes themselves, so neither list has to be maintained beside the other.
+      let unplated = false
+      for (let offset = 3; offset < data.length; offset += 4) {
+        if (data[offset] < 250) {
+          unplated = true
+          break
+        }
+      }
 
       let top = Infinity
       let bottom = -1
       for (let y = 0; y < info.height; y += 1) {
         for (let x = 0; x < info.width; x += 1) {
-          if (data[(y * info.width + x) * info.channels] > (PLATE.r + MARK.r) / 2) {
+          const offset = (y * info.width + x) * 4
+          const ink = unplated ? data[offset + 3] > 8 : data[offset] > (PLATE.r + MARK.r) / 2
+          if (ink) {
             top = Math.min(top, y)
             bottom = Math.max(bottom, y)
           }
         }
       }
 
+      return bottom - top + 1
+    }
+
+    // `.ico` is a container around PNGs already measured below, not a drawing of its own.
+    const outputs = (await buildAssets()).filter(([path]) => path.endsWith('.png'))
+    expect(outputs.length).toBeGreaterThanOrEqual(6)
+
+    let tallest = 0
+    for (const [path, bytes] of outputs) {
+      const drawn = await inkHeight(bytes)
+      tallest = Math.max(tallest, drawn)
+
       expect(
-        bottom - top + 1,
-        `${name} upscales the mark above its native height`,
+        drawn,
+        `${path} draws the mark ${drawn}px from the board's ${CROP.height}px master. This ` +
+          `pipeline is outside 016's upscale exception, which is scoped to the second source ` +
+          `(FR-1045), and nothing derived from the board may be enlarged.`,
       ).toBeLessThanOrEqual(CROP.height)
     }
+
+    expect(
+      tallest,
+      'The tallest mark this pipeline draws is nowhere near the 300px master, so the bound above ' +
+        'cannot fail and this test asserts nothing. That is precisely what happened when its ' +
+        'subjects became two favicons: re-point it at what the pipeline actually draws largest.',
+    ).toBeGreaterThan(CROP.height * 0.4)
+
+    // The in-app marks are that largest output, and the constant they are drawn at is the one an
+    // edit would move. Stated so the failure above names a cause rather than a symptom.
+    expect(tallest).toBe(IN_APP_MARK_HEIGHT)
   })
 
   it('renders the in-app mark tall enough for a 3× display at its largest CSS size', () => {

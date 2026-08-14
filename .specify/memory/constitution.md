@@ -1,5 +1,144 @@
 <!--
 SYNC IMPACT REPORT
+Version change: 5.0.0 → 5.1.0
+
+RATIFICATION STATUS: **RATIFIED 2026-08-12**, on the same standing this project has used four
+times before: an implementation surfaced a platform dependency, and Principle V's own text requires
+the interface to be introduced *in the same change that introduces the capability* while forbidding
+the enumeration that names them from going stale. Drafted by the implementing session for 016's
+US5, which does not start before this lands.
+
+Rationale: MINOR. **A section is materially expanded and nothing is retracted.** Principle V's
+device-capability list gains an eighth entry, `InstallService`, and the paragraph explaining why it
+had to be an interface rather than a lint exemption. No prohibition is lifted, no principle is
+removed or redefined, and **no work performed under 5.0.0 is invalidated** — which is the versioning
+policy's own test for MINOR against MAJOR.
+
+**3.1.0 is the precedent and it is exact.** That amendment added `VisibilityService` as the seventh
+device interface for the same reason in the same shape: a poll had to stop while the tab was hidden,
+the only way to ask was a browser API feature code may not call, and the alternatives were an
+interface or an exemption. It was MINOR, and it recorded that *"the listing is the ratification
+act"* — which is why this is an amendment at all rather than a line of code somebody adds quietly.
+
+What forced it: FR-1031 requires the sign-in screen to explain that installing is what enables
+notifications, **when and only when** the reader is on a mobile-class device that has not installed
+the application. Notification delivery on iOS is available only to an installed application, so an
+attendee on an uninstalled iPhone can grant permission and receive nothing. Detecting that state
+needs `matchMedia('(display-mode: standalone)')` and a `beforeinstallprompt` listener on `window`,
+and `mynet/no-direct-platform-access` refuses both in feature code — the rule's `DOM` set names
+`matchMedia` and `window` explicitly, added after it was found reporting zero violations because its
+detector was too narrow.
+
+Alternatives considered and rejected, from 016's research R2:
+  - **A lint exemption for one call site.** Rejected on the constitution's own reasoning for
+    `VisibilityService`: an exemption would trade a structural boundary for a poll interval, and the
+    same trade here buys an install banner.
+  - **Detect via the service worker.** A worker cannot report whether the page is running standalone.
+  - **Always show the guidance.** Contradicts FR-1031's "when, and only when", and nags an attendee
+    who has already installed.
+
+**Deliberately NOT decided here**: nothing about notification triggers moves. A received message
+remains the only thing that dispatches (3.1.0, and 016's FR-1029 restates it for the card exchange).
+The guidance explains a capability; it does not request permission, and FR-1036 keeps
+`NotificationPrompt.tsx` the only caller of `requestPermission` in the client.
+
+Templates and downstream artifacts requiring updates: none. No template names the capability list,
+and `packages/platform/tests/substitution.test.ts` derives its expectations from `DeviceServices`
+rather than from a restated list, so the eighth capability is covered by that test the moment it is
+declared.
+
+PRIOR REPORT (4.1.0 → 5.0.0), retained because it is the amendment that gates 016 and 017:
+
+Version change: 4.1.0 → 5.0.0
+
+RATIFICATION STATUS: **RATIFIED 2026-08-12 by the project owner.**
+
+Rationale: MAJOR. **Two delivered, shipped guarantees are retracted** — the one-directional card
+exchange (3.2.0, N2) and the instantly-published Q&A model (3.3.0, Q1) — and the second of those
+reverses a recorded Principle VIII exception **forty-eight hours after it was ratified**. The written
+versioning policy scopes MAJOR to principles and governance, and strictly neither reversal removes a
+principle; the **operative** rule here was set by precedent twice and binds: 3.0.0 was MAJOR for
+withdrawing a single delivered requirement (001's FR-066), and 4.0.0 named retraction of delivered
+requirements as one of its three MAJOR triggers. This is the project's **third MAJOR** and the
+**first to reverse an amendment younger than a week**.
+
+**This is the first amendment driven by the client using the running product and reporting what is
+wrong**, rather than by a design session. That is why it is one amendment and not two, though its two
+reversals are independent and gate different features (016 and 017): they have one cause and one
+date. 4.0.0/4.1.0 is the only precedent for same-day paired amendments, and there 4.1.0 closed
+entries 4.0.0 had opened — a sequential dependency absent here. Issuing two would also produce 5.0.0
+and 6.0.0 on one day from one conversation, since each half independently triggers MAJOR.
+
+Sources: `brainstorm/10-app-fixes-and-install-icon.md`, `brainstorm/11-client-feedback-programme.md`,
+and `assets/feedback-1.md` — an exhaustive extraction from a 52-minute client conversation on
+2026-08-12 (118 requirements, 19 functional areas, 7 explicitly unresolved threads).
+
+Owner decisions cited by this amendment (all 2026-08-12):
+  C1. **Sharing a digital business card is a MUTUAL EXCHANGE.** One act, and both parties hold each
+      other's card; the recipient is not asked. **Reverses N2 (3.2.0) and the sentence that carried
+      it** — "Nothing about a person may become durable without that person's own act."
+      The reasoning is deliberately NOT the physical-card metaphor, which was available and is
+      insufficient: N2 was never argued from metaphor, so a metaphor cannot unmake it. The
+      operative ground is that a card resolves only what its owner already published to co-attendees
+      under D-16's single visibility decision — the client states the same independently at REQ-046
+      of the feedback extraction — so a mutual exchange discloses **nothing that discoverability had
+      not already disclosed to the same audience**. The escape hatch predates the change: 007's block
+      already severs card resolution in both directions.
+  C2. **The Q&A model is replaced by the client's**, in full: a question is moderated before it is
+      public, carries resolved/pending lifecycle state that survives the event, may be grouped
+      manually with its duplicates, and is projectable in vote order. **Reverses Q1 (3.3.0)** and
+      retracts shipped 009 requirements.
+      The reasoning is the one 009 recorded against itself: *"a public Q&A surface needs a moderator,
+      and a moderator is an organizer — the actor Principle III excludes by construction."* 4.0.0
+      created that actor, so the premise that kept Q&A unmoderated has expired. The same shape forced
+      the administration reversal three days earlier.
+      **ATTRIBUTION IS NOT RATIFIED HERE.** The client asks for first-name-only (REQ-062, REQ-063);
+      3.3.0 binds full real name; the client's own extraction records the thread as unresolved
+      (OPEN-002) and the transcript contains both positions. Opened as register entry 27 rather than
+      settled — see below.
+  C3. **Every feature MUST declare its administrative counterpart**, including where it is
+      explicitly none. A new Principle IX obligation and a new Feature Declarations row. No reversal.
+      It paid for itself the day it was set: "add a confirm-password field" is five screens across
+      two products, and the naive reading was one.
+  C4. **The install icon derives from a SECOND brand source**, `assets/brand/new-logo.png`, and the
+      resulting ~4× upscale is a **measured, named exception** recorded in the audit rather than a
+      weakened check. Icon only — explicitly **NOT a rebrand**; the in-app coral mark is untouched
+      and register entry 23 is unaffected.
+
+Modified binding constraints:
+  - VIII. Attendee Data Is Personal Data — the **second** exception changes SHAPE (publication is now
+    conditional on approval, not immediate) and its attribution clause is marked UNDER REVIEW against
+    entry 27, with the shipped full-name behaviour standing until that entry closes. Pre-publication
+    moderator visibility is explained in place rather than left to be derived — it is **not** a fourth
+    exception, and the reasoning for why is stated so nobody has to reconstruct it.
+  - IX. Every Feature Declares Its Own Completeness — gains the administrative-counterpart obligation.
+  - "Networking relationships and appointments" — the one-directional rule is superseded IN PLACE.
+  - "Audience questions" — the moderation model replaces instant publication; *"there is no moderator
+    and there will not be one"* is now false and is rewritten rather than deleted.
+  - "Brand identity and application icons" — "One source" becomes two, bounded and named.
+
+Register changes:
+  - 27. OPENED. Q&A attribution: first name, full name, or attendee-chosen. Blocks feature 017.
+  - 28. OPENED. Two brand marks now coexist — which one is MyNet's. Blocks nothing.
+  - 22 unchanged and still blocks 012. 19 and 21 remain ADDRESSED-not-closed. 23 unaffected by C4.
+  - 4 ESCALATED again, and this time by observation rather than by argument: a second layout defect
+    invisible to every gate was found by a person using the product.
+  - No entry is closed by this amendment.
+
+Deliberately NOT decided here, and each MUST NOT be read as settled:
+  - Notification triggers 2 and 3 (REQ-095, REQ-112) are present in the source conversation and are
+    **not** granted. "Notification delivery" already requires an amendment per trigger, and REQ-112
+    additionally needs a scheduled-work mechanism this product has never had.
+  - Payment-gated event access (REQ-024). Payments did not move at 4.0.0 and do not move here.
+  - Networking outside an event (REQ-047, REQ-048) — blocked on the client's own legal review
+    (REQ-049), and contradicts D1's per-event discovery.
+
+Templates and guidance requiring updates:
+  ✅ .specify/templates/spec-template.md — Feature Declarations gains the C3 row
+  ✅ CLAUDE.md — standing decisions, invariants, and open questions
+  ⚠ scripts/brand-audit.mjs — C4's named exception is feature 016's implementation work, not this
+    amendment's; the amendment states the rule, the feature encodes it
+
 Version change: 4.0.0 → 4.1.0
 
 RATIFICATION STATUS: **RATIFIED 2026-08-11 by the project owner**, in the same session that ratified
@@ -1178,9 +1317,10 @@ Application code MUST call project-owned interfaces, never external APIs directl
 two dimensions:
 
 **Device and browser capabilities** — `NotificationService`, `CalendarService`, `CameraService`,
-`ContactShareService`, `SecureStorage`, `ConnectivityService`, and `VisibilityService` (added 3.1.0;
-whether the attendee is actually looking at this tab). Initial implementations MAY be web-based or
-no-op stubs.
+`ContactShareService`, `SecureStorage`, `ConnectivityService`, `VisibilityService` (added 3.1.0;
+whether the attendee is actually looking at this tab), and `InstallService` (added 5.1.0; whether
+the application is running installed, and how it may be installed on this device). Initial
+implementations MAY be web-based or no-op stubs.
 
 `VisibilityService` is listed for a reason worth stating, because it is the first capability added
 by an implementation rather than by a product decision. A surface that polls MUST NOT poll a tab
@@ -1189,6 +1329,23 @@ nobody is looking at — a backgrounded tab has its timers throttled unpredictab
 is `document.visibilityState`, and this principle forbids feature code from asking it directly. The
 choice was therefore an interface or an exemption, and an exemption would have traded a structural
 boundary for a poll interval.
+
+`InstallService` is the **second** capability added by an implementation rather than by a product
+decision, and it is listed on `VisibilityService`'s precedent rather than by analogy to it — the
+listing is the ratification act, and leaving the enumeration stale is what this clause exists to
+prevent. Notification delivery on iOS is available **only** to an installed application, so an
+attendee on an uninstalled iPhone can grant permission and still receive nothing; telling them so
+requires knowing whether the application is installed. The only way to ask is
+`matchMedia('(display-mode: standalone)')` together with a `beforeinstallprompt` listener on
+`window`, and `mynet/no-direct-platform-access` refuses both in feature code. The choice was again
+an interface or an exemption, and the same answer follows: an exemption would trade a structural
+boundary for an install banner.
+
+**The interface MUST model both platform halves as first-class, not one as a failure of the
+other.** Chromium fires `beforeinstallprompt` and can present a real system prompt; iOS Safari
+fires nothing and exposes no install API to the page at all, so its half is instructional copy and
+cannot be anything else. An interface shaped only around the Chromium case would make the iOS path
+look like an error rather than a different platform, and would invite a control that cannot work.
 
 **Platform capabilities** — `StorageService`, for durable binary content that does not belong in the
 database (added 2.3.0 by D9, for avatar images). This is a *platform* capability rather than a device
@@ -1328,15 +1485,32 @@ migration.
   - *First* (2.3.0, D10): an attendee's profile is visible to attendees registered for the same
     event, enforced server-side by the event-scoping predicate, and the attendee MUST be able to
     withdraw from that visibility without deleting their account.
-  - *Second* (3.3.0, Q1): an **audience question is visible to every attendee registered for the
-    event it was asked at, under the asker's real name, and there is no opt-out** — including for
-    an attendee who has turned discoverability off, because discoverability governs being *found*
-    in the directory, not being *seen* having spoken in a room. Enforced server-side by the same
-    event-scoping predicate as the first. **The two exceptions are not the same shape and the
-    difference is the point**: the first is withdrawable and the second is not, so an attendee who
-    wants to say nothing publicly must not ask, rather than ask and then retreat. What bounds it is
-    stated with it under "Audience questions" — the attendee is told before they publish, the name
-    is not a route into the profile, and the question is reportable.
+  - *Second* (3.3.0, Q1; **shape amended 5.0.0 by C2**): an **audience question is visible to every
+    attendee registered for the event it was asked at, attributed to the asker, and there is no
+    opt-out** — including for an attendee who has turned discoverability off, because discoverability
+    governs being *found* in the directory, not being *seen* having spoken in a room. Enforced
+    server-side by the same event-scoping predicate as the first.
+
+    **5.0.0 changed when this exception takes effect, not what it discloses.** Publication is now
+    conditional on a moderator approving the question, where from 3.3.0 until 2026-08-12 it was
+    immediate on asking. The disclosure is unchanged and the no-opt-out is unchanged; what moved is
+    that a question now has a state in which it exists and is not yet public.
+
+    **The attribution clause is UNDER REVIEW against register entry 27 and MUST NOT be resolved by
+    inference.** 3.3.0 bound the asker's full real name; the client asks for the first name alone.
+    Until entry 27 closes, **the shipped full-name behaviour stands**. That a question is attributed
+    at all is not under review — anonymity was considered in 3.2.0 and not chosen.
+
+    **A moderator reading a question before it is public is not a further exception**, because
+    content submitted for publication was never private. The reasoning is written out under
+    "Audience questions" rather than left here to be reconstructed, along with the one case that
+    genuinely needs a rule: a *refused* question is stored personal data that never became public.
+
+    **The two exceptions are not the same shape and the difference is the point**: the first is
+    withdrawable and the second is not, so an attendee who wants to say nothing publicly must not
+    ask, rather than ask and then retreat. What bounds it is stated with it under "Audience
+    questions" — the attendee is told before they publish, the name is not a route into the profile,
+    and the question is reportable *after* publication as well as screened before it.
   - *Third* (4.1.0, A8): **a reported message and the reporter's stated reason are visible to a
     platform operator in the administrative report queue.** Four conditions scope it, and all four
     bind:
@@ -1431,6 +1605,20 @@ explicit, reviewable declaration covering all of the following:
   that is collected but does not appear in both answers is a defect, not an omission to fix later.
 - **Register position** — which Open Questions Register entries block this feature, and which it
   resolves.
+- **Administrative counterpart** *(added 5.0.0 by C3)* — for every capability the feature adds to
+  MyNet, whether an administrative counterpart already exists, must be built here, or is explicitly
+  **none**. A feature adding no attendee-facing capability declares that and is done.
+
+  **"None" is a valid and common answer; silence is not.** The obligation is to have looked. It was
+  set the day a request to add a confirm-password field turned out to span **five screens across two
+  products** — three in MyNet and two in the administrative site — where the natural reading of the
+  request was one screen, and the two nobody was looking at were the ones guarding the tier that
+  reads the report queue.
+
+  *Rationale*: since 4.0.0 this product has had two actors and two websites against one database, and
+  the failure mode that creates is asymmetric capability — a thing attendees can do that no
+  administrator can see, undo, or answer for. That asymmetry is invisible in the product that has the
+  capability, which is precisely why it needs declaring rather than noticing.
 
 **An obligation that is not declared is presumed unmet.** An explicit "not applicable, because…" is
 a valid declaration; silence is not. A specification missing this declaration MUST NOT pass its
@@ -1727,10 +1915,38 @@ both are struck through, and a struck-through entry is not where anybody looks f
   stranger insert themselves into another attendee's Network by sending one message. This half was
   settled by 007 as a consequence of open send, before entry 7 itself was answered.
 
-- **Sharing a card is one-directional.** It gives the recipient the sharer's card and gives the
-  sharer nothing; you hold theirs when they share back. **Nothing about a person may become durable
-  without that person's own act** — the property worth protecting in a product with public self
-  sign-up and no moderator by construction.
+- ~~**Sharing a card is one-directional.**~~ **SUPERSEDED 2026-08-12 in 5.0.0 by C1. Sharing a card
+  is a MUTUAL EXCHANGE.** One act, and both parties hold each other's card. The recipient is not
+  asked, and there is no pending state.
+
+  *The original rule, kept because a reader must see what was reversed*: "It gives the recipient the
+  sharer's card and gives the sharer nothing; you hold theirs when they share back. **Nothing about a
+  person may become durable without that person's own act** — the property worth protecting in a
+  product with public self sign-up and no moderator by construction."
+
+  **The metaphor is not the argument, and MUST NOT be cited as one.** That a physical card exchange
+  is mutual was available to N2 and was not what N2 was argued from, so it cannot be what unmakes it.
+  The operative reasoning is narrower and is the whole licence for this reversal: **a card resolves
+  only what its owner already published to co-attendees** under D-16's one-visibility-decision rule,
+  so a mutual exchange discloses nothing that discoverability had not already disclosed to the same
+  audience. It moves *when* a co-attendee sees those fields, not *whether*. The client reached the
+  same position independently, at REQ-046 of the 2026-08-12 extraction.
+
+  **Three things bound it, and an implementation carrying the reversal without them has not
+  implemented this rule:**
+  - **The exchange writes both records in one transaction, or neither.** A half-completed exchange is
+    a state this model has no name for, and the party it would favour is arbitrary.
+  - **The escape hatch predates the change and MUST remain.** 007's block already severs card
+    resolution in both directions, so the control that answers an unwanted exchange existed before
+    the exchange could be unwanted. A block MUST continue to sever both directions.
+  - **Everything else about a card is unchanged.** It still cannot be recalled, still resolves the
+    sharer's live profile rather than a snapshot, still bypasses discoverability and MUST NOT consult
+    verification. This amendment changes the *direction* of the act and nothing else about it.
+
+  **What is NOT decided**: whether a mutual exchange requires the *recipient* to be discoverable at
+  the moment of sharing. Sharing checks it today; resolution deliberately does not. A first
+  acquisition is neither case, and the feature that builds this MUST decide and declare it rather
+  than inherit either answer.
 
 - **The stored record is the exchange, not the person**: sharer, recipient, the instant, and the
   event it happened at. A held card MUST resolve the sharer's **current** profile at read time. A
@@ -1784,11 +2000,21 @@ attribution turned out to carry and the three consequences that bound it.*
 - **An audience question is attributed to its author.** Anonymous questions were the alternative and
   were not chosen. A question therefore carries the asking attendee's identity, and so does a vote.
 
-- **A question is public to the event, under a real name, with no opt-out.** This is the second
-  recorded exception to Principle VIII's "private content stays private", and it is recorded there
-  as well as here. Every attendee registered for the event sees every question asked at it, with
-  the asker's display name attached, **including questions asked by an attendee who has turned
-  discoverability off**. Three consequences bind alongside it, and an implementation that carries
+- **A question becomes public to the event ONCE A MODERATOR APPROVES IT**, with no opt-out from that
+  publication. *Amended 2026-08-12 in 5.0.0 by C2: publication was immediate on asking from 3.3.0
+  until then.* This is the second recorded exception to Principle VIII's "private content stays
+  private", and it is recorded there as well as here. Every attendee registered for the event sees
+  every **approved** question asked at it, with the asker's name attached, **including questions
+  asked by an attendee who has turned discoverability off**.
+
+  **Whether that name is the full name or the first name alone is register entry 27 and is NOT
+  decided.** 3.3.0 bound the full real name; the client asks for first name only (REQ-062, REQ-063);
+  the client's own extraction records the thread as unresolved (OPEN-002) and the source transcript
+  contains both positions. **The shipped behaviour — full display name — stands until entry 27
+  closes**, and no feature may resolve it by inference in either direction. Attribution itself is not
+  in question: a question is attributed, and anonymity remains unchosen.
+
+  Three consequences bind alongside it, and an implementation that carries
   the exception without them has not implemented this rule:
   - **Attribution MUST NOT consult verification state.** Verification gates exactly one thing —
     discoverability — and this constitution has held since 2.3.0 that no feature may use it for
@@ -1806,14 +2032,57 @@ attribution turned out to carry and the three consequences that bound it.*
   exception ships. The three consequences are here rather than only in a feature specification
   because a specification governs one phase and this governs every phase after it.
 
-- **Reporting from a question is what makes the absence of a moderator survivable.** Q&A is the
-  product's **first many-to-many surface**: until now, anything one attendee wrote reached one other
-  attendee (007) or nobody (notes). A question reaches the whole room, and organizer administration
-  is excluded by construction, so there is **no moderator and there will not be one**. A question
-  MUST therefore be reportable from the question itself, on the disposal path 3.1.0 made binding —
-  the report leaves the product as operator mail, blocks in the same action, and is readable from
-  nowhere inside the product. Blocking MUST make the two attendees invisible to each other in Q&A,
-  in both directions. **A public surface with no moderator and no report control MUST NOT ship.**
+- **A question is moderated before it is public.** *Added 2026-08-12 in 5.0.0 by C2.* The sequence is
+  **submit → moderate → publish → vote**, and votes are only ever cast on published questions. A
+  moderator MUST be able to approve a question, refuse it, and remove one already published; MUST be
+  able to mark a published question **resolved** or **pending**; and MUST be able to group manually
+  identified duplicates. Pending questions MUST survive the end of the event they were asked at, and
+  automatic grouping of similar questions is **not** required — the client accepted manual
+  consolidation for a first version.
+
+  **The premise that forbade this has expired, and that is the whole justification.** This block used
+  to read: *"organizer administration is excluded by construction, so there is no moderator and there
+  will not be one."* Every word of that was true when written and the second clause is now false —
+  **4.0.0 created the actor**. 009 recorded the cost of the exclusion against itself in exactly these
+  terms, which is why this reads as a premise expiring rather than as a change of mind. It is the
+  same shape that forced the administration reversal three days earlier: an exclusion whose price is
+  an unkeepable safety promise gets paid for or reversed.
+
+  **Moderation does not replace reporting; the two cover different moments and both MUST ship.**
+  Moderation is pre-publication and catches what should never have been shown. Reporting is
+  post-publication and catches what a moderator approved and should not have. A question MUST
+  therefore remain reportable from the question itself, on the disposal path 3.1.0 made binding — the
+  report leaves the product as operator mail, blocks in the same action, and is readable from nowhere
+  inside MyNet. Blocking MUST continue to make the two attendees invisible to each other in Q&A, in
+  both directions. **A public surface with no moderator and no report control MUST NOT ship** — and
+  it now has both rather than only the second.
+
+- **A moderator reading an unpublished question is NOT a fourth Principle VIII exception**, and the
+  reasoning is recorded here so that nobody has to derive it and nobody mistakes its absence for an
+  oversight. Content submitted **for publication** was never private: the act of asking is a request
+  to be read by the room, and whoever decides publication is necessarily among the first readers.
+  There is no expectation of privacy to except from.
+
+  **A refused question is the case that needs a rule, and it does not get one by inference.** It is
+  attendee-authored content that never became public and is still stored, so it is personal data
+  under Principle VIII like any other: it MUST be reached by the deletion cascade, MUST appear in the
+  export, and its retention MUST be declared by the feature that introduces it. The two coverage
+  tests will fail that feature's build until it is, which is the mechanism working as designed.
+
+- **Who moderates follows from 4.0.0's authority scoping and is not a new grant.** A question belongs
+  to a session, a session to exactly one conference, and a **conference organizer's** authority
+  reaches the conferences they are assigned — so Q&A moderation falls inside authority that already
+  exists, and a platform operator retains the product-wide authority they already hold. What is
+  **not** settled by that: the client describes an event having several coordinators (REQ-065), and
+  whether one conference may carry multiple organizer assignments is a question for the feature that
+  builds this rather than a licence it inherits.
+
+- **The projected view is a display, not a workspace, and MUST NOT become a privileged view in
+  MyNet.** A screen in a hall showing approved questions in live vote order has a fourth audience —
+  a room, possibly with no signed-in reader at all. Standing decision A2 forbids MyNet growing an
+  administrative or role-dependent surface, and that is untouched here: wherever this view lives, it
+  MUST NOT be a mode that MyNet renders for some readers and not others. Which product hosts it, and
+  what it requires of an unauthenticated reader, are for the feature to decide and declare.
 
 - **Q&A is consequently a personal-data surface under Principle VIII**, and this is the operative
   consequence rather than a note. Questions and votes MUST carry identity scoping enforced
@@ -1970,9 +2239,41 @@ through, and a struck-through entry is not where anybody looks for a rule.*
 Until then no mark existed here, and none was invented — Principle I forbids answering a question
 nobody asked, and a mark is exactly such a question.
 
-- **One source, and derived assets rather than delivered ones.** Every icon, favicon and in-app mark
-  MUST derive from the tracked brand source **by a readable script**, not be committed as an opaque
-  binary of unknown provenance. A reviewer MUST be able to verify the crop geometry, the plate colour
+- **Two sources as of 5.0.0, each bound to named surfaces**, and derived assets rather than delivered
+  ones either way. *Amended 2026-08-12 by C4; there was one source from 3.4.0 until then.*
+  `assets/brand/logo.png` — the owner's board — remains the source for **every in-app mark**.
+  `assets/brand/new-logo.png` is the source for **the install icons and favicons only**.
+
+  **This is an icon change and explicitly NOT a rebrand.** The owner ruled so on 2026-08-12. The
+  in-app coral mark is untouched, on the rail, the top bar and the five authentication screens, and
+  **register entry 23 is unaffected** — the token-adoption question concerns the board's navy and
+  coral, which this change does not alter.
+
+  **The consequence is that MyNet now shows one mark on a home screen and a different one inside the
+  app, and that is knowingly accepted rather than overlooked.** It is recorded so that a later reader
+  does not "fix" it, and it is why register entry **28** exists: which of the two marks is this
+  product's is now an open question, and no feature may answer it by quietly replacing the other.
+
+  **The second source is a raster of a lockup and needs three things said about it, because each
+  contradicts something this block already binds.** It is 114×133 pixels against a board of
+  1254×1254; it carries an alpha channel where the board carries none; and it depicts a wordmark
+  beneath a mark.
+  - **The wordmark MUST be cropped away.** "A raster lockup is forbidden" is unchanged and applies
+    here: what an icon derives from is the mark, never the mark plus rendered text.
+  - **The plate colour MUST be chosen deliberately and its choice recorded**, because the derivation
+    that produced the board's navy does not transfer. That derivation was mechanical — the board has
+    no alpha, so the mark's edges are blends against its own navy and any other plate haloes. A
+    source *with* alpha has no such constraint and therefore no such answer.
+  - **The upscale MUST be a measured, named exception rather than a relaxed check.** Filling a 512px
+    icon from this source is roughly a fourfold enlargement, and the audit that fails a build on any
+    upscale is deliberate — 010 established it after finding one asset drawn at 1.06× and fixed the
+    *asset*. The rule that replaces it MUST name this file, this factor and these outputs, so that a
+    second upscale arriving later still fails. **Weakening the check until it stops checking anything
+    is forbidden**, which is the discipline 4.0.0 applied to the five administration guards.
+
+  **The derivation rule itself is unchanged and now applies twice over.** Every icon, favicon and
+  in-app mark MUST derive from its tracked brand source **by a readable script**, not be committed as
+  an opaque binary of unknown provenance. A reviewer MUST be able to verify the crop geometry, the plate colour
   and the maskable safe-zone inset by **reading code**, and the script MUST fail loudly rather than
   emit a plausible asset from an unexpected source. This is the convention the provisional generator
   established and it is retained deliberately: it is what makes a later vector redraw a change of
@@ -2506,6 +2807,50 @@ one or set the standard they judge by.
   features' worth of desktop-first administrative design, in a project whose only approved visual
   reference is a mobile-only 390×844 prototype frame. The administrative product is desk work, so it
   is *predominantly* the width band nobody has ever reviewed. **This amendment does not close it.**
+
+**Opened in 5.0.0**
+
+Owner decisions taken on 2026-08-12, recorded in brainstorms #10 and #11
+(`brainstorm/10-app-fixes-and-install-icon.md`, `brainstorm/11-client-feedback-programme.md`). Both
+entries are opened rather than answered, following the precedent 3.2.0 set and 4.0.0 followed of
+leaving a question explicitly open for the phase told to answer it.
+
+- **27. Q&A attribution: full name, first name alone, or attendee-chosen.** Created by C2, against
+  Q1. **Blocks feature 017.** 3.3.0 bound the asker's full real name with no opt-out and argued it
+  at length; the client asks for the first name alone (REQ-062, REQ-063); **the client's own
+  extraction records the thread as unresolved** (OPEN-002), and the source transcript contains both
+  positions in the same conversation. REQ-061 adds a requirement neither position states — that the
+  system MUST know the true author whatever is displayed — which is compatible with all three
+  answers and is worth carrying into whichever is chosen.
+
+  **Opened rather than settled because settling it would be the exact failure Principle I forbids.**
+  The client's stated preference was available and would have made 017 unblocked today; taking it
+  would have closed by inference a thread the client herself recorded as open. The practical case
+  that decides it is mundane and should be put to her directly: two attendees named Ana at one event.
+
+- **28. Two brand marks now coexist, and which one is MyNet's is undecided.** Created by C4. **Blocks
+  nothing**, and the product behaves as the owner directed. The install icon derives from
+  `assets/brand/new-logo.png` — a gradient disc — while every in-app mark derives from the board's
+  coral N. The owner ruled explicitly that this is an icon change and not a rebrand, so the
+  divergence is **accepted knowingly** rather than overlooked.
+
+  Recorded because a knowingly accepted divergence and an unnoticed one look identical six months
+  later, and because the resolution in either direction is expensive: adopting the gradient mark
+  in-app repaints five authentication screens, the rail and the top bar, and interacts with entry 23,
+  which concerns the board's values and not this mark's. **No feature may resolve it by quietly
+  replacing one mark with the other.**
+
+**Escalated in 5.0.0, without being answered**
+
+- **4. Desktop and tablet layouts have never been validated by the client.** *Escalated a third
+  time, and this time by observation rather than argument.* 3.4.0 escalated it for a brand mark;
+  4.0.0 for a second product. 5.0.0 escalates it because **a person using the product found a second
+  layout defect that every gate had passed**: the message composer grows without a bound until its
+  send control leaves the viewport, on the mobile width band that *is* the approved prototype's only
+  frame. The first was 008's dialog rendering in the top-left corner. Two instances is a pattern, and
+  the pattern is that this project's ten correctness gates verify that a control exists, is labelled,
+  is focusable and works — and none of them looks at where it is. **This amendment does not close
+  it**, and no feature may be read as having validated a layout because its tests are green.
 **Open — require a client decision**
 
 *Numbering is stable.* Resolved entries are **struck through in place** rather than removed, and
@@ -2909,4 +3254,4 @@ so a gap in the source would silently render as the wrong number against a neigh
 stay consistent with this constitution and MUST NOT contain implementation plans, session tasks,
 progress updates, or invented requirements.
 
-**Version**: 4.1.0 | **Ratified**: 2026-08-04 | **Last Amended**: 2026-08-11
+**Version**: 5.1.0 | **Ratified**: 2026-08-04 | **Last Amended**: 2026-08-12

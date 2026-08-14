@@ -79,7 +79,7 @@ test.describe('saved sessions', () => {
 
     // ── Sign out ─────────────────────────────────────────────────────────────────────────
     await page.getByRole('button', { name: 'Sign out' }).click()
-    await expect(page.getByLabel('Password')).toBeVisible()
+    await expect(page.getByLabel('Password', { exact: true })).toBeVisible()
 
     // ── A different device: a fresh context carries nothing over ─────────────────────────
     const otherDevice = await browser.newContext()

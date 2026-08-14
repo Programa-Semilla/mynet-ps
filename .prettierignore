@@ -26,4 +26,10 @@ brainstorm/
 .githooks/
 CLAUDE.md
 
+# Owner-supplied source material: the brand boards, and the verbatim record of the client
+# conversation constitution v5.0.0 was argued from. `feedback-1.md` is a transcript extraction,
+# not prose this project authored — reflowing it would edit somebody else's words to satisfy a
+# code formatter, and the amendment cites it by requirement number.
+assets/
+
 deploy/vm/maintenance/index.html

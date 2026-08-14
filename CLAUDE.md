@@ -5,7 +5,7 @@ Guidance for Claude Code (claude.ai/code) working in this repository.
 This file is the **working brief**: what the product is, what has been decided, and how work is
 done here. It is deliberately short. Depth lives elsewhere, and these are authoritative over it:
 
-1. **`.specify/memory/constitution.md` (v4.1.0)** — governance and the authoritative decision
+1. **`.specify/memory/constitution.md` (v5.1.0)** — governance and the authoritative decision
    register. Supersedes tool defaults, habit, and any conflicting statement in this file.
 2. **`docs/superpowers/specs/2026-08-06-mynet-delivery-roadmap-design.md`** — the decomposition of
    the remaining product into features, with dependency order, reserved migration numbers, and gate
@@ -217,8 +217,32 @@ alternative — the mark at the head of `TabletRail` in coral, mirroring `Deskto
 weighed, because the spec recorded that surface as not existing. Corrected in the spec; the
 arrangement is an owner decision under register entry 4.
 
-A contact is somebody whose digital business card you hold. Sharing is **one-directional** — it
-gives your card and takes nothing — and a held card resolves the sharer's **live** profile under a
+**016 (App fixes, mutual card exchange, and the install icon) is shipped**, squash-merged to
+`develop` in [#21](https://github.com/Programa-Semilla/mynet-ps/pull/21) — six items the
+owner reported after using the deployed product, plus the reversal C1 ratified. Five repairs, one
+reversal, one asset change: the composer is bounded so a long message can be sent on a phone, the
+conversation list refreshes itself, five password fields across two products gained a reveal
+control and MyNet's two credential-setting forms gained confirmation, card exchange became mutual
+and atomic, the sign-in screen explains what installing buys on an uninstalled phone, and the
+install icons derive from the owner's second brand source.
+
+**It needed an amendment nobody anticipated.** Phase 0 research found that install detection cannot
+be written without `matchMedia` and `beforeinstallprompt`, which `mynet/no-direct-platform-access`
+refuses in feature code — so US5 was gated on **constitution v5.1.0**, adding an eighth device
+capability to Principle V's list. The specification and its review gate both missed it; Principle V
+is what surfaced it, which is the boundary working as designed.
+
+**Its by-hand validation is outstanding, it is the only thing outstanding, and it shipped without
+it — deliberately, on the merge decision of 2026-08-13.** T067 (quickstart
+scenarios 1–7, two browser profiles) and **T068 — install on a physical phone, judge the icon, and
+retype the composer test with a real keyboard** — join the same unwalked scenarios from 007, 008,
+009 and 013. SC-1001 and SC-1009 are explicitly not machine-checkable, and **this feature exists
+because a person found what the gates could not** — which is exactly why an unwalked T068 is a
+larger debt here than the four it joins, rather than one more of the same.
+
+A contact is somebody whose digital business card you hold. Sharing was **one-directional** as
+shipped — **reversed 2026-08-12 by constitution v5.0.0 (C1): it is now a mutual exchange**, one act
+and both parties hold each other's card, delivered by **016**. A held card resolves the sharer's **live** profile under a
 standing consent that outlives both the conference and the discoverability toggle. Appointments are
 proposed, then accepted or declined, over a seeded 30-minute slot grid whose availability is a
 function of the reader's own commitments alone. Home gained its seventh and last card, which is the
@@ -246,7 +270,19 @@ a Q&A surface with **no way to report anything on it** — which the Success Cri
 complete. The boundary survives as a reading order rather than as two merges.
 
 A question is asked on a session, published to **every attendee registered for the conference
-under the author's real name with no opt-out**, and ranked by upvotes. That visibility is the
+under the author's real name with no opt-out**, and ranked by upvotes.
+
+**All of that is reversed by constitution v5.0.0 (C2), ratified 2026-08-12, and 017 rebuilds it.**
+The client's model replaces it: a question is **moderated before it is public** (submit → moderate →
+publish → vote), carries **resolved/pending** state that survives the event, may be **grouped
+manually** with its duplicates, and is **projectable** in vote order. The premise that forbade this
+expired rather than being overturned — 009 recorded against itself that a public Q&A surface *"needs
+a moderator, and a moderator is an organizer"*, and v4.0.0 created that actor. **Attribution is NOT
+part of the reversal**: full name still stands as shipped, and whether it becomes first-name-only is
+**register entry 27**, open, blocking 017. Until 009 is rebuilt, everything below describes what is
+running.
+
+That visibility is the
 **second recorded exception** to Principle VIII's "private content stays private" — constitution
 **v3.3.0, ratified 2026-08-10**, which gated the first line of code exactly as v3.2.0 gated 008's.
 009's own artifacts drafted it as a *third* exception, counting v3.2.0's N2; **N2 is an exception
@@ -714,6 +750,106 @@ refactor.
   content and on authority, never on a person; no profile edit at any tier; and no read path over
   the audit trail (FR-999).
 
+**App fixes, mutual exchange and the install icon (016)**
+
+- **A card exchange is MUTUAL, atomic, and guarded once.** `shareCard` opens
+  `getDb().transaction()` and writes **both rows or neither** (FR-1022) — a restructure rather than
+  a second insert beside the first, because statements handed the pool autocommit. The guard is
+  evaluated **once** and governs both inserts: per-insert it would run twice, and a registration
+  withdrawn between them writes one row and not the other. `cards-atomicity.test.ts` induces the
+  failure with a **real `BEFORE INSERT` trigger** on the reciprocal row — mocking the query layer
+  would prove the property is checked while checking nothing, since the subject *is* the transaction.
+- **FR-1053's discoverability guard is load-bearing for the amendment, not inherited convention.**
+  C1 licenses taking somebody's card without asking on one ground: a card resolves only what its
+  owner already published to co-attendees. Against a non-discoverable recipient that ground does not
+  exist, so **relaxing the condition needs another amendment**. The physical-card metaphor is
+  explicitly *not* the argument — it was available to v3.2.0 (N2) and cannot unmake it.
+- **`requireHeldCard` stays DIRECTIONAL even though exchanges are now mutual**, and the reason
+  changed with C1. It used to be *"sharing gives; it does not take"* (FR-602, retracted). It is now
+  that **the row is the authority**: a symmetric `OR` would grant a read from a *single* row, which
+  is the state of every card written before 016 and of any pair whose second insert never happened.
+- **The conversation list polls at 10s; the thread stays at 3s.** `usePoll` carries 007's four
+  properties (visible-only, jittered, backing off to a ceiling, three-failure threshold) so a second
+  caller cannot re-argue them. **SC-1002's 15-second bound is arithmetic, not slack** — a poll of
+  interval N has a worst case of N plus jitter plus the request.
+- **FR-1054's pause condition asks the LIST, never the width.** `useDisplayed` observes the pane's
+  own `class`/`style` with a `MutationObserver` and reads `display`. A first version re-measured on
+  navigation and a test hiding the pane directly caught it: the address is not what determines
+  whether an element is displayed, and that version was the width-coupling one step removed.
+- **Messages stays entirely uncached, and a refresh loop is what will tempt somebody to change it.**
+  `messages-absences.test.ts` fails if `conversations` or `messages` is wrapped in `cached`.
+- **The password reveal control is implemented TWICE, deliberately.** `apps/admin` depends on
+  `@mynet/data` and `@mynet/config` only, and a `packages/ui` holding one component would give the
+  administrative site its first dependency on shared *presentation*. **What prevents divergence is
+  the test, not the code**: the same assertions run in both products, so a drift fails a build.
+  Revisit when a *second* shared control appears. `type="button"` on the toggle is load-bearing —
+  without it, revealing a password submits the sign-in form and spends a throttle attempt.
+- **An eighth device capability, `InstallService`, ratified in constitution v5.1.0.** The second
+  added by an implementation rather than a product decision, on `VisibilityService`'s precedent —
+  **the listing is the ratification act**. It exists because iOS delivers notifications only to an
+  installed application, and asking needs `matchMedia` plus `beforeinstallprompt`, both refused in
+  feature code. **The interface models both platform halves as first-class**: `promptToInstall` is
+  `null` where the platform offers none, so FR-1034's "no control that cannot work" is enforced by
+  the type rather than remembered.
+- **Two brand pipelines, two sources, one `public/` directory — and the boundary is the fragile
+  part.** `generate-install-icons.mjs` owns MyNet's install icons and favicons from
+  `new-logo.png`; `generate-brand-assets.mjs` keeps the board and owns **every in-app mark in both
+  products and every administrative asset**. A separate path rather than a parameterisation, because
+  a flag-selected constant set is how the wrong crop applies silently. `brand-audit.mjs` asserts the
+  two write **disjoint** sets.
+- **The ~3.23× upscale is a named exception with three coordinates — this source, this factor, these
+  outputs — and a second upscale still fails.** Checked for **equality**, not as a ceiling: a
+  ceiling is what quietly absorbs the next one. **Weakening it until it stops checking anything is
+  forbidden.** The home-screen icon now visibly differs from the in-app coral mark: **knowingly
+  accepted, and register entry 28 is why that is recorded rather than rediscovered.**
+
+**016's deep review — 33 findings, all fixed. What it changed that is now invariant:**
+
+- **A requirement whose subject is PROSE cannot be verified by searching for its own number**, and
+  this is the review's most transferable finding. FR-1052 required every comment citing the retracted
+  one-directional rule to be rewritten. It scored **compliant** because the number appears wherever
+  the work was done — and nowhere it was missed. **The check is brightest exactly where it is
+  blindest.** Five files still asserted the old rule as current fact.
+- **The product told the sharer the exchange had not happened, and two green tests required it to.**
+  `ShareCardAction` said *"you will hold theirs when they share it with you"* while the server wrote
+  both rows, on the one surface whose header says it exists to prevent a misreading of card
+  direction. It passed every gate because **FR-1052 was scoped to comments and never reached product
+  copy** — now **FR-1055** — and because the suite was *enforcing* the retracted model.
+  `apps/web/tests/unit/card-model-record.test.ts` is the guard. Unlike every other absence test here
+  it reads **prose rather than stripping it**, because prose is its subject, and it exempts
+  explicitly-marked historical notes by paragraph — a sentence window produced false positives on
+  correct paragraphs, and **a guard that cries wolf gets weakened until it checks nothing**.
+- **An inventory that is read twice must be DERIVED twice, never written twice.** The upscale
+  exception measured a hand-maintained list of 6 while the pipeline emitted 7, so a new icon at
+  6.46× would have passed green. Both readers are now projections of one `INSTALL_ICONS`, and
+  `MAX_UPSCALE` is derived — a new output fails **by existing**, which is `deletion-coverage`'s
+  property. The coverage assertion is deliberately in **both** `brand-audit.mjs` and the unit test:
+  they fail at different moments, and the unit layer needs no build.
+- **The application pool now carries `lock_timeout`, `statement_timeout` and
+  `idle_in_transaction_session_timeout`.** 016's deadlock fix traded a fast `40P01` abort for a
+  **wait**, and nothing bounded it — `shareCard` holds 1 of 10 connections across five round trips,
+  so ten stalled shares exhaust the pool and **every route stops serving**. `statement_timeout` is
+  deliberately larger than `lock_timeout` so a blocked statement fails as `55P03`, naming its cause.
+  `migrate.ts`'s header — which had said this was "a different decision nobody has made" — now points
+  here: **a migration prefers to abort loudly, a request prefers to fail one caller fast.**
+- **A lint denylist is a list of what somebody remembered.** `getComputedStyle` and
+  `MutationObserver` were absent, so `useDisplayed` reached them freely — while `matchMedia`, one
+  identifier away, required **constitution v5.1.0 and an eighth capability**. Five identifiers added;
+  the three violations resolved with **per-line** disables carrying reasons, never a file-level
+  exemption, so a fourth platform call still fails.
+- **`useDisplayed` observes size, not attributes, and `IntersectionObserver` was REJECTED for it.**
+  Its default root is the **viewport** — the exact coupling FR-1054 forbids — and it would pause the
+  refresh for a list merely scrolled out of view. A `MutationObserver` on `class`/`style` could not
+  see a breakpoint change at all, because the class string is constant and only the *computed* style
+  moves.
+- **A superseded read must report "superseded", not success.** Returning normally let `usePoll`
+  reset the failure count and clear the staleness notice while the retry was still failing — a
+  load-amplification path during an incident. `POLL_SUPERSEDED` is the third outcome; FR-1012's
+  screen guarantee is unchanged.
+- **`exchangePermitted` takes `FOR SHARE`, and it must never become `FOR UPDATE`.** Shared locks do
+  not conflict, so simultaneous exchanges lock each other's rows in opposite orders and neither
+  waits. An exclusive lock here would break the pair sort that fixed the deadlock.
+
 **Deployment**
 
 - **`deploy/vm/` is the whole platform**: Caddy with automatic Let's Encrypt TLS serving the built
@@ -1027,6 +1163,79 @@ the same session. The administrative programme is unblocked:**
     conference content is not attendee data. Reverting ownership silently to the platform tier was
     rejected — it is a tidier invariant that hides the event nobody is prompted to act on.
 
+**2026-08-12** (ratified in constitution **v5.0.0**) — **the project's third MAJOR, and the first
+amendment driven by the client USING the product rather than by a design session.** It retracts two
+delivered guarantees, one of them **48 hours after it was ratified**. Sources: brainstorms #10 and
+#11, and `assets/feedback-1.md` — 118 requirements extracted from a 52-minute client conversation:
+
+40. **Sharing a card is a mutual exchange.** One act, both parties hold each other's card, the
+    recipient is not asked. **Reverses decision 25 / v3.2.0 N2** and the sentence that carried it —
+    *"nothing about a person may become durable without that person's own act"*. **The physical-card
+    metaphor is NOT the argument and must never be cited as one**: it was available to N2 and is not
+    what N2 was argued from, so it cannot be what unmakes it. The operative ground is that a card
+    resolves only what its owner already published to co-attendees under decision 16's single
+    visibility decision — so the exchange moves *when* a co-attendee sees those fields, not
+    *whether*. The client reached the same position independently (REQ-046). Three bounds: **both
+    records commit in one transaction or neither**; blocking still severs resolution **both ways**,
+    so the escape hatch predates the change; and nothing else about a card moves — no recall, live
+    resolution, no verification check. **Not decided**: whether the recipient must be discoverable at
+    the moment of sharing. Delivered by **016**.
+41. **The Q&A model is replaced by the client's, in full.** Moderated before publication, resolved/
+    pending lifecycle surviving the event, manual grouping, projectable in vote order. **Reverses
+    decision 27 / v3.3.0** and retracts shipped 009 requirements. **A premise expired rather than a
+    mind changing**: 009 wrote against itself that a public Q&A surface *"needs a moderator, and a
+    moderator is an organizer — the actor Principle III excludes by construction"*, and v4.0.0
+    created that actor. **Moderation does not replace reporting** — pre-publication screening and
+    post-publication reporting cover different moments and both ship. **A moderator reading an
+    unpublished question is not a fourth privacy exception** (content submitted for publication was
+    never private), but **a refused question is stored personal data** and needs cascade, export and
+    retention like anything else. **Attribution is explicitly NOT ratified** — register entry 27.
+    Delivered by **017**.
+42. **Every feature declares its administrative counterpart**, including where it is explicitly
+    none. A Principle IX obligation and a Feature Declarations row. **"None, because…" is valid and
+    common; silence is not — the obligation is to have looked.** Set the day a request to add a
+    confirm-password field turned out to span **five screens across two products**, where the natural
+    reading was one, and the two nobody was looking at guarded the tier that reads the report queue.
+    Since v4.0.0 there are two actors and two sites against one database, and the failure mode is a
+    capability attendees have that no administrator can see, undo or answer for.
+43. **The install icon derives from a SECOND brand source, and this is not a rebrand.**
+    `assets/brand/logo.png` remains the source for every **in-app** mark; `assets/brand/new-logo.png`
+    is the source for **install icons and favicons only**. The in-app coral mark is untouched and
+    **register entry 23 is unaffected**. Three rules bind the second source, each because it
+    contradicts something already binding: the **wordmark is cropped away** (a raster lockup stays
+    forbidden); the **plate colour is chosen deliberately and recorded**, because the board's navy
+    was derived mechanically from a source with no alpha and this one has alpha; and the ~4× upscale
+    is a **measured, named exception** in `brand-audit.mjs` — naming this file, this factor and these
+    outputs, so a *second* upscale still fails. **Weakening the check until it stops checking
+    anything is forbidden.** The home-screen icon will visibly differ from the in-app mark:
+    **knowingly accepted**, and **register entry 28** is why that is recorded rather than left to be
+    rediscovered. Delivered by **016**.
+
+**Three things v5.0.0 deliberately did NOT decide, and none may be read as settled**: notification
+triggers 2 and 3 are present in the client conversation (REQ-095 document published, REQ-112 session
+starting in 15 minutes) and are **not granted** — each needs its own amendment, and REQ-112 needs a
+scheduled-work mechanism this product has never had; **payment-gated event access** (REQ-024) does
+not move, exactly as it did not at v4.0.0; and **networking outside an event** (REQ-047, REQ-048) is
+blocked on the client's own legal review (REQ-049).
+
+**2026-08-12** (ratified in constitution **v5.1.0**) — **the smallest amendment this project has
+made, and the only one drafted by an implementation rather than requested by anybody:**
+
+44. **`InstallService` is an eighth device capability.** Principle V's enumerated list goes from
+    seven to eight, and **the listing is the ratification act** — `VisibilityService`'s precedent
+    from v3.1.0, followed exactly. MINOR: a section is materially expanded, no prohibition is
+    lifted, and nothing delivered is retracted. **Not sought**: 016's specification and its review
+    gate both missed the dependency, and Phase 0 research found it — install detection needs
+    `matchMedia('(display-mode: standalone)')` and a `beforeinstallprompt` listener, and
+    `mynet/no-direct-platform-access` names both in its DOM set. The alternatives were an interface
+    or a lint exemption, and an exemption would have traded a structural boundary for an install
+    banner, which is the constitution's own reasoning for the seventh. **The interface must model
+    both platform halves as first-class**: Chromium can present a real prompt, iOS Safari exposes no
+    install API at all, and a shape built only around the first makes the second look like a failure
+    and invites a control that cannot work. **Nothing about notification triggers moves** — a
+    received message is still the only thing that dispatches, and the guidance requests no
+    permission.
+
 ## How work is done here
 
 ### Branching and change flow
@@ -1060,7 +1269,9 @@ open questions.
   Declarations*, and as of 2026-08-11 it is **finally in `.specify/templates/spec-template.md`** —
   it had been mandatory since v2.1.0 and hand-copied into every spec from 002 to 010, because the
   template never carried it despite the roadmap saying it did. Draft v4.0.0 adds a first row,
-  **Actor and tier**: every feature through 010 had one actor and never had to say so.
+  **Actor and tier**: every feature through 010 had one actor and never had to say so. **v5.0.0 adds
+  a second, `Administrative counterpart`** (decision 42) — for every capability a feature adds to
+  MyNet, whether the administrative half exists, must be built here, or is explicitly none.
 - **Out of product scope**: payment processing. **Organizer administration came IN at v4.0.0**
   (standing decisions 31–36), under four binding conditions — a separate product, a second actor in
   two tiers, no self sign-up into either, and no admin surface in MyNet. An administrative
@@ -1146,19 +1357,71 @@ is a working summary. Each names what it blocks, because *when* to ask matters a
 
 ### Require a client decision
 
-**No open question blocks any feature.** v3.2.0 closed the connection model, card-exchange semantics
+**One open question now blocks a feature again — entry 27 blocks 017.** That is new as of
+2026-08-12 and reverses the position this section has held since v3.2.0. Everything else below blocks
+**release**, not code.
+
+- **Register entry 27 — Q&A attribution: full name, first name alone, or attendee-chosen.** Opened
+  by **v5.0.0 (C2)**. **Blocks 017.** v3.3.0 bound the full real name and argued it at length; the
+  client asks for the first name alone (REQ-062, REQ-063); **her own extraction records the thread as
+  unresolved** (OPEN-002) and the transcript carries both positions in one conversation. REQ-061 adds
+  something neither position states — the system must know the true author whatever is displayed —
+  which is compatible with all three answers. **Opened rather than settled deliberately**: the
+  client's stated preference was available and taking it would have closed by inference a thread she
+  herself recorded as open. The case that decides it is mundane and should be put to her directly:
+  two attendees named Ana at one event.
+- **Register entry 28 — two brand marks now coexist, and which one is MyNet's is undecided.** Opened
+  by **v5.0.0 (C4)**. **Blocks nothing**; the product behaves as directed. Recorded because a
+  knowingly accepted divergence and an unnoticed one look identical six months later, and because
+  resolving it either way is expensive. **No feature may resolve it by quietly replacing one mark
+  with the other.**
+
+- **A card acquired by mutual exchange outlives the discoverability toggle that licensed it — and
+  whether that residual is accepted is NOT decided.** Raised by **016's deep review**, not by an
+  amendment, so it is recorded here rather than numbered in the constitution's register;
+  **promoting it to a numbered entry is an owner act.** **Blocks nothing** — the product behaves
+  exactly as C1 ratified.
+
+  C1 licenses taking somebody's card without asking on one ground, and FR-1053 enforces it: a card
+  resolves only what its owner already published to co-attendees, so **the exchange moves *when* a
+  co-attendee sees those fields, not *whether*.** That holds for the **instant** of sharing. It does
+  not hold for the **duration**. Discoverability is revocable and event-scoped; a held card is
+  neither, cannot be recalled, and resolves the **live** profile — including avatar bytes —
+  indefinitely, because `heldCardSelect` deliberately applies no discoverability, no verification and
+  no registration condition. Those three absences are correct and are the feature; the point is that
+  C1 made them reachable by *one party's* act.
+
+  So looping `POST /cards` over the directory converts a revocable publication into a permanent one.
+  016 narrowed it — the `card_share` throttle was tightened and its comment corrected, because that
+  comment had claimed the reciprocal row "harms nobody" and it is the sentence a later change would
+  cite to raise the ceiling. **A throttle bounds a rate, not a right**, which is why this is recorded
+  rather than closed. The subject also cannot see who holds their card: `GET /cards/shared` exists
+  and has **no client consumer**, so the only remedy — blocking — requires knowing whom to block.
+
+Historically: v3.2.0 closed the connection model, card-exchange semantics
 and Q&A attribution; **v3.3.0** closed public Q&A visibility and withdrew FR-756a; **v3.4.0** closed
 the oldest entry of all, the brand mark; **v3.5.0** closed four more — the UAT address, the mail
 provider, VAPID custody and the operator address; and **v4.0.0/v4.1.0** opened entries 24, 25 and 26
-and closed all three in the same session. **009, 010, 011 and 013 are shipped, and the attendee
-delivery roadmap is complete.** Everything below blocks **release**, not code.
+and closed all three in the same session. **009, 010, 011, 013 and 016 are shipped, and the attendee
+delivery roadmap is complete.** Two of those closures — card-exchange semantics and Q&A visibility —
+were **reversed on 2026-08-12 by v5.0.0**, which is the first time this project has reopened settled
+ground on client feedback rather than on a design finding.
 
 **Two programmes are now in flight and their numbering interleaves, which is worth stating once
 rather than re-deriving.** The attendee roadmap ends at **012 — Launch Readiness & Production**,
 still queued. The administrative programme runs **013, 014, 015** and began while 011 was in a
 parallel branch; 013 took the next free number rather than the next number in its own sequence,
 because parallel branches cannot see each other's reservations. The constitution records the same
-lesson about version numbers three times over.
+lesson about version numbers three times over. **A third strand now runs beside both** — the client
+feedback programme that v5.0.0 opened, of which **016 is delivered and 017 (the Q&A rebuild) is
+not startable**.
+
+**Nothing is in flight as of 2026-08-13, and what comes next is a choice rather than a queue.**
+016 landed and no branch is open. **017 is blocked** — register entry 27 (Q&A attribution) is the
+first open question to block a feature since v3.2.0, and it is the client's to answer; the case that
+decides it is two attendees named Ana at one event. **012 is blocked** on register entries 22 and 4.
+**014 and 015 are startable now** and are the administrative programme's own next steps. Choosing
+among them is an owner decision, not a planning inference.
 
 The closing sequence for 24, 25 and 26 is worth keeping, because it is the argument for opening
 entries you cannot yet answer: those three produced a **third privacy exception**, a

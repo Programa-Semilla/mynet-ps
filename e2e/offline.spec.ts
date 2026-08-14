@@ -234,7 +234,7 @@ test.describe('offline', () => {
     ).toBeGreaterThan(0)
 
     await page.getByRole('button', { name: 'Sign out' }).click()
-    await expect(page.getByLabel('Password')).toBeVisible()
+    await expect(page.getByLabel('Password', { exact: true })).toBeVisible()
 
     const residue = await page.evaluate(
       async (needles) => {

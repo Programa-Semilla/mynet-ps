@@ -89,7 +89,22 @@ describe('the share control', () => {
     expect(control).not.toHaveTextContent(/grace hopper's card/i)
   })
 
-  it('confirms in words that the card moved OUTWARD and nothing came back (FR-603)', async () => {
+  /**
+   * ───────────────────────────────────────────────────────────────────────────────────────
+   * **T042 (016) — THIS TEST REQUIRED THE OPPOSITE UNTIL 016, AND THE TITLE WAS THE WORSE HALF.**
+   *
+   * It was called *"confirms in words that the card moved OUTWARD and nothing came back"* and it
+   * asserted `/you will hold theirs when they share it with you/`. Constitution **v5.0.0 (C1)**
+   * retracts "nothing came back": `shareCard` writes both rows in one transaction (FR-1022), so
+   * the assertion pinned a sentence that was false the moment it rendered — and being green, it
+   * is why no gate caught the copy.
+   *
+   * Retitling is not cosmetic here. "Nothing came back" is the *property* that has to stop being
+   * asserted; a test whose body was corrected under a title still claiming it would leave the
+   * retracted model in the suite, which is exactly how this survived a review.
+   * ───────────────────────────────────────────────────────────────────────────────────────
+   */
+  it('T042 — confirms in words that the cards were EXCHANGED, both ways (FR-1021, FR-1022)', async () => {
     renderShare()
 
     await userEvent.click(screen.getByRole('button', { name: /share your card/i }))
@@ -99,9 +114,16 @@ describe('the share control', () => {
     // to anybody who has not focused it before it goes.
     const confirmation = await screen.findByRole('status')
 
-    expect(confirmation).toHaveTextContent(/your card is now with grace hopper/i)
-    // The sentence that closes the misreading: the reader learns they did not collect anything.
-    expect(confirmation).toHaveTextContent(/you will hold theirs when they share it with you/i)
+    // Both parties named, and the exchange stated in both directions. The apostrophe is written
+    // `&apos;` in the source and arrives here as a plain `'`; the pattern tolerates either rather
+    // than pinning which entity the component used.
+    expect(confirmation).toHaveTextContent(/you and grace hopper have exchanged cards/i)
+    expect(confirmation).toHaveTextContent(/each see the other.s profile in network/i)
+
+    // **The retracted sentence must be gone, not merely unasserted.** Copy that says the reader
+    // received nothing would contradict the row the server has already written for them, and an
+    // added assertion alone would go on passing beside it.
+    expect(confirmation.textContent ?? '').not.toMatch(/hold theirs|shares? back/i)
 
     // And the control is gone, so a second share is not invited for no reason.
     expect(screen.queryByRole('button', { name: /share your card/i })).not.toBeInTheDocument()
@@ -145,6 +167,17 @@ describe('the contacts list', () => {
     renderContacts(vi.fn(async () => []))
 
     expect(await screen.findByText(/your contacts will appear here/i)).toBeInTheDocument()
+
+    // ───────────────────────────────────────────────────────────────────────────────────────
+    // **FR-1055 — the body states the EXCHANGE, and used to instruct the reader to wait.**
+    //
+    // It read *"theirs will arrive here when they share back"*, describing a step C1 removed.
+    // `card-model-record.test.ts` catches a regression to that wording, but a source guard can
+    // only prove the old claim is absent — it cannot prove the right one is present. Both
+    // halves are needed, and the heading assertion above would have passed either way.
+    // ───────────────────────────────────────────────────────────────────────────────────────
+    expect(screen.getByText(/sharing a card is an exchange/i)).toBeInTheDocument()
+    expect(screen.queryByText(/share back|shares back/i)).not.toBeInTheDocument()
 
     // A contact exists only because somebody shared a card, and cards are shared from a profile
     // in Discover — so the empty state has exactly one next step and must offer it.

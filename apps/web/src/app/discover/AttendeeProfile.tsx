@@ -393,15 +393,26 @@ const ProfileBody = ({ state }: { state: ProfileState }): ReactNode => {
 
         {/*
           ═══════════════════════════════════════════════════════════════════════════════════
-          008 — **the third action, and the one that keeps the core journey completable**
+          008 — **the third action, and the one that keeps proposing independent of exchanging**
           (SC-604, User Story 3: "From a contact or a profile").
 
-          The spec's Assumptions are explicit that *scheduling does not require holding a card*,
-          and without this control that sentence is false in the product: sharing is
-          one-directional (FR-602), so sharing your card with somebody you just met gives you
-          nothing, they do not become your contact, and Network — the only other surface with a
-          scheduling action — never lists them. The journey *discover → share → schedule* would
-          dead-end at step three.
+          **The justification written here until 016 is now false, and it is replaced rather than
+          patched.** It argued that sharing was one-directional (FR-602), so sharing your card
+          with somebody you just met gained you nothing, they did not become your contact, and
+          Network — the only other surface with a scheduling action — never listed them, leaving
+          *discover → share → schedule* to dead-end at step three. Constitution **v5.0.0 (C1)**
+          retracts that: one act now writes both rows (FR-1021, FR-1022), the contact does appear
+          in Network, and that dead end is gone. A reader who trusted the old sentence could
+          reasonably delete this control on the strength of it.
+
+          What survives is the spec's Assumption itself — *scheduling does not require holding a
+          card* — and removing this control would still make it false, by a different route. The
+          only remaining way to reach a scheduling action would run through an exchange that is
+          immediate, mutual and **irrevocable** (FR-1026), and which the other person is never
+          asked about (FR-1023). Proposing is the deliberately *answerable* act in this feature:
+          it is accepted or declined, on the invitee's own terms. Gating the answerable act
+          behind the one that cannot be undone inverts that, and it would mean handing over your
+          contact details in order to ask for half an hour.
 
           No registration check is needed and none is possible to get wrong here: this view is
           reached at `/discover/<attendeeId>` under the active conference and reads the profile

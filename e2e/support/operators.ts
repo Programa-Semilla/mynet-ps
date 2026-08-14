@@ -105,7 +105,7 @@ const attemptSignIn = async (page: Page, password: string): Promise<boolean> => 
   await expect(email, 'the administrative sign-in screen did not render').toBeVisible()
 
   await email.fill(SEED_OPERATOR_EMAIL)
-  await page.getByLabel(/password/i).fill(password)
+  await page.getByLabel('Password', { exact: true }).fill(password)
 
   // ═══════════════════════════════════════════════════════════════════════════════════════════
   // **THE OUTCOME IS READ FROM THE RESPONSE, NOT INFERRED FROM THE DOM — AND THE WAIT IS ARMED

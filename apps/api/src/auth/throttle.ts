@@ -384,9 +384,69 @@ export const THRESHOLDS: Record<ThrottleAction, ActionThreshold> = {
    * kind of considered, per-person act as opening a conversation with them, and the two are
    * often the same encounter. Generous enough for a busy hallway hour; nowhere near enough to
    * paper a conference.
+   *
+   * ═════════════════════════════════════════════════════════════════════════════════════════
+   * **T044 (016) — RE-CHECKED UNDER MUTUAL EXCHANGE, AND THE FIRST ANSWER WAS WRONG ABOUT WHOSE
+   * DATA THE SECOND ROW IS.**
+   *
+   * Constitution v5.0.0 (C1) makes one call write **two** rows rather than one. This entry
+   * originally concluded that the numbers could stand, on the ground that *"the second row is the
+   * reciprocal one, and it lands in the **sharer's own** account — a contact they acquired by
+   * their own act, which they chose, and which harms nobody."* **That sentence is retracted, and
+   * it is retracted because it confuses where a row lands with whose data it is.**
+   *
+   * The reciprocal row is `(sharer_id = recipient, recipient_id = caller)`. It sits in the
+   * caller's contacts, and its **subject is the recipient**. What it confers is a read of that
+   * person's **live** profile through `heldCardSelect` — which applies **no** discoverability
+   * condition, **no** verification condition and **no** registration join, because those three
+   * absences are the standing-consent feature (FR-612–FR-614) — and the single-card route serves
+   * their **avatar bytes**. It cannot be recalled (FR-618), it survives the conference, and the
+   * subject cannot enumerate who holds it.
+   *
+   * So the count of unsolicited durable consequences per call went from **one to two**, and the
+   * new one is the more sensitive of the pair.
+   *
+   * **FR-1053's ground holds for the INSTANT and not for the DURATION, which is the whole of the
+   * correction.** C1 licenses the exchange because *"the exchange moves **when** a co-attendee
+   * sees those fields, not **whether**"* — true at the moment of sharing, when the recipient is
+   * discoverable and the caller could already read all of it. But discoverability is **revocable
+   * and event-scoped**, and a held card is **neither**. Looping this route over a directory
+   * therefore converts a revocable publication into a permanent one, which is a change of kind
+   * rather than of timing, and it is precisely the harm this counter is the only bound on.
+   * ═════════════════════════════════════════════════════════════════════════════════════════
+   *
+   * ─────────────────────────────────────────────────────────────────────────────────────────
+   * **SO THE IDENTIFIER ALLOWANCE COMES DOWN — 10 → 5 — AND THE ARITHMETIC IS STATED HERE
+   * RATHER THAN LEFT FOR SOMEBODY TO REDERIVE WHILE RAISING IT.**
+   *
+   * `delayFor` ramps at `2^(excess-1)` seconds to a six-minute ceiling, so the head of the curve
+   * is what `freeAttempts` governs and the tail is what the ceiling governs:
+   *
+   *   * At 10 free: ten immediate, then nine ramped shares costing ~8.5 minutes in total, then
+   *     one every six minutes — roughly **27 in the first hour**.
+   *   * At 5 free: five immediate, the same nine ramped, then the same six-minute steps —
+   *     roughly **22 in the first hour**.
+   *
+   * **Five is a real reduction in the burst and NOT a reduction in the sustained rate**, and
+   * saying so is the point: past the ramp the rate is ten an hour whatever `freeAttempts` is,
+   * because the ceiling alone sets it. A hallway hour of genuine encounters — five shares with no
+   * delay at all, a sixth costing one second, a seventh two — is untouched; a directory sweep
+   * pays over two minutes per person from the thirteenth onward.
+   *
+   * **The ramp is designed to make abuse expensive, not impossible, and what is being acquired is
+   * now permanent.** That residual is deliberate and is stated rather than implied: a determined
+   * account with a verified address can still accumulate a few hundred live-resolving profile
+   * reads a day. Closing it absolutely needs an **absolute cap on *successful* exchanges per
+   * window** — a mechanism this table does not have, since every entry here delays and then
+   * refuses the remainder — and adding one is an owner decision on ratified text (`v5.0.0` C1),
+   * recorded as finding S1 rather than taken here.
+   *
+   * **Do not cite the retracted sentence to raise this ceiling.** The number that would justify a
+   * raise is a change in what a held card *confers*, not a change in how many rows a call writes.
+   * ─────────────────────────────────────────────────────────────────────────────────────────
    */
   card_share: {
-    identifier: { freeAttempts: 10, ceilingMs: IDENTIFIER_MAX_DELAY_MS },
+    identifier: { freeAttempts: 5, ceilingMs: IDENTIFIER_MAX_DELAY_MS },
     source: { freeAttempts: 60, ceilingMs: SOURCE_MAX_DELAY_MS },
     mayDeny: true,
   },

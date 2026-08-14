@@ -40,7 +40,7 @@ test.describe('accessibility', () => {
     for (const width of WIDTHS) {
       await page.setViewportSize({ width: width.px, height: 900 })
       await page.goto('/')
-      await expect(page.getByLabel('Password')).toBeVisible()
+      await expect(page.getByLabel('Password', { exact: true })).toBeVisible()
 
       const { violations } = await scan(page)
       expect(

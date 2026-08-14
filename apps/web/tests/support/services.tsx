@@ -41,6 +41,15 @@ export const noopDevices: PlatformServices['devices'] = {
   // gated on visibility — the open thread's poll, today — leaving the failure as an absence of
   // requests rather than an error anybody sees.
   visibility: { isVisible: () => true, subscribe: () => () => {} },
+  // 016 — the eighth capability (constitution v5.1.0). **Uninstalled, non-mobile, no prompt** is
+  // the desktop case, where FR-1031 renders no guidance — so component tests that are not about
+  // the guidance are unaffected by its existence. `promptToInstall: null` is deliberately the
+  // default: it is the iOS shape, and a caller assuming a function fails here rather than on a
+  // phone nobody is testing on.
+  install: {
+    current: () => ({ installed: false, mobile: false, promptToInstall: null }),
+    subscribe: () => () => {},
+  },
 }
 
 /**
