@@ -244,9 +244,17 @@ is started in practice, so building it second lets 007 wire that entry point rat
 an inert control that 007 later revisits. If throughput ever matters more than sequence, 007 can move
 alongside 006 at the cost of that revisit.
 
-Migration numbers are **reserved here**. A phase claims its number when its spec is written, not
-when its migration is generated, so two parallel branches never generate the same filename and no
-file is ever renamed during a rebase.
+Migration numbers are **recorded here, and claimed at generation.** *Changed by constitution 5.3.0
+(O4); until 2026-08-14 a phase claimed its number when its spec was written.* A phase takes the next
+free number **when it generates its migration**, and MUST extend the table above in the same change.
+
+**The reservation scheme was abandoned because it collided three times and each collision left a
+permanent artifact rather than a one-off fix** — the journal carries `idx: 10` against tag
+`0011_conference_authoring` and snapshot `0010_snapshot.json`, a three-way skew every future
+generation must be told about. It also held `0010` for a phase that adds no schema at all, so the
+sequence reserved a gap for a migration nobody was going to write. Reserving in advance only works
+when branches can see each other's reservations, and the recurring lesson of this project is that
+they cannot. Claiming late has never forced a rename; claiming early forced one three times.
 
 ### Three properties of this shape worth stating explicitly
 
