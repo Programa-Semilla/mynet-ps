@@ -463,22 +463,24 @@ These bind every task below and are not repeated per task.
 
 ## Phase 9: Foundational — Tranche 2 (BLOCKING PREREQUISITES)
 
-**No user story below may start until this phase completes.**
+**Phase 9 blocks US5, US6 and US8 in full. It does NOT block US7 in full** — the taxonomy depends
+only on T112, T114, T118 and T125–T127, and waiting on the events/sessions/enrolment schema or the
+catalog/agenda/panel comment rewrites would lengthen the critical path for no dependency reason.
 
 ### Schema
 
-- [ ] T110 [P] Add `modality` and `format` to `events` in `apps/api/src/db/schema/events.ts`, each with a header stating it is conference content. **Modality is controlled with no neutral default; format is descriptive and nothing may branch on it** (FR-1046, FR-1047)
-- [ ] T111 [P] Add `kind`, `capacity`, `enrolmentClosingOffsetHours` and `accessLink` to `sessions` in `apps/api/src/db/schema/catalog.ts`, and **make `roomId` nullable** (FR-1049, FR-1060, FR-1061, FR-1062, FR-1052)
+- [ ] T110 [P] Add `modality` and `format` to `events` in `apps/api/src/db/schema/events.ts`, each with a header stating it is conference content. **Modality is controlled with no neutral default; format is descriptive and nothing may branch on it** (FR-1046, FR-1047, FR-1045)
+- [ ] T111 Add `kind`, `capacity`, `enrolmentClosingOffsetHours` and `accessLink` to `sessions` in `apps/api/src/db/schema/catalog.ts`, and **make `roomId` nullable** (FR-1049, FR-1060, FR-1061, FR-1062, FR-1052)
 - [ ] T112 Create `apps/api/src/db/schema/vocabulary.ts` — `sectors`, `subsectors`, `interestOptions`, each with `retiredAt`. **A new file rather than an addition to `profiles.ts`**, and one append-only export line in `schema/index.ts` (R17)
 - [ ] T113 Add `sessionEnrolments` to `apps/api/src/db/schema/agenda.ts` — composite PK `(sessionId, attendeeId)`, `takenAt`, `viewedAt`, **and an explicit `index(sessionId)`**. PostgreSQL creates no index for a foreign key and the `count(*)` runs **inside the exclusive lock** (R12)
-- [ ] T114 [P] Add `sector`, `subsector`, `productiveActivity` and `company` to `attendee_profiles` in `apps/api/src/db/schema/profiles.ts`, **all nullable** — FR-336 holds and REQ-027 is not granted (FR-1097)
+- [ ] T114 Add `sector`, `subsector`, `productiveActivity` and `company` to `attendee_profiles` in `apps/api/src/db/schema/profiles.ts`, **all nullable** — FR-336 holds and REQ-027 is not granted (FR-1097)
 - [ ] T115 Generate migration `0012` and verify by reading it: `modality` back-filled **`in-person`** with the default **dropped in the same migration**, and `0010` left empty (FR-1048, R19)
 
 ### The comments this tranche falsifies
 
-- [ ] T116 [P] Rewrite `apps/api/src/db/schema/catalog.ts`'s "**Absent by design**: … no capacity, no attendance … not named by any requirement" — FR-1061 and FR-1063 name both. **Rewrite, do not delete**: the comment is the record
-- [ ] T117 [P] Rewrite `apps/api/src/db/schema/catalog.ts`'s "Speakers are the only optional part of a session's identity" — the room is now optional too (FR-1049)
-- [ ] T118 [P] Rewrite `apps/api/src/db/schema/profiles.ts`'s "A fixed taxonomy would be an organizer-authored artifact, and **Principle III puts that out of scope**" — v4.0.0 reversed that premise (FR-1088)
+- [ ] T116 Rewrite `apps/api/src/db/schema/catalog.ts`'s "**Absent by design**: … no capacity, no attendance … not named by any requirement" — FR-1061 and FR-1063 name both. **Rewrite, do not delete**: the comment is the record
+- [ ] T117 Rewrite `apps/api/src/db/schema/catalog.ts`'s "Speakers are the only optional part of a session's identity" — the room is now optional too (FR-1049)
+- [ ] T118 Rewrite `apps/api/src/db/schema/profiles.ts`'s "A fixed taxonomy would be an organizer-authored artifact, and **Principle III puts that out of scope**" — v4.0.0 reversed that premise (FR-1088, FR-1096a)
 - [ ] T119 [P] Rewrite `apps/api/src/db/schema/agenda.ts`'s "the fact that one attendee intends to attend one session" — saving is now one of two commitments (FR-1066a)
 - [ ] T120 [P] Rewrite `apps/web/src/app/agenda/SessionPanel.tsx`'s "a fifth section the roadmap says will never arrive" — the enrolment control is that fifth section
 
@@ -506,9 +508,9 @@ These bind every task below and are not repeated per task.
 ### Tests for User Story 5
 
 - [ ] T129 [P] [US5] Add `apps/api/tests/integration/enrolment-capacity.test.ts` — **concurrent** attempts on the last place; assert no ordering produces more places than capacity (FR-1068, SC-1014)
-- [ ] T130 [P] [US5] Add `apps/api/tests/integration/enrolment-refusals.test.ts` — assert the four refusals are **mutually different** from each other, not merely that each maps to some message (FR-1069a). This is the assertion 014's own recorded lesson says a per-code check would pass while checking nothing
+- [ ] T130 [P] [US5] Add `apps/api/tests/integration/enrolment-refusals.test.ts` — assert the four refusals are **mutually different** from each other, not merely that each maps to some message (FR-1069a). This is the assertion 014's own recorded lesson says a per-code check would pass while checking nothing (SC-1015)
 - [ ] T131 [P] [US5] Assert **already-enrolled resolves before full**, so a double-tap on a full session does not report `full` about a place the caller already holds (R12)
-- [ ] T132 [P] [US5] Add `apps/api/tests/integration/enrolment-deadline.test.ts` — closing derives from start plus offset; a session moved later **re-opens** enrolment; an attendee already holding a place **keeps it** after closing (FR-1071, FR-1071b, FR-1071c)
+- [ ] T132 [P] [US5] Add `apps/api/tests/integration/enrolment-deadline.test.ts` — closing derives from start plus offset; a session moved later **re-opens** enrolment; an attendee already holding a place **keeps it** after closing (FR-1071, FR-1071b, FR-1071c, FR-1071a)
 - [ ] T133 [P] [US5] Add `apps/api/tests/integration/capacity-reduction.test.ts` — lowering capacity below places held is **refused, naming how many are held**, and nobody is evicted (FR-1061a)
 - [ ] T134 [P] [US5] Assert a kind change is refused while any save or place exists, **checked under the same lock** (FR-1065)
 
@@ -524,19 +526,23 @@ These bind every task below and are not repeated per task.
 - [ ] T142 [US5] Implement the capacity-reduction refusal in `admin-catalog.ts`, reading the held count **inside the updating transaction with the session row locked** (FR-1061a, R12)
 - [ ] T143 [US5] Implement the kind-change refusal under the same lock (FR-1065)
 
+- [ ] T208 [US5] **Build the attendee-side commitment control** in `apps/web/src/app/SessionPresentation.tsx` — on an optional session it takes a place, on a mandatory one it saves, and there is exactly **one** control whose identity is determined by the session's kind (FR-1063, SC-1013)
+- [ ] T209 [US5] Display **remaining places** beside that control, as **text** rather than colour or a bar alone, and omit it entirely where it cannot be read live rather than showing a stale figure (FR-1070, FR-1070b)
+- [ ] T210 [P] [US5] Add `apps/web/tests/unit/commitment-exclusivity.test.tsx` asserting **no route exists** by which an optional session can be saved, so the "saved but holds no place" state is unreachable — and that the cost is presented rather than worked around (FR-1064, FR-1064a)
+
 ### The roster — the fourth privacy exception
 
 - [ ] T144 [US5] Implement `GET /admin/conferences/:eventId/sessions/:id/enrolments` behind `requireConferenceAuthority`, projecting **names only** (FR-1073, O1)
-- [ ] T145 [P] [US5] Add `apps/api/tests/integration/roster-bounds.test.ts` asserting all four bounds: only enrolment; only an assigned organizer; only that conference's sessions; and refusal identical to a conference that does not exist (FR-1073a)
+- [ ] T145 [P] [US5] Add `apps/api/tests/integration/roster-bounds.test.ts` asserting all four bounds: only enrolment; only an assigned organizer; only that conference's sessions; and refusal identical to a conference that does not exist (FR-1073a, SC-1018)
 - [ ] T146 [US5] Build `apps/admin/src/app/conferences/EnrolmentRoster.tsx`
 - [ ] T147 [US5] Add the pre-enrolment notice telling the attendee their name becomes visible to that conference's organizers **before** they take a place — the only privacy exception the subject can decline by not acting (FR-1074)
 
 ### Deletion, and the confirmation that lies
 
 - [ ] T148 [US5] Add a **separate held-places field** beside the four engagement counts — **never a fifth count**. `hasEngagement` has zero callers; `countEngagement`'s boolean is a sum, so adding places to it makes places-held sessions undeletable, which is the opposite of O2 (R15, FR-1077b)
-- [ ] T149 [US5] **Fix `apps/admin/src/app/conferences/CancelDialog.tsx` so it stops asserting nothing is attached** when places are held. It must state the number held, that those attendees **will not be notified and their rows carry no marker**, that nothing survives to explain the absence, and that cancellation is the preserving alternative (FR-1077c — the Critical review finding)
+- [ ] T149 [US5] **Fix `apps/admin/src/app/conferences/CancelDialog.tsx` so it stops asserting nothing is attached** when places are held. It must state the number held, that those attendees **will not be notified and their rows carry no marker**, that nothing survives to explain the absence, and that cancellation is the preserving alternative (FR-1077c — the Critical review finding, FR-1077, FR-1077a)
 - [ ] T150 [US5] Re-read the held-places figure **inside the deleting transaction under the same lock**, refusing and re-presenting if it has risen since the organizer was shown it (FR-1077b)
-- [ ] T151 [P] [US5] Add `apps/admin/tests/unit/cancel-dialog-copy.test.tsx` asserting the confirmation **never** claims nothing is attached to a session with places held
+- [ ] T151 [P] [US5] Add `apps/admin/tests/unit/cancel-dialog-copy.test.tsx` asserting the confirmation **never** claims nothing is attached to a session with places held (SC-1025)
 
 ### Withdrawal and deletion release places
 
@@ -555,10 +561,10 @@ These bind every task below and are not repeated per task.
 
 ### Tests for User Story 6
 
-- [ ] T154 [P] [US6] Add `apps/api/tests/integration/notify-enrolled.test.ts` — cancelled, start time and room each reach an attendee who holds a place and has **no saved row** (FR-1079)
+- [ ] T154 [P] [US6] Add `apps/api/tests/integration/notify-enrolled.test.ts` — cancelled, start time and room each reach an attendee who holds a place and has **no saved row** (FR-1079, SC-1016)
 - [ ] T155 [P] [US6] Assert the **mixed** attendee — one save and one place, both changed by one act — receives **exactly one** notification whose count is saves plus places (SC-1016a)
 - [ ] T156 [P] [US6] Assert a title, summary, speaker, capacity, closing-offset or access-link change dispatches **nothing** (FR-1058, FR-1079a, FR-1099c)
-- [ ] T157 [P] [US6] Assert **nothing time-driven dispatches**, over the source rather than by observing that nothing arrived (SC-1017)
+- [ ] T157 [P] [US6] Assert **nothing time-driven dispatches**, over the source rather than by observing that nothing arrived (SC-1017, FR-1072, FR-1072a)
 - [ ] T158 [P] [US6] Assert the **trigger set is still two and the material set still three** after the population widens — counting dispatching modules is not sufficient evidence (SC-1026)
 
 ### Implementation for User Story 6
@@ -583,21 +589,21 @@ These bind every task below and are not repeated per task.
 ### Tests for User Story 7
 
 - [ ] T165 [P] [US7] Assert a profile with **every** taxonomy field empty saves and leaves every destination usable (SC-1019, FR-1097)
-- [ ] T166 [P] [US7] Assert a conference organizer **cannot reach** the vocabulary at all, and a platform operator can (SC-1020, FR-1091)
-- [ ] T167 [P] [US7] Assert **no administrative tier can write** an attendee's own selections, in Drizzle or raw SQL (FR-1093)
+- [ ] T166 [P] [US7] Assert a conference organizer **cannot reach** the vocabulary at all, and a platform operator can (SC-1020, FR-1091, FR-1091a)
+- [ ] T167 [P] [US7] Assert **no administrative tier can write** an attendee's own selections, in Drizzle or raw SQL (FR-1093, FR-1093a)
 - [ ] T168 [P] [US7] Assert a profile write **accepts every value the attendee already holds** — retained free text and retired values alike — and refuses only values neither held nor choosable (FR-1095b)
 - [ ] T169 [P] [US7] Assert renaming a held vocabulary value is **refused**, offering retire-plus-create (FR-1094c)
-- [ ] T170 [P] [US7] Assert `attendee_interests` has **no migration** and `listDirectory` is unchanged (R18)
+- [ ] T170 [P] [US7] Assert `attendee_interests` has **no migration** and `listDirectory` is unchanged (R18, SC-1021)
 
 ### Implementation for User Story 7
 
-- [ ] T171 [US7] Seed `sectors` with **Servicios, Comercio, Industria, Agro**; `subsectors` and `interestOptions` ship **empty** (FR-1086)
-- [ ] T172 [US7] Create `apps/api/src/db/queries/admin-vocabulary.ts` and `apps/api/src/routes/admin/vocabulary.ts` behind **`requirePlatformOperator`** — `requireConferenceAuthority` reads `:eventId` and 404s without one, so it cannot express product-wide authority at all (R20)
-- [ ] T173 [US7] Implement retire-not-delete, and the **rename refusal** while any attendee holds the value (FR-1094, FR-1094c)
-- [ ] T174 [US7] Enforce vocabulary membership **at the write in `writeOwnProfile`** — union the choosable set with what the attendee already holds. No foreign key, no mapping migration (R18, FR-1095b)
+- [ ] T171 [US7] Seed `sectors` with **Servicios, Comercio, Industria, Agro**; `subsectors` and `interestOptions` ship **empty** (FR-1086, FR-1085, FR-1085a, FR-1087)
+- [ ] T172 [US7] Create `apps/api/src/db/queries/admin-vocabulary.ts` and `apps/api/src/routes/admin/vocabulary.ts` behind **`requirePlatformOperator`** — `requireConferenceAuthority` reads `:eventId` and 404s without one, so it cannot express product-wide authority at all (R20, FR-1089, FR-1090)
+- [ ] T173 [US7] Implement retire-not-delete, and the **rename refusal** while any attendee holds the value (FR-1094, FR-1094c, FR-1094a, FR-1094b)
+- [ ] T174 [US7] Enforce vocabulary membership **at the write in `writeOwnProfile`** — union the choosable set with what the attendee already holds. No foreign key, no mapping migration (R18, FR-1095b, FR-1095, FR-1095a)
 - [ ] T175 [US7] Add the audit entries for vocabulary acts, committing **in the same transaction** as the act (FR-1089a, FR-994's rule)
 - [ ] T176 [US7] Append `{ to: '/vocabulary', label: 'Vocabulary', platformOnly: true }` to `ADMIN_DESTINATIONS` in `apps/admin/src/app/shell/AdminShell.tsx` — tier-hiding already exists and needs nothing built (R20)
-- [ ] T177 [US7] Build the vocabulary destination in `apps/admin/src/app/vocabulary/`, with an **empty-list state that invites authoring** rather than looking broken — the shipped condition
+- [ ] T177 [US7] Build the vocabulary destination in `apps/admin/src/app/vocabulary/`, with an **empty-list state that invites authoring** rather than looking broken — the shipped condition (FR-1092)
 - [ ] T178 [US7] Add the taxonomy fields to the attendee profile editor, presenting **held-but-unchoosable values as present and removable** (FR-1095b)
 - [ ] T179 [US7] Show the company on the networking card when given, and **no empty company line** when not (FR-1096)
 - [ ] T180 [US7] Join the productive-activity description to Discover's existing free-text search; **sector and subsector must not join it** (FR-1099d)
@@ -622,14 +628,16 @@ These bind every task below and are not repeated per task.
 - [ ] T186 [P] [US8] Assert conference **creation** refuses without an explicit modality, with its own code (FR-1059b)
 - [ ] T187 [P] [US8] Assert neither product renders a session summary as clickable markup — over markdown, autolinking and any raw-HTML path (FR-1054)
 
+- [ ] T211 [P] [US8] Assert there is **no timed release, per-attendee gating or reveal condition** on an access link — withholding it until a session starts needs either a lifecycle state or a scheduler, and this feature adds neither (FR-1056)
+
 ### Implementation for User Story 8
 
 - [ ] T188 [US8] Implement the modality/room/link validation and its distinct refusal codes (FR-1050, FR-1050a, FR-1050b)
 - [ ] T189 [US8] Implement `https:`-only access-link validation. **Never fetch the link to check it** — that is a server-side request to a URL a promoted attendee typed (FR-1053)
-- [ ] T190 [US8] Extend the conference update path to accept modality and format, and **build the conference editor** in `apps/admin/src/app/conferences/ConferenceEditor.tsx` — the update path has no caller today, so a value set at creation is currently uncorrectable (FR-1059)
+- [ ] T190 [US8] Extend the conference update path to accept modality and format, and **build the conference editor** in `apps/admin/src/app/conferences/ConferenceEditor.tsx` — the update path has no caller today, so a value set at creation is currently uncorrectable (FR-1059, SC-1023)
 - [ ] T191 [US8] Add modality to conference creation and reword shipped FR-1007's field list in the same change (FR-1059b)
 - [ ] T192 [US8] Tell the organizer, where they type it, that an access link is **published immediately** to everyone holding the join code (FR-1055)
-- [ ] T193 [US8] Present the link on the attendee's session view; derive in-person/virtual from what the session carries rather than storing it (FR-1051)
+- [ ] T193 [US8] Present the link on the attendee's session view; derive in-person/virtual from what the session carries rather than storing it (FR-1051, SC-1022)
 
 **Checkpoint**: User Story 8 is independently testable. **All user stories complete.**
 
@@ -646,6 +654,9 @@ These bind every task below and are not repeated per task.
 - [ ] T200 [P] Assert the tranche-2 absences: no waitlist, no automatic enrolment, no attendance or check-in record, no administrative enrolling on somebody's behalf, no record of access-link use (FR-1082, FR-1083, FR-1084, FR-1076, FR-1057)
 - [ ] T201 [P] Assert no view in either product presents a count of **changes**, and that the permitted **remaining-places** count is kept distinct from it (SC-1024, FR-1070a)
 - [ ] T202 [P] Add e2e coverage for quickstart scenarios 10–13 in `e2e/`, two browser profiles
+- [ ] T212 Rewrite `apps/admin/src/app/conferences/CancelDialog.tsx`'s header comment claiming the product **has no route that would** identify anybody — FR-1073 makes it false. **FR-1025 is narrowed by name, not contradicted**: it survives unnarrowed for saves, notes, questions and votes (FR-1075a)
+- [ ] T213 [P] Declare deletion and export coverage for the taxonomy: an attendee's **chosen** sector, subsector, activity and company are attendee data and export with the profile; the **vocabulary** is reference data needing a `NOT_EXPORTED` entry with a stated reason. **Nothing survives a deletion de-attributed** (FR-1098)
+- [ ] T214 Decide and implement Discover's filter options for controlled values — the accumulate-what-you-have-seen design exists because a conference-wide list would disclose the population shape, and a **closed vocabulary is not population data**. State the outcome either way rather than leaving it ambiguous, and assert the row's absences (FR-1099, FR-1099a, FR-1099b)
 - [ ] T203 Regenerate and commit the OpenAPI contract now every route exists
 - [ ] T204 Update `CLAUDE.md` — standing decisions 50–53, register entry 31, and the tranche-2 invariants
 - [ ] T205 Record any deliberate deviation in `specs/014-conference-content-authoring/deviations.md`, following D14's rule that "scoped deliberately" and "weakened until it passed" are indistinguishable in a diff
