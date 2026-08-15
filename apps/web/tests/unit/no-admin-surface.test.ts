@@ -1,10 +1,10 @@
-import { existsSync, readdirSync, readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath, URL } from 'node:url'
 
 import { describe, expect, it } from 'vitest'
 
-import { changedSinceBranchPoint } from '../support/branch-point.js'
+import { changedInRange, fileAt, TRANCHE_2 } from '../support/feature-range.js'
 
 /**
  * T089 (014) — **FR-1003 and SC-1008, re-proved rather than assumed still true.**
@@ -53,27 +53,28 @@ const sourceFiles = (directory: string): string[] =>
     return /\.tsx?$/.test(entry.name) ? [path] : []
   })
 
-const codeOnly = (path: string): string =>
-  readFileSync(path, 'utf8')
-    .replace(/\/\*[\s\S]*?\*\//g, ' ')
-    .replace(/^\s*\/\/.*$/gm, ' ')
+const stripped = (source: string): string =>
+  source.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/^\s*\/\/.*$/gm, ' ')
+
+const codeOnly = (path: string): string => stripped(readFileSync(path, 'utf8'))
+
+/** A changed file's code as 014 SHIPPED it — read at the pinned head, not from the checkout. */
+const codeAtHead = (path: string): string => stripped(fileAt(REPO, TRANCHE_2.head, path))
 
 const label = (path: string): string => path.slice(webSrc.length)
 
 /**
- * Every `apps/web/src` file this feature touched, relative to the branch point.
+ * Every `apps/web/src` file this feature touched — the pinned range `63bfd977..8b775e17`, which
+ * is 014 tranche 2 exactly as it landed (PR #24).
  *
- * The resolution lives in `tests/support/branch-point.ts` rather than here, because this guard and
- * `marker-not-cached.test.ts` each had their own copy of it and **neither copy could run in CI** —
- * a depth-1 checkout has no `develop` ref to find a merge base in. That file explains both failure
- * modes and why it throws rather than degrading to an empty diff.
+ * The resolution lives in `tests/support/feature-range.ts`, shared with
+ * `marker-not-cached.test.ts`. Its predecessor (`branch-point.ts`) re-derived the branch point
+ * from the checkout context, which was correct on the feature branch and false in every context
+ * after the merge — that file's replacement header records the full trajectory. Deleted paths
+ * (tranche 2's FR-1066a renames) are excluded by the helper itself: a file the feature removed
+ * cannot carry an administrative surface, and has no content at the head to read.
  */
-const changedByThisFeature = (): string[] =>
-  changedSinceBranchPoint(REPO, 'apps/web/src')
-    // A file the feature DELETED (a rename's old path is reported as one) cannot carry an
-    // administrative surface, and reading it throws. Tranche 2 renamed `SavedEmptyState.tsx`
-    // and `useSavedSessions.ts` under FR-1066a; the new paths are in the diff and are scanned.
-    .filter((path) => existsSync(join(REPO, path)))
+const changedByThisFeature = (): string[] => changedInRange(REPO, TRANCHE_2, 'apps/web/src')
 
 const all = sourceFiles(webSrc)
 
@@ -83,8 +84,9 @@ describe('014 — MyNet still has no administrative surface (FR-1003, SC-1008)',
     expect(
       changedByThisFeature().length,
       '014 changed no file in `apps/web/src`, so the diff-aware assertions below check nothing. ' +
-        'This feature changes three directories there (research R7, R8) — if the diff is empty, ' +
-        'the comparison base is wrong rather than the feature being clean.',
+        'This feature changed three directories there (research R7, R8), and its diff is pinned ' +
+        'history now — an empty result means the range in `feature-range.ts` is wrong, never ' +
+        'that the feature was clean.',
     ).toBeGreaterThan(3)
   })
 
@@ -136,15 +138,11 @@ describe('014 — MyNet still has no administrative surface (FR-1003, SC-1008)',
 
     const changed = changedByThisFeature()
       .filter((path) => !FR_1074_DISCLOSURE.has(path))
-      .map((path) => join(REPO, path))
       .filter((path) => /\.tsx?$/.test(path))
 
-    const branching = changed
-      .filter((path) => {
-        const code = codeOnly(path)
-        return /\btier\b|\boperator\b|\borganiz(er|ed|es)\b|\badmin\b/i.test(code)
-      })
-      .map((path) => path.slice(REPO.length))
+    const branching = changed.filter((path) =>
+      /\btier\b|\boperator\b|\borganiz(er|ed|es)\b|\badmin\b/i.test(codeAtHead(path)),
+    )
 
     expect(
       branching,
@@ -160,10 +158,8 @@ describe('014 — MyNet still has no administrative surface (FR-1003, SC-1008)',
     // actor and the audit trail records them; the attendee is told WHAT changed, never WHO — and
     // an organizer is an ordinary attendee to everybody else in this product.
     const naming = changedByThisFeature()
-      .map((path) => join(REPO, path))
       .filter((path) => /\.tsx?$/.test(path))
-      .filter((path) => /changedBy|actor|\bactId\b|lastChangeAct/i.test(codeOnly(path)))
-      .map((path) => path.slice(REPO.length))
+      .filter((path) => /changedBy|actor|\bactId\b|lastChangeAct/i.test(codeAtHead(path)))
 
     expect(
       naming,

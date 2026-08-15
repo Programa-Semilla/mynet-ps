@@ -3,7 +3,7 @@ import { join } from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
-import { changedSinceBranchPoint, fileAtBranchPoint } from '../support/branch-point.js'
+import { changedInRange, fileAt, TRANCHE_2 } from '../support/feature-range.js'
 
 /**
  * T077 (014) — **research R7's structural claims, asserted rather than trusted** (FR-1030,
@@ -85,12 +85,26 @@ describe('R7 — the marker adds no read, no capability and no cache entry', () 
    * A guard asserting a **product-wide** fact fails when any feature legitimately changes that
    * fact, and the tempting repair — edit the literal to eight — buys one more amendment of life
    * and hides who changed what. The property 014 actually owes is narrower and does not expire:
-   * **the capability set is whatever it was at the branch point.** A feature that adds one has to
-   * change this file to pass, which is the conversation the guard exists to force; a feature that
-   * does not, never touches it, however many other features add capabilities in the meantime.
+   * **the capability set is whatever it was at the branch point.**
    *
-   * Counted **and** compared, because the two catch different mistakes: comparing catches an
-   * addition, and counting non-vacuity catches a regex that stopped matching.
+   * **PINNED AT BOTH ENDS since fix/post-merge-verification (2026-08-15).** The branch-relative
+   * form read one end from the checkout, and after the squash merged, every checkout context
+   * gave it a different wrong answer (`tests/support/feature-range.ts` records them). 014's diff
+   * is fixed history now — `63bfd977..8b775e17` — so both ends are read from history and the
+   * assertion is deterministic everywhere, and still what it always was: this feature changed
+   * nothing about the set. The old form also NAMED the seven against the working tree; that half
+   * is gone deliberately, because it re-froze a product-wide fact (a later amendment renaming or
+   * retiring a capability would fail 014's guard), and the exact, order-sensitive equality below
+   * already catches a removal paired with an addition within the feature.
+   *
+   * **Stated plainly: this file no longer examines the working tree, and can never again fail on
+   * a future edit** — it is a sealed proof about history. That is not where the live protection
+   * went missing: a present-day change to `DeviceServices` fails the typecheck against
+   * `packages/platform/tests/substitution.test.ts`, which constructs a typed double for every
+   * capability — so the set cannot change without editing that file, and editing it is the
+   * conversation (`DISPATCH_CALLERS`' rule, applied to Principle V). The lint boundary
+   * (`mynet/no-direct-platform-access`) guards the other side: nothing reaches a platform API
+   * around the set.
    * ═══════════════════════════════════════════════════════════════════════════════════════════
    */
   it('leaves the device-capability set exactly as the branch point had it (Principle V)', () => {
@@ -101,8 +115,8 @@ describe('R7 — the marker adds no read, no capability and no cache entry', () 
     }
 
     const PATH = 'packages/platform/src/interfaces/index.ts'
-    const now = membersOf(read(PATH))
-    const before = membersOf(fileAtBranchPoint(REPO, PATH))
+    const before = membersOf(fileAt(REPO, TRANCHE_2.base, PATH))
+    const after = membersOf(fileAt(REPO, TRANCHE_2.head, PATH))
 
     // Non-vacuity first: an extractor that silently returns nothing would make the comparison
     // below `[] === []` and pass forever. This is the 010 precache defect in miniature.
@@ -111,22 +125,8 @@ describe('R7 — the marker adds no read, no capability and no cache entry', () 
       'no capabilities extracted at the branch point — the comparison would be vacuous',
     ).toBeGreaterThan(5)
 
-    // The seven that predate this feature must all still be there. Named rather than counted, so
-    // that a *removal* paired with an addition cannot cancel out.
-    expect(now).toEqual(
-      expect.arrayContaining([
-        'notifications',
-        'calendar',
-        'camera',
-        'contactShare',
-        'secureStorage',
-        'connectivity',
-        'visibility',
-      ]),
-    )
-
     expect(
-      now,
+      after,
       'The device-capability set changed within this feature. An addition is a constitution ' +
         'amendment rather than an implementation detail — `VisibilityService` (v3.1.0) and ' +
         '`InstallService` (v5.1.0) are both precedents for how expensive one is, and both were ' +
@@ -143,15 +143,13 @@ describe('R7 — the marker adds no read, no capability and no cache entry', () 
    * did.
    */
   it('required no change to the platform substitution test (Principle V)', () => {
-    // Compared against the branch point rather than against HEAD~1: this feature is many commits
-    // long, and "unchanged since the last commit" is a claim about the last commit rather than
-    // about the feature.
-    //
-    // The resolution lives in `tests/support/branch-point.ts`, shared with
-    // `no-admin-surface.test.ts`. Both had their own copy and **neither could run in CI**, where a
-    // depth-1 checkout has no `develop` ref; that file explains both failure modes and why it
-    // throws rather than degrading to an empty diff, which would make this guard pass forever.
-    const changed = changedSinceBranchPoint(REPO)
+    // The whole feature's diff, pinned at both ends (`63bfd977..8b775e17`) — this feature is many
+    // commits long, and "unchanged since the last commit" is a claim about the last commit rather
+    // than about the feature. The range lives in `tests/support/feature-range.ts`, shared with
+    // `no-admin-surface.test.ts`; its header records why the branch-relative predecessor had a
+    // different wrong answer in every post-merge context, and why this throws rather than
+    // degrading to an empty diff, which would make this guard pass forever.
+    const changed = changedInRange(REPO, TRANCHE_2)
 
     expect(
       changed.filter((path) => path === 'packages/platform/tests/substitution.test.ts'),
@@ -163,7 +161,7 @@ describe('R7 — the marker adds no read, no capability and no cache entry', () 
     // The guard is only meaningful if the diff is real: an empty comparison would pass forever.
     expect(
       changed.length,
-      'no changes found against the branch point — the guard is vacuous',
+      'no changes found in the pinned range — the range in `feature-range.ts` is wrong',
     ).toBeGreaterThan(5)
   })
 
