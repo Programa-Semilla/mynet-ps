@@ -341,7 +341,8 @@ does not cite it, exactly as register entry 7 was.
 
 ### Opened 2026-08-14 by #12 — tranche 2, and what it costs to close 014
 
-- **Constitution v5.3.0 is not drafted and gates the first line of code.** It must ratify three
+- ~~**Constitution v5.3.0 is not drafted and gates the first line of code.**~~ **DRAFTED AND RATIFIED
+  2026-08-14** as standing decisions 50–53; it opened register entry 31. It ratified three
   things: a **named enrolment roster** for assigned organizers (a bounded reversal of FR-1042 and the
   shipped `no-attendee-state-disclosure` guard), **enrolment's exclusion from the engagement set**,
   and the **attendee-visible seat count**.

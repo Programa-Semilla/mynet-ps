@@ -2,13 +2,25 @@
 SYNC IMPACT REPORT
 Version change: 5.2.0 → 5.3.0
 
-RATIFICATION STATUS: **DRAFTED 2026-08-14, AWAITING OWNER RATIFICATION.** Drafted at the owner's
-request following brainstorm #12 (`brainstorm/12-conference-content-authoring-tranche-2.md`), which
-scoped **014 tranche 2** — the change that closes feature 014. This amendment gates its first line of
-code, as 5.2.0 gated tranche 1, 4.0.0 gated 013, 3.3.0 gated 009 and 3.2.0 gated 008.
+RATIFICATION STATUS: **RATIFIED 2026-08-14 by the project owner**, on reading the drafted amendment
+together with the specification, plan and task list it gates. Drafted the same day at their request
+following brainstorm #12 (`brainstorm/12-conference-content-authoring-tranche-2.md`), which scoped
+**014 tranche 2** — the change that closes feature 014. This amendment gated its first line of code,
+as 5.2.0 gated tranche 1, 4.0.0 gated 013, 3.3.0 gated 009 and 3.2.0 gated 008.
 
-It is drafted first and ratified second, because this project does not let an amendment ratify
-itself. **No line of tranche 2 may be written until this is ratified.**
+It was drafted first and ratified second, because this project does not let an amendment ratify
+itself. **Feature 014 tranche 2 is licensed from this point**, including its first line of code.
+
+**What ratification does NOT do**: entry 31 remains open and blocks nothing. Entries 19, 21, 4, 22,
+27, 28, 29 and 30 are untouched. Ratifying a named enrolment roster did not decide whether a deletion
+should notify the attendees it strands — that is entry 31, and answering it needs a third
+notification trigger and therefore another amendment.
+
+**O2 was ratified with its cost stated rather than softened, and that is deliberate.** A session with
+places held may be deleted, those attendees hold no saved row, and so they receive no notification and
+no marker. The owner took that decision after the consequence was put to them and reaffirmed it. It is
+**not** precedent for a second `NOT_ENGAGEMENT` entry, and a later feature citing it as one has
+misread it.
 
 **NUMBERING CHECKED BEFORE CLAIMING, WHICH IS THE RULE 5.2.0'S REBASE PRODUCED.** At drafting, `5.3.0`
 was claimed by nothing but brainstorm #12 itself, and no branch other than
@@ -109,14 +121,14 @@ Templates and dependent artifacts:
     its migration is generated"* — which O4 directly reverses. **This is the artifact O4 is about**,
     so leaving it stale would have left the abolished scheme stated authoritatively in the one
     document a feature reads to find a number.
-  - CLAUDE.md — ⚠ pending on ratification: standing decisions 50–53 and register entry 31. Held
-    deliberately, following 5.2.0, which records CLAUDE.md as *"updated on ratification"* — a working
-    brief that describes a decision as binding before the owner has taken it is the drift Principle I
-    exists to prevent.
+  - CLAUDE.md — ✅ updated on ratification: standing decisions 50–53 and register entry 31. It was
+    held until then deliberately, following 5.2.0's practice, because a working brief that describes a
+    decision as binding before the owner has taken it is the drift Principle I exists to prevent.
   - brainstorm/12-conference-content-authoring-tranche-2.md, brainstorm/00-overview.md — ✅ current.
-  - specs/014-conference-content-authoring/ — ⚠ tranche 2 is unwritten; this amendment gates it.
+  - specs/014-conference-content-authoring/ — ✅ tranche 2 specified, planned and tasked (93 FRs,
+    15 SCs, 109 tasks T106–T214). **Ratification lifts the gate on T106.**
 
-Deferred: none. Tranche 2 has no blocking register entry once this is ratified.
+Deferred: none. Tranche 2 has no blocking register entry.
 
 A NOTE ON WHAT THIS AMENDMENT COSTS. 5.2.0's note observed that widening the trigger set cost the
 ability to verify "one trigger" by reading one sentence. This one costs something comparable in a
@@ -3760,5 +3772,4 @@ so a gap in the source would silently render as the wrong number against a neigh
 stay consistent with this constitution and MUST NOT contain implementation plans, session tasks,
 progress updates, or invented requirements.
 
-**Version**: 5.3.0 (DRAFTED 2026-08-14, awaiting owner ratification) | **Ratified**: 2026-08-04 |
-**Last Amended**: 2026-08-14
+**Version**: 5.3.0 | **Ratified**: 2026-08-04 | **Last Amended**: 2026-08-14

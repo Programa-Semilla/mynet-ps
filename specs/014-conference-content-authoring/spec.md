@@ -6,8 +6,8 @@
 
 **Status**: **OPEN — tranche 1 of 2 MERGED to `develop` 2026-08-14 (PR #23, squash); tranche 2
 SPECIFIED 2026-08-14 in Part II below, with no plan, no tasks and no code.** Constitution v5.2.0
-RATIFIED 2026-08-12; **v5.3.0 DRAFTED 2026-08-14 and AWAITING RATIFICATION — it gates tranche 2's
-first line of code.** **This feature is not complete and this document does not claim it is.**
+RATIFIED 2026-08-12; **v5.3.0 RATIFIED 2026-08-14 — it gated tranche 2's first line of code and no
+longer blocks it.** **This feature is not complete and this document does not claim it is.**
 Tranche 2 is being written on `spec/014-conference-content-authoring-tranche-2`, branched from
 `develop`, against this same directory, and it is the change that closes 014.
 
@@ -503,7 +503,7 @@ migration `0011` on constitution v5.2.0. Everything below is **tranche 2**, and 
 2026-08-14 that 014 stays open and grows — brainstorm #11's *"rescoped and kept whole"*, honoured
 literally.
 
-**Tranche 2 is gated on constitution v5.3.0**, drafted 2026-08-14 and **awaiting ratification**. Its
+**Tranche 2 was gated on constitution v5.3.0**, drafted and **RATIFIED 2026-08-14**. Its
 decisions O1–O4 are cited throughout. As v5.2.0 gated tranche 1, v4.0.0 gated 013, v3.3.0 gated 009
 and v3.2.0 gated 008: **no line of implementation may be written until it is ratified.** This
 specification may be written, reviewed and planned meanwhile, which is the same order 008 and 009
@@ -874,7 +874,7 @@ answer for tranche 2 alone; tranche 1's answers stand unchanged above.
 | **Deletion & export coverage** (Principle VIII) | **An enrolment IS attendee data.** It cascades from the attendee, appears in the personal-data export, and is released by **withdrawal from the conference** as well as by account deletion — the second needs writing by hand, because nothing cascades from a registration and that gap is invisible in the schema. **Capacity, the closing offset, modality, format and the access link are conference content**: no cascade, no export coverage, declared with that reason rather than allow-listed. **The taxonomy vocabulary is reference data, not attendee data** — no cascade, no export — while an attendee's *chosen* sector, subsector, activity description and interests **are** attendee data and must be exported with the profile. **Enrolment is deliberately NOT engagement** (v5.3.0 O2), which requires the first entry in the exclusion list, with the justification written down rather than configured. |
 | **Event scoping** (Standing decision D1/7) | **Mixed, deliberately, and neither side is a default.** Optional-session configuration, enrolments and the roster are **per-event**, because a session belongs to exactly one conference. **The taxonomy vocabulary is product-wide** and an attendee's taxonomy selections are **cross-event**, because a profile describes the person rather than their presence at one conference — the same reason the profile has always been cross-event. That asymmetry is the point: a per-conference sector list attached to a cross-event profile field would make somebody's sector change when they switched events. |
 | **Administrative counterpart** (Principle IX, added 5.0.0) | **Tranche 2 adds two attendee-facing capabilities, and each has a different answer.** (1) **Enrolling in an optional session** — its counterpart **exists and is built here**: the organizer sets the capacity and the deadline that bound it, and reads the roster that results. This is the row that forced constitution v5.3.0's O1, because the counterpart could not exist without a privacy exception. (2) **Choosing taxonomy values on a profile** — its counterpart is **partly built here and partly explicitly NONE**. A platform operator authors the *vocabulary* an attendee chooses from, which is the administrative half; but **no administrative tier may see, correct or override an attendee's selections**, and that absence is deliberate and guarded. "None, because a person is not authorable at any tier" is the answer, and it is the same answer tranche 1 gave for profile editing. |
-| **Register position** (Governance) | **Blocked by**: constitution **v5.3.0**, drafted 2026-08-14 and not yet ratified — nothing else. **Resolves**: none. **Escalates**: entry **4** again, by adding a fifth administrative destination and a new attendee-side control at the width that already truncates; entry **22**, by giving the cached conference a third way to be wrong — remaining places can now be stale, which is why that read must be live. **Opens**: entry **31** (whether deleting a session should notify the attendees enrolled in it), opened by v5.3.0 as the recorded consequence of O2. |
+| **Register position** (Governance) | **Blocked by**: nothing. Constitution **v5.3.0** was its only gate and was **ratified 2026-08-14**. **Resolves**: none. **Escalates**: entry **4** again, by adding a fifth administrative destination and a new attendee-side control at the width that already truncates; entry **22**, by giving the cached conference a third way to be wrong — remaining places can now be stale, which is why that read must be live. **Opens**: entry **31** (whether deleting a session should notify the attendees enrolled in it), opened by v5.3.0 as the recorded consequence of O2. |
 | **Migration number** (Branching — parallel work; rule changed 5.3.0 by O4) | **None claimed here, deliberately.** Tranche 2 adds schema and will take the **next free number at generation**, extending the delivery roadmap's number table in the same change. Reserving one in this document is exactly what O4 abolished, after the scheme collided three times. |
 
 ## Assumptions — Tranche 2

@@ -424,10 +424,21 @@ unclaimed defect from 004's review.
 **014 (Conference content authoring) is OPEN, with its first tranche implemented and green.**
 Brainstorm #11 rescoped it from a parallel branch on 2026-08-12, and the owner decided on 2026-08-14
 that **014 stays open and grows** rather than closing at what was built — #11's *"rescoped and kept
-whole"*, honoured literally. Tranche 2 is event types, optional sessions with capacity and enrolment,
-and the profile taxonomy; **two of its three parts are unblocked today**, and only the taxonomy waits
-on the client's interest, sector and subsector lists, which do not exist. It has no tasks and no
-code, and `specs/014-conference-content-authoring/spec.md` carries the scope. Everything below
+whole"*, honoured literally.
+
+**Tranche 2 is SPECIFIED, PLANNED and TASKED as of 2026-08-14, on constitution v5.3.0 — ratified the
+same day — and no code is written.** It carries **all three** outstanding rows: the event model
+(modality and format as two orthogonal axes, an optional room, a validated `https:`-only access link),
+optional sessions (capacity, a relative closing offset, enrolment **replacing** saving, a named
+roster), and the profile taxonomy. 93 requirements (FR-1045–FR-1099), 15 success criteria, 109 tasks
+(T106–T214), one PR, migration `0012`.
+
+**The record said the taxonomy was blocked on the client's lists, and that was wrong.** Brainstorm #12
+found REQ-035 names the four sectors verbatim — Servicios, Comercio, Industria, Agro — and that #11
+had already ruled the taxonomy to be authored or seeded data rather than a spec constant. What is
+missing is the *subsector* and *interest* lists: content for a surface, not a prerequisite for building
+one. **It also found two requirements already shipped**: REQ-012's "short description" is
+`sessions.summary`, and REQ-014's "presenters" are `speakers`. Everything below this paragraph
 describes **tranche 1**, which is complete.
 
 **Tranche 1 is implemented**, on constitution **v5.2.0** — the amendment
@@ -1397,6 +1408,59 @@ personal data about people who are not attendees, which is not new, but v5.2.0 m
 attendee typing into a form. **Entry 29 shares a boundary with v5.0.0's entry 27** — both are about
 what the product discloses about a person without asking them — and they are deliberately not merged.
 
+**2026-08-14** (ratified in constitution **v5.3.0**) — **the amendment gating 014 tranche 2, the change
+that closes 014. It is the first amendment to grant a Principle VIII exception that the principle's own
+text had predicted in advance**: that text read *"Three exceptions are recorded; a fourth needs a fourth
+amendment"*, and this is the fourth. MINOR, judged explicitly against a real MAJOR argument — it
+narrows FR-1042, and v3.0.0 was MAJOR for retracting a delivered requirement. It does not carry because
+FR-1042 is **narrowed, not withdrawn**: it survives intact for saved sessions, notes, questions and
+votes, and yields only for enrolment, only to an assigned organizer. Adding a Principle VIII exception
+was MINOR in both v3.3.0 and v4.1.0.
+
+50. **A named enrolment roster is visible to a conference organizer assigned to that conference.** The
+    **fourth** recorded Principle VIII exception, and the first administrative read of attendee state
+    this project has ever permitted. Four conditions bind: **only an assigned organizer**, for their
+    own conferences (a platform operator holds it by the product-wide authority they already have);
+    **only enrolment** — no saved session, private note, question or vote is disclosed to any
+    administrative tier, and FR-1042 survives unnarrowed for all four; **only that conference's
+    sessions**, so it is not a directory, not a cross-conference view of one attendee and not a route
+    into a profile; and **the attendee is told before they enrol**, which makes this the only one of
+    the four exceptions the subject can decline by not acting. Motivated by REQ-086: an organizer told
+    to close enrolment early *because materials must be prepared* cannot prepare them for people they
+    cannot name. **Recorded rather than reasoned away**: an enrolment is arguably not "messages, notes,
+    and appointments" as the private-content clause enumerates them, so a feature could have concluded
+    no exception was needed — which is exactly the shortcut v3.3.0 and v4.1.0 each refused.
+51. **An enrolment is NOT engagement, and a session with places held MAY be deleted.** Decision 49's
+    set stays at four — a saved session, a private note, a question, a vote — and a fifth attachment
+    type is declared **outside** it. **The cost is ratified, not overlooked**: because enrolling
+    *replaces* saving on an optional session, an enrolled attendee holds no saved row, so deleting
+    that session destroys held places **with no notification, no marker and no trace**, and the person
+    finds out by arriving. Delivering it requires the **first entry** in a `NOT_ENGAGEMENT` list that
+    is empty by design and demands each entry say *whose data it is and why losing it silently is
+    acceptable*. This sits against decision 49's own rationale, and that tension is why it is written
+    down. **It is NOT precedent for narrowing decision 49's four**, and whether such a deletion should
+    notify the enrolled is **register entry 31**.
+52. **An attendee may be shown the number of remaining places** — "4 places left". This is **not** the
+    count v5.2.0's N2 forbids: N2's subject is a count of *changes*, and this is a fact about one
+    session's availability at the moment somebody decides whether to take a seat. It is the same
+    *family*, so it is ratified deliberately rather than inherited by silence. **N2 is untouched and
+    unweakened.**
+53. **Migration numbers are claimed at generation, not reserved in advance**, and the claiming feature
+    MUST extend the roadmap's number table in the same change. Reserve-in-advance collided three times
+    and each collision left a permanent artifact rather than a one-off fix — the journal carries
+    `idx: 10` against tag `0011_conference_authoring` and snapshot `0010_snapshot.json`, a three-way
+    skew every future generation must be told about. It also held `0010` for a phase that adds no
+    schema at all. **Reserving only works when branches can see each other's reservations, and the
+    recurring lesson of this project is that they cannot.**
+
+**One register entry opened by v5.3.0, and it blocks nothing**: **31** — whether deleting a session
+should notify the attendees enrolled in it. Decision 51 makes such a deletion silent, and the remedy
+would be a **third** notification trigger and therefore another amendment, so it is opened rather than
+solved — the same reasoning v4.0.0 gave when it predicted the third privacy exception and refused to
+grant it by inference. **It shares a boundary with entry 29** — both are about what the product fails
+to tell somebody about their own commitments — and they are deliberately not merged: a suppression
+preference and a missing trigger are different mechanisms with different costs.
+
 
 ## How work is done here
 
@@ -1629,6 +1693,16 @@ not been opened deliberately.
   attendee typing into a form. Principle VIII has only ever considered attendees, and both coverage
   tests derive from the schema, so the question they cannot ask is who answers for somebody who never
   signed up. **Blocks nothing today; blocks any claim that Principle VIII's coverage is complete.**
+
+- **Register entry 31 — whether deleting a session should notify the attendees enrolled in it.**
+  Opened by v5.3.0. Standing decision 51 places an enrolment outside decision 49's engagement set, so a
+  session with places held may be deleted — and because enrolling **replaces** saving on an optional
+  session, those attendees hold no saved row and are reached by no marker and no push. **A held place
+  can disappear with no trace, and the person learns by arriving.** The obvious remedy is exactly what
+  cannot be done cheaply: a deletion is not one of the three material changes, so notifying on it is a
+  **third trigger** and needs its own amendment. Opened rather than solved, on the reasoning v4.0.0
+  gave when it predicted the third privacy exception and refused to grant it by inference. **Blocks
+  nothing**; the product behaves as decision 51 ratifies.
 
 - **Register entries 19 and 21 are ADDRESSED but NOT closed — by v4.0.0, v4.1.0, or 013 shipping.**
   013 built the first actor capable of moderating an avatar and of reading a report queue, and

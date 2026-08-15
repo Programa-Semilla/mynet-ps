@@ -425,15 +425,19 @@ pass the administrative end-to-end specs, because it supplies no `ADMIN_ORIGIN` 
 **Added 2026-08-14.** T001–T105 above are tranche 1's, **merged to `develop` in PR #23**. These
 continue the numbering and **must not renumber them**. Tranche 2 is the change that closes 014.
 
-> ## ⛔ BLOCKING PRECONDITION — read before T106
+> ## ✅ PRECONDITION DISCHARGED — v5.3.0 RATIFIED 2026-08-14
 >
-> **Constitution v5.3.0 is DRAFTED (2026-08-14) and NOT RATIFIED.** It records the **fourth**
-> Principle VIII privacy exception (O1, the named enrolment roster), the engagement exclusion (O2),
-> the attendee-visible seat count (O3) and the migration-numbering change (O4).
+> **Constitution v5.3.0 is RATIFIED.** It records the **fourth** Principle VIII privacy exception
+> (O1, the named enrolment roster), the engagement exclusion (O2), the attendee-visible seat count
+> (O3) and the migration-numbering change (O4).
 >
-> **No task below may be started until the owner ratifies it**, exactly as T001 waited on v5.2.0.
-> The ratification note on T106 mirrors T001's `*(unblocked — v5.2.0 ratified)*` marker: it is added
-> **when ratification happens**, not in advance.
+> **Tranche 2 is licensed from T106**, exactly as T001 was once v5.2.0 was ratified. The precondition
+> is left recorded rather than deleted: a gate that was never seen to be closed is one nobody can tell
+> was checked.
+>
+> **O2's cost travels with the licence.** Deleting an optional session destroys held places with no
+> notification, no marker and no trace. That is ratified, not overlooked — see T149, T151 and T212,
+> and register entry 31.
 
 ## Global constraints — Tranche 2
 
@@ -454,7 +458,7 @@ These bind every task below and are not repeated per task.
 
 ## Phase 8: Setup — Tranche 2 (migration mechanics)
 
-- [ ] T106 Move `apps/api/migrations/meta/README.md` aside before any generation — `drizzle-kit generate` JSON-parses every file in `meta/`. Restore it afterwards. Same trap as T001; it has not gone away
+- [ ] T106 *(unblocked — v5.3.0 ratified 2026-08-14)* Move `apps/api/migrations/meta/README.md` aside before any generation — `drizzle-kit generate` JSON-parses every file in `meta/`. Restore it afterwards. Same trap as T001; it has not gone away
 - [ ] T107 Add a fourth section to `apps/api/migrations/meta/README.md` recording **why `0010` stays permanently empty**: tranche 2 redefines the same named CHECK constraint `0011` drops and re-adds, so numbering it `0010` would order a dependent migration before its dependency (R19)
 - [ ] T108 Extend the reserved-number table in `docs/superpowers/specs/2026-08-06-mynet-delivery-roadmap-design.md` in this same change — constitution O4 requires the claiming feature to extend it, and this is the fourth collision this project has had over a number
 - [ ] T109 State the migration lock strategy in `specs/014-conference-content-authoring/data-model.md`: a `statement_timeout` on the migration connection, and any index build issued outside the wrapping transaction where the runner allows. Altering `sessions` takes `ACCESS EXCLUSIVE` on the table every attendee request touches

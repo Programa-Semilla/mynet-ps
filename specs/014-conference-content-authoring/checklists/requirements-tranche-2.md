@@ -115,6 +115,5 @@ tranche 1 would break citations already written into a merged PR, a review-findi
 constitution.
 
 **One thing the checklist cannot assert, and the plan must.** Tranche 2 is gated on **constitution
-v5.3.0**, drafted 2026-08-14 and **not yet ratified**. A passing checklist means the specification is
-sound, not that implementation is licensed. `/speckit-plan` may proceed; the first line of code may
-not.
+v5.3.0**, drafted and **ratified 2026-08-14**. A passing checklist meant the specification was sound,
+not that implementation was licensed; ratification granted the licence separately. Both are now done.

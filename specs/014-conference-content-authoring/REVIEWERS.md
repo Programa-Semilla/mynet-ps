@@ -214,12 +214,13 @@ Everything above is tranche 1's guide, for the work merged in PR #23. This cover
 closes 014: 109 tasks (T106–T214), 93 requirements (FR-1045–FR-1099), 15 success criteria
 (SC-1013–SC-1026), four user stories, one PR, one migration (`0012`).
 
-> ## ⛔ Do not approve for implementation yet
+> ## ✅ Ratified — implementation is licensed
 >
-> **Constitution v5.3.0 is DRAFTED and NOT RATIFIED.** It records the **fourth** Principle VIII
-> privacy exception — the named enrolment roster. Reviewing the specification and plan is exactly
-> what should happen now; **no line of implementation may be written until the owner ratifies it**,
-> as v5.2.0 gated tranche 1 and v4.0.0 gated 013.
+> **Constitution v5.3.0 was RATIFIED 2026-08-14.** It records the **fourth** Principle VIII privacy
+> exception — the named enrolment roster — and it gated this tranche's first line of code, as v5.2.0
+> gated tranche 1 and v4.0.0 gated 013. **Reviewing the amendment on its merits is still the first
+> item on the checklist below**, because ratification is what makes it binding, not what makes it
+> beyond question.
 
 ## Why This Change
 

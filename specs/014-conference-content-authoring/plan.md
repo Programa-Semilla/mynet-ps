@@ -145,14 +145,15 @@ established. The attendee half touches three existing directories in `apps/web` 
 # Part II — Tranche 2 implementation plan
 
 **Branch**: `spec/014-conference-content-authoring-tranche-2` | **Date**: 2026-08-14 | **Spec**: [spec.md](./spec.md) Part II
-**Constitution**: **v5.3.0 (O1–O4) — DRAFTED 2026-08-14 and NOT RATIFIED.**
+**Constitution**: **v5.3.0 (O1–O4) — RATIFIED 2026-08-14.**
 **Input**: brainstorm #12, and Part II of the specification (FR-1045–FR-1099, SC-1013–SC-1026)
 
-> **THE RATIFICATION GATE IS OPEN AND THIS PLAN DOES NOT CLOSE IT.** v5.2.0 was ratified before
-> tranche 1's first line of code, as v4.0.0 was for 013, v3.3.0 for 009 and v3.2.0 for 008. v5.3.0 is
-> drafted and awaiting the owner. **Planning is licensed; implementation is not.** The Constitution
-> Check below records this as an explicit condition rather than passing silently, because a gate that
-> passes quietly is a gate nobody notices is open.
+> **THE RATIFICATION GATE IS CLOSED.** v5.3.0 was **ratified 2026-08-14**, after this plan was
+> written and before any line of code — the same order v5.2.0 took for tranche 1, v4.0.0 for 013,
+> v3.3.0 for 009 and v3.2.0 for 008. **Implementation is licensed from T106.** The Constitution Check
+> below recorded Principle VIII as CONDITIONAL while the gate was open rather than passing silently,
+> and that condition is now discharged rather than deleted — a gate that was never seen to be open is
+> a gate nobody can tell was checked.
 
 ## Summary
 
@@ -237,18 +238,17 @@ read** (remaining places) — deliberately opposite, and the opposition is the d
 | **V. Abstraction before platform/data APIs** | PASS | PASS — **no new device capability**. The commitment set rides an existing payload and remaining places is an ordinary read, so `substitution.test.ts` is untouched (R13) |
 | **VI. Web-first delivery** | PASS | PASS — admin stays non-installable. One cached read grown in place, one live read declared `passThrough` (R13) |
 | **VII. Verified on Linux CI** | PASS — every gate binds both products | PASS — **five guards amended deliberately** (R14, R15, R16, R17, R20) and one added. Every amendment is a widening followed by a named exemption, never a weakened pattern |
-| **VIII. Attendee data is personal data** | **CONDITIONAL — see below.** The roster is the fourth recorded privacy exception and needs v5.3.0 ratified | **CONDITIONAL, unchanged.** Design is complete and compliant; the licence is not yet granted |
+| **VIII. Attendee data is personal data** | **CONDITIONAL when written** — the roster is the fourth recorded privacy exception and needed v5.3.0 ratified | **PASS — condition discharged 2026-08-14.** v5.3.0 is ratified, O1 records the exception, and its four bounds are asserted separately (FR-1073a, T145) |
 | **IX. Feature declares completeness** | PASS — all 13 rows discharged a second time | PASS |
 
-**One gate is CONDITIONAL rather than PASS, and it must not be read as passing.** Principle VIII
-requires a privacy exception to be **recorded, not derived**. O1 records the fourth one — the named
-enrolment roster — and O1 is **drafted, not ratified**. Until the owner ratifies v5.3.0, this feature
-has a complete design for a disclosure it is not licensed to build. **No other gate depends on it**,
-which is why planning proceeds.
+**One gate was CONDITIONAL and is now discharged.** Principle VIII requires a privacy exception to be
+**recorded, not derived**. O1 records the fourth one — the named enrolment roster — and the owner
+**ratified v5.3.0 on 2026-08-14**. The condition is left in the table rather than erased, because the
+record of a gate having been open is what shows it was checked.
 
 **No violation requiring justification.** Three risks are tracked below rather than waived.
 
-**Governance**: **blocked by** constitution v5.3.0 (drafted, unratified) and nothing else. **Resolves**
+**Governance**: **blocked by nothing.** Constitution v5.3.0 ratified 2026-08-14. **Resolves**
 no register entry. **Escalates** entry **4** (a fifth administrative destination plus a new
 attendee-side control at the width that already truncates) and entry **22** (remaining places gives
 the cached conference a third way to be wrong, which is why that read is live). **Opens** entry **31**,

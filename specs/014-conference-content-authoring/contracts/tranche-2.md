@@ -3,7 +3,7 @@
 **Created 2026-08-14.** Tranche 1's contract is [`authoring.md`](./authoring.md) and is unchanged.
 This covers enrolment, the vocabulary, and the conference editor.
 
-**Gated on constitution v5.3.0 (O1–O4), drafted and not ratified.**
+**Gated on constitution v5.3.0 (O1–O4), ratified 2026-08-14.**
 
 ## Guards
 
