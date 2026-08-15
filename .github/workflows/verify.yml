@@ -42,20 +42,33 @@ name: verify
 
 on:
   pull_request:
-    types: [opened, reopened, synchronize, closed]
+    # `closed` was removed by fix/post-merge-verification (2026-08-15). It was a fossil of 001's
+    # preview pipeline — the `cleanup` job that needed it was deleted in 006 — and it was not
+    # harmless: a closed-event run resolves its concurrency group to the BASE branch's ref, which
+    # collided with the push run the merge itself triggers. `cancel-in-progress: true` then killed
+    # the push run within seconds — observed on every merge to `develop` since at least
+    # 2026-08-10 — and the push run is the ONLY run carrying `verify-push`, `deploy-uat` and
+    # `deploy-prod`. Re-adding `closed` requires a job that genuinely needs it AND a concurrency
+    # group that cannot collide with the push run's.
+    types: [opened, reopened, synchronize]
     branches: [develop, main]
   push:
     branches: [develop, main]
 
-# A superseded run tells a reviewer nothing, and its preview resources cost money. Cancel it.
+# A superseded PULL REQUEST run tells a reviewer nothing — cancel it. A PUSH run is never
+# cancelled: it is the run that deploys, and `deploy.sh` raises the maintenance flag mid-script,
+# so cancelling one mid-deploy leaves the environment serving 503 while the next run reports
+# green. Two rapid merges therefore QUEUE (GitHub keeps the newest pending run per group and
+# lets the in-progress one finish) rather than the second killing the first.
 concurrency:
   group: verify-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
+# `contents: read` is all this workflow uses. `pull-requests: write` and `deployments: write`
+# were fossils of 001's preview pipeline (deleted in 006, same as the `closed` trigger above) —
+# nothing here comments on a PR or touches the deployments API.
 permissions:
   contents: read
-  pull-requests: write
-  deployments: write
 
 env:
   NODE_VERSION: '22'
@@ -159,17 +172,17 @@ jobs:
     name: test-unit
     runs-on: ubuntu-latest
     steps:
-      # `fetch-depth: 0` because two guards in this gate compare against the BRANCH POINT.
+      # `fetch-depth: 0` because two guards in this gate read PINNED HISTORY.
       #
-      # `no-admin-surface.test.ts` re-asserts FR-1003 over the files this feature actually
-      # touched, and `marker-not-cached.test.ts` proves no eighth device capability was added by
-      # showing `substitution.test.ts` is unchanged since the branch point. Both resolve that
-      # point with `git merge-base` (see `tests/support/branch-point.ts`).
+      # `no-admin-surface.test.ts` re-asserts FR-1003 over the files 014 actually touched, and
+      # `marker-not-cached.test.ts` proves 014 added no device capability. Both read the
+      # feature's diff at its recorded range — `63bfd977..8b775e17`, pinned in
+      # `tests/support/feature-range.ts` — so the checkout must contain those commits.
       #
-      # The default depth-1 checkout has no `develop` ref and no history, so `merge-base` exits
-      # non-zero and both guards error. They are the only tests in this repository that consult
-      # git, so nothing else here needed history and the omission was invisible: the branch they
-      # were written on had a local `develop`, and CI had never run them.
+      # The default depth-1 checkout has no history, so `git diff`/`git show` against the pinned
+      # commits exit non-zero and both guards error loudly (they throw rather than degrade to an
+      # empty diff). They are the only tests in this repository that consult git; nothing else
+      # here needs history.
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
@@ -713,7 +726,9 @@ jobs:
     # **`verify-push` is therefore no longer a reduced set**: it asserts the same ten, so a
     # merge is held to exactly the standard the pull request was.
     # ═════════════════════════════════════════════════════════════════════════════════════════
-    if: always() && github.event_name == 'pull_request' && github.event.action != 'closed'
+    # No `action != 'closed'` clause: the workflow no longer triggers on `closed` at all (see the
+    # trigger block), and a guard against an event that cannot occur is a false record.
+    if: always() && github.event_name == 'pull_request'
     needs:
       - typecheck
       - lint

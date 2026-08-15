@@ -533,8 +533,10 @@ message would have passed, because every one of them did. Two of them.
   `listSaved` read (research R7), so 014 declares **no new cached read**, adds **no device
   capability**, and leaves `substitution.test.ts` untouched — asserted as an unchanged file against
   the branch point, which is the cheapest proof a capability was not added. *That guard originally
-  froze the count at seven and broke when 016 ratified an eighth; it now compares the set against
-  this branch's own base, which is the property 014 owes and which no later amendment can falsify.*
+  froze the count at seven and broke when 016 ratified an eighth; branch-relative next, it broke
+  again in every post-merge context; since fix/post-merge-verification it compares the set at the
+  feature's pinned history range (`63bfd977..8b775e17`, `tests/support/feature-range.ts`), which is
+  the property 014 owes stated in a form no checkout context and no later amendment can falsify.*
   The one member added is
   `markViewed`, a **write**, whose cache purge is correct rather than tolerated: the programme it
   clears is the one that just changed. *"No view in either product may present that count"* is
