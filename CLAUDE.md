@@ -424,20 +424,28 @@ generated file is erased by the next regeneration, and putting it on a dedicated
 connection covers *every* migration, including `0003`, whose missing timeout was a recorded
 unclaimed defect from 004's review.
 
-**014 (Conference content authoring) is OPEN, with its first tranche implemented and green.**
-Brainstorm #11 rescoped it from a parallel branch on 2026-08-12, and the owner decided on 2026-08-14
-that **014 stays open and grows** rather than closing at what was built — #11's *"rescoped and kept
-whole"*, honoured literally.
+**014 (Conference content authoring) is SHIPPED — closed by tranche 2, squash-merged to `develop`
+in [#24](https://github.com/Programa-Semilla/mynet-ps/pull/24) on 2026-08-15.** Brainstorm #11
+rescoped it from a parallel branch on 2026-08-12, and the owner decided on 2026-08-14 that **014
+stays open and grows** rather than closing at what was built — #11's *"rescoped and kept whole"*,
+honoured literally; tranche 2 is what it grew into, and merging it is what closed the feature.
 
-**Tranche 2 is IMPLEMENTED as of 2026-08-15, on constitution v5.3.0 — ratified 2026-08-14 — and it
-is the change that closes 014.** It carries **all three** outstanding rows: the event model
+**Tranche 2 is MERGED as of 2026-08-15, on constitution v5.3.0 — ratified 2026-08-14 — and it
+is the change that closed 014.** It carries **all three** outstanding rows: the event model
 (modality and format as two orthogonal axes, an optional room, a validated `https:`-only access link),
 optional sessions (capacity, a relative closing offset, enrolment **replacing** saving, a named
 roster), and the profile taxonomy. 93 requirements (FR-1045–FR-1099), 15 success criteria, 109 tasks
 (T106–T214), one PR, migration `0012`. **T206 and T207 — the by-hand walks of quickstart scenarios
 10–17, the latter needing a person and a phone — are outstanding and join the unwalked scenarios from
 007, 008, 009, 013, tranche 1 and 016.** Everything a machine can check is checked and green,
-including an end-to-end journey in which three attendees race for two places.
+including an end-to-end journey in which three attendees race for two places. **A deep review
+preceded the merge and is recorded as Part II of
+`specs/014-conference-content-authoring/review-findings.md`**: 107/107 spec compliance after one
+FR-1047 fix (a guard the `events.ts` header claimed existed and did not — 013's false-header class),
+then 20 findings from five perspectives, 16 fixed, 2 Minor deliberately deferred to a maintenance
+pass, and 2 Notable observations captured to `brainstorm/idea-inbox.md` — one of which, the roster
+read writing no audit entry, touches the fourth privacy exception's disclosure moment and deserves a
+decision rather than a rediscovery.
 
 **Invariants tranche 2 establishes:**
 
@@ -1682,19 +1690,21 @@ lesson about version numbers three times over. **A third strand now runs beside 
 feedback programme that v5.0.0 opened, of which **016 is delivered and 017 (the Q&A rebuild) is
 not startable**.
 
-**014's tranche 1 is MERGED to `develop`, and 014 itself remains OPEN.** That sentence replaces one
-written a day earlier saying nothing was in flight, and one written hours earlier saying this work
-would be held un-integrated — **the hold was reversed the same day, before it took effect.**
+**014 is CLOSED: both tranches are merged to `develop`.** That sentence replaces one saying tranche
+1 was merged and 014 remained open, which itself replaced one written a day earlier saying nothing
+was in flight, and one written hours earlier saying this work would be held un-integrated — **the
+hold was reversed the same day, before it took effect.**
 
 Tranche 1 landed via PR [#23](https://github.com/Programa-Semilla/mynet-ps/pull/23), squash-merged
 after all eleven CI jobs passed and `verify:clean` ran 13 of 13 green against a database that had
 never existed. It carries constitution **v5.2.0**, migration `0011`, and `deviations.md` **D22**.
 
-**Tranche 2 is now implemented on `spec/014-conference-content-authoring-tranche-2`**, a fresh
-branch off `develop` against the same spec directory, and it is the change that closes 014 —
-delivered as specified: event types, optional sessions with capacity and enrolment, the profile
-taxonomy, migration `0012`. What remains of 014 once its PR merges is the by-hand validation
-(T206/T207) that every feature since 007 has carried forward.
+**Tranche 2 landed via PR [#24](https://github.com/Programa-Semilla/mynet-ps/pull/24)**,
+squash-merged 2026-08-15 from `spec/014-conference-content-authoring-tranche-2` — a fresh branch off
+`develop` against the same spec directory — after all eleven CI jobs passed and its deep review
+(Part II of `review-findings.md`) closed. Delivered as specified: event types, optional sessions
+with capacity and enrolment, the profile taxonomy, migration `0012`. What remains of 014 is the
+by-hand validation (T206/T207) that every feature since 007 has carried forward.
 
 **Merging rather than holding removed a standing obligation, and that is why it was the better
 choice.** Held, this branch would have had to re-merge `develop` on every merge to `develop` —
@@ -1703,11 +1713,12 @@ separate numbering tables: constitution version, standing decisions, register en
 session number, and nearly the migration number. Integrated, that debt is paid and tranche 2 begins
 from a current base. This is the collision itself, recorded where it happened: 016 was authored on
 `develop` while 014 was authored on a branch taken before it, and each artifact honestly described a
-project in which the other did not exist. 014 is implemented and merged `develop` into itself on
-2026-08-14, taking the renumbering described under standing decision 45. **017 is blocked** —
-register entry 27 (Q&A attribution) is the first open question to block a feature since v3.2.0, and
-it is the client's to answer; the case that decides it is two attendees named Ana at one event.
-**012 is blocked** on register entries 22 and 4. **015 is startable.** Choosing among them is an
+project in which the other did not exist. 014 merged `develop` into itself on 2026-08-14, taking
+the renumbering described under standing decision 45, and closed in #24 the next day. **With 014
+done, the administrative programme has one feature left — 015 — and it is the only startable work.**
+**017 is blocked** — register entry 27 (Q&A attribution) is the first open question to block a
+feature since v3.2.0, and it is the client's to answer; the case that decides it is two attendees
+named Ana at one event. **012 is blocked** on register entries 22 and 4. Choosing among them is an
 owner decision, not a planning inference.
 
 The closing sequence for 24, 25 and 26 is worth keeping, because it is the argument for opening
