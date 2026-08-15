@@ -1322,7 +1322,7 @@ export const patchConference = async (
           OR (${sessions.endsAt} AT TIME ZONE ${timezone})::date
               NOT BETWEEN ${startsOn}::date AND ${endsOn}::date
         )
-      ORDER BY ${sessions.startsAt}
+      ORDER BY ${sessions.startsAt}, ${sessions.title}, ${sessions.id}
     `)
 
     if (orphans.length > 0) {
@@ -1735,7 +1735,10 @@ export const overlappingInRoom = async (
         input.excludeSessionId ? ne(sessions.id, input.excludeSessionId) : undefined,
       ),
     )
-    .orderBy(asc(sessions.startsAt))
+    // The same total order as the two refusal lists (`sessionsViolatingModality` and the
+    // orphan query): these rows land in the `room_overlap` warning payload, and `starts_at`
+    // alone leaves same-instant ties to executor order.
+    .orderBy(asc(sessions.startsAt), asc(sessions.title), asc(sessions.id))
 
   return rows
 }
@@ -2134,11 +2137,16 @@ const sessionsViolatingModality = async (
       ? sql`(${sessions.accessLink} IS NOT NULL OR ${sessions.roomId} IS NULL)`
       : sql`(${sessions.roomId} IS NOT NULL OR ${sessions.accessLink} IS NULL)`
 
+  // Ordered totally — start, then title, then id — because the list lands in a refusal payload
+  // whose order a reader (and a test) may rely on. `starts_at` alone is untotal: two sessions
+  // sharing a start time arrive in executor order, which flipped on a real CI run
+  // (fix/post-merge-verification). The orphan query above and `overlappingInRoom`'s warning
+  // payload carry the same three keys.
   const rows = await tx.execute<{ id: string; title: string }>(sql`
     SELECT ${sessions.id} AS id, ${sessions.title} AS title
     FROM ${sessions}
     WHERE ${sessions.eventId} = ${scope.eventId}::uuid AND ${violates}
-    ORDER BY ${sessions.startsAt}
+    ORDER BY ${sessions.startsAt}, ${sessions.title}, ${sessions.id}
   `)
 
   return rows.map((row) => ({ id: row.id, title: row.title }))

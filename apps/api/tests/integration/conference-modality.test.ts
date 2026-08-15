@@ -87,8 +87,12 @@ describe('conference modality and format changes (T182, FR-1059a, FR-1047)', () 
       sessions?: { id: string; title: string }[]
     }
     expect(body.code).toBe('modality_conflicts_sessions')
-    // Named, FR-1014's shape: an organizer told only "no" has to find them by eye.
-    expect(body.sessions?.map((one) => one.title)).toEqual(['Opening Keynote', 'Closing Panel'])
+    // Named, FR-1014's shape: an organizer told only "no" has to find them by eye. The order is
+    // the query's total order — start, then title, then id — and both fixtures share a start
+    // time, so this asserts the title tiebreak. It used to expect creation order, which the
+    // query never promised: with `ORDER BY starts_at` alone the tie fell to executor order, and
+    // the assertion flipped on a real CI run (fix/post-merge-verification).
+    expect(body.sessions?.map((one) => one.title)).toEqual(['Closing Panel', 'Opening Keynote'])
   })
 
   it('cannot prepare the sessions first either — the change is unreachable by construction', async () => {
