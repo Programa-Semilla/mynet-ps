@@ -1,0 +1,24 @@
+{
+  "name": "@mynet/platform",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Device capability interfaces and their web implementations (constitution Principle V)",
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./web": "./src/web/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0"
+  },
+  "devDependencies": {
+    "@mynet/config": "workspace:*",
+    "@mynet/data": "workspace:*",
+    "@types/react": "^19.2.18",
+    "typescript": "6.0.3"
+  }
+}

@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>MyNet — back shortly</title>
+    <!--
+      DELIBERATELY SINGLE-FILE, WITH ZERO ASSETS.
+
+      This page is served while the API may be stopped, rebuilding or crash-looping, so it cannot
+      depend on anything the stack provides — no stylesheet, no font, no image. It is also the
+      reason the Caddyfile can `rewrite * /index.html` instead of resolving {path}: there is no
+      asset for {path} to find, so resolving it would only ever expose a stray future file.
+
+      The colours are the product's own tokens, written literally because there is no stylesheet
+      to read them from.
+    -->
+    <style>
+      :root {
+        color-scheme: light;
+      }
+      body {
+        margin: 0;
+        min-height: 100dvh;
+        display: grid;
+        place-items: center;
+        padding: 1.5rem;
+        background: #fdf8f3;
+        color: #525a70;
+        font-family:
+          system-ui,
+          -apple-system,
+          'Segoe UI',
+          sans-serif;
+        line-height: 1.55;
+      }
+      main {
+        max-width: 32rem;
+        background: #fff;
+        border: 1px solid #efe8e1;
+        border-radius: 0.75rem;
+        padding: 2rem;
+        box-shadow: 0 1px 3px rgb(27 35 64 / 0.08);
+      }
+      h1 {
+        margin: 0 0 0.75rem;
+        font-size: 1.5rem;
+        color: #1b2340;
+      }
+      p {
+        margin: 0 0 0.75rem;
+      }
+      p:last-child {
+        margin-bottom: 0;
+      }
+      .until {
+        font-weight: 600;
+        color: #1b2340;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>MyNet is being updated</h1>
+      <p>We are deploying a change. Nothing you have saved has been lost.</p>
+      <!--
+        RETURN_TIME — replaced by maintenance.sh when the operator passes `--until`, and left as
+        this comment when they do not.
+
+        An HTML comment rather than visible placeholder text, because the un-substituted page must
+        read correctly on its own: an operator who forgets `--until` should not publish the word
+        "RETURN_TIME" to every visitor.
+      -->
+      <p>Please try again in a few minutes.</p>
+    </main>
+  </body>
+</html>

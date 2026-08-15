@@ -1,0 +1,41 @@
+{
+  "name": "@mynet/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "MyNet API — project-owned service over managed PostgreSQL (constitution, Technology and Architecture Constraints)",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "start": "node dist/server.js",
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "tsx src/db/migrate.ts",
+    "db:seed": "tsx src/db/seed/index.ts",
+    "admin:bootstrap": "tsx src/admin/bootstrap.ts",
+    "contract:generate": "tsx src/contract/generate.ts",
+    "contract:check": "tsx src/contract/check.ts"
+  },
+  "dependencies": {
+    "@fastify/cookie": "^11.1.2",
+    "@fastify/cors": "^11.3.0",
+    "@fastify/swagger": "^9.8.1",
+    "argon2": "^0.45.1",
+    "drizzle-orm": "^0.45.2",
+    "fastify": "^5.11.2",
+    "fastify-plugin": "^6.0.0",
+    "nodemailer": "^9.0.5",
+    "postgres": "^3.4.9",
+    "sharp": "^0.35.3",
+    "web-push": "^3.6.7"
+  },
+  "devDependencies": {
+    "@mynet/config": "workspace:*",
+    "@types/node": "^26.1.2",
+    "@types/nodemailer": "^8.0.1",
+    "@types/web-push": "^3.6.4",
+    "drizzle-kit": "^0.31.10",
+    "tsx": "^4.23.6",
+    "typescript": "6.0.3"
+  }
+}

@@ -2,6 +2,13 @@ node_modules/
 dist/
 build/
 .vite/
+coverage/
+
+# Playwright (FR-068). Reports and traces are CI artifacts, never committed.
+playwright-report/
+test-results/
+blob-report/
+.playwright/
 
 *.log
 npm-debug.log*
@@ -16,3 +23,9 @@ pnpm-debug.log*
 
 .DS_Store
 Thumbs.db
+
+# spex: generated/local files (only constitution is committed)
+**/.claude/
+**/.specify/**
+!**/.specify/memory/
+!**/.specify/memory/constitution.md

@@ -1,0 +1,35 @@
+node_modules/
+dist/
+build/
+coverage/
+.vite/
+playwright-report/
+test-results/
+
+pnpm-lock.yaml
+
+# Generated from Fastify route schemas — an output, never hand-edited (contracts/README.md).
+contracts/openapi.json
+packages/data/src/generated/
+
+# Generated SQL. Formatting it would obscure the diff that reviewers read (FR-037).
+apps/api/migrations/
+
+# Approved visual reference, explicitly not production code (constitution Principle II).
+GroundZero/
+
+# Authored and reviewed documents, not code. Reformatting them would rewrite artifacts that
+# went through the spec and plan review gates, burying real revisions in whitespace churn.
+specs/
+brainstorm/
+.specify/
+.githooks/
+CLAUDE.md
+
+# Owner-supplied source material: the brand boards, and the verbatim record of the client
+# conversation constitution v5.0.0 was argued from. `feedback-1.md` is a transcript extraction,
+# not prose this project authored — reflowing it would edit somebody else's words to satisfy a
+# code formatter, and the amendment cites it by requirement number.
+assets/
+
+deploy/vm/maintenance/index.html

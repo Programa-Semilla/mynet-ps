@@ -1,0 +1,163 @@
+import { Suspense } from 'react'
+import { Route, Routes } from 'react-router'
+
+import { AppShell } from '../shell/AppShell.js'
+import { NotFound } from '../shell/NotFound.js'
+import { Home } from './destinations/Home.js'
+import { DestinationPlaceholder } from './destinations/Placeholder.js'
+import { DESTINATIONS, HOME, PUBLIC_ROUTES, SHELL_ROUTES } from './navigation.js'
+import { RequireAuth } from './RequireAuth.js'
+
+/**
+ * T069, T070 — five individually addressable destinations (FR-012, FR-013, FR-014, FR-015).
+ *
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ * **Recorded override.** `GroundZero/requirements.md` describes a "single-route" product demo
+ * and the prototype switches destinations through `useState` in a 1,400-line `App.tsx`. The
+ * project owner decided on 2026-08-04 that each destination is individually addressable, and
+ * constitution v2.0.0 classifies "single-route" as a HOW statement that does not bind. This
+ * file is that decision; it was not inferred (Principle I).
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ *
+ * **The routes are generated from `DESTINATIONS`, not written again here.** They used to be
+ * literal `path` props, with each destination module looking its own address up a third time
+ * through `destinationFor('/agenda')!`. Changing an address in one place type-checked cleanly
+ * and turned that non-null assertion into a runtime crash inside the shell — the blank page
+ * FR-061 exists to prevent. One list, one source.
+ *
+ * Nesting is what makes FR-014 fall out rather than needing to be implemented: a direct load of
+ * `/discover` matches the child directly, so the destination renders active on first paint
+ * without passing through Home. There is no redirect and no "default then correct" step that a
+ * shared link could be seen flickering through.
+ *
+ * The guard wraps the shell rather than each destination, so `*` is guarded too — an
+ * unauthenticated visitor at a nonsense address is asked to sign in rather than being told what
+ * does and does not exist.
+ */
+export const AppRoutes = () => (
+  <Routes>
+    {/*
+      T048 (004) — the addresses reachable **without a session**, outside the guard.
+
+      A person creating an account or following a reset link does not have one, so wrapping
+      these in `RequireAuth` would render the sign-in screen at every one of them and make self
+      sign-up unreachable. They are declared in `navigation.ts` for the same reason destinations
+      are: this file names no address, so 006–009 extend that file and never this one.
+    */}
+    {PUBLIC_ROUTES.map((route) => (
+      <Route key={route.path} path={route.path} element={<Loadable>{route.element}</Loadable>} />
+    ))}
+
+    <Route element={<RequireAuth />}>
+      <Route element={<AppShell />}>
+        {DESTINATIONS.map((destination) => {
+          // Home is the only destination whose address is the index rather than a segment.
+          if (destination.path === HOME.path) {
+            return <Route key={destination.path} index element={<Home />} />
+          }
+
+          // ─────────────────────────────────────────────────────────────────────────────
+          // T017 (005) — **the destination says what renders it; this file names no address**
+          // (FR-233).
+          //
+          // This used to read `destination.path === '/agenda' ? <Agenda /> : …`. Four more
+          // features would each have added a branch to that expression, so the router would
+          // have become the shared file every destination feature edits — the contention
+          // 002's per-domain splits exist to remove.
+          //
+          // A destination with no element yet is not broken: Discover, Messages and Network
+          // legitimately render the placeholder, which is a real state rather than a missing
+          // one.
+          // ─────────────────────────────────────────────────────────────────────────────
+          return (
+            <Route
+              key={destination.path}
+              path={destination.path.slice(1)}
+              // ─────────────────────────────────────────────────────────────────────────────
+              // T130 (006) — **wrapped, because a destination may now be code-split.**
+              //
+              // Discover is `lazy`; Home and Agenda are not. `navigation.ts` records why the
+              // rule narrowed from "the five destinations stay eager" to "the destinations
+              // needed to render the workspace stay eager". Wrapping generically keeps this
+              // file naming no address, and an eager destination simply never suspends — the
+              // same harmless generality the `Loadable` note below already describes.
+              // ─────────────────────────────────────────────────────────────────────────────
+              element={
+                <Loadable>
+                  {destination.element ?? <DestinationPlaceholder destination={destination} />}
+                </Loadable>
+              }
+            >
+              {/*
+                Nested addresses the destination declares for itself — today, Agenda's session
+                detail panel. Rendered generically: this file still names no address, so 009
+                extending that panel and 006–008 gaining their own nested views change
+                `navigation.ts` and never the router.
+              */}
+              {destination.children?.map((child) => (
+                <Route
+                  key={child.path}
+                  path={child.path}
+                  // ───────────────────────────────────────────────────────────────────────
+                  // T130 (006) — **wrapped, because a nested surface may now be code-split.**
+                  //
+                  // Discover's profile view is `lazy`, for the reason `navigation.ts` records:
+                  // it is reached deliberately, once, by somebody who has decided to look at
+                  // one person, and paying for it on every cold load of Home is exactly the
+                  // cost the asset budget exists to notice. Agenda's session panel is eager and
+                  // never suspends, so its boundary is simply never reached — the same
+                  // harmless generality the destination loop above already has.
+                  // ───────────────────────────────────────────────────────────────────────
+                  element={<Loadable>{child.element}</Loadable>}
+                />
+              ))}
+            </Route>
+          )
+        })}
+
+        {/*
+          004 — addresses inside the shell that are not destinations: joining a conference, the
+          profile, and the account actions. Rendered generically, so this file still names none
+          of them, and the rail, top bar and conference switcher stay in place around them.
+        */}
+        {SHELL_ROUTES.map((route) => (
+          <Route
+            key={route.path}
+            path={route.path.slice(1)}
+            element={<Loadable>{route.element}</Loadable>}
+          />
+        ))}
+
+        {/* FR-015 — inside the shell, so the navigation stays available. Never a blank screen. */}
+        <Route path="*" element={<NotFound />} />
+      </Route>
+    </Route>
+  </Routes>
+)
+
+/**
+ * The boundary the code-split standalone surfaces need (T130).
+ *
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ * `navigation.ts` declares these with `lazy`, so React needs somewhere to suspend while the
+ * chunk arrives. The fallback is announced rather than silent — a blank region during a slow
+ * chunk fetch is indistinguishable from a broken navigation, and a screen-reader user gets
+ * nothing at all from an empty `<div>`.
+ *
+ * **006 widened this**: it wraps the destinations and their nested children too, because
+ * Discover and its profile view are now code-split. An eager destination never suspends, so its
+ * boundary is simply never reached — which is the same harmless generality that lets this file
+ * go on naming no address at all.
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ */
+const Loadable = ({ children }: { children: React.ReactNode }) => (
+  <Suspense
+    fallback={
+      <p role="status" aria-live="polite" className="px-4 py-6 text-sm text-text-muted tablet:px-6">
+        Loading…
+      </p>
+    }
+  >
+    {children}
+  </Suspense>
+)

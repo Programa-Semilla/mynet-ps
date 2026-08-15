@@ -1,0 +1,28 @@
+{
+  "extends": "@mynet/config/tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx",
+    // `vite/client` for the bundler's ambient types, and jest-dom for the matchers the component
+    // layer uses (`toBeInTheDocument`, `toHaveTextContent`). `apps/web` picks the latter up
+    // through its own setup file's import; declaring it here keeps this app's `tsc --noEmit`
+    // honest about tests it actually runs.
+    //
+    // `vite-plugin-pwa/client` is deliberately absent — `apps/web` names it for the
+    // `virtual:pwa-register` module declaration, and this program has no such module and must
+    // not acquire one. That is the type-level half of FR-923.
+    "types": ["vite/client", "@testing-library/jest-dom"],
+    "paths": {
+      // `@mynet/data` and nothing else. The admin client deliberately takes NO dependency on
+      // `@mynet/platform` (research R9, FR-923): it needs none of the seven device capabilities,
+      // and adding an eighth for administration would be a Principle V change rather than a
+      // convenience. `apps/admin/tests/unit/no-platform-dependency.test.ts` asserts this.
+      "@mynet/data": ["../../packages/data/src/index.ts"],
+      "@mynet/data/http": ["../../packages/data/src/http/index.ts"],
+      "@/*": ["./src/*"]
+    }
+  },
+  "include": ["src", "tests", "vite.config.ts", "vitest.config.ts"]
+  // No `exclude` for a service worker, because there is no service worker. `apps/web` excludes
+  // `src/sw.ts` here; that this file has nothing to exclude is the point.
+}

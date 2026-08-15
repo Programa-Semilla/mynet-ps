@@ -1,0 +1,1061 @@
+name: verify
+
+# Constitution Principle VII — every change passes an automated pipeline on Linux with no
+# Apple infrastructure. A change is not complete until this is green, and completion is
+# claimed from this output rather than from inspection.
+#
+# ─────────────────────────────────────────────────────────────────────────────────────────
+# **TEN REQUIRED CHECKS.** Each has its own job below so that each reports its own result, and
+# the aggregate `verify` job at the bottom refuses to report success unless every one of them
+# literally succeeded (FR-064):
+#
+#    1 typecheck        5 contract          9 test-e2e
+#    2 lint             6 migrations       10 build
+#    3 test-unit        7 test-integration
+#    4 test-component   8 test-accessibility
+#
+# ═════════════════════════════════════════════════════════════════════════════════════════
+# **006 (T076) — FIVE JOBS WERE DELETED, AND THIS IS NOT THE SHORTCUT FR-071 FORBIDS.**
+#
+# `db-branch`, `deploy-api`, `deploy-preview`, `schema-diff` and `cleanup` are gone, along with
+# the three vendors they served — Neon, Fly.io and Cloudflare Pages. Constitution v3.0.0 moved
+# the product onto two Azure VMs (research D9, D13), so those jobs serve nothing.
+#
+# **The distinction that matters: those five jobs BUILT ENVIRONMENTS. THEY VERIFIED NOTHING.**
+# Every check that verifies correctness is unchanged and still runs — including `test-e2e`,
+# which was checked specifically and runs against `localhost:3000` on its own `postgres:17`
+# service container, never against the preview. Zero checks were weakened, disabled, or made
+# non-blocking (FR-490).
+#
+# **The cost is real and is recorded rather than glossed.** 001's FR-066 and SC-011 promise a
+# reviewer a working preview of *that exact change*, `deploy-preview` was that promise's only
+# implementation, and v3.0.0 **withdraws both requirements** — the first delivered requirement
+# this project has retracted, which is why it is a major version. What replaces it is a
+# long-lived UAT environment deployed on merge to `develop`: a reviewer now sees the change
+# deployed *after* approving it rather than before.
+#
+# With the vendors gone, `FLY_API_TOKEN`, `NEON_API_KEY`, `NEON_PROJECT_ID`, the three
+# Cloudflare secrets and the `preview-base` branch are all no longer needed — so the aggregate
+# check can go green for the first time, because **its cause disappeared rather than being
+# suppressed** (register entry 17, closed by replacement).
+# ═════════════════════════════════════════════════════════════════════════════════════════
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, closed]
+    branches: [develop, main]
+  push:
+    branches: [develop, main]
+
+# A superseded run tells a reviewer nothing, and its preview resources cost money. Cancel it.
+concurrency:
+  group: verify-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+  deployments: write
+
+env:
+  NODE_VERSION: '22'
+  # ─────────────────────────────────────────────────────────────────────────────────────────
+  # Every database this workflow touches is an ephemeral branch holding seeded throwaway
+  # attendees (FR-067). These values are therefore **not secrets**, and writing them in the open
+  # is deliberate: putting them in the secret store would sit them next to real credentials and
+  # invite somebody to assume this workflow is safe to point at production. It is not.
+  #
+  # Declared at workflow level so every job inherits them as environment variables. They cannot
+  # be composed into a job-level `env:` block — the `env` context is not available there.
+  # ─────────────────────────────────────────────────────────────────────────────────────────
+  AUTH_PASSWORD_PEPPER: preview-only-pepper-not-a-secret
+  AUTH_ATTEMPT_HASH_KEY: preview-only-attempt-key-not-a-secret
+
+jobs:
+  # ═════════════════════════════════════════════════════════════════════════════════════════
+  # T008 (013) — **`apps/admin` is covered by the five gates below WITHOUT a job of its own,
+  # and that is the deliberate arrangement rather than an omission.**
+  #
+  # The second website (constitution v4.0.0, standing decision 33) enters every existing gate
+  # through the root scripts, because each of them already addresses the whole workspace:
+  #
+  #   typecheck       `pnpm -r typecheck`      — recursive; `@mynet/admin` declares the script
+  #   lint            `eslint .`               — `mynet/admin-client` block in packages/config
+  #   test-unit       vitest `unit` project    — `apps/admin/tests/unit/**` in vitest.base.ts
+  #   test-component  vitest `component`       — `apps/admin/tests/**/*.test.tsx`, same file
+  #   build           `pnpm build`             — the root script builds api, web, then admin
+  #
+  # Five duplicate jobs re-running the same commands against a filtered subset would report the
+  # same failures twice and, worse, would create a second place for the two applications' gate
+  # coverage to drift apart. Principle VII asks that every gate run on Linux CI, not that every
+  # application have its own copy of them.
+  #
+  # **What this arrangement costs is worth stating**: a failure in `test-unit` no longer tells
+  # you which product it came from without reading the output. That is the trade, and the check
+  # names in the required-checks assertion at the bottom of this file are unchanged because of
+  # it — adding admin-specific names there would have needed branch-protection changes that
+  # nobody has configured yet (see the open questions in CLAUDE.md).
+  # ═════════════════════════════════════════════════════════════════════════════════════════
+
+  # ── Gate 1: type checking (FR-001) ──────────────────────────────────────────────────────
+  typecheck:
+    name: typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      # `--frozen-lockfile` is what makes FR-002 a gate: if a manifest and the committed
+      # lockfile disagree, this fails rather than silently resolving something else.
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+
+  # ── Gate 2: lint (FR-004, and SC-009's colour-literal count) ────────────────────────────
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - name: formatting
+        run: pnpm format:check
+      # ─────────────────────────────────────────────────────────────────────────────────────
+      # **006 — the deploy scripts are PARSED AND LINTED here, and nothing did that before.**
+      #
+      # `deploy/vm/*.sh` are executed by `deploy-uat` and `deploy-prod` against real
+      # environments, and no gate in this pipeline had ever looked at them. One defect reached
+      # review because of it: `maintenance.sh on` exited non-zero whenever `--until` was
+      # omitted, because its last statement was an `[[ … ]] && echo` AND-list whose false test
+      # became the script's exit status — aborting **every** default deploy immediately after
+      # raising the maintenance flag. `bash -n` does not catch that; ShellCheck's SC2015 does,
+      # which is why both run.
+      #
+      # ShellCheck is preinstalled on `ubuntu-latest`.
+      # ─────────────────────────────────────────────────────────────────────────────────────
+      - name: shell syntax and lint (deploy and hook scripts)
+        run: |
+          set -euo pipefail
+          mapfile -t SCRIPTS < <(find deploy .githooks -type f \( -name '*.sh' -o -name 'pre-*' \) | sort -u)
+          if [ "${#SCRIPTS[@]}" -eq 0 ]; then
+            echo "::error::No shell scripts matched. A gate that checks nothing is not a gate."
+            exit 1
+          fi
+          echo "Checking ${#SCRIPTS[@]} shell scripts:"
+          printf '  %s\n' "${SCRIPTS[@]}"
+          for f in "${SCRIPTS[@]}"; do bash -n "$f"; done
+          shellcheck --severity=warning "${SCRIPTS[@]}"
+
+  # ── Gate 3: unit tests (FR-005) ─────────────────────────────────────────────────────────
+  test-unit:
+    name: test-unit
+    runs-on: ubuntu-latest
+    steps:
+      # `fetch-depth: 0` because two guards in this gate compare against the BRANCH POINT.
+      #
+      # `no-admin-surface.test.ts` re-asserts FR-1003 over the files this feature actually
+      # touched, and `marker-not-cached.test.ts` proves no eighth device capability was added by
+      # showing `substitution.test.ts` is unchanged since the branch point. Both resolve that
+      # point with `git merge-base` (see `tests/support/branch-point.ts`).
+      #
+      # The default depth-1 checkout has no `develop` ref and no history, so `merge-base` exits
+      # non-zero and both guards error. They are the only tests in this repository that consult
+      # git, so nothing else here needed history and the omission was invisible: the branch they
+      # were written on had a local `develop`, and CI had never run them.
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test:unit
+
+  # ── Gate 4: component tests (FR-005) ────────────────────────────────────────────────────
+  test-component:
+    name: test-component
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test:component
+
+  # ── Gate 5: API contract (FR-044a, FR-044b, FR-044c) ────────────────────────────────────
+  #
+  # Fails on two distinct drifts, which is why one job covers both: the committed contract no
+  # longer matching what the routes generate, and the client's generated types no longer
+  # matching the committed contract. Either one alone would let a client ship expecting a shape
+  # the server does not produce.
+  contract:
+    name: contract
+    runs-on: ubuntu-latest
+    # `contract:check` builds the Fastify app to read its route schemas, and `buildApp` calls
+    # `loadConfig()`, which requires DATABASE_URL. No query is ever issued — `getDb()` is lazy —
+    # so a syntactically valid placeholder is enough, and using one keeps this job independent
+    # of the database branch it does not need.
+    env:
+      DATABASE_URL: postgresql://unused:unused@localhost:5432/unused
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm contract:check
+
+  # ── Gate 6: migrations against a genuinely clean database (FR-038, SC-015) ──────────────
+  #
+  # The branch is fresh, so this proves the committed migrations apply from nothing — not that
+  # they apply to a database that already happens to have the right shape. `drizzle-kit push`
+  # is prohibited everywhere (research.md D6); this is the only path a schema change travels.
+  migrations:
+    name: migrations
+    runs-on: ubuntu-latest
+    # ─────────────────────────────────────────────────────────────────────────────────────
+    # **A PostgreSQL service container, not a Neon branch.**
+    #
+    # These gates need *a real database*, which is what FR-005 and FR-069 ask for — not Neon
+    # specifically. Binding them to the old `db-branch` job meant one unset repository secret
+    # (`NEON_API_KEY`) skipped every database-dependent check in the pipeline, and under
+    # Principle VII a skip is not a pass: the checks that enforce this product's personal-data
+    # guarantees had never executed once, across three merged features.
+    #
+    # A per-job container is also **more** isolated than the three shared Neon branches it
+    # replaces, because each job gets its own runner and therefore its own database that no
+    # other job can reach. `pnpm verify:clean` has always run these same suites against stock
+    # `postgres:17` locally, so this is the environment they were already proved against.
+    #
+    # **006 (T076) — this used to end "Neon is still what the preview uses". There is no
+    # preview and there is no Neon.** Both went with the vendor jobs (research D13), so this
+    # service container is now the only database CI touches — the same real PostgreSQL, per
+    # job. FR-067 is unchanged and now binds UAT instead of a preview (FR-485), enforced by
+    # `deploy/vm/_common.sh` rather than by a permanently data-free branch.
+    # ─────────────────────────────────────────────────────────────────────────────────────
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: mynet
+          POSTGRES_PASSWORD: mynet
+          POSTGRES_DB: mynet_ci
+        ports:
+          - 5432:5432
+        # Without a health gate the first migration races the server's startup and fails with a
+        # connection error that reads like a broken migration.
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://mynet:mynet@localhost:5432/mynet_ci
+      # ───────────────────────────────────────────────────────────────────────────────────
+      # **`loadConfig()` requires these, and the workflow has never supplied them.**
+      #
+      # A second latent fault, invisible until now because `db-branch` failed first: every job
+      # below builds the Fastify app, and `loadConfig()` refuses to start without a pepper and
+      # an attempt-hash key. Had the Neon secret been set, these jobs would simply have failed
+      # one line further on.
+      #
+      # Throwaway values for a container that is destroyed with the job. They are deliberately
+      # NOT repository secrets: nothing they protect outlives the run, and a real secret here
+      # would be a production credential sitting in a public repository's workflow environment.
+      # ───────────────────────────────────────────────────────────────────────────────────
+      AUTH_PASSWORD_PEPPER: ci-only-not-a-secret-ephemeral-database
+      AUTH_ATTEMPT_HASH_KEY: ci-only-not-a-secret-ephemeral-database
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm db:migrate
+      # Applying twice proves idempotence. A migration that only works once turns the second
+      # deployment of the day into an outage.
+      - name: migrations are idempotent
+        run: pnpm db:migrate
+
+  # ── Gate 7: integration tests against a real database (FR-005, FR-069) ──────────────────
+  #
+  # Against this pull request's own branch, never a shared one. FR-069's isolation case is the
+  # most important test in the slice and it is meaningless against a mock: the claim is that the
+  # *query* cannot reach another attendee's rows.
+  test-integration:
+    name: test-integration
+    # Still ordered after `migrations` so a broken migration fails once, loudly, rather than as
+    # a confusing cascade here. The harness applies them itself against its own container.
+    needs: migrations
+    runs-on: ubuntu-latest
+    # ─────────────────────────────────────────────────────────────────────────────────────
+    # **A PostgreSQL service container, not a Neon branch.**
+    #
+    # These gates need *a real database*, which is what FR-005 and FR-069 ask for — not Neon
+    # specifically. Binding them to the old `db-branch` job meant one unset repository secret
+    # (`NEON_API_KEY`) skipped every database-dependent check in the pipeline, and under
+    # Principle VII a skip is not a pass: the checks that enforce this product's personal-data
+    # guarantees had never executed once, across three merged features.
+    #
+    # A per-job container is also **more** isolated than the three shared Neon branches it
+    # replaces, because each job gets its own runner and therefore its own database that no
+    # other job can reach. `pnpm verify:clean` has always run these same suites against stock
+    # `postgres:17` locally, so this is the environment they were already proved against.
+    #
+    # **006 (T076) — this used to end "Neon is still what the preview uses". There is no
+    # preview and there is no Neon.** Both went with the vendor jobs (research D13), so this
+    # service container is now the only database CI touches — the same real PostgreSQL, per
+    # job. FR-067 is unchanged and now binds UAT instead of a preview (FR-485), enforced by
+    # `deploy/vm/_common.sh` rather than by a permanently data-free branch.
+    # ─────────────────────────────────────────────────────────────────────────────────────
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: mynet
+          POSTGRES_PASSWORD: mynet
+          POSTGRES_DB: mynet_ci
+        ports:
+          - 5432:5432
+        # Without a health gate the first migration races the server's startup and fails with a
+        # connection error that reads like a broken migration.
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://mynet:mynet@localhost:5432/mynet_ci
+      # ───────────────────────────────────────────────────────────────────────────────────
+      # **`loadConfig()` requires these, and the workflow has never supplied them.**
+      #
+      # A second latent fault, invisible until now because `db-branch` failed first: every job
+      # below builds the Fastify app, and `loadConfig()` refuses to start without a pepper and
+      # an attempt-hash key. Had the Neon secret been set, these jobs would simply have failed
+      # one line further on.
+      #
+      # Throwaway values for a container that is destroyed with the job. They are deliberately
+      # NOT repository secrets: nothing they protect outlives the run, and a real secret here
+      # would be a production credential sitting in a public repository's workflow environment.
+      # ───────────────────────────────────────────────────────────────────────────────────
+      AUTH_PASSWORD_PEPPER: ci-only-not-a-secret-ephemeral-database
+      AUTH_ATTEMPT_HASH_KEY: ci-only-not-a-secret-ephemeral-database
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test:integration
+
+  # ── Gate 10: production build and asset budget (FR-072) ─────────────────────────────────
+  #
+  # Ordered before the browser gates because they consume this artifact: the end-to-end suite
+  # runs against a production build, not a dev server, so that the service worker and the bundle
+  # it actually asserts on are the ones an attendee receives.
+  build:
+    name: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # ─────────────────────────────────────────────────────────────────────────────────────
+      # T066 (006) — **`/api`, because client and API share one origin** (FR-476, research D6).
+      #
+      # Caddy serves this build and reverse-proxies `/api/*` to the API container, so a relative
+      # base is the whole configuration. The client's HTTP layer already defaults to a relative
+      # base (`apps/web/src/app/services.ts`), which is why this is configuration rather than
+      # code — and why the artifact this job uploads is the one `deploy.sh` ships.
+      #
+      # The configuration this replaces baked an absolute `*.fly.dev` address in here, and it is
+      # what made sign-in impossible: `fly.dev` and `pages.dev` are separate registrable domains
+      # on the Public Suffix List, so the `SameSite=Lax` session cookie was never sent at all.
+      # ─────────────────────────────────────────────────────────────────────────────────────
+      - run: pnpm build
+        env:
+          VITE_API_BASE_URL: /api
+      - name: asset budget
+        run: node scripts/asset-budget.mjs
+      # ─────────────────────────────────────────────────────────────────────────────────────
+      # The brand audit lives here, and only here, because it asserts things about the **built**
+      # output: what the service worker precaches, and what the emitted manifest declares. It
+      # started life as a unit test guarded by `existsSync(dist/sw.js)` — which is never true in
+      # `test-unit`, since that job does not build. It skipped on every run and reported green.
+      #
+      # It also proves the committed brand assets are byte-identical to what the pipeline
+      # produces (FR-806, FR-803), which until now existed only as a by-hand quickstart step.
+      # ─────────────────────────────────────────────────────────────────────────────────────
+      - name: brand audit
+        run: node scripts/brand-audit.mjs
+      # ─────────────────────────────────────────────────────────────────────────────────────
+      # **This artifact has no consumer today, and saying so is the honest thing.**
+      #
+      # A comment here previously claimed it was "the one `deploy.sh` ships". It is not:
+      # `deploy.sh` runs its own `pnpm --filter @mynet/web build` and nothing downloads this.
+      # It is kept because it is genuinely useful for inspecting what a run produced, and
+      # because consuming it is the right way to close the provenance gap `deploy.sh` records.
+      # ─────────────────────────────────────────────────────────────────────────────────────
+      - uses: actions/upload-artifact@v4
+        with:
+          name: web-dist
+          path: apps/web/dist
+          retention-days: 7
+      # ─────────────────────────────────────────────────────────────────────────────────────
+      # T008 (013) — the second website's build output, uploaded separately.
+      #
+      # Two artifacts rather than one, because the two products are deployed to two hosts by
+      # Caddy (`admin.<host>` and `<host>`, decision 37) and an operator inspecting a run needs
+      # to know which bundle is which. Combining them would also hide the property FR-923 is
+      # about: this directory contains **no `manifest.webmanifest` and no `sw.js`**, and that is
+      # visible at a glance only while it is its own artifact.
+      # ─────────────────────────────────────────────────────────────────────────────────────
+      - uses: actions/upload-artifact@v4
+        with:
+          name: admin-dist
+          path: apps/admin/dist
+          retention-days: 7
+
+  # ── Gates 8 and 9: accessibility and end-to-end (FR-068, SC-005) ────────────────────────
+  #
+  # Two jobs from one suite, because FR-063 names accessibility checks and end-to-end browser
+  # tests as separate required checks. Reporting them as one would let an accessibility
+  # regression hide behind a passing navigation suite.
+  #
+  # Both drive a real browser against a production build and a real API over a real database.
+  test-accessibility:
+    name: test-accessibility
+    needs: migrations
+    runs-on: ubuntu-latest
+    # ─────────────────────────────────────────────────────────────────────────────────────
+    # **A PostgreSQL service container, not a Neon branch.**
+    #
+    # These gates need *a real database*, which is what FR-005 and FR-069 ask for — not Neon
+    # specifically. Binding them to the old `db-branch` job meant one unset repository secret
+    # (`NEON_API_KEY`) skipped every database-dependent check in the pipeline, and under
+    # Principle VII a skip is not a pass: the checks that enforce this product's personal-data
+    # guarantees had never executed once, across three merged features.
+    #
+    # A per-job container is also **more** isolated than the three shared Neon branches it
+    # replaces, because each job gets its own runner and therefore its own database that no
+    # other job can reach. `pnpm verify:clean` has always run these same suites against stock
+    # `postgres:17` locally, so this is the environment they were already proved against.
+    #
+    # **006 (T076) — this used to end "Neon is still what the preview uses". There is no
+    # preview and there is no Neon.** Both went with the vendor jobs (research D13), so this
+    # service container is now the only database CI touches — the same real PostgreSQL, per
+    # job. FR-067 is unchanged and now binds UAT instead of a preview (FR-485), enforced by
+    # `deploy/vm/_common.sh` rather than by a permanently data-free branch.
+    # ─────────────────────────────────────────────────────────────────────────────────────
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: mynet
+          POSTGRES_PASSWORD: mynet
+          POSTGRES_DB: mynet_ci
+        ports:
+          - 5432:5432
+        # Without a health gate the first migration races the server's startup and fails with a
+        # connection error that reads like a broken migration.
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://mynet:mynet@localhost:5432/mynet_ci
+      VITE_API_BASE_URL: http://localhost:3000
+      WEB_ORIGIN: http://localhost:5173
+      # ───────────────────────────────────────────────────────────────────────────────────
+      # **013 — without this every administrative test times out, and the API looks healthy.**
+      #
+      # `app.ts` allows CORS on administrative routes from `config.adminOrigin ?? false`, so an
+      # unset value means the answer is `false` and the **browser** refuses every request the
+      # admin client makes. Nothing fails server-side; the specs simply wait for a response that
+      # never comes, which is what they did on this branch's first CI run.
+      #
+      # This was recorded as "it passed locally only because `pnpm start` writes `ADMIN_ORIGIN`
+      # into `.env.local`". **014 found that to be untrue** — `.env.local` carries `WEB_ORIGIN`
+      # and never carried this one — so the local runner could not reproduce a green CI run for
+      # as long as the administrative specs have existed, and a full local `pnpm verify` failed
+      # twelve of them. `scripts/verify-clean.mjs` now allocates an admin port and sets both
+      # `MYNET_ADMIN_PORT` and `ADMIN_ORIGIN`, which makes the sentence true of the runner that
+      # is actually meant to mirror this job.
+      #
+      # The lesson survives its own correction, and is now the sharper one: a value the pipeline
+      # supplies by hand is a value the local runner must supply too, or the two verify different
+      # things and the difference is invisible until somebody runs both.
+      #
+      # Deployed environments set nothing here, because Caddy serves `admin.<host>` and proxies
+      # `/api/*` beneath it, so administrative requests are same-origin. Local and CI are the
+      # only topologies where two ports stand in for two hosts.
+      # ───────────────────────────────────────────────────────────────────────────────────
+      ADMIN_ORIGIN: http://localhost:5174
+      # ───────────────────────────────────────────────────────────────────────────────────
+      # **`loadConfig()` requires these, and the workflow has never supplied them.**
+      #
+      # A second latent fault, invisible until now because `db-branch` failed first: every job
+      # below builds the Fastify app, and `loadConfig()` refuses to start without a pepper and
+      # an attempt-hash key. Had the Neon secret been set, these jobs would simply have failed
+      # one line further on.
+      #
+      # Throwaway values for a container that is destroyed with the job. They are deliberately
+      # NOT repository secrets: nothing they protect outlives the run, and a real secret here
+      # would be a production credential sitting in a public repository's workflow environment.
+      # ───────────────────────────────────────────────────────────────────────────────────
+      AUTH_PASSWORD_PEPPER: ci-only-not-a-secret-ephemeral-database
+      AUTH_ATTEMPT_HASH_KEY: ci-only-not-a-secret-ephemeral-database
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      # Its own container, so it applies its own migrations. The `migrations` job proves the
+      # committed migrations apply cleanly; this makes this suite's database usable.
+      - run: pnpm db:migrate
+      - run: pnpm exec playwright test e2e/accessibility.spec.ts
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: accessibility-report
+          path: playwright-report
+          retention-days: 7
+
+  test-e2e:
+    name: test-e2e
+    needs: migrations
+    runs-on: ubuntu-latest
+    # ─────────────────────────────────────────────────────────────────────────────────────
+    # **A PostgreSQL service container, not a Neon branch.**
+    #
+    # These gates need *a real database*, which is what FR-005 and FR-069 ask for — not Neon
+    # specifically. Binding them to the old `db-branch` job meant one unset repository secret
+    # (`NEON_API_KEY`) skipped every database-dependent check in the pipeline, and under
+    # Principle VII a skip is not a pass: the checks that enforce this product's personal-data
+    # guarantees had never executed once, across three merged features.
+    #
+    # A per-job container is also **more** isolated than the three shared Neon branches it
+    # replaces, because each job gets its own runner and therefore its own database that no
+    # other job can reach. `pnpm verify:clean` has always run these same suites against stock
+    # `postgres:17` locally, so this is the environment they were already proved against.
+    #
+    # **006 (T076) — this used to end "Neon is still what the preview uses". There is no
+    # preview and there is no Neon.** Both went with the vendor jobs (research D13), so this
+    # service container is now the only database CI touches — the same real PostgreSQL, per
+    # job. FR-067 is unchanged and now binds UAT instead of a preview (FR-485), enforced by
+    # `deploy/vm/_common.sh` rather than by a permanently data-free branch.
+    # ─────────────────────────────────────────────────────────────────────────────────────
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: mynet
+          POSTGRES_PASSWORD: mynet
+          POSTGRES_DB: mynet_ci
+        ports:
+          - 5432:5432
+        # Without a health gate the first migration races the server's startup and fails with a
+        # connection error that reads like a broken migration.
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://mynet:mynet@localhost:5432/mynet_ci
+      VITE_API_BASE_URL: http://localhost:3000
+      WEB_ORIGIN: http://localhost:5173
+      # ───────────────────────────────────────────────────────────────────────────────────
+      # **013 — without this every administrative test times out, and the API looks healthy.**
+      #
+      # `app.ts` allows CORS on administrative routes from `config.adminOrigin ?? false`, so an
+      # unset value means the answer is `false` and the **browser** refuses every request the
+      # admin client makes. Nothing fails server-side; the specs simply wait for a response that
+      # never comes, which is what they did on this branch's first CI run.
+      #
+      # This was recorded as "it passed locally only because `pnpm start` writes `ADMIN_ORIGIN`
+      # into `.env.local`". **014 found that to be untrue** — `.env.local` carries `WEB_ORIGIN`
+      # and never carried this one — so the local runner could not reproduce a green CI run for
+      # as long as the administrative specs have existed, and a full local `pnpm verify` failed
+      # twelve of them. `scripts/verify-clean.mjs` now allocates an admin port and sets both
+      # `MYNET_ADMIN_PORT` and `ADMIN_ORIGIN`, which makes the sentence true of the runner that
+      # is actually meant to mirror this job.
+      #
+      # The lesson survives its own correction, and is now the sharper one: a value the pipeline
+      # supplies by hand is a value the local runner must supply too, or the two verify different
+      # things and the difference is invisible until somebody runs both.
+      #
+      # Deployed environments set nothing here, because Caddy serves `admin.<host>` and proxies
+      # `/api/*` beneath it, so administrative requests are same-origin. Local and CI are the
+      # only topologies where two ports stand in for two hosts.
+      # ───────────────────────────────────────────────────────────────────────────────────
+      ADMIN_ORIGIN: http://localhost:5174
+      # ───────────────────────────────────────────────────────────────────────────────────
+      # **`loadConfig()` requires these, and the workflow has never supplied them.**
+      #
+      # A second latent fault, invisible until now because `db-branch` failed first: every job
+      # below builds the Fastify app, and `loadConfig()` refuses to start without a pepper and
+      # an attempt-hash key. Had the Neon secret been set, these jobs would simply have failed
+      # one line further on.
+      #
+      # Throwaway values for a container that is destroyed with the job. They are deliberately
+      # NOT repository secrets: nothing they protect outlives the run, and a real secret here
+      # would be a production credential sitting in a public repository's workflow environment.
+      # ───────────────────────────────────────────────────────────────────────────────────
+      AUTH_PASSWORD_PEPPER: ci-only-not-a-secret-ephemeral-database
+      AUTH_ATTEMPT_HASH_KEY: ci-only-not-a-secret-ephemeral-database
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm db:migrate
+      # ───────────────────────────────────────────────────────────────────────────────────
+      # T079 (006) — **this line NAMED FIVE SPEC FILES WHILE ITS COMMENT SAID "EVERYTHING".**
+      #
+      # The comment read "everything except the accessibility suite". The list was 001's five,
+      # and neither 004 nor 005 added theirs — so ten spec files, including the whole identity
+      # journey, password recovery, saved sessions, session notes and the panel's keyboard
+      # behaviour, **have never run in CI once**. Every one of them passes locally under
+      # `pnpm verify:clean`, which is why nobody noticed: the gate was green and narrow.
+      #
+      # That is the silent-narrowing failure this codebase warns about repeatedly, and FR-490
+      # asks 006 to confirm no check was weakened — so it is fixed rather than merely observed.
+      #
+      # Derived from the directory now, minus the accessibility suite, which reports as its own
+      # required check. A spec added by a later feature is covered the moment it is written, and
+      # the emptiness guard means a glob that stops matching fails loudly instead of passing
+      # with nothing to run.
+      #
+      # **T079's actual question is answered by the two lines above this one**: `test-e2e` runs
+      # against `localhost:3000` with its own `postgres:17` service container and needs only
+      # `migrations`. It never depended on the preview, so deleting the preview does not touch
+      # it (research D13).
+      # ───────────────────────────────────────────────────────────────────────────────────
+      - name: end-to-end (every spec except the accessibility suite)
+        run: |
+          set -euo pipefail
+          mapfile -t SPECS < <(ls e2e/*.spec.ts | grep -v 'accessibility\.spec\.ts$')
+          if [ "${#SPECS[@]}" -eq 0 ]; then
+            echo "::error::No end-to-end specs matched. A gate that runs nothing is not a gate."
+            exit 1
+          fi
+          echo "Running ${#SPECS[@]} spec files:"
+          printf '  %s\n' "${SPECS[@]}"
+          pnpm exec playwright test --ignore-snapshots "${SPECS[@]}"
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: e2e-report
+          path: playwright-report
+          retention-days: 7
+
+  # ── The aggregate gate (FR-064, FR-071) ─────────────────────────────────────────────────
+  #
+  # `needs` alone is NOT sufficient: a skipped or cancelled dependency leaves a dependent job
+  # skipped, and a skipped job reports neutral — which branch protection reads as "not
+  # failing". FR-064 forbids exactly that, so this job runs with `if: always()` and asserts
+  # every result is literally 'success'. Anything else — skipped, cancelled, timed out — is
+  # a failure here.
+  #
+  # This is also the line of defence against the specific shortcut FR-071 names. Commenting a
+  # job out of `needs` below is the only way to make this pass without that job succeeding, and
+  # it is visible in the diff.
+  verify:
+    name: verify
+    runs-on: ubuntu-latest
+    # ═════════════════════════════════════════════════════════════════════════════════════════
+    # **T078 (006) — RECOMPOSED AROUND THE JOBS THAT REMAIN, WITH NOTHING WEAKENED.**
+    #
+    # The eleventh check was `deploy-preview`. It is gone with its vendor, and 001's FR-066 and
+    # SC-011 are withdrawn with it by constitution v3.0.0 — explicitly, as a retraction rather
+    # than as a quiet omission. **The other ten are unchanged**, and that is the property
+    # FR-490 asks this change to hold: five jobs were removed because they built environments,
+    # not because they were inconvenient.
+    #
+    # It also now runs on `push`. The eleven checks used to include a preview that exists only
+    # for a pull request, so asserting all eleven on a push left `deploy-preview` skipped,
+    # `skipped != success`, and every merge into a protected branch permanently red — a signal
+    # that is always red teaches reviewers to ignore it, which is exactly as useless as one that
+    # is always green. With the preview gone, all ten can genuinely run on both, so
+    # **`verify-push` is therefore no longer a reduced set**: it asserts the same ten, so a
+    # merge is held to exactly the standard the pull request was.
+    # ═════════════════════════════════════════════════════════════════════════════════════════
+    if: always() && github.event_name == 'pull_request' && github.event.action != 'closed'
+    needs:
+      - typecheck
+      - lint
+      - test-unit
+      - test-component
+      - contract
+      - migrations
+      - test-integration
+      - test-accessibility
+      - test-e2e
+      - build
+    steps:
+      - name: assert every required check succeeded
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          echo "$RESULTS"
+
+          count=$(echo "$RESULTS" | jq -r 'length')
+          if [ "$count" -ne 10 ]; then
+            echo "::error::Expected 10 required checks, found $count."
+            echo "A check removed from \`needs\` is a check that no longer gates (FR-490)."
+            echo "This count went 11 -> 10 exactly once, in 006, when \`deploy-preview\` was deleted"
+            echo "along with its vendor and 001's FR-066/SC-011 were withdrawn in constitution v3.0.0."
+            echo "It must not move again without an amendment."
+            exit 1
+          fi
+
+          failed=$(echo "$RESULTS" | jq -r 'to_entries[] | select(.value.result != "success") | "\(.key)=\(.value.result)"')
+          if [ -n "$failed" ]; then
+            echo "::error::Required checks did not succeed:"
+            echo "$failed" | while read -r line; do echo "::error::  $line"; done
+            echo "A skipped, cancelled, or errored check MUST NOT report success (FR-064, FR-071)."
+            exit 1
+          fi
+
+          echo "All 10 required checks succeeded."
+
+  # ── The post-merge aggregate (T078) ─────────────────────────────────────────────────────
+  #
+  # ═══════════════════════════════════════════════════════════════════════════════════════
+  # **THIS USED TO ASSERT SIX CHECKS. IT NOW ASSERTS THE SAME TEN `verify` DOES.**
+  #
+  # The six were the ones that could run after a squash merge, because the other five depended
+  # on ephemeral per-pull-request resources that were already destroyed. Those resources are
+  # gone (T076), and every remaining check runs on its own service container — so there is no
+  # longer any reason for a merge to be held to a lower standard than the pull request was.
+  #
+  # It is a genuine strengthening rather than a rename: `migrations`, `test-integration`,
+  # `test-accessibility` and `test-e2e` now gate `develop` and `main` as well, and they are the
+  # four that would catch a bad merge resolution against a real database.
+  # ═══════════════════════════════════════════════════════════════════════════════════════
+  verify-push:
+    name: verify-push
+    runs-on: ubuntu-latest
+    if: always() && github.event_name == 'push'
+    needs:
+      - typecheck
+      - lint
+      - test-unit
+      - test-component
+      - contract
+      - migrations
+      - test-integration
+      - test-accessibility
+      - test-e2e
+      - build
+    steps:
+      - name: assert every post-merge check succeeded
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          echo "$RESULTS"
+
+          count=$(echo "$RESULTS" | jq -r 'length')
+          if [ "$count" -ne 10 ]; then
+            echo "::error::Expected 10 post-merge checks, found $count."
+            echo "This went 6 -> 10 in 006, when the ephemeral preview resources were deleted and"
+            echo "every gate became runnable on a push. It must not go back down."
+            exit 1
+          fi
+
+          failed=$(echo "$RESULTS" | jq -r 'to_entries[] | select(.value.result != "success") | "\(.key)=\(.value.result)"')
+          if [ -n "$failed" ]; then
+            echo "::error::Post-merge checks did not succeed:"
+            echo "$failed" | while read -r line; do echo "::error::  $line"; done
+            exit 1
+          fi
+
+          echo "All 10 post-merge checks succeeded."
+
+  # ── The deployment gate (T077, FR-484) ──────────────────────────────────────────────────
+  #
+  # ═══════════════════════════════════════════════════════════════════════════════════════
+  # **A CHANGE REACHES UAT ON MERGE TO `develop`, AND PRODUCTION ON MERGE TO `main`.**
+  #
+  # That matches the existing branch flow, in which promoting `develop` to `main` is already a
+  # reviewed pull request — so production is gated by a human review of a change that has been
+  # running on UAT, rather than by a second approval mechanism nobody would maintain.
+  #
+  # **Both jobs depend on `verify-push`**, which is the aggregate that runs on a push and which
+  # now asserts the same ten checks `verify` does. So nothing deploys from a red pipeline, and
+  # nothing deploys from a *skipped* one either — that aggregate refuses to accept a skipped
+  # dependency as success (FR-064), which is what stops "the tests were skipped" from becoming
+  # "the deploy went ahead".
+  #
+  # **They are deliberately inert until the environments exist**, and they say so rather than
+  # failing: no domain has been registered and no Azure subscription has been named — both are
+  # owner decisions the specification records as open (tasks T004, T006). A job that failed on
+  # every merge for a reason nobody can act on is the always-red signal `verify` was fixed to
+  # stop being.
+  # ═══════════════════════════════════════════════════════════════════════════════════════
+  deploy-uat:
+    name: deploy-uat
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+    needs: [verify-push]
+    environment: uat
+    # ═════════════════════════════════════════════════════════════════════════════════════════
+    # **ITS OWN GROUP, WITH CANCELLATION OFF — and that is a correction.**
+    #
+    # The workflow-level group sets `cancel-in-progress: true`, which is right for verification
+    # and wrong for a job that mutates a long-lived environment. Two merges in quick succession
+    # would cancel the first run *mid-deploy*, and `deploy.sh` raises the maintenance flag at
+    # step [1b/6] before touching anything: a cancelled job leaves a file on the VM that nothing
+    # else removes, so UAT serves a 503 to every visitor indefinitely while the second run
+    # deploys on top of it and reports green.
+    # ═════════════════════════════════════════════════════════════════════════════════════════
+    concurrency:
+      group: deploy-uat
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v5
+      # `deploy.sh` builds the client, so the toolchain has to be here. Without these the job
+      # fails at step [2/6] the first time it stops being inert.
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # ═══════════════════════════════════════════════════════════════════════════════════════
+      # T070, T071 (010) — **JUST-IN-TIME SSH ADMISSION** (FR-833, research R1).
+      #
+      # `provision-vm.sh` locks port 22 to the provisioning operator's own address, and a hosted
+      # runner has no stable one. Three ways out were considered and two rejected:
+      #
+      #   * **Widen the rule to GitHub's published Actions ranges** — thousands of addresses
+      #     belonging to anybody who can run a workflow. This is what FR-833 exists to forbid.
+      #   * **A self-hosted runner on a known address** — removes the problem and adds a machine
+      #     to patch. Putting it *on the UAT VM* was rejected outright: two vCPUs already shared
+      #     between an API, a database and a client build is the wrong place for a build agent.
+      #   * **This**: one address, for the length of one deploy.
+      #
+      # R1 records a fourth as the intended successor — deploying through the Azure agent with no
+      # SSH at all — and declines it here, because rewriting the transport in the same change that
+      # first proves the deploy works leaves you unable to tell which half is broken.
+      # ═══════════════════════════════════════════════════════════════════════════════════════
+      - name: assert no firewall rule survived a previous run
+        env:
+          AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
+        run: |
+          set -euo pipefail
+          [ -n "${AZURE_CREDENTIALS:-}" ] || exit 0
+
+          # ─────────────────────────────────────────────────────────────────────────────────
+          # **THIS IS THE STEP THAT MATTERS, AND IT RUNS BEFORE ANYTHING ELSE.**
+          #
+          # Teardown that runs is not teardown that worked. `if: always()` covers failure and
+          # cancellation; it does not cover a runner that is killed, an API call that times out,
+          # or a token that expires between admission and cleanup. In every one of those cases
+          # port 22 stays open to one address **indefinitely**, and nothing anywhere reports it.
+          #
+          # So the next run looks. It **fails** rather than tidying up, because silently deleting
+          # a leaked rule would erase the only evidence that the environment was exposed, and for
+          # how long. A red build is how a person finds out.
+          # ─────────────────────────────────────────────────────────────────────────────────
+          source deploy/vm/_common.sh
+          mynet::load_env uat
+          CLIENT_SECRET="$(echo "$AZURE_CREDENTIALS" | jq -r .clientSecret)"
+          echo "::add-mask::$CLIENT_SECRET"
+          az login --service-principal \
+            -u "$(echo "$AZURE_CREDENTIALS" | jq -r .clientId)" \
+            -p "$CLIENT_SECRET" \
+            --tenant "$(echo "$AZURE_CREDENTIALS" | jq -r .tenantId)" >/dev/null
+
+          STALE="$(mynet::az network nsg rule list -g "$RESOURCE_GROUP" \
+            --nsg-name "${VM_NAME}NSG" --query "[?starts_with(name,'allow-ssh-ci-')].name" -o tsv)"
+
+          if [ -n "$STALE" ]; then
+            echo "::error::A just-in-time SSH rule from a previous run is still in place:"
+            printf '  %s\n' $STALE
+            echo ""
+            echo "Port 22 on ${VM_NAME} has been open to that run's runner address since it ended."
+            echo "This run is REFUSING rather than cleaning up, because deleting it quietly would"
+            echo "erase the only evidence of how long the environment was exposed."
+            echo ""
+            echo "Investigate, then remove it by hand:"
+            for rule in $STALE; do
+              echo "  az network nsg rule delete -g $RESOURCE_GROUP --nsg-name ${VM_NAME}NSG -n $rule"
+            done
+            exit 1
+          fi
+          echo "No stale admission rule. Proceeding."
+
+      - name: admit this runner to port 22
+        id: admit
+        env:
+          AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
+        run: |
+          set -euo pipefail
+          [ -n "${AZURE_CREDENTIALS:-}" ] || exit 0
+          source deploy/vm/_common.sh
+          mynet::load_env uat
+
+          # Several services, because any one of them can be down and a deploy that fails on
+          # somebody else's outage is a bad deploy. Same reasoning as provision-vm.sh.
+          RUNNER_IP=""
+          for svc in https://api.ipify.org https://checkip.amazonaws.com https://ifconfig.me; do
+            [ -n "$RUNNER_IP" ] && break
+            RUNNER_IP="$(curl -fsS --max-time 8 "$svc" 2>/dev/null | tr -d '[:space:]' || true)"
+          done
+          [ -n "$RUNNER_IP" ] || { echo "::error::Could not determine this runner's address."; exit 1; }
+
+          # Named for the run, so a leak names the run that leaked it.
+          RULE="allow-ssh-ci-${GITHUB_RUN_ID}"
+          echo "rule=$RULE" >> "$GITHUB_OUTPUT"
+
+          # Priority 1150: below the operator's 1100 rule, so this ADDS an address rather than
+          # replacing one. A single /32 — FR-833's whole point.
+          mynet::az network nsg rule create -g "$RESOURCE_GROUP" --nsg-name "${VM_NAME}NSG" \
+            -n "$RULE" --priority 1150 --direction Inbound --access Allow --protocol Tcp \
+            --source-address-prefixes "${RUNNER_IP}/32" --destination-port-ranges 22 -o none
+          echo "Admitted ${RUNNER_IP}/32 to port 22 as $RULE."
+
+      - name: trust the host key, verified out-of-band (FR-834)
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          [ -n "${DEPLOY_SSH_KEY:-}" ] || exit 0
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          # From a secret, never from ssh-keyscan at deploy time: accepting a key on first
+          # connection is trust-on-first-use against a host whose address is public. The stored
+          # value was compared against the fingerprints the VM reported through the Azure guest
+          # agent — a channel independent of SSH. See OPERATIONS-LOG.md.
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          cat >> ~/.ssh/config <<'CONF'
+          Host *
+            IdentityFile ~/.ssh/id_deploy
+            StrictHostKeyChecking yes
+          CONF
+
+      - name: deploy to UAT
+        env:
+          AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
+          MAIL_SMTP_URL: ${{ secrets.MAIL_SMTP_URL }}
+          PUSH_VAPID_PRIVATE_KEY: ${{ secrets.PUSH_VAPID_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${AZURE_CREDENTIALS:-}" ]; then
+            echo "::notice::UAT deployment credentials are not configured, so there is nothing to do."
+            echo "The environment itself IS provisioned and serving — see OPERATIONS-LOG.md."
+            echo "What is missing is the automation's own credentials. To enable this job, add to"
+            echo "the 'uat' environment:"
+            echo "  * AZURE_CREDENTIALS  -- a service principal scoped to rg-mynet-uat, with"
+            echo "                          network-write on vm-mynet-uatNSG for the rule above;"
+            echo "  * DEPLOY_SSH_KEY     -- az login grants control-plane access, not shell;"
+            echo "  * SSH_KNOWN_HOSTS    -- verified out-of-band, NOT accepted on first connection."
+            exit 0
+          fi
+          ./deploy/vm/deploy.sh uat --migrate
+
+      # ═══════════════════════════════════════════════════════════════════════════════════════
+      # **UNCONDITIONAL. `always()` COVERS CANCELLATION, WHICH IS THE CASE THAT LEAKS.**
+      #
+      # A merge cancelled mid-deploy is not exotic — it is what happens when somebody notices a
+      # mistake and pushes a fix. Without `always()` the rule outlives the run and port 22 stays
+      # open to a hosted runner's address forever.
+      #
+      # `continue-on-error` so a failed teardown cannot mask the deploy's own result, and so the
+      # error is visible rather than swallowed. The stale-rule assertion at the top of the NEXT
+      # run is what actually catches a teardown that did not work.
+      # ═══════════════════════════════════════════════════════════════════════════════════════
+      - name: withdraw the runner's admission
+        if: always()
+        continue-on-error: true
+        env:
+          AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
+          RULE: ${{ steps.admit.outputs.rule }}
+        run: |
+          set -euo pipefail
+          [ -n "${AZURE_CREDENTIALS:-}" ] && [ -n "${RULE:-}" ] || exit 0
+          source deploy/vm/_common.sh
+          mynet::load_env uat
+          mynet::az network nsg rule delete -g "$RESOURCE_GROUP" \
+            --nsg-name "${VM_NAME}NSG" -n "$RULE" -o none
+          echo "Withdrew $RULE."
+
+          REMAINING="$(mynet::az network nsg rule list -g "$RESOURCE_GROUP" \
+            --nsg-name "${VM_NAME}NSG" --query "[?starts_with(name,'allow-ssh-ci-')].name" -o tsv)"
+          if [ -n "$REMAINING" ]; then
+            echo "::error::Teardown ran and something remains: $REMAINING"
+            exit 1
+          fi
+
+  deploy-prod:
+    name: deploy-prod
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [verify-push]
+    environment: prod
+    # Its own group, cancellation off — see `deploy-uat` for why.
+    concurrency:
+      group: deploy-prod
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: deploy to production
+        env:
+          AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
+        run: |
+          set -euo pipefail
+          if [ -z "${AZURE_CREDENTIALS:-}" ]; then
+            echo "::notice::Production is not provisioned yet, so there is nothing to deploy to."
+            echo "See the deploy-uat job for the two owner decisions this is blocked on."
+            echo "Production additionally requires an EXERCISED RESTORE before it holds real"
+            echo "attendee data (SC-413) -- see deploy/vm/OPERATIONS-LOG.md."
+            exit 0
+          fi
+          az login --service-principal \
+            -u "$(echo "$AZURE_CREDENTIALS" | jq -r .clientId)" \
+            -p "$(echo "$AZURE_CREDENTIALS" | jq -r .clientSecret)" \
+            --tenant "$(echo "$AZURE_CREDENTIALS" | jq -r .tenantId)" >/dev/null
+          ./deploy/vm/deploy.sh prod --migrate

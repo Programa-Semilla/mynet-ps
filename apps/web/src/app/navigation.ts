@@ -1,0 +1,498 @@
+import { CalendarDays, Compass, Home, MessageSquare, Users, type LucideIcon } from 'lucide-react'
+import { createElement, lazy, type ReactElement } from 'react'
+
+import { SessionPanel } from './agenda/SessionPanel.js'
+import { Agenda } from './destinations/Agenda.js'
+
+/**
+ * T130 (004) — **the standalone surfaces are code-split, and the asset budget is why.**
+ *
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ * 004 adds twelve screens. Imported eagerly, every one of them lands in the initial shell
+ * chunk, and `scripts/asset-budget.mjs` failed by 5.1 KB gzipped — which is the budget doing
+ * exactly its job. Its own message says the alternative out loud: *do not raise it to make a
+ * red build green.*
+ *
+ * Splitting is the honest fix rather than a way round the gate, because **none of these is
+ * needed to render the workspace**. Signing up, verifying an address, recovering a password,
+ * joining a conference, editing a profile and closing an account are each reached deliberately,
+ * once, by somebody who has decided to do that thing — and paying for all twelve on every cold
+ * load of Home is the cost the budget exists to notice.
+ *
+ * The five **destinations** stay eager. Home and Agenda are the workspace; a spinner between
+ * the rail and the thing it navigates to would be a worse product for a saving the budget does
+ * not need.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ * **T130 (006) — THAT LAST PARAGRAPH IS NARROWED, AND THE NARROWING IS RECORDED RATHER THAN
+ * MADE QUIETLY.**
+ *
+ * The rule is now **"the destinations needed to render the workspace stay eager"**, which is
+ * what 004's reasoning actually said — Home and Agenda are named in it; "the five" was a
+ * shorthand that happened to be true while three of them were placeholders.
+ *
+ * 006 gives Discover real content and the initial shell went 2.9 KB over budget. The saving the
+ * budget did not need in 004 is one it needs now, and Discover fails 004's own test for staying
+ * eager: it is not the workspace, it is the second question the product answers, and it is
+ * reached by a deliberate navigation. Home and Agenda are unchanged.
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ */
+const SignUp = lazy(() => import('./auth/SignUp.js').then((m) => ({ default: m.SignUp })))
+const Verify = lazy(() => import('./auth/Verify.js').then((m) => ({ default: m.Verify })))
+const ResetRequest = lazy(() =>
+  import('./auth/ResetRequest.js').then((m) => ({ default: m.ResetRequest })),
+)
+const ResetPassword = lazy(() =>
+  import('./auth/ResetPassword.js').then((m) => ({ default: m.ResetPassword })),
+)
+const JoinConference = lazy(() =>
+  import('./join/JoinConference.js').then((m) => ({ default: m.JoinConference })),
+)
+const Profile = lazy(() => import('./profile/Profile.js').then((m) => ({ default: m.Profile })))
+const ProfileEdit = lazy(() =>
+  import('./profile/ProfileEdit.js').then((m) => ({ default: m.ProfileEdit })),
+)
+const Account = lazy(() => import('./profile/Account.js').then((m) => ({ default: m.Account })))
+
+/**
+ * T130 (006) — **the profile view is code-split too, and the asset budget is again why.**
+ *
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ * Discover pushed the initial shell 2.9 KB over the 150 KB budget, and the gate's own message
+ * says the alternative out loud: *do not raise it to make a red build green.* Splitting is the
+ * honest fix, and this is the right thing to split — the profile view meets the same test the
+ * twelve surfaces above do. It is reached **deliberately, once, by somebody who has decided to
+ * look at one person**, so paying for it on every cold load of Home is precisely the cost the
+ * budget exists to notice.
+ *
+ * **Discover itself is split as well** — see the narrowed rule in the block above. Splitting the
+ * profile view alone recovered 0.6 KB of the 2.9 KB; splitting the destination recovered the
+ * rest, and it is the change that matches what the budget is actually measuring, which is what
+ * an attendee downloads before **Home** is usable.
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ */
+const Discover = lazy(() =>
+  import('./destinations/Discover.js').then((m) => ({ default: m.Discover })),
+)
+const AttendeeProfile = lazy(() =>
+  import('./discover/AttendeeProfile.js').then((m) => ({ default: m.AttendeeProfile })),
+)
+
+/**
+ * T031 (007) — **Messages is code-split, on the established rule rather than on a measurement.**
+ *
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ * The rule the block above narrowed — *the destinations needed to render the workspace stay
+ * eager* — decides this without needing to be reinterpreted. Messages is not the workspace. It
+ * is the third question the product answers, reached by a deliberate navigation, exactly as
+ * Discover is. It goes on to carry a conversation list, a thread, a composer, two confirmation
+ * dialogs, a block-management list and the push permission surface, none of which an attendee
+ * looking at Home has asked for.
+ *
+ * **The urgency research R7 attached to this is withdrawn, because the number behind it was
+ * wrong.** R7 and tasks.md T003 record the shell as sitting 0.6 KB under a 150 KB budget, which
+ * would have made splitting structural rather than a judgement. That baseline was measured with
+ * a repository-root `.env` present, and `envDir` below points Vite at it: `NODE_ENV=development`
+ * in that file makes a local `pnpm build` resolve React, React DOM and React Router to their
+ * **development** builds. CI has no `.env` — it is gitignored — so the number the gate actually
+ * sees is **91.7 KB, with 58 KB to spare**. Splitting here is correct and stays; it is simply
+ * not load-bearing, and a later reader should not plan around headroom that does not exist.
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ *
+ * **Both entries resolve to the same module, so the thread is NOT split separately** — the
+ * opposite of Discover's profile view, for a product reason recorded at the re-export in
+ * `messages/Messages.tsx`: the thread is this destination's primary content, rendered beside
+ * the list, not an overlay reached once.
+ */
+const Messages = lazy(() => import('./messages/Messages.js').then((m) => ({ default: m.Messages })))
+const Thread = lazy(() => import('./messages/Messages.js').then((m) => ({ default: m.Thread })))
+
+/**
+ * T049 (008) — **Network is code-split, on the established rule rather than on a measurement.**
+ *
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ * The rule the Discover block narrowed — *the destinations needed to render the workspace stay
+ * eager* — decides this without needing to be reinterpreted, exactly as it decided Messages.
+ * Network is not the workspace. It is the third question the product answers ("where are my
+ * conversations, notes and appointments?"), reached by a deliberate navigation, and it goes on
+ * to carry a contacts list, an appointments view, a scheduling dialog and two confirmations —
+ * none of which an attendee looking at Home has asked for.
+ *
+ * Home and Agenda remain the only eager destinations, which is now three features in a row
+ * applying the same test rather than three separate judgements.
+ *
+ * **Home's appointment summary card is deliberately NOT part of this chunk.** It lives in
+ * `home/cards/`, is imported by the Home registry eagerly with every other card, and reads the
+ * appointments repository directly — so an attendee who never opens Network still gets the card,
+ * and opening Network does not pay for Home. Standing decision 9 requires each card to own its
+ * own states, and sharing a chunk with a destination would have made that a lie the first time
+ * the chunk failed to load.
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ */
+const Network = lazy(() =>
+  import('./destinations/Network.js').then((m) => ({ default: m.Network })),
+)
+
+/**
+ * The five destinations, declared once (FR-012, FR-013).
+ *
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ * The router, all three navigation forms, and the tests read this list. That is the point:
+ * three navigation forms built from three hand-written lists would drift, and the drift would
+ * show up as a destination reachable on desktop but not on mobile — which SC-004's "complete
+ * navigation journey across all five destinations" would only catch at one width.
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ *
+ * Order is deliberate and matches the prototype: Home first because it is the entry view, then
+ * the attendee's own time (Agenda), then other people (Discover, Messages, Network).
+ *
+ * **All five destinations now carry product content.** 002 gave Home and Agenda theirs, 006
+ * Discover, 007 Messages, and 008 Network — the last one. There is no placeholder destination
+ * left, so `purpose` is now a description on every entry rather than a statement that content is
+ * still to come.
+ */
+
+/**
+ * T048 (004) — what every addressable surface must state, destination or not.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ * 004 adds the product's first addresses that are **not** destinations: creating an account,
+ * joining a conference, verifying an address, recovering a password, the profile, and the
+ * account actions. The five destinations are fixed and this feature adds none (spec, "Where
+ * this feature's surfaces live"), so they cannot go in `DESTINATIONS` — but `TopBar` and
+ * `RouteAnnouncer` still have to be able to name them, or a screen-reader user arriving at
+ * `/join` is told "Page not found" while looking at a working form.
+ *
+ * That is not hypothetical: 005 hit exactly this when it added the first *nested* address, and
+ * the note on `destinationFor` below records what it cost.
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ */
+export interface Addressable {
+  /** Distinct, stable, shareable address (FR-013). */
+  readonly path: string
+  /** The accessible name of every control that navigates here (FR-021). */
+  readonly label: string
+  /** Announced with the label on arrival, so the change is described rather than silent. */
+  readonly purpose: string
+}
+
+export interface Destination extends Addressable {
+  /** Distinct, stable, shareable address (FR-013). */
+  readonly path: string
+  /** The accessible name of every control that navigates here (FR-021). */
+  readonly label: string
+  /**
+   * What this destination will answer once it has content. Shown on the destination itself so
+   * the placeholder says something true rather than "coming soon".
+   */
+  readonly purpose: string
+  readonly icon: LucideIcon
+  /**
+   * T016 (005) — **what renders this destination** (FR-233).
+   *
+   * ───────────────────────────────────────────────────────────────────────────────────────
+   * The router used to decide by comparing the address to the literal `'/agenda'`. That
+   * worked for exactly one destination with content, and it meant each of the four features
+   * still to come — 006 Discover, 007 Messages, 008 Network, and 004's profile view — would
+   * add another branch to the same `if` in `routes.tsx`. Four features editing one shared
+   * expression is precisely the contention 002's per-domain file splits exist to avoid.
+   *
+   * Declaring it here inverts that: a destination says what renders it, and `routes.tsx`
+   * stops naming any address literally. A later feature changes **this line only**, and the
+   * router is not touched again. FR-233 requires the literal special case to be *retired* by
+   * this change, not merely supplemented — so `routes.tsx` now has no address comparison
+   * left in it at all.
+   *
+   * **Optional, and every destination now declares one** — 008 added the last, for Network.
+   * The field stays optional deliberately rather than being tightened: a future destination
+   * lands before its content does, and `undefined` meaning "render the placeholder" is what
+   * makes that an honest intermediate state rather than a broken one.
+   *
+   * Built with `createElement` rather than JSX because this module is `.ts` and is read by the
+   * router, all three navigation forms, and the tests. Renaming it to `.tsx` would churn a
+   * shared file for syntax alone, which is the opposite of what this change is for.
+   * ───────────────────────────────────────────────────────────────────────────────────────
+   */
+  readonly element?: ReactElement
+  /**
+   * T035 (005) — addresses **nested inside** this destination (FR-198, research D4).
+   *
+   * ───────────────────────────────────────────────────────────────────────────────────────
+   * Declared here for exactly the reason `element` is. tasks.md places the nested session
+   * route in `routes.tsx`; putting it there would have reintroduced a literal Agenda special
+   * case into the router one line after FR-233 retired the last one, and 009 — which extends
+   * the same panel — would have had to edit the router to do it.
+   *
+   * A destination owns its addresses. `routes.tsx` renders whatever is declared and names
+   * none of them.
+   *
+   * **Nested, not sibling**: the parent stays mounted, so the programme is still behind the
+   * panel, closing is a navigation rather than a refetch, and Back closes the panel through
+   * the browser's own mechanism (FR-205).
+   * ───────────────────────────────────────────────────────────────────────────────────────
+   */
+  readonly children?: readonly { readonly path: string; readonly element: ReactElement }[]
+}
+
+export const DESTINATIONS: readonly Destination[] = [
+  {
+    path: '/',
+    label: 'Home',
+    purpose: 'What is happening next, and who you should meet today.',
+    icon: Home,
+  },
+  {
+    /*
+      T085 (002) — Agenda now has content, so its `purpose` had to stop promising something it
+      does not yet do. The destination renders the conference programme, read-only; saving a
+      session, personal notes and Q&A arrive with feature 005, and "your personalised schedule"
+      described that later state rather than this one.
+
+      `purpose` is shown on placeholder destinations, so for Agenda it is now only a description
+      — but leaving it stale would make the next reader think saving was already built.
+    */
+    path: '/agenda',
+    label: 'Agenda',
+    /*
+      T028 (005) — `purpose` again describes what the destination actually is. 002 narrowed it
+      from "your personalised schedule" to "the conference programme" because saving did not
+      exist yet; 005 is the feature that makes it a personal schedule, so the wording that was
+      premature then is accurate now.
+    */
+    purpose: 'The conference programme, and the sessions you saved from it.',
+    icon: CalendarDays,
+    element: createElement(Agenda),
+    // `/agenda/<sessionId>` — the detail panel, rendered over the programme (FR-198).
+    children: [{ path: ':sessionId', element: createElement(SessionPanel) }],
+  },
+  {
+    /*
+      T052, T087 (006) — **Discover has content now**, and it declares both of its addresses
+      here rather than in `routes.tsx`. That is FR-233 inherited: a destination owns its element
+      and its nested addresses, and the router names none of them. 007, 008 and 009 extend this
+      file the same way.
+
+      `purpose` already described what this destination would be, and it turns out to have been
+      accurate — so unlike Agenda's, it needs no correction. It is now a description rather than
+      placeholder text, because the placeholder is gone.
+    */
+    path: '/discover',
+    label: 'Discover',
+    purpose: 'Attendees you might want to meet, with search and filters.',
+    icon: Compass,
+    element: createElement(Discover),
+    // `/discover/<attendeeId>` — the profile view, rendered over the directory (FR-431). Nested
+    // rather than sibling, so the directory stays mounted behind it: closing is a navigation
+    // rather than a refetch, and Back closes the dialog through the browser's own mechanism.
+    children: [{ path: ':attendeeId', element: createElement(AttendeeProfile) }],
+  },
+  {
+    /*
+      T031 (007) — **Messages declares its element and its nested address here**, appended to
+      this entry and to nothing else. 006 extended the Discover entry the same way, and the
+      pattern is the point: a destination owns its addresses, `routes.tsx` names none of them,
+      and 008 and 009 extend their own entries without touching a neighbour's.
+
+      `purpose` needs no correction. It described what this destination would be and it turns
+      out to have been accurate — it is now a description rather than placeholder copy, because
+      the placeholder is gone.
+    */
+    path: '/messages',
+    label: 'Messages',
+    purpose: 'Your conversations with other attendees.',
+    icon: MessageSquare,
+    element: createElement(Messages),
+    // `/messages/<conversationId>` — one conversation, rendered inside the destination (FR-566).
+    // Nested rather than sibling, so the list stays mounted behind it on the two-pane layouts:
+    // opening a conversation is a navigation rather than a remount, and Back leaves the thread
+    // through the browser's own mechanism.
+    //
+    // ═══════════════════════════════════════════════════════════════════════════════════════
+    // **`new/<attendeeId>` IS THE ADDRESS OF A CONVERSATION THAT DOES NOT EXIST YET** (FR-503a),
+    // and it is what Discover's *message* action opens.
+    //
+    // FR-503a requires that choosing *Message* creates nothing — no conversation, no
+    // participation, no record of the attempt — so there is no identifier to address the thread
+    // by until the first message is actually sent. A second address is the honest way to say
+    // that: the reader is composing *to a person*, not reading *a conversation*.
+    //
+    // The alternative was `/messages/new?attendee=…`, which makes `new` a value of
+    // `:conversationId` that the thread has to recognise and exclude — a reserved word hiding in
+    // a parameter, which is exactly the sort of thing a later feature trips over. React Router
+    // ranks a static segment above a dynamic one, so `new/…` is matched here and never as a
+    // conversation identifier.
+    // ═══════════════════════════════════════════════════════════════════════════════════════
+    children: [
+      { path: ':conversationId', element: createElement(Thread) },
+      { path: 'new/:attendeeId', element: createElement(Thread) },
+    ],
+  },
+  {
+    /*
+      T047, T048 (008) — **Network has content now**, and it declares its element on this entry
+      and on nothing else (FR-643a). 006 and 007 each extended their own entry the same way, and
+      the pattern is the point: a destination owns its addresses, `routes.tsx` names none of
+      them, and no feature touches a neighbour's line.
+
+      T048 — `purpose` needs **no correction**, and that is worth recording rather than leaving
+      as a silent non-change. Agenda's had to be narrowed twice, in 002 and again in 005, because
+      it promised a personalised schedule before saving existed. This one has said "Saved
+      contacts, exchanged cards, and scheduled appointments" since 001 and turns out to have been
+      accurate — it is now a description rather than placeholder copy, because the placeholder is
+      gone. 006 and 007 each recorded exactly this about their own entries.
+
+      **No `children`, unlike the three entries above.** Nothing inside Network is separately
+      addressable: the contacts/appointments switch is a mobile-only view toggle rather than a
+      distinct thing to link to, and the scheduling dialog opens over whatever opened it rather
+      than at an address of its own. Adding a nested route for either would promise a shareable
+      link to a state that has no independent meaning.
+    */
+    path: '/network',
+    label: 'Network',
+    purpose: 'Saved contacts, exchanged cards, and scheduled appointments.',
+    icon: Users,
+    element: createElement(Network),
+  },
+] as const
+
+/** Home is the default destination (FR-012). */
+export const HOME = DESTINATIONS[0] as Destination
+
+/** An address that is not one of the five destinations. */
+export interface StandaloneRoute extends Addressable {
+  readonly element: ReactElement
+}
+
+/**
+ * T048 (004) — addresses reachable **without a session** (FR-300, FR-326).
+ *
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ * **These sit OUTSIDE `RequireAuth`, and that is the whole point of the list existing.**
+ *
+ * A person creating an account does not have a session — that is what they are here to obtain.
+ * Rendering the sign-in screen at `/sign-up`, which is what the guard does to every address it
+ * wraps, would make self sign-up unreachable.
+ *
+ * The list is short and it must stay short: every entry is a surface anybody on the internet
+ * can reach, and each one the server treats as a separately rate-limited action (FR-387).
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ */
+export const PUBLIC_ROUTES: readonly StandaloneRoute[] = [
+  {
+    path: '/sign-up',
+    label: 'Create an account',
+    purpose: 'Create a MyNet account with your email address.',
+    element: createElement(SignUp),
+  },
+  // T065 (004) — the three addresses a transactional message points at, or leads to. Each is
+  // reached out of a mail client, often in a different browser from the one that signed up,
+  // so none of them may assume a session (FR-319, FR-326).
+  {
+    path: '/verify',
+    label: 'Verify your email address',
+    purpose: 'Confirm the address on your account, which is what makes you visible to others.',
+    element: createElement(Verify),
+  },
+  {
+    path: '/reset-password-request',
+    label: 'Reset your password',
+    purpose: 'Ask for a link to set a new password.',
+    element: createElement(ResetRequest),
+  },
+  {
+    path: '/reset-password',
+    label: 'Set a new password',
+    purpose: 'Choose a new password from your reset link.',
+    element: createElement(ResetPassword),
+  },
+]
+
+/**
+ * T048 (004) — addresses **inside** the authenticated shell that are not destinations.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ * They render within `AppShell`, so the rail, the top bar and the conference switcher stay
+ * where they are — an attendee joining a second conference or editing their profile has not
+ * left the workspace. They are deliberately **not a sixth destination** (spec: the five are
+ * fixed), which is why they are declared here rather than appended to `DESTINATIONS`.
+ *
+ * Where they hang off the existing five is Open Question 8, recorded rather than resolved.
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ */
+export const SHELL_ROUTES: readonly StandaloneRoute[] = [
+  {
+    path: '/join',
+    label: 'Join a conference',
+    purpose: 'Register for a conference by entering its join code.',
+    element: createElement(JoinConference),
+  },
+  // T075 (004) — the attendee's own profile, reachable from the shell **without becoming a
+  // sixth destination**. The five are fixed (spec, "Where this feature's surfaces live"), and
+  // exactly where these hang off them is Open Question 8 — recorded rather than resolved,
+  // because it is a presentation question better answered against the built shell.
+  {
+    path: '/profile',
+    label: 'Your profile',
+    purpose: 'What other attendees see about you, and what you have chosen to share.',
+    element: createElement(Profile),
+  },
+  {
+    path: '/profile/edit',
+    label: 'Edit your profile',
+    purpose: 'Change your company, role, headline, interests and availability.',
+    element: createElement(ProfileEdit),
+  },
+  {
+    // Separate from the profile deliberately: describing yourself and deciding whether the
+    // account exists are not the same kind of act, and a surface that treats them alike invites
+    // the second by accident (Desktop layout declaration).
+    path: '/account',
+    label: 'Your account',
+    purpose: 'Who can find you, and what happens to what the product holds about you.',
+    element: createElement(Account),
+  },
+]
+
+/**
+ * The destination a given address resolves to, or undefined for a not-found address.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ * **Resolves nested addresses to their owning destination** (005).
+ *
+ * This was an exact match, which was correct while every address *was* a destination. 005
+ * added the first nested one — `/agenda/<sessionId>`, the session detail panel — and the exact
+ * match then reported it as no destination at all. The consequences were not cosmetic and were
+ * found in a browser rather than by reading:
+ *
+ *   - the top bar read **"Not found"** while a perfectly valid session panel was open, and
+ *   - `RouteAnnouncer` announced **"Page not found"** to screen-reader users on every open.
+ *
+ * The second is the serious one. Opening a session is exactly the moment a screen-reader user
+ * needs to be told what happened, and they were being told the page did not exist.
+ *
+ * A prefix match with a `/` boundary rather than `startsWith` alone: `/agendaX` must not
+ * resolve to Agenda, and Home's `'/'` must not swallow every address in the product — which it
+ * would, being a prefix of all of them. Home therefore stays exact-only, and the longest match
+ * wins so a future destination nested under another still resolves to the nearer one.
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ */
+export const destinationFor = (pathname: string): Addressable | undefined => {
+  const exact = DESTINATIONS.find((destination) => destination.path === pathname)
+  if (exact) return exact
+
+  const nested = DESTINATIONS.filter(
+    (destination) => destination.path !== HOME.path && pathname.startsWith(`${destination.path}/`),
+  ).sort((a, b) => b.path.length - a.path.length)[0]
+  if (nested) return nested
+
+  // ───────────────────────────────────────────────────────────────────────────────────────
+  // T048 (004) — the addresses that are not destinations, checked last.
+  //
+  // Last, because a destination must always win: `/agenda` resolving to anything but Agenda
+  // would be worse than the bug this fixes. Exact match only — none of these has nested
+  // addresses today, and inventing a prefix rule for a case that does not exist would be the
+  // kind of anticipation that later reads as a rule somebody relied on.
+  // ───────────────────────────────────────────────────────────────────────────────────────
+  return [...SHELL_ROUTES, ...PUBLIC_ROUTES].find((route) => route.path === pathname)
+}

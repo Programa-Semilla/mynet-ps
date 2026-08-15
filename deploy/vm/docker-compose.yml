@@ -1,0 +1,241 @@
+# Single-VM deployment for MyNet — one VM per environment (FR-484, research D9).
+#
+#   caddy     -> auto-TLS, serves the built client AND reverse-proxies /api/* (ports 80/443)
+#   api       -> the Fastify API (apps/api/Dockerfile). NOT published to the host.
+#   postgres  -> PostgreSQL 17, LOOPBACK ONLY (FR-486)
+#
+# Every secret comes from the sibling `.env`, copied from `.env.example` on the VM and never
+# committed or rsynced.
+name: mynet
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - '80:80'
+      - '443:443'
+    # 256 MB is ample for a proxy and a file server; the point is that it cannot be the process
+    # that exhausts the host.
+    mem_limit: 256m
+    # ───────────────────────────────────────────────────────────────────────────────────────
+    # **Bounded logs.** Docker's default `json-file` driver has no size cap, and the API logs a
+    # request and a response line per HTTP request at `info`. Those files share the 64 GB OS
+    # disk with `postgres_data` AND with `deploy/vm/backups` — so an unbounded log fills the
+    # disk, PostgreSQL stops accepting writes, and `backup.sh` refuses below its disk floor at
+    # the same moment. The incident and the loss of recovery points would arrive together.
+    # ───────────────────────────────────────────────────────────────────────────────────────
+    logging:
+      driver: json-file
+      options: { max-size: '20m', max-file: '5' }
+    environment:
+      ACME_EMAIL: ${ACME_EMAIL}
+      APP_DOMAIN: ${APP_DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # ─────────────────────────────────────────────────────────────────────────────────────
+      # The built client. **Read-only, and produced by CI rather than built here**: the `build`
+      # job already produces `apps/web/dist`, and building it a second time on a Standard_B2s
+      # would be slower, would need the whole toolchain on the VM, and would make what is
+      # deployed something other than what was verified.
+      # ─────────────────────────────────────────────────────────────────────────────────────
+      - ./web:/srv/web:ro
+      # ─────────────────────────────────────────────────────────────────────────────────────
+      # 011 — **the administrative client, a SECOND artifact from a second build**, served by
+      # the `admin.{$APP_DOMAIN}` block in the Caddyfile.
+      #
+      # A separate directory rather than a subdirectory of `./web`, and that is structural: the
+      # attendee service worker is registered at **root scope**, so anything served from under
+      # `/srv/web` inherits an origin on which that worker intercepts navigations. Two
+      # directories is what makes the two products two origins on disk as well as in DNS.
+      # ─────────────────────────────────────────────────────────────────────────────────────
+      - ./admin:/srv/admin:ro
+      # The maintenance page and its ON flag. Read-only is correct: Caddy only ever READS the
+      # flag; `maintenance.sh` writes it on the host side over SSH.
+      - ./maintenance:/srv/maintenance:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - api
+
+  api:
+    build:
+      # Build context is the repository root — the Dockerfile COPYs the whole pnpm workspace.
+      context: ../..
+      dockerfile: apps/api/Dockerfile
+    image: mynet-api:local
+    restart: unless-stopped
+    # ───────────────────────────────────────────────────────────────────────────────────────
+    # **An explicit ceiling, on a Standard_B2s that also runs the database.** `sharp` decodes
+    # natively with `limitInputPixels` at 50 MP, whose own comment records that a 50 MP input
+    # costs ~200 MB decoded and that "Node's heap limit never catches it". Without a per-
+    # container limit the kernel's OOM killer picks among three containers, and on a database
+    # host it frequently picks PostgreSQL. This makes an API memory event kill the API.
+    # ───────────────────────────────────────────────────────────────────────────────────────
+    mem_limit: 1200m
+    # ───────────────────────────────────────────────────────────────────────────────────────
+    # **Bounded logs.** Docker's default `json-file` driver has no size cap, and the API logs a
+    # request and a response line per HTTP request at `info`. Those files share the 64 GB OS
+    # disk with `postgres_data` AND with `deploy/vm/backups` — so an unbounded log fills the
+    # disk, PostgreSQL stops accepting writes, and `backup.sh` refuses below its disk floor at
+    # the same moment. The incident and the loss of recovery points would arrive together.
+    # ───────────────────────────────────────────────────────────────────────────────────────
+    logging:
+      driver: json-file
+      options: { max-size: '20m', max-file: '5' }
+    # ───────────────────────────────────────────────────────────────────────────────────────
+    # **Longer than the application's own drain, deliberately.** `server.ts` installs a SIGTERM
+    # handler with a bounded 15-second drain and comments that "this makes the upper bound
+    # ours". Docker's default grace period is **10 seconds**, so that bound was unreachable:
+    # anything still draining at 10s was SIGKILLed with the connection pool abandoned rather
+    # than released — the precise outcome the application's timer exists to prevent.
+    # ───────────────────────────────────────────────────────────────────────────────────────
+    stop_grace_period: 20s
+    # ─────────────────────────────────────────────────────────────────────────────────────────
+    # **NOT published to the host.** Reachable only by caddy on the private compose network,
+    # which is what makes "client and API share one origin" a property of the topology rather
+    # than of a configuration value somebody could change (FR-476).
+    # ─────────────────────────────────────────────────────────────────────────────────────────
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      API_HOST: 0.0.0.0
+      API_PORT: '3000'
+      # Same origin, so this is the public address of the whole site. CORS remains configured
+      # (research D7) because local development is genuinely cross-origin and because a
+      # deployment that accidentally split the origins should fail closed with a recognisable
+      # CORS error rather than silently working in some browsers.
+      WEB_ORIGIN: https://${APP_DOMAIN}
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${DATABASE_HOST:-postgres}:5432/${DATABASE_NAME}
+      # Exactly one proxy sits in front of this service: caddy. Not `true` — trusting every hop
+      # makes the throttle's source dimension attacker-chosen, which `app.ts` records at length.
+      TRUSTED_PROXY_HOPS: '1'
+      AUTH_PASSWORD_PEPPER: ${AUTH_PASSWORD_PEPPER}
+      AUTH_ATTEMPT_HASH_KEY: ${AUTH_ATTEMPT_HASH_KEY}
+      AUTH_SESSION_IDLE_DAYS: ${AUTH_SESSION_IDLE_DAYS:-14}
+      # Transactional account mail (register entry 18, still open). Blank keeps the development
+      # sink: verification and reset links are written to a log and never sent, which is NOT what
+      # a real environment wants — and the API says so on startup rather than pretending.
+      MAIL_FROM: ${MAIL_FROM:-}
+      MAIL_SMTP_URL: ${MAIL_SMTP_URL:-}
+      # 007 — where a conduct report is mailed (FR-547, register entry 21, still open). Blank
+      # stores the report and blocks the reported attendee anyway; only the mail is skipped.
+      MAIL_OPERATOR_ADDRESS: ${MAIL_OPERATOR_ADDRESS:-}
+      # Web Push (007, register entry 20, still open). Blank keeps the development sink: a
+      # notification is recorded and never delivered, and the client never asks for permission.
+      # Messages are unaffected — delivery is deniable by design (FR-552).
+      PUSH_VAPID_PUBLIC_KEY: ${PUSH_VAPID_PUBLIC_KEY:-}
+      PUSH_VAPID_PRIVATE_KEY: ${PUSH_VAPID_PRIVATE_KEY:-}
+      PUSH_VAPID_SUBJECT: ${PUSH_VAPID_SUBJECT:-mailto:no-reply@mynet.invalid}
+      AVATAR_DIMENSION_PX: ${AVATAR_DIMENSION_PX:-512}
+      AVATAR_CARD_DIMENSION_PX: ${AVATAR_CARD_DIMENSION_PX:-96}
+      # ─────────────────────────────────────────────────────────────────────────────────────
+      # 011 — **the administrative settings, and without these lines the feature cannot be
+      # brought into service at all.**
+      #
+      # Compose reads the sibling `.env` for `${...}` interpolation into THIS file; it does not
+      # inject it into containers. A variable that is not named here does not exist in the API
+      # process. `.env.example` documents all four and `README.md` gives the bootstrap command,
+      # so the operator fills them in, runs the command, and it exits 0 having done nothing —
+      # `loadConfig` sees `undefined`, `bootstrapOperatorCredential` returns `not-configured`,
+      # and a seeded operator (whose `password_hash` is null by design, FR-990) stays unable to
+      # sign in **forever**. No report queue, no promotion, no moderation.
+      #
+      # The two session bounds fail more quietly: they would be silently ignored and the code
+      # defaults applied, so an operator who shortens the absolute cap in `.env` would believe
+      # a bound that is not in force — the same class of inert configuration `config.ts` refuses
+      # to tolerate for the idle/absolute relationship.
+      #
+      # **`ADMIN_ORIGIN` is deliberately absent** and must stay absent: Caddy makes the
+      # administrative site same-origin with its API in every deployed environment, so the CORS
+      # allow-list must not be widened to an origin nobody named. It is development-only.
+      # ─────────────────────────────────────────────────────────────────────────────────────
+      ADMIN_SESSION_IDLE_MINUTES: ${ADMIN_SESSION_IDLE_MINUTES:-30}
+      ADMIN_SESSION_ABSOLUTE_HOURS: ${ADMIN_SESSION_ABSOLUTE_HOURS:-8}
+      ADMIN_BOOTSTRAP_EMAIL: ${ADMIN_BOOTSTRAP_EMAIL:-}
+      ADMIN_BOOTSTRAP_PASSWORD: ${ADMIN_BOOTSTRAP_PASSWORD:-}
+    healthcheck:
+      # ─────────────────────────────────────────────────────────────────────────────────────
+      # `/ready`, not `/health` (FR-482). A container that is "running" with an unreachable
+      # database answers /health perfectly and every attendee request with a failure — which is
+      # exactly the deploy SC-412 exists to catch before it takes traffic.
+      #
+      # **Probed with `node`, not `wget` — and that is a correction.** This read
+      # `wget -q -T 3 -O /dev/null …`, and the runtime image is `node:22-slim`, which ships
+      # **neither `wget` nor `curl`** (verified: `docker run --rm node:22-slim command -v wget`
+      # finds nothing). The probe therefore failed on every interval and the API was reported
+      # permanently `unhealthy` — on a stack whose entire operational surface is
+      # `docker compose ps`, so the one container-level signal an operator has was stuck at the
+      # wrong value, and a later `condition: service_healthy` on caddy would have deadlocked.
+      #
+      # Node 22 has a global `fetch`, so this needs no package and no image change.
+      # ─────────────────────────────────────────────────────────────────────────────────────
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:3000/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  postgres:
+    image: postgres:17
+    restart: unless-stopped
+    mem_limit: 1500m
+    # ───────────────────────────────────────────────────────────────────────────────────────
+    # **Bounded logs.** Docker's default `json-file` driver has no size cap, and the API logs a
+    # request and a response line per HTTP request at `info`. Those files share the 64 GB OS
+    # disk with `postgres_data` AND with `deploy/vm/backups` — so an unbounded log fills the
+    # disk, PostgreSQL stops accepting writes, and `backup.sh` refuses below its disk floor at
+    # the same moment. The incident and the loss of recovery points would arrive together.
+    # ───────────────────────────────────────────────────────────────────────────────────────
+    logging:
+      driver: json-file
+      options: { max-size: '20m', max-file: '5' }
+
+    # ═════════════════════════════════════════════════════════════════════════════════════════
+    # **LOOPBACK ONLY** (FR-486). The database never faces the public internet — not behind a
+    # firewall rule that could be widened, but bound to an address that is not routable off the
+    # machine. Reached for maintenance over an SSH tunnel.
+    #
+    # This is the operational obligation v3.0.0 accepted in exchange for dropping the managed
+    # provider: nobody else is watching this port, so it must not be one.
+    # ═════════════════════════════════════════════════════════════════════════════════════════
+    ports:
+      - '127.0.0.1:5432:5432'
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${DATABASE_NAME}
+    # A checkpoint interrupted by Docker's default 10s window is a crash-recovery cycle on the
+    # next start. Give it room to shut down cleanly.
+    stop_grace_period: 60s
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      # ─────────────────────────────────────────────────────────────────────────────────────
+      # Where `backup.sh` writes its dump.
+      #
+      # **This comment used to end "before moving it off the machine". Nothing moves it.**
+      # Every artifact stays on this VM, on the same disk as the data it protects — so the one
+      # event a daily backup is most kept for (loss of the disk, or of the VM) destroys the
+      # database and all seven artifacts together. README section 5 states the limitation and
+      # what closing it requires; it is a known gap, not an implemented off-host copy.
+      # ─────────────────────────────────────────────────────────────────────────────────────
+      - ./backups:/backups
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER} -d ${DATABASE_NAME}']
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+
+volumes:
+  caddy_data:
+  caddy_config:
+  postgres_data:

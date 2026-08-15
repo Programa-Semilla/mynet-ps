@@ -1,0 +1,439 @@
+import { and, asc, eq, sql } from 'drizzle-orm'
+
+import { assertVerifiedScope, type EventScope } from '../../plugins/event-access.js'
+import { getDb } from '../client.js'
+import { savedSessions, sessionEnrolments, sessionNotes } from '../schema/agenda.js'
+import { sessions } from '../schema/catalog.js'
+
+/**
+ * T007, T008 (005) — reads and writes of the attendee's own agenda (FR-184–FR-214, FR-229).
+ *
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ * **EVERY FUNCTION HERE TAKES AN `EventScope` AS ITS FIRST PARAMETER, NEVER A BARE STRING —
+ * AND NONE TAKES AN ATTENDEE IDENTIFIER AT ALL.**
+ *
+ * Both halves matter and they carry different requirements.
+ *
+ * The scope is the 002 pattern unchanged (FR-229): it can only be produced by
+ * `requireEventAccess`, so a handler that skipped verification has nothing to pass and does
+ * not compile. Verification is a precondition of the operation rather than a step a writer may
+ * omit.
+ *
+ * The **absence** of an attendee parameter is this feature's own addition (FR-190, FR-208,
+ * FR-227). The attendee comes out of the scope, which came out of the sign-in session. There
+ * is no expression anybody could write here that reads or modifies another attendee's saves or
+ * notes, because there is no argument in which to name them. That is what makes the isolation
+ * structural instead of a rule every future handler has to remember.
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ *
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ * **T008 — a session identifier from the client is never trusted to belong to the conference,
+ * and the check is folded into the statement rather than performed before it** (FR-231).
+ *
+ * Every write below carries `WHERE EXISTS (SELECT 1 FROM sessions WHERE id = … AND event_id =
+ * scope.eventId)`. Reading the session first and then writing would be wrong twice over:
+ *
+ *   1. **It is a race.** The gap between the read and the write is a window in which the
+ *      answer can change.
+ *   2. **It leaks existence.** A separate read gives the handler a distinguishable "no such
+ *      session" to report, which is exactly the difference between a 403 and a 404 that
+ *      FR-231 forbids. Folded in, the statement simply affects no rows, and every caller
+ *      reports the one refusal.
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ */
+
+/**
+ * T074 (014) — one saved session, with whether it has moved since the attendee last looked.
+ *
+ * This read returned bare identifiers until 014. The marker travels here rather than on a method
+ * of its own, deliberately: a `listChangedSessions` would be a read whose subject is *things that
+ * happened*, which is the surface FR-1031 forbids — and once the read exists, rendering it is a
+ * small ask (research R7).
+ */
+export type SavedSessionRow = {
+  readonly sessionId: string
+  readonly changedSinceViewed: boolean
+  /**
+   * T196's server half (014 tranche 2, R13) — which of the two commitments this row is
+   * (FR-1063, FR-1066). One list with a discriminator rather than two reads, and that is not
+   * stylistic: FR-1064 forbids the saved-but-holds-no-place state, and a single row whose kind
+   * is a property of its appearance makes that state **unrepresentable on the client** rather
+   * than merely absent. Two reads would make it a typeable value and put the union in three
+   * consumers.
+   */
+  readonly commitment: 'saved' | 'place'
+}
+
+export type NoteRow = {
+  readonly sessionId: string
+  readonly body: string
+  readonly updatedAt: string
+}
+
+/**
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ * **A malformed session identifier is refused exactly like a well-formed one that is not in
+ * this conference** (FR-231).
+ *
+ * Matched here rather than declared as `format: uuid` on the route, and rather than left to
+ * PostgreSQL's cast, because both alternatives leak. A schema `format` produces a 400 with a
+ * validation body before the handler runs; a failed `::uuid` cast produces a 500. Either one
+ * separates "not a uuid" from "not in this conference" — a smaller disclosure than existence,
+ * but still a difference an attacker can read, and the same reason `requireEventAccess`
+ * matches the event id rather than parsing it.
+ *
+ * It lives in the query layer so it cannot be forgotten by a route added later.
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ */
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/**
+ * The session ids this attendee has saved in this conference (FR-188).
+ *
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ * **Identifiers, not whole sessions.** The programme is fetched and cached separately;
+ * returning full sessions here would be a second source of truth for session data that could
+ * disagree with the first (contracts/agenda-api.md).
+ *
+ * Joined through `sessions` and filtered on the scope's event, because `saved_sessions`
+ * deliberately does not store `event_id` — denormalising it would create exactly the second
+ * source of truth this paragraph is about, and the one that disagreed would be the one
+ * authorization read (data-model.md).
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ *
+ * An attendee who has saved nothing gets `[]` — a valid answer that the client renders as an
+ * explicit empty state, never a failure (FR-195).
+ */
+export const listSavedSessions = async (unverified: EventScope): Promise<SavedSessionRow[]> => {
+  // Membership, not merely shape. A value can satisfy `EventScope` and still never have been
+  // through the guard; this is the check that makes the guarantee true at runtime, not only in
+  // the type system.
+  const scope = assertVerifiedScope(unverified)
+
+  // ───────────────────────────────────────────────────────────────────────────────────────────
+  // T074 (014) / T196 (tranche 2) — **the commitment set: saves and held places, one read**
+  // (FR-1030, FR-1066, research R7, R13).
+  //
+  // The marker is computed rather than stored — two timestamps and a comparison. Nothing is
+  // written per change and nothing per committed attendee: the rejected alternative — flagging
+  // every row when a session moves — is one write per saver, so a keynote with a thousand
+  // savers would be a thousand row updates inside an organizer's request.
+  //
+  // `logistics_changed_at` is null until a session's first material change, and `null > x` is
+  // null in SQL rather than false, which would arrive as `null` on the wire and render as a
+  // marker in a client that checked truthiness. `coalesce` is what stops that.
+  //
+  // A `UNION ALL`, and it cannot produce a duplicate: FR-1064 makes saved-and-enrolled a state
+  // with no route (the save write excludes optional sessions, enrolment excludes mandatory
+  // ones), so the two branches partition the commitment space by the session's own kind.
+  // ───────────────────────────────────────────────────────────────────────────────────────────
+  const rows = await getDb().execute<{
+    session_id: string
+    changed: boolean
+    commitment: 'saved' | 'place'
+  }>(sql`
+    SELECT ss.session_id,
+           coalesce(s.logistics_changed_at > ss.viewed_at, false) AS changed,
+           'saved' AS commitment
+    FROM ${savedSessions} ss
+    JOIN ${sessions} s ON s.id = ss.session_id
+    WHERE ss.attendee_id = ${scope.attendeeId}::uuid AND s.event_id = ${scope.eventId}::uuid
+    UNION ALL
+    SELECT se.session_id,
+           coalesce(s.logistics_changed_at > se.viewed_at, false) AS changed,
+           'place' AS commitment
+    FROM ${sessionEnrolments} se
+    JOIN ${sessions} s ON s.id = se.session_id
+    WHERE se.attendee_id = ${scope.attendeeId}::uuid AND s.event_id = ${scope.eventId}::uuid
+    ORDER BY session_id
+  `)
+
+  return rows.map((row) => ({
+    sessionId: row.session_id,
+    changedSinceViewed: row.changed,
+    commitment: row.commitment,
+  }))
+}
+
+/**
+ * T075 (014) — records that this attendee has looked at this session, clearing its marker
+ * (FR-1030).
+ *
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ * **The instant is `now()` in the database, never a value the client sends.** A timestamp on the
+ * wire would let a client clear a marker for a change it has not seen, and would put the
+ * marker's correctness on the device's clock — the same reasoning `throttle.ts` records for
+ * measuring its window in PostgreSQL rather than in Node.
+ *
+ * **Idempotent, and a no-op for a session the attendee has not saved.** There is no row to stamp
+ * and refusing would make opening a session in Agenda's "All" view an error. Scoped identically
+ * to every other write here: `attendee_id` comes from the scope, and the session must belong to
+ * the verified conference.
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ */
+export const markSessionViewed = async (
+  unverified: EventScope,
+  sessionId: string,
+): Promise<boolean> => {
+  const scope = assertVerifiedScope(unverified)
+  if (!UUID.test(sessionId)) return false
+
+  // T163 (014 tranche 2, FR-1080) — **whichever commitment the attendee holds is stamped.** An
+  // enrolled attendee holds no saved row (FR-1064), so without the second statement a holder
+  // would be notified of a room change and then see a marker nothing could clear. At most one
+  // statement affects a row — the commitments partition by the session's kind — and both stay
+  // no-ops for a session the attendee holds nothing on, for the shipped reason: opening a
+  // session from Agenda's "All" view is not an error.
+  await getDb().execute(sql`
+    UPDATE ${savedSessions}
+    SET viewed_at = now()
+    WHERE attendee_id = ${scope.attendeeId}::uuid
+      AND session_id = ${sessionId}::uuid
+      AND EXISTS (
+        SELECT 1 FROM ${sessions}
+        WHERE ${sessions.id} = ${sessionId}::uuid AND ${sessions.eventId} = ${scope.eventId}::uuid
+      )
+  `)
+  await getDb().execute(sql`
+    UPDATE ${sessionEnrolments}
+    SET viewed_at = now()
+    WHERE attendee_id = ${scope.attendeeId}::uuid
+      AND session_id = ${sessionId}::uuid
+      AND EXISTS (
+        SELECT 1 FROM ${sessions}
+        WHERE ${sessions.id} = ${sessionId}::uuid AND ${sessions.eventId} = ${scope.eventId}::uuid
+      )
+  `)
+
+  return sessionBelongsToScope(scope, sessionId)
+}
+
+/**
+ * T210's server half (014 tranche 2) — what a save attempt can come to (FR-1064).
+ *
+ * `'not-saveable'` is the one explained refusal in this module: the session exists and the
+ * reader may see it, but it is optional and enrolment REPLACES saving there — so the
+ * saved-but-holds-no-place state has **no route by which it can arise**, and the route tells
+ * the attendee what the commitment actually is rather than pretending the session is missing.
+ */
+export type SaveOutcome = 'saved' | 'not-saveable' | 'not-found'
+
+/**
+ * Save a session. **Idempotent** (FR-187), and **mandatory sessions only** (FR-1064).
+ *
+ * `ON CONFLICT DO NOTHING` against the composite primary key, so saving twice cannot create a
+ * second row — the schema enforces it and this expresses it. A double-tap on a slow connection
+ * is simply the same request twice.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ * **The kind is read under `FOR SHARE`, inside the writing transaction, and the insert obeys
+ * what the locked read settled.** This write used to be a single autocommit
+ * `INSERT … SELECT WHERE kind = 'mandatory'`, and that shape had a window FR-1064 forbids: the
+ * feeding SELECT is evaluated against the statement snapshot, so a save racing an organizer's
+ * mandatory→optional kind change (`updateSession` holds the session row `FOR UPDATE` while
+ * `commitmentCountsFor` reads zero) could commit a saved row onto a session that was optional
+ * by the time the insert landed — the "saved but holds no place" state that has no route, on a
+ * row the client could then never remove, because an optional session's toggle only ever
+ * releases a place. `FOR SHARE` conflicts with that `FOR UPDATE` without serialising savers
+ * against each other, so the kind this transaction reads is the settled one, and `takePlace`
+ * one module over is immune to the mirror race for exactly the same reason.
+ *
+ * The locked read carries the same two conditions the feeding SELECT carried, so nothing became
+ * distinguishable: a session outside the verified conference and a session that does not exist
+ * are both `'not-found'` (T008, FR-231).
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ */
+export const saveSession = async (
+  unverified: EventScope,
+  sessionId: string,
+): Promise<SaveOutcome> => {
+  const scope = assertVerifiedScope(unverified)
+  if (!UUID.test(sessionId)) return 'not-found'
+
+  return getDb().transaction(async (tx) => {
+    const settled = await tx.execute<{ kind: string }>(sql`
+      SELECT kind FROM ${sessions}
+      WHERE id = ${sessionId}::uuid AND event_id = ${scope.eventId}::uuid
+      FOR SHARE
+    `)
+    const row = settled[0]
+    if (!row) return 'not-found'
+    if (row.kind !== 'mandatory') return 'not-saveable'
+
+    await tx.execute(sql`
+      INSERT INTO ${savedSessions} (attendee_id, session_id)
+      VALUES (${scope.attendeeId}::uuid, ${sessionId}::uuid)
+      ON CONFLICT (attendee_id, session_id) DO NOTHING
+    `)
+    return 'saved'
+  })
+}
+
+/**
+ * Unsave a session. **Idempotent** — succeeds whether or not it was saved (research D6).
+ *
+ * Scoped identically to `saveSession`: the delete cannot reach a row whose session is not in
+ * this conference, and it cannot reach another attendee's row because `attendee_id` comes from
+ * the scope rather than from an argument.
+ */
+export const unsaveSession = async (
+  unverified: EventScope,
+  sessionId: string,
+): Promise<boolean> => {
+  const scope = assertVerifiedScope(unverified)
+  if (!UUID.test(sessionId)) return false
+
+  await getDb().execute(sql`
+    DELETE FROM ${savedSessions}
+    WHERE attendee_id = ${scope.attendeeId}::uuid
+      AND session_id = ${sessionId}::uuid
+      AND EXISTS (
+        SELECT 1 FROM ${sessions}
+        WHERE ${sessions.id} = ${sessionId}::uuid AND ${sessions.eventId} = ${scope.eventId}::uuid
+      )
+  `)
+
+  return sessionBelongsToScope(scope, sessionId)
+}
+
+/**
+ * Every note this attendee has written in this conference.
+ *
+ * Returned as a set rather than per session, so opening the detail panel needs no additional
+ * request and the whole set caches as one entry (data-model.md, `resource: notes`).
+ *
+ * **Nothing here can read a note the requester did not write** — `attendee_id` comes from the
+ * scope, and there is no parameter in which to name anyone else (FR-208).
+ */
+export const listNotes = async (unverified: EventScope): Promise<NoteRow[]> => {
+  const scope = assertVerifiedScope(unverified)
+
+  const rows = await getDb()
+    .select({
+      sessionId: sessionNotes.sessionId,
+      body: sessionNotes.body,
+      updatedAt: sessionNotes.updatedAt,
+    })
+    .from(sessionNotes)
+    .innerJoin(sessions, eq(sessions.id, sessionNotes.sessionId))
+    .where(and(eq(sessionNotes.attendeeId, scope.attendeeId), eq(sessions.eventId, scope.eventId)))
+    .orderBy(asc(sessionNotes.sessionId))
+
+  return rows.map((row) => ({
+    sessionId: row.sessionId,
+    body: row.body,
+    // An absolute instant over the wire, as everywhere else in this product (FR-124).
+    updatedAt: row.updatedAt.toISOString(),
+  }))
+}
+
+/**
+ * Write or replace this attendee's note against a session.
+ *
+ * `INSERT … ON CONFLICT DO UPDATE`, so the caller never has to know whether a note already
+ * existed — and **the last confirmed write wins** (FR-214). No merge is attempted and no
+ * conflict is detected; conflict resolution is a separately recorded decision the constitution
+ * requires, and this feature does not take one.
+ *
+ * Returns `null` when the session does not belong to this conference, so the route can refuse
+ * with wording that discloses nothing (FR-231). The over-length and empty cases never reach
+ * here — the route schema refuses them first, and the column's CHECK refuses them again if a
+ * second write path ever appears (FR-213, research D9).
+ *
+ * `updatedAt` is returned because it is what lets the client's status enter `saved` **from a
+ * confirmed response** rather than from a keystroke — the property that keeps the autosave
+ * non-optimistic (FR-210, research D5).
+ *
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ * **`updatedAt` is formatted to ISO-8601 in the database, not parsed on the way out.**
+ *
+ * A raw `execute` hands back the driver's own text for a `timestamptz` —
+ * `2026-08-07 13:37:37.693025+00` — which is neither what the route schema declares
+ * (`format: date-time`) nor what every other instant in this product sends (FR-124).
+ * Reconstructing it in JavaScript would mean parsing a space separator and a two-digit offset,
+ * which `new Date` does not accept reliably. `to_char` below produces exactly what
+ * `Date#toISOString` produces, so this route and the catalog's cannot drift apart in what an
+ * instant looks like on the wire. An integration test caught the difference.
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ */
+export const upsertNote = async (
+  unverified: EventScope,
+  sessionId: string,
+  body: string,
+): Promise<{ updatedAt: string } | null> => {
+  const scope = assertVerifiedScope(unverified)
+  if (!UUID.test(sessionId)) return null
+
+  const rows = await getDb().execute<{ updated_at: string }>(sql`
+    INSERT INTO ${sessionNotes} (attendee_id, session_id, body, updated_at)
+    SELECT ${scope.attendeeId}::uuid, ${sessionId}::uuid, ${body}, now()
+    WHERE EXISTS (
+      SELECT 1 FROM ${sessions}
+      WHERE ${sessions.id} = ${sessionId}::uuid AND ${sessions.eventId} = ${scope.eventId}::uuid
+    )
+    ON CONFLICT (attendee_id, session_id)
+      DO UPDATE SET body = excluded.body, updated_at = now()
+    RETURNING to_char(updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS updated_at
+  `)
+
+  // ───────────────────────────────────────────────────────────────────────────────────────
+  // No row means the `WHERE EXISTS` refused: the session is not in this conference. Here
+  // `RETURNING` *is* conclusive, unlike in `saveSession` — `DO UPDATE` always returns a row,
+  // so the only way to get none is for the guard to have excluded the insert.
+  // ───────────────────────────────────────────────────────────────────────────────────────
+  const row = rows[0]
+  if (!row) return null
+
+  return { updatedAt: row.updated_at }
+}
+
+/**
+ * Remove this attendee's note against a session. **Idempotent** — succeeds whether or not one
+ * existed.
+ *
+ * This is the path FR-212 takes: clearing the text does not write an empty note, it deletes.
+ * Together with the column's `length(body) > 0` constraint, "no note" has exactly one
+ * representation in the database.
+ */
+export const deleteNote = async (unverified: EventScope, sessionId: string): Promise<boolean> => {
+  const scope = assertVerifiedScope(unverified)
+  if (!UUID.test(sessionId)) return false
+
+  await getDb().execute(sql`
+    DELETE FROM ${sessionNotes}
+    WHERE attendee_id = ${scope.attendeeId}::uuid
+      AND session_id = ${sessionId}::uuid
+      AND EXISTS (
+        SELECT 1 FROM ${sessions}
+        WHERE ${sessions.id} = ${sessionId}::uuid AND ${sessions.eventId} = ${scope.eventId}::uuid
+      )
+  `)
+
+  return sessionBelongsToScope(scope, sessionId)
+}
+
+/**
+ * Whether a session is part of the conference this scope verifies.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ * **This is not the authorization check** — the authorization check is folded into each
+ * statement above and has already run by the time this is called. This exists only so an
+ * idempotent write can tell "nothing to do" from "not yours", which the statements themselves
+ * cannot express: a `DELETE` that matched no row and a `DELETE` refused by the `EXISTS` guard
+ * are the same zero.
+ *
+ * It reads `sessions` alone. That table is conference content, not attendee data, and it is
+ * already filtered to the verified event — so this discloses nothing that the caller has not
+ * already been granted, and the caller turns a `false` into the same refusal every other cause
+ * produces (FR-231).
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ */
+const sessionBelongsToScope = async (scope: EventScope, sessionId: string): Promise<boolean> => {
+  const rows = await getDb()
+    .select({ id: sessions.id })
+    .from(sessions)
+    .where(and(eq(sessions.id, sessionId), eq(sessions.eventId, scope.eventId)))
+    .limit(1)
+
+  return rows.length > 0
+}
