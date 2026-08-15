@@ -8,6 +8,7 @@ import {
   ADA,
   clearThrottle,
   cookieHeader,
+  ensureInterestOptions,
   resetDatabase,
   SEED_PASSWORD,
   sessionCookieFrom,
@@ -38,6 +39,11 @@ describe('profile limits are enforced at the column, not only at the route (FR-3
   beforeAll(async () => {
     app = await setupTestApp()
     await resetDatabase()
+    // T174 (014 tranche 2) — FR-1088: the count-bound fixtures below arrive through the route,
+    // so their labels have to be choosable for the COUNT to be the thing refused.
+    await ensureInterestOptions(
+      Array.from({ length: PROFILE_LIMITS.interestCount + 1 }, (_, i) => `Topic ${i}`),
+    )
   })
 
   afterAll(async () => {

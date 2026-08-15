@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath, URL } from 'node:url'
 
@@ -68,7 +68,12 @@ const label = (path: string): string => path.slice(webSrc.length)
  * a depth-1 checkout has no `develop` ref to find a merge base in. That file explains both failure
  * modes and why it throws rather than degrading to an empty diff.
  */
-const changedByThisFeature = (): string[] => changedSinceBranchPoint(REPO, 'apps/web/src')
+const changedByThisFeature = (): string[] =>
+  changedSinceBranchPoint(REPO, 'apps/web/src')
+    // A file the feature DELETED (a rename's old path is reported as one) cannot carry an
+    // administrative surface, and reading it throws. Tranche 2 renamed `SavedEmptyState.tsx`
+    // and `useSavedSessions.ts` under FR-1066a; the new paths are in the diff and are scanned.
+    .filter((path) => existsSync(join(REPO, path)))
 
 const all = sourceFiles(webSrc)
 
@@ -116,7 +121,21 @@ describe('014 — MyNet still has no administrative surface (FR-1003, SC-1008)',
    * have introduced rather than for administration in general.
    */
   it('changed no file in MyNet that branches on who is reading (FR-1003)', () => {
+    // ═══════════════════════════════════════════════════════════════════════════════════════
+    // **ONE exemption, one file, and it is a REQUIREMENT rather than a leak** (T147, FR-1074).
+    // The pre-enrolment notice must tell the attendee, before they take a place, that their
+    // name becomes visible to "the organizers of this conference" — constitution v5.3.0 O1's
+    // fourth binding condition, and the only privacy exception its subject can decline by not
+    // acting. That sentence is disclosure COPY an attendee reads; it names the other actor
+    // without branching on who is reading, which is this test's actual subject. The categorical
+    // suite above still scans this file, unexempted, for every real branching pattern
+    // (`tier ===`, `isOperator`, an `/admin` address, an authoring capability) — this narrows
+    // one heuristic word-match, not the guarantee.
+    // ═══════════════════════════════════════════════════════════════════════════════════════
+    const FR_1074_DISCLOSURE = new Set(['apps/web/src/app/SessionPresentation.tsx'])
+
     const changed = changedByThisFeature()
+      .filter((path) => !FR_1074_DISCLOSURE.has(path))
       .map((path) => join(REPO, path))
       .filter((path) => /\.tsx?$/.test(path))
 

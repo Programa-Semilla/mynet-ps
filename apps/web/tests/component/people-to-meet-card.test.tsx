@@ -216,7 +216,12 @@ describe('the card fails alone (FR-448)', () => {
     expect(failing).toHaveTextContent(/problem on our side/i)
     expect(failing.querySelector('button')).not.toBeNull()
 
-    for (const name of ['Up next', 'Rest of your day', 'Your conferences', 'Next saved session']) {
+    for (const name of [
+      'Up next',
+      'Rest of your day',
+      'Your conferences',
+      'Next on your programme',
+    ]) {
       expect(
         await screen.findByRole('region', { name }),
         `${name} must survive this card's failure`,

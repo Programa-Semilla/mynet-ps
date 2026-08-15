@@ -305,6 +305,17 @@ const ProfileBody = ({ state }: { state: ProfileState }): ReactNode => {
               {[profile.role, profile.company].filter(Boolean).join(' · ')}
             </p>
           )}
+          {/*
+            T179 (014 tranche 2) — sector and subsector, rendered ONLY where set (FR-1092): an
+            unset field is absent from this view entirely — no empty row, no placeholder, no
+            dash — exactly as company has always been. One line for the pair, because a
+            subsector never exists without its sector (FR-1087).
+          */}
+          {profile.sector && (
+            <p className="mt-1 text-sm text-text-body">
+              {[profile.sector, profile.subsector].filter(Boolean).join(' · ')}
+            </p>
+          )}
           {availability && (
             <p className="mt-1 text-sm text-text-body">
               <span className="font-medium">Availability:</span> {availability}
@@ -319,6 +330,11 @@ const ProfileBody = ({ state }: { state: ProfileState }): ReactNode => {
       </div>
 
       {profile.headline && <p className="mb-4 text-sm text-text-body">{profile.headline}</p>}
+
+      {/* T179 — the productive-activity description, present only where written (FR-1092). */}
+      {profile.productiveActivity && (
+        <p className="mb-4 text-sm text-text-body">{profile.productiveActivity}</p>
+      )}
 
       {/* FR-432 — the full interest set, not the truncated one the card shows. */}
       {profile.interests.length > 0 && (

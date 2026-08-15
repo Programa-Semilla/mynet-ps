@@ -57,6 +57,12 @@ export const ADMIN_DESTINATIONS: readonly AdminDestination[] = [
   // ═══════════════════════════════════════════════════════════════════════════════════════════
   { to: '/reports', label: 'Reports', platformOnly: true },
   { to: '/operators', label: 'Operators', platformOnly: true },
+  // 014 tranche 2 — the vocabulary (FR-1089). Platform-tier only for the same shape of reason
+  // as the two above: product-wide reference data no conference owns, so an organizer is
+  // rendered no entry at all, and the server refuses their direct attempts with the same 404 a
+  // nonexistent route gives (SC-1020). Mirrored by hand in `e2e/support/destinations.ts`, and
+  // `admin-destinations-mirror.test.ts` is what keeps the two copies from drifting (T199).
+  { to: '/vocabulary', label: 'Vocabulary', platformOnly: true },
 ]
 
 const linkClass = ({ isActive }: { isActive: boolean }): string =>

@@ -91,4 +91,7 @@ export const ADMIN_DESTINATIONS: readonly AdminDestination[] = [
   { path: '/conferences', heading: /conferences/i, label: 'Conferences' },
   { path: '/reports', heading: /reports/i, label: 'Reports' },
   { path: '/operators', heading: /operators/i, label: 'Operators' },
+  // 014 tranche 2 — the fifth destination. The sweeps that walk this list sign in at platform
+  // tier, so the platform-only vocabulary page is walked like the report queue is.
+  { path: '/vocabulary', heading: /vocabulary/i, label: 'Vocabulary' },
 ]

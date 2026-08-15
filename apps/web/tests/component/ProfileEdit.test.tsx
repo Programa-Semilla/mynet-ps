@@ -3,6 +3,8 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { describe, expect, it, vi } from 'vitest'
 
+import type { ChoosableVocabulary, OwnProfile } from '@mynet/data'
+
 import { ProfileEdit } from '../../src/app/profile/ProfileEdit.js'
 import { EMPTY_PROFILE, testServices, WithServices } from '../support/services.js'
 
@@ -24,9 +26,33 @@ import { EMPTY_PROFILE, testServices, WithServices } from '../support/services.j
 const HEADLINE_LIMIT = 200
 const COMPANY_LIMIT = 120
 
-const renderEditor = (saveOwn = vi.fn(async () => EMPTY_PROFILE)) => {
+const renderEditor = (
+  saveOwn = vi.fn(async () => EMPTY_PROFILE as OwnProfile),
+  overrides: {
+    profile?: Partial<OwnProfile>
+    vocabulary?: Partial<ChoosableVocabulary>
+  } = {},
+) => {
   const base = testServices().repositories.profile
-  const services = testServices({ profile: { ...base, saveOwn } })
+  const services = testServices({
+    profile: {
+      ...base,
+      getOwn: async () => ({ ...EMPTY_PROFILE, ...overrides.profile }) as OwnProfile,
+      saveOwn,
+    },
+    ...(overrides.vocabulary
+      ? {
+          vocabulary: {
+            choosable: async () => ({
+              sectors: [],
+              subsectors: [],
+              interests: [],
+              ...overrides.vocabulary,
+            }),
+          },
+        }
+      : {}),
+  })
 
   render(
     <WithServices services={services}>
@@ -113,26 +139,38 @@ describe('editing a profile', () => {
     expect(headline).toHaveValue('x'.repeat(HEADLINE_LIMIT + 3))
   })
 
-  it('disables saving when there are too many interests, and counts them', async () => {
-    const user = userEvent.setup()
-    renderEditor()
+  it('withholds the add-control at the interest bound, and says why (FR-337, T178)', async () => {
+    // The chooser model makes over-the-limit unreachable by adding — the control is withheld at
+    // the bound rather than refused after it, which is FR-338's disabled-confirmation rule one
+    // step earlier. Twelve held values, all retained free text: the fullest legitimate state.
+    renderEditor(undefined, {
+      profile: { interests: Array.from({ length: 12 }, (_, i) => `Topic ${i}`) },
+      vocabulary: { interests: [{ id: 'i-more', label: 'One more' }] },
+    })
 
-    const interests = await screen.findByLabelText(/^interests$/i)
-    await user.clear(interests)
-    await user.paste(Array.from({ length: 13 }, (_, i) => `Topic ${i}`).join(', '))
-
-    await waitFor(() => expect(save()).toBeDisabled())
-    const reasons = screen.getAllByRole('status').map((element) => element.textContent ?? '')
-    expect(reasons.join(' ')).toMatch(/13 interests.*limit is 12/i)
+    expect(await screen.findByText(/12 interests, which is the limit/i)).toBeInTheDocument()
+    expect(screen.queryByLabelText(/add an interest/i)).not.toBeInTheDocument()
+    // Removal stays available: the bound governs adding, never keeping (FR-1095b).
+    expect(screen.getByRole('button', { name: /remove topic 0/i })).toBeInTheDocument()
+    await waitFor(() => expect(save()).toBeEnabled())
   })
 
   it('sends the whole profile, with blanks as null (whole-profile semantics)', async () => {
     const user = userEvent.setup()
-    const { saveOwn } = renderEditor()
+    const { saveOwn } = renderEditor(undefined, {
+      vocabulary: {
+        interests: [
+          { id: 'i-compilers', label: 'Compilers' },
+          { id: 'i-types', label: 'Type systems' },
+        ],
+      },
+    })
 
     const company = await screen.findByLabelText(/^company$/i)
     await user.type(company, 'Analytical Engines')
-    await user.type(await screen.findByLabelText(/^interests$/i), 'Compilers, Type systems')
+    // T178 — chosen, never typed (FR-1088): each selection adds one value.
+    await user.selectOptions(await screen.findByLabelText(/add an interest/i), 'Compilers')
+    await user.selectOptions(screen.getByLabelText(/add an interest/i), 'Type systems')
     await user.click(save())
 
     await waitFor(() =>
@@ -142,11 +180,86 @@ describe('editing a profile', () => {
         // sending a subset would silently erase whatever it left out.
         role: null,
         headline: null,
+        sector: null,
+        subsector: null,
+        productiveActivity: null,
         networkingIntent: null,
         availability: null,
         interests: ['Compilers', 'Type systems'],
       }),
     )
+  })
+
+  it('renders an explanatory empty state for an empty interest vocabulary, with NO free entry (FR-1086, FR-1088)', async () => {
+    renderEditor(undefined, { vocabulary: { interests: [] } })
+
+    expect(await screen.findByText(/no interests are defined yet/i)).toBeInTheDocument()
+    // FR-1088 — new interests are chosen, not typed: no chooser to choose from means no
+    // control at all, and specifically not a text input standing in for one.
+    expect(screen.queryByLabelText(/add an interest/i)).not.toBeInTheDocument()
+    const inputs = screen.queryAllByRole('textbox').map((element) => element.id)
+    expect(inputs.some((id) => /interest/i.test(id))).toBe(false)
+    // The form is complete and savable without any (FR-1091).
+    await waitFor(() => expect(save()).toBeEnabled())
+  })
+
+  it('presents a held-but-retired value as present and removable, never dropped (FR-1095b)', async () => {
+    const { saveOwn } = renderEditor(undefined, {
+      profile: { sector: 'Industria', interests: ['Fintech (retained)'] },
+      vocabulary: { sectors: [{ id: 's-serv', label: 'Servicios' }], interests: [] },
+    })
+
+    // The held sector is not choosable — and it is still IN the control, marked, because a
+    // held value silently missing from the form would be removed by the next save.
+    const sector = await screen.findByLabelText(/^sector$/i)
+    expect(sector).toHaveValue('Industria')
+    expect(
+      screen.getByRole('option', { name: /industria \(no longer offered\)/i }),
+    ).toBeInTheDocument()
+    expect(await screen.findByText(/cannot be chosen again/i)).toBeInTheDocument()
+
+    // The retained free-text interest renders as a removable chip, like any chosen one.
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: /remove fintech \(retained\)/i }))
+    await user.click(save())
+
+    await waitFor(() =>
+      expect(saveOwn).toHaveBeenCalledWith(expect.objectContaining({ interests: [] })),
+    )
+  })
+
+  it('filters the subsector chooser by the chosen sector, and blocks an unresolved pair (FR-1087)', async () => {
+    const user = userEvent.setup()
+    const { saveOwn } = renderEditor(undefined, {
+      profile: { sector: 'Servicios', subsector: 'Consultoría' },
+      vocabulary: {
+        sectors: [
+          { id: 's-serv', label: 'Servicios' },
+          { id: 's-com', label: 'Comercio' },
+        ],
+        subsectors: [
+          { id: 'ss-cons', sectorId: 's-serv', label: 'Consultoría' },
+          { id: 'ss-min', sectorId: 's-com', label: 'Minorista' },
+        ],
+      },
+    })
+
+    // Filtered: only the chosen sector's refinements are offered.
+    const subsector = await screen.findByLabelText(/^subsector$/i)
+    expect(screen.getByRole('option', { name: 'Consultoría' })).toBeInTheDocument()
+    expect(screen.queryByRole('option', { name: 'Minorista' })).not.toBeInTheDocument()
+
+    // Changing sector strands the old subsector, and the save is blocked with the reason
+    // stated until the ATTENDEE resolves it — the editor never clears it for them (FR-1087).
+    await user.selectOptions(screen.getByLabelText(/^sector$/i), 'Comercio')
+    await waitFor(() => expect(save()).toBeDisabled())
+    const reasons = screen.getAllByRole('status').map((element) => element.textContent ?? '')
+    expect(reasons.join(' ')).toMatch(/belongs to a different sector/i)
+    expect(saveOwn).not.toHaveBeenCalled()
+
+    // Resolving it — choosing a refinement of the new sector — re-enables the save.
+    await user.selectOptions(subsector, 'Minorista')
+    await waitFor(() => expect(save()).toBeEnabled())
   })
 
   it('keeps every edit on screen when saving fails offline', async () => {

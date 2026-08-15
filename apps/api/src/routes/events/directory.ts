@@ -114,7 +114,7 @@ export const directoryRoutes = async (app: FastifyInstance): Promise<void> => {
               type: 'string',
               maxLength: 200,
               description:
-                'Free text over display name, company, role and headline — case- and accent-insensitively, so "Munoz" finds "Muñoz". NEVER matches email address (FR-407).',
+                'Free text over display name, company, role, headline and the productive-activity description (FR-1099d) — case- and accent-insensitively, so "Munoz" finds "Muñoz". NEVER matches email address (FR-407), and deliberately not sector or subsector: those are controlled values whose route into Discover is the open filter question, not the search box.',
             },
             role: { type: 'string', maxLength: 120 },
             interest: { type: 'string', maxLength: 60 },
@@ -156,6 +156,7 @@ export const directoryRoutes = async (app: FastifyInstance): Promise<void> => {
                     'company',
                     'role',
                     'headline',
+                    'productiveActivity',
                     'networkingIntent',
                     'availability',
                     'interests',
@@ -169,6 +170,14 @@ export const directoryRoutes = async (app: FastifyInstance): Promise<void> => {
                     company: { type: ['string', 'null'] },
                     role: { type: ['string', 'null'] },
                     headline: { type: ['string', 'null'] },
+                    productiveActivity: {
+                      type: ['string', 'null'],
+                      description:
+                        'What this person makes or does (FR-1099d, REQ-030). On the card so a ' +
+                        'description somebody can search for is one they can also read; absent ' +
+                        'entirely — never a placeholder — when unset (FR-1092). Sector and ' +
+                        'subsector are deliberately NOT in this payload.',
+                    },
                     networkingIntent: {
                       type: ['string', 'null'],
                       enum: [...NETWORKING_INTENTS, null],

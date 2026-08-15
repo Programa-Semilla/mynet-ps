@@ -77,6 +77,10 @@ const createConference = async (page: Page): Promise<string> => {
   await page.getByLabel('First day').fill(FIRST_DAY)
   await page.getByLabel('Last day').fill(LAST_DAY)
   await page.getByLabel('Venue timezone').fill('UTC')
+  // Tranche 2 — modality is required at creation and has no safe default (FR-1059b): the
+  // placeholder option is disabled, so a submission without choosing is refused server-side
+  // with `modality_missing` and this spec would stall waiting for a join code.
+  await page.getByLabel('Modality').selectOption('in-person')
 
   // `exact` because the list's own "Create a conference" button is still in the accessibility
   // tree behind the dialog, and a substring match resolves to both.

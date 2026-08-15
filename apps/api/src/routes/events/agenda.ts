@@ -9,7 +9,7 @@ import {
   unsaveSession,
   upsertNote,
 } from '../../db/queries/agenda.js'
-import { notFound } from '../../errors.js'
+import { AppError, notFound } from '../../errors.js'
 import { eventScopeOf, type EventParams } from '../../plugins/event-access.js'
 
 /**
@@ -119,14 +119,20 @@ export const agendaRoutes = async (app: FastifyInstance): Promise<void> => {
                 type: 'array',
                 items: {
                   type: 'object',
-                  required: ['sessionId', 'changedSinceViewed'],
+                  required: ['sessionId', 'changedSinceViewed', 'commitment'],
                   additionalProperties: false,
                   properties: {
                     sessionId: { type: 'string', format: 'uuid' },
                     changedSinceViewed: {
                       type: 'boolean',
                       description:
-                        'Computed server-side as `sessions.logistics_changed_at > saved_sessions.viewed_at` — two timestamps and a comparison, with nothing stored per change. That is what keeps FR-1031 structural: there is no per-change record to list and no counter to sum.',
+                        'Computed server-side as `sessions.logistics_changed_at > viewed_at` on whichever commitment row this is — two timestamps and a comparison, with nothing stored per change. That is what keeps FR-1031 structural: there is no per-change record to list and no counter to sum.',
+                    },
+                    commitment: {
+                      type: 'string',
+                      enum: ['saved', 'place'],
+                      description:
+                        '014 tranche 2 (FR-1063, FR-1066): which of the two commitments this row is. One list with a discriminator, so the saved-but-holds-no-place state FR-1064 forbids is unrepresentable rather than merely absent — the envelope grown a second time, exactly as it was grown for the marker.',
                     },
                   },
                 },
@@ -185,8 +191,19 @@ export const agendaRoutes = async (app: FastifyInstance): Promise<void> => {
     },
     async (request, reply) => {
       const saved = await saveSession(eventScopeOf(request), request.params.sessionId)
-      // The one refusal, whatever the cause. See the file header.
-      if (!saved) throw notFound()
+      // The one refusal for everything existence-shaped — see the file header. The optional
+      // kind is the single explained exception (014 tranche 2, FR-1064): the session exists
+      // and the reader may see it, but its commitment is a place, and pretending it is missing
+      // would teach the attendee nothing while a bookmark-shaped retry kept failing.
+      if (saved === 'not-found') throw notFound()
+      if (saved === 'not-saveable') {
+        throw new AppError(
+          'not_saveable',
+          409,
+          'This session takes enrolment instead of saving — take a place to commit to it. ' +
+            'There is no way to bookmark it without one.',
+        )
+      }
       return reply.code(204).send()
     },
   )

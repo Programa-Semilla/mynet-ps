@@ -26,6 +26,21 @@ export interface ProfileDraft {
   readonly company: string | null
   readonly role: string | null
   readonly headline: string | null
+  /**
+   * T178 (014 tranche 2) — the taxonomy fields (FR-1090), every one optional (FR-1091).
+   *
+   * Sector and subsector are LABELS chosen from the controlled vocabulary — never typed
+   * (FR-1087) — and the server accepts, besides the currently choosable, every value the
+   * attendee ALREADY HOLDS: retained free text and retired choices alike (FR-1095b). Whole-
+   * profile semantics make that editor-critical: a save omitting a held value REMOVES it, so
+   * the editor presents held-but-unchoosable values as present and removable, never silently
+   * dropped. The subsector must belong to the chosen sector; resolving a mismatch after a
+   * sector change is the attendee's own act inside their own save (FR-1087).
+   */
+  readonly sector: string | null
+  readonly subsector: string | null
+  /** Free text, bounded like the headline — what this person actually makes or does (REQ-030). */
+  readonly productiveActivity: string | null
   readonly networkingIntent: NetworkingIntent | null
   readonly availability: Availability | null
   /** Bounded in count and in length; the editor surfaces both as they are approached (FR-337). */

@@ -76,7 +76,9 @@ describe('the next-saved-session card', () => {
   }: {
     sessions?: typeof PROGRAMME
     saved?: string[]
-    listSaved?: () => Promise<{ sessionId: string; changedSinceViewed: boolean }[]>
+    listSaved?: () => Promise<
+      { sessionId: string; changedSinceViewed: boolean; commitment: 'saved' | 'place' }[]
+    >
     listSessions?: () => Promise<never>
   } = {}) =>
     render(
@@ -86,17 +88,26 @@ describe('the next-saved-session card', () => {
             listSessions: listSessions ?? (async () => sessions),
             listTracks: async () => [],
           },
-          savedSessions: {
+          commitments: {
             // 014 — the saved read carries a marker per entry (FR-1030). This card projects the
             // identifiers out and renders no marker of its own: Home's marker belongs on rows
             // the attendee can act on, and a count anywhere is FR-1031's prohibition.
             listSaved:
               listSaved ??
-              (async () => saved.map((sessionId) => ({ sessionId, changedSinceViewed: false }))),
+              (async () =>
+                saved.map((sessionId) => ({
+                  sessionId,
+                  changedSinceViewed: false,
+                  commitment: 'saved' as const,
+                }))),
             save: async () => {},
             unsave: async () => {},
 
             markViewed: async () => {},
+            // 014 tranche 2 — enrolment no-ops; `places` rejects so the figure is omitted (FR-1070b).
+            enrol: async () => {},
+            release: async () => {},
+            places: async () => Promise.reject(new Error('places not configured in this test')),
           },
         })}
       >
@@ -113,10 +124,13 @@ describe('the next-saved-session card', () => {
 
   it('LOADING — says so rather than showing nothing', () => {
     renderCard({
-      listSaved: () => new Promise<{ sessionId: string; changedSinceViewed: boolean }[]>(() => {}),
+      listSaved: () =>
+        new Promise<
+          { sessionId: string; changedSinceViewed: boolean; commitment: 'saved' | 'place' }[]
+        >(() => {}),
     })
 
-    expect(screen.getByText(/loading your saved sessions/i)).toBeInTheDocument()
+    expect(screen.getByText(/loading your agenda/i)).toBeInTheDocument()
   })
 
   it('POPULATED — names the next saved session, with its time and room (FR-224)', async () => {
@@ -134,6 +148,33 @@ describe('the next-saved-session card', () => {
 
     expect(await screen.findByText('Later Today')).toBeInTheDocument()
     expect(screen.getByText('Gaudí Hall')).toBeInTheDocument()
+  })
+
+  it('T198 — composes a HELD PLACE exactly as a save: the union arrives on the one read (FR-1066)', async () => {
+    // An optional session the attendee holds a place in — no saved row exists for it anywhere
+    // (FR-1064). The card must read it as part of the attendee's own programme with NO read
+    // change: the row arrives on `listSaved` itself, discriminated `place` (R13), and the card
+    // only ever asks membership.
+    const enrolled = aSession({
+      id: '77777777-7777-4777-8777-777777777777',
+      title: 'Hands-on Workshop',
+      kind: 'optional',
+      startsAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+      endsAt: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
+    })
+
+    renderCard({
+      sessions: [enrolled],
+      listSaved: async () => [
+        { sessionId: enrolled.id, changedSinceViewed: false, commitment: 'place' as const },
+      ],
+    })
+
+    // The stronger commitment is not a weaker presence: the enrolled session renders on the
+    // card exactly as a saved one would, under the heading renamed to be true of both (T194).
+    expect(await screen.findByText('Hands-on Workshop')).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Next on your programme' })).toBeInTheDocument()
+    expect(screen.queryByText(/nothing on your agenda yet/i)).not.toBeInTheDocument()
   })
 
   it('NONE LEFT TODAY — says so explicitly, and does NOT show a past session (FR-225)', async () => {
@@ -170,7 +211,7 @@ describe('the next-saved-session card', () => {
   it('EMPTY — a distinct state when the attendee has saved nothing at all (FR-225)', async () => {
     renderCard({ saved: [] })
 
-    expect(await screen.findByText(/have not saved any sessions yet/i)).toBeInTheDocument()
+    expect(await screen.findByText(/nothing on your agenda yet/i)).toBeInTheDocument()
     // Distinct wording from "nothing more today", because they are different facts.
     expect(screen.queryByText(/nothing more from your agenda today/i)).not.toBeInTheDocument()
     // And it invites them to the programme rather than being a dead end.
@@ -188,7 +229,7 @@ describe('the next-saved-session card', () => {
     expect(screen.getByRole('button', { name: /try again/i })).toBeInTheDocument()
     // Never the empty state: the attendee must not be told they have saved nothing when the
     // truth is that we do not know.
-    expect(screen.queryByText(/have not saved any sessions yet/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/nothing on your agenda yet/i)).not.toBeInTheDocument()
   })
 
   it('distinguishes offline from a server fault (FR-218)', async () => {

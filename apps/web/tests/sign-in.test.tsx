@@ -68,12 +68,16 @@ const renderSignIn = (overrides: Partial<PlatformServices> = {}) => {
       // 005 — signed out, so these reject for the same reason `getCurrent` does. Present
       // because the registry is one object substituted whole (FR-047); absent members would
       // not compile.
-      savedSessions: {
+      commitments: {
         listSaved: async () => Promise.reject(new Error('not signed in')),
         save: async () => Promise.reject(new Error('not signed in')),
         unsave: async () => Promise.reject(new Error('not signed in')),
 
         markViewed: async () => {},
+        // 014 tranche 2 — enrolment no-ops; `places` rejects so the figure is omitted (FR-1070b).
+        enrol: async () => {},
+        release: async () => {},
+        places: async () => Promise.reject(new Error('places not configured in this test')),
       },
       sessionNotes: {
         listNotes: async () => Promise.reject(new Error('not signed in')),
@@ -157,6 +161,10 @@ const renderSignIn = (overrides: Partial<PlatformServices> = {}) => {
         withdraw: async () => Promise.reject(new Error('not signed in')),
         vote: async () => Promise.reject(new Error('not signed in')),
         unvote: async () => Promise.reject(new Error('not signed in')),
+      },
+      // 014 T2 — signed out, so the vocabulary read rejects like its neighbours.
+      vocabulary: {
+        choosable: async () => Promise.reject(new Error('not signed in')),
       },
     },
     freshness: { lastRetrieved: () => null },

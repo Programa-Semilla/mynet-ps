@@ -149,6 +149,75 @@ describe('014 — a session starting dispatches nothing (FR-1033)', () => {
   })
 
   /**
+   * **T157 (014 tranche 2) — the deadline is a new name the clock pattern above cannot see, so
+   * it gets its own** (FR-1072a, research R14e).
+   *
+   * The pattern at `startsAt[^\n]…` covers the identifier that existed when it was written.
+   * Tranche 2 derives an enrolment-closing instant from the start and an offset, and
+   * `if (Date.now() > closesAt)` inside a dispatching path is a reminder that pattern is blind
+   * to. Same shape, new identifiers — extended in the same change that introduced them, which
+   * is what this file's header says a rename-proof guard requires.
+   */
+  it('compares no enrolment deadline against the clock inside a dispatching path (FR-1072a)', () => {
+    const comparing = dispatchers
+      .filter((path) => {
+        const code = codeOnly(path)
+        return /(closesAt|closingOffset|enrolmentOpen|enrolmentClos\w*)[^\n]{0,60}(Date\.now|new Date\(\)\s*)|\bnow\b[^\n]{0,40}(closesAt|closingOffset|enrolmentClos\w*)/.test(
+          code,
+        )
+      })
+      .map(label)
+
+    expect(
+      comparing,
+      'A dispatching path compares the enrolment deadline against now. Passing a deadline is ' +
+        'not a notification and must not become one (FR-1072a): a session approaching its ' +
+        'start is the reminder the trigger rules forbid, and the deadline is measured from ' +
+        'that same instant.',
+    ).toEqual([])
+  })
+
+  /**
+   * **T157 (014 tranche 2) — FR-1072 needs its own assertion, because the scheduler check
+   * above is filtered to DISPATCHERS** (research R14e).
+   *
+   * `maintenance.ts` proves the hole: it matches the scheduler pattern and sits outside the
+   * dispatching population, so a sweep that closed enrolment and dispatched nothing would pass
+   * everything above green. FR-1072 says enrolment closing requires NO scheduled work of any
+   * kind — no job, no sweep, no background timer — so the population here is ALL of
+   * `apps/api/src`, with the one recorded timer named: the retention sweep, which exists to
+   * delete data no cascade can reach and may not grow an enrolment duty.
+   */
+  it('runs no scheduled work for enrolment anywhere (FR-1072, SC-1017)', () => {
+    const scheduled = files
+      // The one recorded timer. Its own assertion above proves it does not dispatch; this one
+      // proves nothing ELSE gained a timer under enrolment's name.
+      .filter((path) => !/maintenance\.ts$/.test(path))
+      .filter((path) => {
+        const code = codeOnly(path)
+        return /setInterval\s*\(|\bcron\b|\bschedule(Job|Delivery)\b/i.test(code)
+      })
+      .map(label)
+
+    expect(
+      scheduled,
+      'Scheduled work exists outside the retention sweep. Enrolment closing is derived against ' +
+        'the database clock at the moment of the request (FR-1071a, FR-1072) — a job that ' +
+        '"closes" enrolment would be a stored lifecycle arriving by timer, and the next ask ' +
+        'would be for it to notify.',
+    ).toEqual([])
+
+    // And the sweep itself stays a DELETION mechanism: nothing enrolment-shaped may join it.
+    const maintenance = codeOnly(join(apiSrc, 'maintenance.ts'))
+    expect(
+      /enrol/i.test(maintenance),
+      'The retention sweep mentions enrolment. A held place is reached by cascades and by the ' +
+        'by-hand withdrawal release (FR-1081) — it needs no sweep, and a sweep that touched it ' +
+        'would be the scheduled work FR-1072 forbids.',
+    ).toBe(false)
+  })
+
+  /**
    * **The trigger set is exactly two**, which is the positive statement of the same rule.
    *
    * `notification-triggers.test.ts` names the permitted callers; this asserts what causes them.

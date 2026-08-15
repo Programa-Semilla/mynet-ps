@@ -1,5 +1,143 @@
 <!--
 SYNC IMPACT REPORT
+Version change: 5.2.0 → 5.3.0
+
+RATIFICATION STATUS: **RATIFIED 2026-08-14 by the project owner**, on reading the drafted amendment
+together with the specification, plan and task list it gates. Drafted the same day at their request
+following brainstorm #12 (`brainstorm/12-conference-content-authoring-tranche-2.md`), which scoped
+**014 tranche 2** — the change that closes feature 014. This amendment gated its first line of code,
+as 5.2.0 gated tranche 1, 4.0.0 gated 013, 3.3.0 gated 009 and 3.2.0 gated 008.
+
+It was drafted first and ratified second, because this project does not let an amendment ratify
+itself. **Feature 014 tranche 2 is licensed from this point**, including its first line of code.
+
+**What ratification does NOT do**: entry 31 remains open and blocks nothing. Entries 19, 21, 4, 22,
+27, 28, 29 and 30 are untouched. Ratifying a named enrolment roster did not decide whether a deletion
+should notify the attendees it strands — that is entry 31, and answering it needs a third
+notification trigger and therefore another amendment.
+
+**O2 was ratified with its cost stated rather than softened, and that is deliberate.** A session with
+places held may be deleted, those attendees hold no saved row, and so they receive no notification and
+no marker. The owner took that decision after the consequence was put to them and reaffirmed it. It is
+**not** precedent for a second `NOT_ENGAGEMENT` entry, and a later feature citing it as one has
+misread it.
+
+**NUMBERING CHECKED BEFORE CLAIMING, WHICH IS THE RULE 5.2.0'S REBASE PRODUCED.** At drafting, `5.3.0`
+was claimed by nothing but brainstorm #12 itself, and no branch other than
+`spec/014-conference-content-authoring-tranche-2` was in flight. The register high-water mark was 30,
+so this amendment opens **31**. The decision prefix `O` was unused. This paragraph exists because the
+fourth collision — recorded at the head of the 5.2.0 report below — established that a shared
+numbering table must be checked and extended in the same change, and the register is now known to be
+such a table.
+
+Rationale: **MINOR, and the judgement was made explicitly rather than defaulted, because there is a
+real argument for MAJOR.**
+
+*For MINOR, which is what this is.* No principle is removed or redefined. No actor is redefined and
+no Principle-level prohibition is lifted. Governance itself does not change. Principle VIII gains a
+**fourth** recorded exception, which is precisely what 3.3.0 did in adding the second and 4.1.0 did in
+adding the third — **both MINOR, both with this same rationale.** It is **not PATCH** for the reason
+those two gave: an exception to a privacy rule is a change in what the product may do, not a
+clarification of what it already did. No work performed under 5.0.0, 5.1.0 or 5.2.0 is invalidated.
+
+*For MAJOR, and why it does not carry.* This amendment narrows **FR-1042**, which 014 tranche 1
+shipped and guarded, and 3.0.0's stated reason for being MAJOR was retracting a delivered requirement
+— *"001's shipped FR-066 and SC-011 — the first delivered requirement this project has retracted,
+which is why 3.0.0 is a major version."* The distinction is that FR-1042 is **narrowed, not
+withdrawn**: it survives intact for saved sessions, private notes, questions and votes, and yields
+only for **enrolment**, only to an organizer **assigned to that conference**. 3.0.0's FR-066 ceased to
+exist; nothing here ceases to exist. The written policy is also explicit and narrow, and a version
+number that departs from its own stated rule teaches the next reader that the rule is advisory.
+
+Owner decisions cited by this amendment (all 2026-08-14, from brainstorm #12):
+  O1. A NAMED ENROLMENT ROSTER IS VISIBLE TO AN ASSIGNED CONFERENCE ORGANIZER. This is the
+      **FOURTH** recorded Principle VIII exception, and Principle VIII's own closing sentence
+      predicted the shape of this moment: *"Three exceptions are recorded; a fourth needs a fourth
+      amendment."* This is that amendment. It is recorded rather than argued out of scope, and that
+      choice is deliberate — an enrolment is arguably not "messages, notes, and appointments" as the
+      private-content clause enumerates them, so a feature could have reasoned it in without an
+      amendment. **The cost of over-recording is a paragraph; the cost of under-recording is a
+      disclosure nobody accepted.** Motivated by REQ-086: an organizer told to close enrolment early
+      because materials must be prepared cannot prepare them for people they cannot name.
+  O2. ENROLMENT IS NOT ENGAGEMENT, AND A SESSION WITH LIVE ENROLMENTS MAY BE DELETED. N5's set stays
+      at four — a saved session, a private note, a question, a vote — and a fifth attachment type is
+      declared **outside** it. **The consequence is recorded rather than softened, because the owner
+      took this decision after it was put to them and reaffirmed it**: tranche 2 must write the first
+      entry into `NOT_ENGAGEMENT`, a list that is empty by design and whose comment requires each
+      entry to *"say whose data it is and why losing it silently is acceptable"*; and because
+      enrolling **replaces** saving on an optional session, an enrolled attendee holds no
+      `saved_sessions` row, so deleting that session destroys held seats with no notification, no
+      marker and no trace. This sits against N5's own rationale, which is that one delete must not
+      silently destroy what other attendees attached to a session. **It is an accepted cost, not an
+      oversight, and a later feature MUST NOT cite it as precedent for narrowing N5's four.**
+  O3. AN ATTENDEE MAY BE SHOWN THE NUMBER OF REMAINING PLACES. "4 places left" is permitted. It is
+      **not** the count N2 forbids — N2's subject is a count of *changes*, and this is a count about
+      one session's availability — but it is the same family, so it is ratified deliberately rather
+      than inherited by silence. N2 is untouched and unweakened.
+  O4. MIGRATION NUMBERS ARE CLAIMED AT GENERATION, NOT RESERVED IN ADVANCE. The reserving feature
+      MUST extend the roadmap's reserved-number table in the same change. Reserve-in-advance has
+      collided three times and currently holds `0010` for a phase that adds no schema at all.
+
+Consequences recorded, which are NOT new grants and MUST NOT be read as any:
+  - **The notification POPULATION widens; the TRIGGER SET does not.** N1's second trigger is worded
+    "a session the attendee has SAVED", and enrolling replaces saving — so without this, an attendee
+    holding a seat in a **cancelled or moved** session would be told nothing, which is the exact
+    stranding N1 exists to prevent. The three material changes are unchanged and **no third trigger
+    is added**. The population/set distinction was written down nowhere before this amendment.
+  - **FR-336 is UNCHANGED.** Taxonomy fields are optional like every other profile field, and
+    REQ-027's mandatory-profile-at-sign-up is **NOT ratified**. A profile row is still created on
+    first save so that "empty profile" has exactly one representation.
+
+Added binding constraints:
+  - "VIII. Attendee Data Is Personal Data" — the fourth recorded exception, with its four scoping
+    conditions; the exception count and the closing "a fifth needs a fifth amendment".
+  - "Notification delivery" — trigger 2's population becomes saved **or enrolled**, with the
+    population-versus-set distinction stated.
+  - "Data scoping, content provenance, and composition" — N5 gains O2's explicit exclusion.
+  - "Administration, and the second actor" — the organizer's second bounded capability.
+  - "Parallel work and shared artifacts" — O4's claim-at-generation rule.
+
+Register changes:
+  - 31. OPENED. **Whether deleting a session should notify the attendees enrolled in it.** O2 makes a
+    deletion destroy held seats silently, and those attendees hold no saved row to be marked. The
+    remedy would be a **third** notification trigger and therefore another amendment, so it is opened
+    rather than solved. **Blocks nothing**; the product behaves exactly as O2 ratifies.
+  - **No entry is closed.** 19 and 21 remain ADDRESSED-not-closed; 4 and 22 remain open and still
+    block 012; 27 remains open and still blocks 017; 28, 29 and 30 are untouched.
+
+Templates and dependent artifacts:
+  - .specify/templates/spec-template.md — ⚠ **updated locally but NOT committed, because
+    `.specify/templates/` is gitignored.** The Feature Declarations row "Reserved migration number"
+    became "Migration number" and now states O4's claim-at-generation rule, since the old wording
+    instructed every future spec to do the thing O4 abolishes. **The edit does not propagate to any
+    other clone**, so a spec authored elsewhere will still be told to reserve a number in advance.
+    Whether the templates directory should be tracked is a question this amendment surfaces and does
+    not answer — it is recorded here rather than fixed, because tracking a previously-ignored
+    directory is a repository decision. plan-template.md and tasks-template.md — ✅ no change
+    required; the actor/tier and administrative-counterpart rows this amendment relies on already
+    exist.
+  - docs/superpowers/specs/2026-08-06-mynet-delivery-roadmap-design.md — ✅ updated. It carried the
+    replaced rule in binding voice — *"A phase claims its number when its spec is written, not when
+    its migration is generated"* — which O4 directly reverses. **This is the artifact O4 is about**,
+    so leaving it stale would have left the abolished scheme stated authoritatively in the one
+    document a feature reads to find a number.
+  - CLAUDE.md — ✅ updated on ratification: standing decisions 50–53 and register entry 31. It was
+    held until then deliberately, following 5.2.0's practice, because a working brief that describes a
+    decision as binding before the owner has taken it is the drift Principle I exists to prevent.
+  - brainstorm/12-conference-content-authoring-tranche-2.md, brainstorm/00-overview.md — ✅ current.
+  - specs/014-conference-content-authoring/ — ✅ tranche 2 specified, planned and tasked (93 FRs,
+    15 SCs, 109 tasks T106–T214). **Ratification lifts the gate on T106.**
+
+Deferred: none. Tranche 2 has no blocking register entry.
+
+A NOTE ON WHAT THIS AMENDMENT COSTS. 5.2.0's note observed that widening the trigger set cost the
+ability to verify "one trigger" by reading one sentence. This one costs something comparable in a
+different place: **Principle VIII's exception list is now four long, and its readability was always
+the argument for keeping exceptions few.** The mitigation is that all four are scoped by the same
+shape — who may read, what exactly, where, and what the subject is told — and O1 is written to that
+shape deliberately so the list stays comparable rather than becoming four unlike things.
+
+PRIOR REPORT (5.1.0 → 5.2.0):
 Version change: 5.1.0 → 5.2.0
 
 **REBASED 2026-08-14, FROM 4.1.0 → 4.2.0, AND THE RENUMBERING IS THE RECORD OF A COLLISION.** This
@@ -1610,7 +1748,7 @@ migration.
 - **Collect only what a requirement names.** Fields not traceable to an authoritative source MUST
   NOT be stored merely because they might be useful.
 - **Private content stays private.** Messages, notes, and appointments are visible only to their
-  participants. Any exception requires a recorded client decision. **Three such exceptions are
+  participants. Any exception requires a recorded client decision. **Four such exceptions are
   recorded.**
   - *First* (2.3.0, D10): an attendee's profile is visible to attendees registered for the same
     event, enforced server-side by the event-scoping predicate, and the attendee MUST be able to
@@ -1667,8 +1805,34 @@ migration.
     unscoped, and unaudited — which this document already concedes they can do. The exception buys a
     narrower disclosure than the status quo it replaces.
 
+  - *Fourth* (5.3.0, O1): **the attendees enrolled in an optional session are visible, by name, to a
+    conference organizer assigned to that conference.** Four conditions scope it, and all four bind:
+    - **Only an assigned conference organizer, and only for their own conferences.** A platform
+      operator holds this by the product-wide authority it already has; nobody else holds it at all.
+    - **Only enrolment.** This grants no read of a saved session, a private note, a question, or a
+      vote. Those remain undisclosed to every administrative tier, and FR-1042 survives for them
+      **unnarrowed**. An enrolment is disclosed because it is a claim on a bounded resource the
+      organizer is responsible for providing; the other four are not.
+    - **Only the sessions of that conference.** It is not a directory, not a cross-conference view of
+      one attendee, and not a route into anybody's profile.
+    - **The attendee is told before they enrol.** Enrolling is an explicit act, so the disclosure is
+      knowable at the moment it is chosen — which is what makes this the *least* invasive of the four
+      exceptions and the only one the subject can decline by not acting.
+
+    *Why this was granted.* REQ-086 requires that some sessions close enrolment early **because
+    materials must be prepared**. An organizer who cannot name the people they are preparing for
+    cannot discharge the requirement, and a bare count does not survive contact with a workshop that
+    needs a check-in list. The alternative considered and rejected was a count alone, which satisfies
+    the arithmetic of materials and not the act of running the room.
+
+    *Why it is recorded rather than reasoned away.* An enrolment is arguably not "messages, notes, and
+    appointments" as this clause enumerates them, so a feature could have concluded no exception was
+    needed and shipped the roster without one. **That is exactly the shortcut 3.3.0 and 4.1.0 each
+    refused.** The cost of recording an exception that may not strictly have been required is a
+    paragraph; the cost of the reverse is a disclosure nobody accepted.
+
   An exception MUST be recorded here rather than **derived** from a rule elsewhere in this document,
-  and **both the second and the third were derivable and were not derived.** The second could have
+  and **the second, the third and the fourth were all derivable and none was derived.** The second could have
   been reasoned from attribution, already binding (3.2.0, N3), plus the plain fact that a question on
   a shared session is visibly public; the owner ruled on 2026-08-10 that derivation is not recording.
   The third could have been reasoned from an operator's evident need to judge what they are asked to
@@ -1681,8 +1845,13 @@ migration.
   was recorded by amendment rather than reasoned into existence inside a feature specification,
   which is what Principle VIII requires and what 3.3.0 ruled when the same shortcut was available for
   Q&A. What 4.0.0's restraint still binds: administration reads attendee data by definition, and the
-  arrival of a second actor is **not** a standing licence over everything. Three exceptions are
-  recorded; a fourth needs a fourth amendment.
+  arrival of a second actor is **not** a standing licence over everything. **Four exceptions are
+  recorded; a fifth needs a fifth amendment.**
+
+  *That sentence read "three… a fourth needs a fourth amendment" until 5.3.0, and 5.3.0 is that
+  fourth amendment.* The prediction held twice running — 4.0.0 forecast the third and 4.1.0 delivered
+  it — which is the strongest available evidence that stating the next threshold in advance is what
+  stops a feature crossing one without noticing.
 
   **Operator records are personal data about somebody who may not be an attendee**, which is a case
   this principle has never had to consider: "every stored record that belongs to an attendee MUST be
@@ -1980,6 +2149,27 @@ Decided by the project owner on 2026-08-06. Binding on every subsequent feature.
     the *author* exercised erasure over their own words, and that reasoning does not transfer to a
     third party deleting somebody else's — the same non-transfer 009 itself found when 007's answer
     for conversations did not carry across.
+
+    *Bounded 5.3.0 by O2.* **An ENROLMENT in an optional session is NOT engagement, and a session
+    with live enrolments MAY be deleted.** The set above stays at exactly four; a fifth kind of
+    attachment is declared outside it by owner decision, taken on 2026-08-14 after the consequence
+    below was put to the owner and reaffirmed.
+
+    **The consequence is recorded here rather than left to be discovered.** Because enrolling
+    *replaces* saving on an optional session, an enrolled attendee holds no `saved_sessions` row —
+    so deleting such a session destroys held seats **with no notification, no marker, and no trace**,
+    and the person who reserved one finds out by arriving. Delivering this also requires the first
+    entry in `NOT_ENGAGEMENT`, a list that is empty by design and whose comment demands each entry
+    *"say whose data it is and why losing it silently is acceptable"* — a sentence deliberately made
+    hard to write.
+
+    **This sits against the rationale immediately above it, and that tension is the point of writing
+    it down.** The rule exists because one delete must not silently destroy what other attendees
+    attached to a session, and an enrolment is the strongest such attachment the product has: an
+    explicit claim on a bounded resource rather than a bookmark. **It is an accepted cost, not an
+    oversight.** A later feature MUST NOT cite O2 as precedent for narrowing the four, and whether a
+    deletion should at least notify the enrolled is **register entry 31** — open, blocking nothing,
+    and answerable only by a third notification trigger and therefore another amendment.
 
 - **Home is composed, not aggregated.** Home is a registry of independent cards. Each card owns its
   own loading, empty, and failure states, and a card that fails MUST NOT blank the dashboard or
@@ -2286,11 +2476,25 @@ the end of this block rather than glossed.
 - **There are exactly TWO triggers, and they are enumerated here.**
 
   1. **A received message.** *3.1.0, M4.*
-  2. **A material change to a session the attendee has SAVED.** *5.2.0, N1.* **Material means
-     exactly three things: the session is cancelled, its start time changes, or its room changes.**
-     The principle the set follows from MUST be applied when reading it — a notification is raised
-     when a change affects **where or whether the attendee must be somewhere**. A title, a summary,
-     or a change of speaker is content, and content does not strand anybody in the wrong corridor.
+  2. **A material change to a session the attendee has SAVED or is ENROLLED IN.** *5.2.0, N1;
+     population extended 5.3.0.* **Material means exactly three things: the session is cancelled, its
+     start time changes, or its room changes.** The principle the set follows from MUST be applied
+     when reading it — a notification is raised when a change affects **where or whether the attendee
+     must be somewhere**. A title, a summary, or a change of speaker is content, and content does not
+     strand anybody in the wrong corridor.
+
+     **5.3.0 widened this trigger's POPULATION and not the trigger SET, and the distinction is
+     load-bearing.** 014 tranche 2 makes enrolling **replace** saving on an optional session, so an
+     attendee holding a seat has no saved row — and under N1 as originally worded they would have
+     been told nothing when that session was cancelled or moved. That is the precise stranding this
+     trigger exists to prevent, so the fix is to widen *who is notified*, not *what notifies*. **The
+     three material changes are unchanged and no third trigger is added.**
+
+     **A feature widening the population is not thereby licensed to widen the set**, and the reverse
+     also holds. The two are separate questions and this is the first amendment that has had to say
+     so: the set governs what the product may interrupt somebody about, and the population governs
+     whose attachment to a session counts as being affected. A new way of attaching to a session
+     raises the second question and MUST NOT be read as answering the first.
 
   **A session STARTING is not a trigger and remains forbidden**, and so do an appointment, an
   audience question, and an announcement. The distinction between a session *starting* and a session
@@ -2330,6 +2534,16 @@ the end of this block rather than glossed.
   carrying the per-row markers**, never on a list of what changed; and **no view inside either
   product may present that count**. The moment a screen answers "how many things changed", this rule
   has been broken regardless of what the payload does.
+
+  *Bounded 5.3.0 by O3, which is a different count and is permitted.* **An attendee MAY be shown the
+  number of remaining places in an optional session** — "4 places left". This is **not** the count N2
+  forbids, and the difference is the subject rather than the arithmetic: N2's subject is *things that
+  happened*, which is what turns a marker into an inbox, while a remaining-places figure is a fact
+  about **one session's availability** at the moment the attendee is deciding whether to take a seat.
+  It is written down because it is the same *family* — a number about other attendees' state on a
+  screen — and inheriting that by silence is what this project records rather than does. **N2 is
+  untouched and unweakened**: no aggregate of changes, no list of changes, and no surface whose
+  subject is what happened.
 
 - **Delivery MUST go through `NotificationService`** (Principle V), over a domain shape rather than
   the browser's own `PushSubscription` type. The signing key is a secret and MUST NOT appear in
@@ -2590,6 +2804,18 @@ absence in the attendee product rather than asserted in prose.
   than by a limit, because promotion is itself platform-tier only. That is recorded as accepted
   rather than overlooked.
 
+  *Extended 5.3.0 by O1.* **A conference organizer MAY read the names of the attendees enrolled in an
+  optional session of a conference they are assigned to.** This is the tier's **second** bounded
+  capability over attendee data and the **only** one that reads it at all, so it is stated here as
+  well as under Principle VIII, where the exception and its four scoping conditions live.
+
+  **It narrows FR-1042 and does not withdraw it.** No administrative tier may read a saved session, a
+  private note, a question, or a vote — that absence is untouched, and its guard MUST continue to
+  fail any administrative route addressing them. What changes is one path, for one relation, for one
+  tier, over its own conferences. **A route granting this MUST be addressed and named so that its
+  scope is legible**, because the guard it edits was written on the reasoning that *"a path is a
+  promise"*, and a promise narrowed silently is a promise broken.
+
 **No self sign-up into either tier** is the load-bearing rule, and it is the exact mirror of D5.
 Self sign-up was chosen for attendees because it was the only model that left the attendee sole
 actor; it is unavailable here because anyone who can sign themselves up as an administrator is not
@@ -2699,11 +2925,22 @@ this gap is materially more serious than it was under 1.x.**
 Features run mostly one at a time, in parallel only where they touch disjoint files. Where two do
 run in parallel, the following apply.
 
-- **Migration numbers are reserved, not discovered.** A feature claims its migration number when its
-  specification is written, from the sequence recorded in the delivery roadmap. Two open pull
-  requests MUST NOT introduce the same migration number, and a migration file MUST NOT be renamed to
-  resolve a conflict — renaming a migration that another branch has already applied is how a
-  database and its history diverge.
+- **Migration numbers are claimed at generation, not reserved in advance.** *Replaced 5.3.0 by O4;
+  the rule until then was that a feature claimed its number when its specification was written, from
+  a sequence recorded in the delivery roadmap.* A feature takes the next free number **when it
+  generates its migration**, and MUST extend the roadmap's reserved-number table in the same change.
+  Two open pull requests MUST NOT introduce the same migration number, and a migration file MUST NOT
+  be renamed to resolve a conflict — renaming a migration that another branch has already applied is
+  how a database and its history diverge.
+
+  *Why the reservation scheme was abandoned.* It collided three times, and each collision left a
+  permanent artifact rather than a one-off fix: the journal now carries `idx: 10` against tag
+  `0011_conference_authoring` and snapshot `0010_snapshot.json`, a three-way skew that every future
+  generation must be told about. It also reserved `0010` for a phase that, by its own scope, adds no
+  schema at all — so the sequence held a gap for a migration nobody was going to write. **Reserving
+  in advance only works when branches can see each other's reservations, and the recurring lesson of
+  this project is that they cannot.** Claiming late costs a rename never; claiming early cost one
+  three times.
 - **Generated artifacts are never hand-merged.** The published API contract and any other generated
   file MUST be resolved by taking one side wholesale and regenerating, never by editing the merged
   result. A hand-reconciled generated file is indistinguishable from a correct one until it is wrong
@@ -3115,6 +3352,23 @@ collision was possible and what it costs; the entries themselves are unchanged i
   answers for a person who never signed up. **Blocks nothing today; it blocks any claim that
   Principle VIII's coverage is complete.**
 
+**Opened in 5.3.0**
+
+- **31. Whether deleting a session should notify the attendees enrolled in it.** O2 places an
+  enrolment outside N5's engagement set, so a session with live enrolments may be deleted — and
+  because enrolling *replaces* saving on an optional session, those attendees hold no `saved_sessions`
+  row and are therefore reached by no marker and no push. **A held seat can disappear with no trace,
+  and the person learns by arriving.** The obvious remedy is to notify them, and that is exactly what
+  cannot be done cheaply: a deletion is not one of N1's three material changes, so notifying on it is
+  a **third trigger** and needs its own amendment. Opening this rather than solving it is deliberate,
+  on the same reasoning 4.0.0 gave when it predicted the third privacy exception and refused to grant
+  it by inference. **Blocks nothing**; the product behaves exactly as O2 ratifies.
+
+  *It shares a boundary with entry 29 and is not merged with it.* Both are about what the product
+  fails to tell somebody about their own commitments — 29 about what a notification discloses, 31
+  about a notification that is never sent — but a suppression preference and a missing trigger are
+  different mechanisms with different costs.
+
 **Open — require a client decision**
 
 *Numbering is stable.* Resolved entries are **struck through in place** rather than removed, and
@@ -3518,4 +3772,4 @@ so a gap in the source would silently render as the wrong number against a neigh
 stay consistent with this constitution and MUST NOT contain implementation plans, session tasks,
 progress updates, or invented requirements.
 
-**Version**: 5.2.0 | **Ratified**: 2026-08-04 | **Last Amended**: 2026-08-12
+**Version**: 5.3.0 | **Ratified**: 2026-08-04 | **Last Amended**: 2026-08-14

@@ -87,6 +87,44 @@ const authoringFiles = [
   join(apiSrc, 'routes', 'admin', 'catalog.ts'),
 ]
 
+/**
+ * T122 (014 tranche 2, R16) — **the roster module: a THIRD file list, with the narrowest rule
+ * of the three.** `admin-enrolments.ts` legitimately projects a display name — that is the
+ * fourth Principle VIII exception (v5.3.0 O1) doing exactly what it was ratified for — so it
+ * cannot join `authoringFiles`, whose invariant is "no identity, ever". It is audited harder
+ * instead: its projection may contain `display_name` and NOTHING ELSE identity-shaped — no
+ * attendee id, no email, no avatar column — asserted below as an allowlist over one named
+ * module rather than an unscanned one.
+ */
+const disclosureFiles = [join(apiSrc, 'db', 'queries', 'admin-enrolments.ts')]
+
+/**
+ * T122 (014 tranche 2) — **the one exempted administrative address, keyed on the full
+ * `METHOD url` label** (never a path prefix: a prefix would exempt every later subresource of
+ * a session along with it). GET and HEAD are one read — Fastify registers HEAD alongside — and
+ * both labels are listed so neither is exempted by accident of the other.
+ *
+ * Three anti-vacuity assertions below keep this honest: every label here must still exist in
+ * the route table, every reason must be substantial, and — the one that is new — every label
+ * must actually MATCH the widened noun regex, so an exemption for a path the detector never
+ * catches fails as stale rather than sitting decorative beside a check that never fires.
+ */
+const ENROLMENT_DISCLOSURE = new Map<string, string>([
+  [
+    'GET /admin/conferences/:eventId/sessions/:id/enrolments',
+    'The enrolment roster — the FOURTH recorded Principle VIII exception (constitution v5.3.0 ' +
+      'O1, FR-1073): an organizer preparing materials cannot prepare them for people they ' +
+      'cannot name. Bounded to enrolment alone, an assigned organizer, that conference’s ' +
+      'sessions, and names only; the attendee is told before they enrol (FR-1074). Every ' +
+      'other administrative read of who saved, noted, questioned or voted must still fail.',
+  ],
+  [
+    'HEAD /admin/conferences/:eventId/sessions/:id/enrolments',
+    'The same read: Fastify auto-registers HEAD beside GET, and an exemption naming only GET ' +
+      'would report the HEAD variant as a new disclosure on every run.',
+  ],
+])
+
 const label = (path: string): string => path.slice(apiSrc.length)
 
 const methodsOf = (route: RouteOptions): string[] =>
@@ -221,6 +259,29 @@ describe('014 — no administrative surface reads attendee state (FR-1042)', () 
   })
 
   /**
+   * T164 (014 tranche 2) — **the enrolment twin of the pin above**, written because R16 found
+   * the shipped assertion is spelled with the table name and would walk straight past a held
+   * place's marker clear. FR-1080 stamps whichever commitment the actor holds, so
+   * `session_enrolments.attendee_id` now legitimately appears in the authoring query layer —
+   * exactly once, inside an `update`, keyed on the caller — and nowhere shaped like a read.
+   */
+  it('uses an enrolment identity only to clear the actor’s own marker (FR-1080)', () => {
+    const code = codeOnly(join(apiSrc, 'db', 'queries', 'admin-catalog.ts'))
+    const uses = [...code.matchAll(/sessionEnrolments\.attendeeId/g)]
+
+    expect(uses.length, 'the FR-1080 marker clear is gone from the authoring query layer').toBe(1)
+
+    const statement =
+      /\.update\(sessionEnrolments\)[\s\S]{0,400}?sessionEnrolments\.attendeeId/.exec(code)
+    expect(
+      statement,
+      'An enrolment attendee id is used outside the FR-1080 marker clear. That column names ' +
+        'somebody holding a place; the roster route is the ONE reader of those names, under ' +
+        'O1’s bounds, and it does not live in this file (FR-1042, FR-1075).',
+    ).not.toBeNull()
+  })
+
+  /**
    * **Rule 3 — the fan-out holds the identifiers, and administration does not import it.**
    *
    * `attendeesToNotify` genuinely resolves who saved a changed session: a notification cannot be
@@ -284,8 +345,15 @@ describe('014 — no administrative surface reads attendee state (FR-1042)', () 
   it('exposes no administrative route addressing attendee state (FR-1042)', () => {
     const disclosing = routes
       .filter((route) => /^\/admin(\/|$)/.test(route.url))
+      // T121 (014 tranche 2, R16): `enrolments?|enrolled|roster|places?` were ADDED to this
+      // set, and the widening precedes the exemption deliberately. As shipped, a roster route
+      // named `enrolments` matched none of the seven nouns and would have shipped green with
+      // no exemption and no record — a pass by omission, indistinguishable from no coverage.
+      // The four original nouns are untouched; the pattern is widened, never relaxed.
       .filter((route) =>
-        /\b(notes?|saves?|saved|votes?|voters?|attendees|questions)\b/i.test(route.url),
+        /\b(notes?|saves?|saved|votes?|voters?|attendees|questions|enrolments?|enrolled|roster|places?)\b/i.test(
+          route.url,
+        ),
       )
       // 013's moderation route removes ONE reported question, which is an act on content under
       // the report queue's bounds — not a read of who engaged with a session. Both its addresses
@@ -293,13 +361,62 @@ describe('014 — no administrative surface reads attendee state (FR-1042)', () 
       .filter((route) => !/^\/admin\/reports\//.test(route.url))
       .filter((route) => !/^\/admin\/questions\/[:{][^/]+$/.test(route.url))
       .flatMap((route) => methodsOf(route).map((method) => `${method} ${route.url}`))
+      // T122 — the named exemption, applied AFTER the flatMap so it exempts exactly the
+      // METHOD+url labels it lists and never every verb on an address (R16).
+      .filter((label) => !ENROLMENT_DISCLOSURE.has(label))
 
     expect(
       disclosing,
       'An administrative route addresses attendee state. An organizer authors CONTENT; who ' +
         'saved, noted, questioned or voted on it is the attendees’ own, and the counts they ' +
-        'need for FR-1025 travel on the programme they already read (FR-1042).',
+        'need for FR-1025 travel on the programme they already read (FR-1042). The ONE ' +
+        'exemption is the enrolment roster, named in ENROLMENT_DISCLOSURE with v5.3.0 O1 as ' +
+        'its licence — a second entry there needs a fifth privacy exception, i.e. an amendment.',
     ).toEqual([])
+  })
+
+  /**
+   * T122 — the exemption's own guards, so it cannot rot into a decorative constant.
+   */
+  it('keeps the enrolment exemption honest — live, reasoned, and actually caught (R16)', () => {
+    const labels = routes
+      .filter((route) => /^\/admin(\/|$)/.test(route.url))
+      .flatMap((route) => methodsOf(route).map((method) => `${method} ${route.url}`))
+
+    for (const [exempted, reason] of ENROLMENT_DISCLOSURE) {
+      // Stale entries: an exemption for a route that no longer exists is a hole waiting for a
+      // new route to fall into it.
+      expect(labels, `exempted label no longer exists: ${exempted}`).toContain(exempted)
+      // A reason has to argue, not gesture.
+      expect(reason.length, `the reason for ${exempted} is too thin to be one`).toBeGreaterThan(80)
+      // And the label must MATCH the widened detector — an exemption for a path the noun regex
+      // never catches has not narrowed anything: the rule was always blind there, and the
+      // "exemption" would be prose beside a check that never fires (016's finding, R16).
+      expect(
+        /\b(notes?|saves?|saved|votes?|voters?|attendees|questions|enrolments?|enrolled|roster|places?)\b/i.test(
+          exempted,
+        ),
+        `${exempted} is not caught by the detector it claims to be exempted from`,
+      ).toBe(true)
+    }
+  })
+
+  /**
+   * T122 — the roster module's projection allowlist: `display_name` and NOTHING else
+   * identity-shaped (R16). Strictly more coverage than before the module existed, when a new
+   * `admin-*` query file was scanned by rule 1 alone and its projections by nothing.
+   */
+  it('projects the display name and no other identity from the roster module (O1, FR-1073a)', () => {
+    for (const path of disclosureFiles) {
+      const code = codeOnly(path)
+
+      expect(/display_name/.test(code), 'the roster module no longer projects a name').toBe(true)
+      expect(
+        /\battendeeId\b|\bemail\b|\bavatar/i.test(code),
+        `${label(path)} reaches an identity column beyond the display name — O1 licenses the ` +
+          'NAME, and the name is all there is',
+      ).toBe(false)
+    }
   })
 
   /**

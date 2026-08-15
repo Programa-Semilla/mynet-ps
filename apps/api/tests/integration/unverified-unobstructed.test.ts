@@ -6,6 +6,7 @@ import { getDb } from '../../src/db/client.js'
 import {
   clearThrottle,
   cookieHeader,
+  ensureInterestOptions,
   resetDatabase,
   SEED_EVENTS,
   sessionCookieFrom,
@@ -48,6 +49,9 @@ describe('an unverified attendee uses the product fully (FR-324, FR-325)', () =>
     app = await setupTestApp({ mail })
     await resetDatabase()
     await clearThrottle()
+    // T174 (014 tranche 2) — FR-1088: an unverified attendee writes a profile like anybody
+    // else, and the interest they choose has to exist to be chosen.
+    await ensureInterestOptions(['Cryptanalysis'])
 
     const created = await app.inject({
       method: 'POST',

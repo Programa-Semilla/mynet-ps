@@ -12,6 +12,7 @@ import { blockRoutes } from './blocks.js'
 import { cardRoutes } from './cards.js'
 import { conversationRoutes } from './conversations.js'
 import { agendaRoutes } from './events/agenda.js'
+import { enrolmentRoutes } from './events/enrolments.js'
 import { appointmentRoutes } from './events/appointments.js'
 import { attendeeProfileRoutes } from './events/attendees.js'
 import { catalogRoutes } from './events/catalog.js'
@@ -23,6 +24,7 @@ import { healthRoutes } from './health.js'
 import { profileRoutes } from './profile.js'
 import { pushRoutes } from './push.js'
 import { reportRoutes } from './reports.js'
+import { vocabularyRoutes } from './vocabulary.js'
 import { activeEventRoutes } from './workspace/active-event.js'
 
 /**
@@ -187,4 +189,16 @@ export const ROUTES: readonly RoutePlugin[] = [
   // event audit with the reason written down.
   // ─────────────────────────────────────────────────────────────────────────────────────────
   adminRoutes,
+  // 014 tranche 2 — the other commitment: places in optional sessions. **Appended after
+  // everything that shipped before it**, per the rule every entry above states: the generated
+  // contract lists paths in observation order, and appending is what keeps a genuine contract
+  // diff distinguishable from noise. Nested under `/events/:eventId` like `agendaRoutes`,
+  // because a place is attendee state about one conference's content and the event audit is
+  // what guards it.
+  enrolmentRoutes,
+  // 014 tranche 2 — the choosable vocabulary. **Appended likewise, and deliberately NOT under
+  // `/events/:eventId`** (R18): it is cross-event reference data naming no attendee, so an
+  // event-scoped address would make the option list a function of the conference (which
+  // FR-1096 forbids) and would demand a scope with nothing behind the address to protect.
+  vocabularyRoutes,
 ]

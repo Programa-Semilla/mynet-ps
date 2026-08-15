@@ -266,3 +266,131 @@ describe('014 — the count lives only in the payload (FR-1031, SC-1009)', () =>
     ).toBe(false)
   })
 })
+
+/**
+ * T110 (014 tranche 2) — **format is a descriptive label with no behavioural consequence, and
+ * that is asserted as an absence rather than trusted** (FR-1047).
+ *
+ * ═════════════════════════════════════════════════════════════════════════════════════════════
+ * **A LABEL THAT QUIETLY ACQUIRES BEHAVIOUR IS A SECOND MODALITY NOBODY DECLARED.**
+ *
+ * Modality governs what a session must carry and is allowed to refuse writes; format may do
+ * neither — no filter, no ordering, no ranking, no validation rule, no notification, no
+ * visibility condition. The guard has three prongs, because "nothing branches on it" is a claim
+ * about three different populations:
+ *
+ *   1. **Source**: no module outside the write path that carries the value may reference the
+ *      conference format at all. A `WHERE`, an `ORDER BY`, a dispatch condition or a validation
+ *      rule would each have to name the column to exist.
+ *   2. **The wire**: no attendee-reachable contract path declares a `format` property, so the
+ *      attendee client cannot branch on a value it is never sent. This is structural in the
+ *      same way `deletion-coverage` is — a new attendee route that serialised it would fail
+ *      here by existing.
+ *   3. **The clients**: asserted beside the other client absences in
+ *      `apps/web/tests/unit/authoring-absences.test.tsx`, over both products' sources.
+ *
+ * The pattern needs calibration because `format` is two other things in this codebase: a JSON
+ * schema KEYWORD (`format: 'uuid'`, always a string literal) and the `Intl` FORMATTER CALL
+ * (`.format(instant)`, always invoked). Both are excluded by lookahead, and the exclusions are
+ * themselves tested below — a guard exercised only by the code that happens to exist stops
+ * guarding when it changes (009's rule for the audit predicate).
+ * ═════════════════════════════════════════════════════════════════════════════════════════════
+ */
+describe('014 tranche 2 — nothing branches on the conference format (FR-1047)', () => {
+  const CONFERENCE_FORMAT_REFERENCE = /\bformat\b(?!\s*\()(?!\s*:\s*['"])/
+
+  /** The write path that legitimately carries the value, and nothing else. */
+  const FORMAT_CARRIERS = [
+    'db/schema/events.ts',
+    'routes/admin/catalog.ts',
+    'db/queries/admin-catalog.ts',
+  ]
+
+  /**
+   * Files where `format` is a DIFFERENT word that happens to collide: sharp's image metadata
+   * calls the file type `format` (004's EXIF pipeline, `images/avatar.ts:112`), which predates
+   * the conference column by two constitution majors. Exempted by name with the reason stated,
+   * per D14's rule — an exemption without a reason is indistinguishable from a weakening.
+   */
+  const UNRELATED_FORMAT = ['images/avatar.ts']
+
+  const normalised = (path: string): string => label(path).split(/[\\/]/).join('/')
+
+  it('recognises the shapes it exists to catch, and ignores the two legitimate ones', () => {
+    // Must catch: a schema PROPERTY named format, a column read, an assignment, a select.
+    expect(CONFERENCE_FORMAT_REFERENCE.test("format: { type: 'string' }")).toBe(true)
+    expect(CONFERENCE_FORMAT_REFERENCE.test('conference.format === null')).toBe(true)
+    expect(CONFERENCE_FORMAT_REFERENCE.test('format: events.format,')).toBe(true)
+    expect(CONFERENCE_FORMAT_REFERENCE.test('.orderBy(events.format)')).toBe(true)
+
+    // Must ignore: the JSON-schema keyword and the Intl formatter call.
+    expect(CONFERENCE_FORMAT_REFERENCE.test("id: { type: 'string', format: 'uuid' }")).toBe(false)
+    expect(CONFERENCE_FORMAT_REFERENCE.test('formatter.format(new Date())')).toBe(false)
+  })
+
+  it('lets no module outside the write path reference the conference format', () => {
+    const referencing = files
+      .filter((path) => CONFERENCE_FORMAT_REFERENCE.test(codeOnly(path)))
+      .map(normalised)
+
+    const offenders = referencing.filter(
+      (name) => !FORMAT_CARRIERS.includes(name) && !UNRELATED_FORMAT.includes(name),
+    )
+    expect(
+      offenders,
+      'A module outside the write path references the conference format. FR-1047 forbids ' +
+        'anything branching on it — no filter, no ordering, no validation rule, no ' +
+        'notification, no visibility condition. If this is a new legitimate carrier of the ' +
+        'value, adding it to FORMAT_CARRIERS is the conversation.',
+    ).toEqual([])
+
+    // Non-vacuity: the carriers themselves must match, or the pattern has rotted.
+    for (const carrier of FORMAT_CARRIERS) {
+      expect(
+        referencing,
+        `${carrier} no longer references format — the pattern is stale`,
+      ).toContain(carrier)
+    }
+  })
+
+  it('declares a format property on administrative contract paths alone', () => {
+    const contract = JSON.parse(
+      readFileSync(
+        fileURLToPath(new URL('../../../../contracts/openapi.json', import.meta.url)),
+        'utf8',
+      ),
+    ) as { paths: Record<string, unknown> }
+
+    const declaresFormatProperty = (node: unknown): boolean => {
+      if (node === null || typeof node !== 'object') return false
+      for (const [key, value] of Object.entries(node as Record<string, unknown>)) {
+        if (
+          key === 'properties' &&
+          value !== null &&
+          typeof value === 'object' &&
+          'format' in (value as Record<string, unknown>)
+        ) {
+          return true
+        }
+        if (declaresFormatProperty(value)) return true
+      }
+      return false
+    }
+
+    const carriers = Object.entries(contract.paths)
+      .filter(([, definition]) => declaresFormatProperty(definition))
+      .map(([path]) => path)
+
+    expect(
+      carriers.filter((path) => !path.startsWith('/admin')),
+      'An attendee-reachable path serialises the conference format. The attendee client cannot ' +
+        'branch on a value it is never sent, and that is the structural half of FR-1047.',
+    ).toEqual([])
+
+    // Non-vacuity: the administrative surface does carry it, or this walk found nothing.
+    expect(
+      carriers.length,
+      'no contract path carries format at all — the walk is stale',
+    ).toBeGreaterThan(0)
+  })
+})

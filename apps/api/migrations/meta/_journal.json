@@ -78,6 +78,13 @@
       "when": 1786601533140,
       "tag": "0011_conference_authoring",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1786759669908,
+      "tag": "0012_conference_authoring_tranche_2",
+      "breakpoints": true
     }
   ]
 }

@@ -72,7 +72,7 @@ test.describe('saved sessions', () => {
     await expect(removeControl(page, second)).toBeVisible()
 
     // ── Filter to Saved — SC-200's second of two interactions ────────────────────────────
-    await page.getByRole('radio', { name: 'Saved' }).check()
+    await page.getByRole('radio', { name: 'My agenda' }).check()
     await expect(page.getByRole('heading', { level: 3 })).toHaveCount(2)
     await expect(page.getByRole('heading', { level: 3, name: first })).toBeVisible()
     await expect(page.getByRole('heading', { level: 3, name: second })).toBeVisible()
@@ -88,7 +88,7 @@ test.describe('saved sessions', () => {
     await signIn(otherPage, ADA)
     await goToAgenda(otherPage)
 
-    await otherPage.getByRole('radio', { name: 'Saved' }).check()
+    await otherPage.getByRole('radio', { name: 'My agenda' }).check()
     await expect(
       otherPage.getByRole('heading', { level: 3 }),
       'Saved sessions are durable server-side state, not something the browser was holding.',
@@ -104,8 +104,8 @@ test.describe('saved sessions', () => {
 
     await otherPage.reload()
     await goToAgenda(otherPage)
-    await otherPage.getByRole('radio', { name: 'Saved' }).check()
-    await expect(otherPage.getByText(/nothing saved yet/i)).toBeVisible()
+    await otherPage.getByRole('radio', { name: 'My agenda' }).check()
+    await expect(otherPage.getByText(/nothing on your agenda yet/i)).toBeVisible()
 
     await otherDevice.close()
   })
@@ -126,7 +126,7 @@ test.describe('saved sessions', () => {
     await goToAgenda(page)
     await expect(removeControl(page, title)).toBeVisible()
 
-    await page.getByRole('radio', { name: 'Saved' }).check()
+    await page.getByRole('radio', { name: 'My agenda' }).check()
     await expect(
       page.getByRole('heading', { level: 3, name: title }),
       'Saving the same session twice must not produce two entries in the agenda.',
@@ -136,7 +136,7 @@ test.describe('saved sessions', () => {
     // the empty state rather than a blank list. The row is gone from *this* view by design, so
     // the return to an unsaved state is confirmed back on All.
     await removeControl(page, title).click()
-    await expect(page.getByText(/nothing saved yet/i)).toBeVisible()
+    await expect(page.getByText(/nothing on your agenda yet/i)).toBeVisible()
 
     await page.getByRole('radio', { name: 'All sessions' }).check()
     await expect(saveControl(page, title)).toBeVisible()
@@ -147,10 +147,10 @@ test.describe('saved sessions', () => {
     await signIn(page, ADA)
     await goToAgenda(page)
 
-    await page.getByRole('radio', { name: 'Saved' }).check()
+    await page.getByRole('radio', { name: 'My agenda' }).check()
 
     // Nothing is seeded, so this is what a reviewer sees first — deliberately.
-    await expect(page.getByText(/nothing saved yet/i)).toBeVisible()
+    await expect(page.getByText(/nothing on your agenda yet/i)).toBeVisible()
     await expect(page.getByRole('heading', { level: 3 })).toHaveCount(0)
 
     await page.getByRole('button', { name: 'Show all sessions' }).click()

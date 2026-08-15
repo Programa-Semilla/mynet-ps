@@ -47,7 +47,7 @@ const renderDialog = (services: ReturnType<typeof stubServices>, onCreated = vi.
   return { onClose, onCreated }
 }
 
-/** Fills every field with a valid conference. */
+/** Fills every field with a valid conference — the modality included, per FR-1059b. */
 const fillIn = async (
   user: ReturnType<typeof userEvent.setup>,
   overrides: Partial<{ startsOn: string; endsOn: string }> = {},
@@ -56,6 +56,7 @@ const fillIn = async (
   await user.type(screen.getByLabelText('Location'), 'A Venue')
   await user.type(screen.getByLabelText('First day'), overrides.startsOn ?? '2028-05-01')
   await user.type(screen.getByLabelText('Last day'), overrides.endsOn ?? '2028-05-03')
+  await user.selectOptions(screen.getByLabelText('Modality'), 'in-person')
 }
 
 describe('creating a conference', () => {
@@ -72,6 +73,55 @@ describe('creating a conference', () => {
 
     await fillIn(user)
     expect(create).toBeEnabled()
+  })
+
+  /**
+   * T191 (014 tranche 2) — **creation collects an explicit modality, and "nobody chose" is not
+   * submittable** (FR-1059b, FR-1048). The select opens on a disabled placeholder rather than
+   * a preselected value, because a default here would be FR-1048's silent default reintroduced
+   * one layer above the column that dropped it — and the server's own refusal
+   * (`modality_missing`) would never be seen through a form that always sends something.
+   */
+  it('will not submit without an explicit modality, and offers no default (FR-1059b, FR-1048)', async () => {
+    const user = userEvent.setup()
+    const services = stubServices({ session: { me: async () => identity('organizer') } })
+    renderDialog(services)
+
+    await user.type(screen.getByLabelText('Name'), 'A New Conference')
+    await user.type(screen.getByLabelText('Location'), 'A Venue')
+    await user.type(screen.getByLabelText('First day'), '2028-05-01')
+    await user.type(screen.getByLabelText('Last day'), '2028-05-03')
+
+    // Everything but the modality is filled, and nothing was preselected for it.
+    expect(screen.getByLabelText('Modality')).toHaveValue('')
+    expect(
+      screen.getByRole('button', { name: 'Create' }),
+      'a conference whose modality nobody chose must not be creatable from this form',
+    ).toBeDisabled()
+
+    await user.selectOptions(screen.getByLabelText('Modality'), 'virtual')
+    expect(screen.getByRole('button', { name: 'Create' })).toBeEnabled()
+  })
+
+  /** FR-1045 — a virtual hackathon is expressible: the two axes are independent controls. */
+  it('sends modality and format as two independent attributes (FR-1045)', async () => {
+    const user = userEvent.setup()
+    const createConference = vi.fn(async () => ({ id: 'event-9', joinCode: 'MYNET234' }))
+    const services = stubServices({
+      session: { me: async () => identity('organizer') },
+      catalog: { createConference },
+    })
+    renderDialog(services)
+
+    await fillIn(user)
+    await user.selectOptions(screen.getByLabelText('Modality'), 'virtual')
+    await user.selectOptions(screen.getByLabelText('Format'), 'hackathon')
+    await user.click(screen.getByRole('button', { name: 'Create' }))
+    await screen.findByText('MYNET234')
+
+    expect(createConference).toHaveBeenCalledWith(
+      expect.objectContaining({ modality: 'virtual', format: 'hackathon' }),
+    )
   })
 
   it('refuses a range that ends before it starts, by disabling rather than by explaining', async () => {

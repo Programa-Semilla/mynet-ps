@@ -1,5 +1,6 @@
 import type { Session } from '@mynet/data'
-import { Bookmark, BookmarkCheck } from 'lucide-react'
+import { Bookmark, BookmarkCheck, Ticket, TicketCheck } from 'lucide-react'
+import { useCallback, useId, useRef } from 'react'
 import { Link } from 'react-router'
 
 import { venueTimeOf } from './sessions.js'
@@ -92,61 +93,210 @@ export const ChangedChip = () => (
 )
 
 /**
- * T024 (005) — whether this row can be saved, and what doing so would mean.
+ * T024 (005), T208 (014 tranche 2) — whether this row carries the commitment control, and what
+ * activating it would mean.
  *
  * Optional on `SessionRow`, and that optionality is deliberate rather than convenience: this
- * row is also what the Home rest-of-day card renders. A mandatory save control would have
- * changed a card belonging to another feature, which standing decision 9 and FR-226 both
+ * row is also what the Home rest-of-day card renders. A mandatory commitment control would
+ * have changed a card belonging to another feature, which standing decision 9 and FR-226 both
  * forbid. Absent, the row is byte-for-byte the row 002 shipped.
+ *
+ * **`committed` is membership in the union commitment set** — a save on a mandatory session, a
+ * held place in an optional one. Which write `onToggle` runs is the hook's business, decided
+ * by the session's own kind (FR-1063); the affordance carries no kind because the session
+ * beside it already does.
  */
-export interface SaveAffordance {
-  readonly saved: boolean
+export interface CommitmentAffordance {
+  readonly committed: boolean
   readonly onToggle: () => void
 }
 
 /**
- * The save control (FR-184, FR-186, FR-189, FR-196).
+ * T208 (014 tranche 2) — the ONE commitment control, whose identity is the session's kind
+ * (FR-184, FR-186, FR-189, FR-196, FR-1063, SC-1013).
+ *
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ * **EXACTLY ONE CONTROL PER SESSION, AND THE SESSION'S KIND DECIDES WHICH** (FR-1063). A
+ * mandatory session offers save/unsave, exactly as 005 shipped it. An optional session offers
+ * take-a-place/release — enrolment REPLACES saving there, so there is no second control, no
+ * bookmark beside the reservation, and no state in which the two could disagree (FR-1064).
+ * The cost is stated rather than mitigated: there is no way to keep an optional session in
+ * view without committing to a place (FR-1064a).
+ * ═════════════════════════════════════════════════════════════════════════════════════════
  *
  * ─────────────────────────────────────────────────────────────────────────────────────────
- * **The accessible name states what activating it will do, and changes with the state**
- * (FR-189). The icon carries the same information for a sighted reader and the name carries it
- * for everyone else; neither is the sole carrier. The session title is in the name because a
- * programme contains dozens of these, and "Save" repeated forty times tells a screen-reader
- * user which control they are on and nothing about which session.
+ * **The accessible name states what activating it will do, and changes with the state and the
+ * kind** (FR-189). The icon carries the same information for a sighted reader and the name
+ * carries it for everyone else; neither is the sole carrier. The session title is in the name
+ * because a programme contains dozens of these.
  *
  * **Never `disabled` while the write is in flight.** A disabled element is not focusable, so
  * the browser would move focus to the body and a keyboard reader would lose their place
- * mid-list — the handoff SC-206 tests across the whole journey. Re-entry is safe without it
- * because saving is idempotent (FR-187), so a double activation is the same request twice.
+ * mid-list. Re-entry is safe without it: saving and releasing are idempotent, and a repeated
+ * enrol is answered `already_enrolled` with its own sentence rather than an error state.
  *
- * **Touch sizing at 44px** (`size-11`), met by the control's own box rather than by padding on
- * the row, so the target is real at 320px without crowding the time, title and track beside it
- * (SC-211, FR-199).
+ * **Touch sizing at 44px** (`size-11`), met by the control's own box (SC-211, FR-199).
  *
  * No focus styling here: `:focus-visible` is applied once, globally, in `theme/tokens.css`.
- * Adding `focus:outline-none` is the prototype defect the constitution names by name.
  * ─────────────────────────────────────────────────────────────────────────────────────────
  */
-export const SaveControl = ({ session, save }: { session: Session; save: SaveAffordance }) => (
-  <button
-    type="button"
-    onClick={save.onToggle}
-    aria-label={
-      save.saved
-        ? `Remove ${session.title} from your agenda`
-        : `Save ${session.title} to your agenda`
-    }
-    className={`flex size-11 shrink-0 items-center justify-center rounded-md ${
-      save.saved ? 'text-accent-strong' : 'text-text-muted'
-    }`}
-  >
-    {save.saved ? (
-      <BookmarkCheck aria-hidden="true" className="size-5" />
-    ) : (
-      <Bookmark aria-hidden="true" className="size-5" />
-    )}
-  </button>
-)
+export const CommitmentControl = ({
+  session,
+  commitment,
+}: {
+  session: Session
+  commitment: CommitmentAffordance
+}) =>
+  session.kind === 'optional' ? (
+    <PlaceControl session={session} commitment={commitment} />
+  ) : (
+    <button
+      type="button"
+      onClick={commitment.onToggle}
+      aria-label={
+        commitment.committed
+          ? `Remove ${session.title} from your agenda`
+          : `Save ${session.title} to your agenda`
+      }
+      className={`flex size-11 shrink-0 items-center justify-center rounded-md ${
+        commitment.committed ? 'text-accent-strong' : 'text-text-muted'
+      }`}
+    >
+      {commitment.committed ? (
+        <BookmarkCheck aria-hidden="true" className="size-5" />
+      ) : (
+        <Bookmark aria-hidden="true" className="size-5" />
+      )}
+    </button>
+  )
+
+/**
+ * T147, T208 (014 tranche 2) — the optional session's half of the commitment control: take a
+ * place, or release the one held (FR-1063, FR-1067) — with the pre-enrolment notice in front
+ * of taking one (FR-1074).
+ *
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ * **THE NOTICE COMES BEFORE EVERY ENROLMENT, AND THAT IS A DECISION RATHER THAN A DEFAULT**
+ * (FR-1074). Holding a place makes the attendee's name visible to that conference's organizers
+ * — the fourth recorded Principle VIII exception, and the only one its subject can decline by
+ * not acting, which is only true if they know **before** they act. No recorded pattern for a
+ * remembered, once-per-attendee notice exists in this product, and inventing one would be
+ * durable per-attendee state nobody specified — so the notice is confirmed on every enrolment.
+ * The cost is one extra activation for a repeat enroller; the alternative's cost is a privacy
+ * disclosure somebody was told about once, months ago, on another device.
+ *
+ * A native `<dialog>` opened with `showModal()`, centred by the BASE rule in
+ * `theme/tokens.css` — never a local `m-auto`, which is the repeated defect that rule exists
+ * to end. Escape dismisses it (the platform's `cancel`), and focus returns to the control that
+ * opened it, explicitly, because `<dialog>` does not restore focus reliably across engines.
+ * Nested inside `SessionPanel`'s dialog this control's `cancel` reaches the panel's React
+ * handler too (009's finding); the panel guards on `event.target`, so one Escape closes only
+ * the notice.
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ */
+const PlaceControl = ({
+  session,
+  commitment,
+}: {
+  session: Session
+  commitment: CommitmentAffordance
+}) => {
+  const dialogRef = useRef<HTMLDialogElement>(null)
+  const openerRef = useRef<HTMLButtonElement>(null)
+  const headingId = useId()
+
+  // Close first, then restore focus: while the dialog is modal everything behind it is inert,
+  // and an inert element cannot take focus — SessionPanel's documented ordering, kept here.
+  const dismiss = useCallback(() => {
+    dialogRef.current?.close()
+    openerRef.current?.focus()
+  }, [])
+
+  const confirm = useCallback(() => {
+    commitment.onToggle()
+    dialogRef.current?.close()
+    openerRef.current?.focus()
+  }, [commitment])
+
+  return (
+    <>
+      <button
+        ref={openerRef}
+        type="button"
+        onClick={() => {
+          // Releasing needs no notice: the disclosure FR-1074 is about happens on TAKING a
+          // place, and withdrawing is the attendee reducing what is shared, not extending it.
+          if (commitment.committed) commitment.onToggle()
+          else dialogRef.current?.showModal()
+        }}
+        aria-label={
+          commitment.committed
+            ? `Release your place in ${session.title}`
+            : `Take a place in ${session.title}`
+        }
+        className={`flex size-11 shrink-0 items-center justify-center rounded-md ${
+          commitment.committed ? 'text-accent-strong' : 'text-text-muted'
+        }`}
+      >
+        {commitment.committed ? (
+          <TicketCheck aria-hidden="true" className="size-5" />
+        ) : (
+          <Ticket aria-hidden="true" className="size-5" />
+        )}
+      </button>
+
+      <dialog
+        ref={dialogRef}
+        aria-labelledby={headingId}
+        onCancel={(event) => {
+          // Escape: the platform would close the dialog anyway; routed through `dismiss` so the
+          // focus restoration cannot be skipped. Prevented so nothing closes twice.
+          event.preventDefault()
+          // React re-delivers a nested dialog's `cancel` to ancestor handlers (009): stopping it
+          // here keeps SessionPanel's guard a second line of defence rather than the only one.
+          event.stopPropagation()
+          dismiss()
+        }}
+        // No `m-auto` and no positioning of this dialog's own: the base `dialog` rule in
+        // `theme/tokens.css` restores the user-agent centring Tailwind's reset removes.
+        className="w-full max-w-sm rounded-md border border-border-subtle bg-surface-raised p-0 backdrop:bg-surface-inverse/50"
+      >
+        <div className="px-4 py-4">
+          <h2 id={headingId} className="mb-2 font-display text-lg font-medium text-text-primary">
+            Before you take a place
+          </h2>
+          {/*
+            FR-1074 — the disclosure, in full, before the act. Names WHO sees WHAT: the
+            organizers of this conference, the attendee's name, because they prepare materials
+            for the people attending. Constitution v5.3.0 O1's condition — "the attendee is told
+            before they enrol" — is this paragraph.
+          */}
+          <p className="mb-4 text-sm text-text-body">
+            Holding a place puts your name on this session&rsquo;s enrolment list, which the
+            organizers of this conference can read — that is how they prepare for the people
+            attending. Release your place at any time to come off the list.
+          </p>
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={dismiss}
+              className="rounded-sm border border-border-strong px-3 py-2 text-sm font-medium text-text-primary"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={confirm}
+              className="rounded-sm bg-accent-strong px-3 py-2 text-sm font-medium text-text-inverse"
+            >
+              Take a place
+            </button>
+          </div>
+        </div>
+      </dialog>
+    </>
+  )
+}
 
 /**
  * One line of a programme: time, title, room, track, speakers — and, on Agenda, controls to
@@ -166,7 +316,7 @@ export const SaveControl = ({ session, save }: { session: Session; save: SaveAff
 export const SessionRow = ({
   session,
   timezone,
-  save,
+  commitment,
   openHref,
   registerOpener,
   changed = false,
@@ -176,11 +326,15 @@ export const SessionRow = ({
   /**
    * T076 (014) — whether **this attendee** has yet looked at this session since it materially
    * changed (FR-1030). Defaults to false, so the Home cards and the programme's "All" view —
-   * which know nothing about the attendee's saved set — render exactly the row they did before.
+   * which know nothing about the attendee's commitment set — render exactly the row they did
+   * before.
    */
   changed?: boolean
-  /** Omitted by the Home cards, which stay exactly as 002 built them. */
-  save?: SaveAffordance
+  /**
+   * Omitted by the Home cards, which stay exactly as 002 built them. T208 — was `save`; the
+   * control it renders is the commitment control, whose identity the session's kind decides.
+   */
+  commitment?: CommitmentAffordance
   /**
    * The address of this session's detail panel (FR-198). Absent on the Home cards, which render
    * this row and must not gain an Agenda-only affordance.
@@ -221,10 +375,15 @@ export const SessionRow = ({
         {session.cancelled && <CancelledChip />}
         {changed && !session.cancelled && <ChangedChip />}
       </div>
-      <p className="text-sm text-text-muted">{session.room.name}</p>
+      {/*
+        T193 (014 tranche 2) — no room line at all when the session has none (SC-1022). A
+        virtual session's whereabouts is its access link, shown on the detail panel; an empty
+        room line here would be the placeholder FR-138's reasoning already forbids for speakers.
+      */}
+      {session.room && <p className="text-sm text-text-muted">{session.room.name}</p>}
       <SpeakerLine speakers={session.speakers} />
     </div>
 
-    {save && <SaveControl session={session} save={save} />}
+    {commitment && <CommitmentControl session={session} commitment={commitment} />}
   </li>
 )

@@ -52,9 +52,23 @@ test.describe('durability', () => {
     // an attendee sees that was living in the old process's memory does not come back.
     await redeployApi()
 
-    await page.reload()
-
-    await expectOwnWorkspace(page, ADA)
+    // ───────────────────────────────────────────────────────────────────────────────────────
+    // **A reload loop, not one reload — because the browser's connection pool outlives the
+    // process it pooled connections to.** `redeployApi` returns only after `/ready` answers,
+    // but the page may still hold a kept-alive socket to the DEAD process; the first fetch on
+    // it is reset, the card classifies the rejection as offline, renders its failure state
+    // with a "Try again" control, and — correctly — never retries by itself. That is the
+    // product working as designed during a deploy window, and it failed this spec
+    // intermittently, under full-suite load only, for exactly the reason `api-process.ts`'s
+    // header warns this test is sensitive to. The guarantee under test is durability — the
+    // data is there when the attendee looks — not that a restart drops zero in-flight
+    // connections, so a look that retries is the honest assertion shape (`authoring.spec.ts`'s
+    // propagation loop, applied here).
+    // ───────────────────────────────────────────────────────────────────────────────────────
+    await expect(async () => {
+      await page.reload()
+      await expectOwnWorkspace(page, ADA)
+    }).toPass({ timeout: 45_000 })
   })
 
   test('the sign-in session itself survives redeployment', async ({ page }) => {
@@ -62,11 +76,15 @@ test.describe('durability', () => {
     await signIn(page, ADA)
 
     await redeployApi()
-    await page.reload()
 
-    // Sessions are rows, not process memory (FR-026). A restart that signed everybody out would
-    // mean every deployment logged the whole conference out mid-event.
-    await expect(page.getByRole('heading', { name: `Hello, ${ADA.displayName}` })).toBeVisible()
+    // The reload loop, for the stale-keep-alive reason the previous test documents: the
+    // session read itself can land on a pooled socket to the dead process.
+    await expect(async () => {
+      await page.reload()
+      // Sessions are rows, not process memory (FR-026). A restart that signed everybody out
+      // would mean every deployment logged the whole conference out mid-event.
+      await expect(page.getByRole('heading', { name: `Hello, ${ADA.displayName}` })).toBeVisible()
+    }).toPass({ timeout: 45_000 })
     await expect(page.getByLabel('Password', { exact: true })).toHaveCount(0)
   })
 

@@ -38,11 +38,37 @@ import { describe, expect, it } from 'vitest'
  * ─────────────────────────────────────────────────────────────────────────────────────────────
  */
 
-const WRITE_LAYER = fileURLToPath(new URL('../../src/db/queries/admin-catalog.ts', import.meta.url))
+/**
+ * T175 (014 tranche 2) — **the population is now TWO write layers, widened deliberately.**
+ * The vocabulary's acts commit with their entries under exactly the rule above (FR-1089a names
+ * FR-994's rule by number), and a new query module outside this list would be a write layer
+ * this guard never reads — the widening is the decision R20's gap analysis asks for, never a
+ * weakening: every assertion below runs over each file independently.
+ */
+const WRITE_LAYERS = [
+  fileURLToPath(new URL('../../src/db/queries/admin-catalog.ts', import.meta.url)),
+  fileURLToPath(new URL('../../src/db/queries/admin-vocabulary.ts', import.meta.url)),
+]
+
+/** The closed action set each write layer may record — an act recorded under another
+ * feature's name is an accountability record pointing at the wrong thing. */
+const ACTIONS_BY_LAYER: Record<string, readonly string[]> = {
+  'admin-catalog.ts': [
+    'create_conference',
+    'update_conference',
+    'write_catalog',
+    'delete_catalog',
+    'write_session',
+    'cancel_session',
+    'reinstate_session',
+    'delete_session',
+  ],
+  'admin-vocabulary.ts': ['write_vocabulary', 'retire_vocabulary_value', 'delete_vocabulary_value'],
+}
 
 /** 009's rule: every name below appears in the prose explaining it. */
-const code = (): string =>
-  readFileSync(WRITE_LAYER, 'utf8')
+const codeOf = (layer: string): string =>
+  readFileSync(layer, 'utf8')
     .replace(/\/\*[\s\S]*?\*\//g, ' ')
     .replace(/^\s*\/\/.*$/gm, ' ')
 
@@ -74,77 +100,77 @@ const callsIn = (source: string): string[] => {
 /** A call is atomic when its object argument is followed by a second one — the executor. */
 const passesExecutor = (call: string): boolean => /\}\s*,\s*\w+\s*,?\s*\)$/.test(call)
 
-describe('the authoring audit trail is transactional (T023, FR-1037)', () => {
-  it('finds the write layer and its audit calls — a gate that cannot fail is not a gate', () => {
-    const source = code()
-    expect(source.length, 'the authoring write layer is missing or empty').toBeGreaterThan(1_000)
-    expect(
-      callsIn(source).length,
-      'No `appendAuditEntry` calls were found in the authoring write layer. Either the audit ' +
-        'entries moved — in which case this assertion has to move with them — or the acts have ' +
-        'stopped recording anything at all (FR-1037).',
-    ).toBeGreaterThan(0)
-  })
+describe.each(WRITE_LAYERS.map((layer) => [layer.split('/').at(-1) as string, layer]))(
+  'the authoring audit trail is transactional in %s (T023, FR-1037)',
+  (name, layer) => {
+    it('finds the write layer and its audit calls — a gate that cannot fail is not a gate', () => {
+      const source = codeOf(layer)
+      expect(source.length, 'the authoring write layer is missing or empty').toBeGreaterThan(1_000)
+      expect(
+        callsIn(source).length,
+        'No `appendAuditEntry` calls were found in the authoring write layer. Either the audit ' +
+          'entries moved — in which case this assertion has to move with them — or the acts have ' +
+          'stopped recording anything at all (FR-1037).',
+      ).toBeGreaterThan(0)
+    })
 
-  it('passes the acting transaction on every call', () => {
-    const bare = callsIn(code()).filter((call) => !passesExecutor(call))
+    it('passes the acting transaction on every call', () => {
+      const bare = callsIn(codeOf(layer)).filter((call) => !passesExecutor(call))
 
-    expect(
-      bare,
-      'An authoring act appends its audit entry outside the transaction that performs the act. ' +
-        'If the insert fails, the act still commits — unrecorded — which is precisely what ' +
-        'FR-1037 promises cannot happen. Pass the transaction as the second argument.\n\n' +
-        'This is not hypothetical: 013 shipped exactly this defect, in a function whose own ' +
-        'header claimed every caller passed one.',
-    ).toEqual([])
-  })
+      expect(
+        bare,
+        'An authoring act appends its audit entry outside the transaction that performs the act. ' +
+          'If the insert fails, the act still commits — unrecorded — which is precisely what ' +
+          'FR-1037 promises cannot happen. Pass the transaction as the second argument.\n\n' +
+          'This is not hypothetical: 013 shipped exactly this defect, in a function whose own ' +
+          'header claimed every caller passed one.',
+      ).toEqual([])
+    })
 
-  it('takes its executor as a required parameter, never a defaulted one', () => {
-    // ───────────────────────────────────────────────────────────────────────────────────────
-    // The other half, and the one that made 013's defect possible. `appendAuditEntry` defaults
-    // its executor to the pool — correctly, for the single caller that has no transaction to
-    // join — which means **the unsafe call is the shorter one to write**. Every function in the
-    // authoring write layer therefore requires a `tx`, so the mistake cannot be made silently.
-    //
-    // Matched on the parameter list rather than on a call, because the failure is a signature
-    // that permits the omission rather than a call site that takes it.
-    // ───────────────────────────────────────────────────────────────────────────────────────
-    const source = code()
-    const optional = [...source.matchAll(/\btx\s*(\?|=)\s*/g)].map((match) => match[0])
+    it('takes its executor as a required parameter, never a defaulted one', () => {
+      // ───────────────────────────────────────────────────────────────────────────────────────
+      // The other half, and the one that made 013's defect possible. `appendAuditEntry` defaults
+      // its executor to the pool — correctly, for the single caller that has no transaction to
+      // join — which means **the unsafe call is the shorter one to write**. Every function in the
+      // authoring write layer therefore requires a `tx`, so the mistake cannot be made silently.
+      //
+      // Matched on the parameter list rather than on a call, because the failure is a signature
+      // that permits the omission rather than a call site that takes it.
+      // ───────────────────────────────────────────────────────────────────────────────────────
+      const source = codeOf(layer)
+      const optional = [...source.matchAll(/\btx\s*(\?|=)\s*/g)].map((match) => match[0])
 
-    expect(
-      optional,
-      'A function in the authoring write layer takes its transaction as optional or defaulted. ' +
-        'That makes the unrecorded-act path the shorter one to write, which is how 013 shipped ' +
-        'this defect. Require it.',
-    ).toEqual([])
-  })
+      expect(
+        optional,
+        'A function in the authoring write layer takes its transaction as optional or defaulted. ' +
+          'That makes the unrecorded-act path the shorter one to write, which is how 013 shipped ' +
+          'this defect. Require it.',
+      ).toEqual([])
+    })
 
-  it('names an authoring action on every call, from the closed set', () => {
-    // A call that passes a transaction and writes the wrong action is atomic and useless. The
-    // check constraint would refuse an undeclared one at runtime;
-    // `admin-audit-completeness.test.ts` fails the build first. This asserts the narrower thing:
-    // every call in *this* module writes one of 014's eight.
-    const used = [...code().matchAll(/action:\s*'([a-z_]+)'/g)].map((match) => match[1] as string)
+    it('names an authoring action on every call, from the closed set', () => {
+      // A call that passes a transaction and writes the wrong action is atomic and useless. The
+      // check constraint would refuse an undeclared one at runtime;
+      // `admin-audit-completeness.test.ts` fails the build first. This asserts the narrower
+      // thing: every call in *this* module writes one of its own declared actions.
+      const used = [...codeOf(layer).matchAll(/action:\s*'([a-z_]+)'/g)].map(
+        (match) => match[1] as string,
+      )
 
-    expect(used.length, 'no audit actions found in the authoring write layer').toBeGreaterThan(0)
+      expect(used.length, 'no audit actions found in the authoring write layer').toBeGreaterThan(0)
 
-    const authoring = [
-      'create_conference',
-      'update_conference',
-      'write_catalog',
-      'delete_catalog',
-      'write_session',
-      'cancel_session',
-      'reinstate_session',
-      'delete_session',
-    ]
+      const declared = ACTIONS_BY_LAYER[name] ?? []
+      expect(
+        declared.length,
+        `${name} has no declared action set in ACTIONS_BY_LAYER`,
+      ).toBeGreaterThan(0)
 
-    expect(
-      used.filter((action) => !authoring.includes(action)),
-      'The authoring write layer records an action outside the eight 014 declares. An act ' +
-        'recorded under another feature’s name is an accountability record pointing at the ' +
-        'wrong thing.',
-    ).toEqual([])
-  })
-})
+      expect(
+        used.filter((action) => !declared.includes(action)),
+        'A write layer records an action outside the set its feature declares. An act ' +
+          'recorded under another feature’s name is an accountability record pointing at the ' +
+          'wrong thing.',
+      ).toEqual([])
+    })
+  },
+)

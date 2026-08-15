@@ -68,8 +68,8 @@ test.describe('Agenda offline', () => {
       await expect(page.getByText(/saved on this device/i)).toBeVisible()
 
       // The saved filter works offline too: the saved set is cached alongside the programme.
-      await page.getByRole('radio', { name: 'Saved' }).check()
-      await expect(page.getByText(/nothing saved yet/i)).toBeVisible()
+      await page.getByRole('radio', { name: 'My agenda' }).check()
+      await expect(page.getByText(/nothing on your agenda yet/i)).toBeVisible()
     } finally {
       await context.setOffline(false)
     }
@@ -111,12 +111,12 @@ test.describe('Agenda offline', () => {
     ).toBeVisible()
 
     // And nothing replayed itself while offline — exactly one save happened, the one just made.
-    await page.getByRole('radio', { name: 'Saved' }).check()
+    await page.getByRole('radio', { name: 'My agenda' }).check()
     await expect(page.getByRole('heading', { level: 3 })).toHaveCount(1)
 
     // Clean up.
     await page.getByRole('button', { name: `Remove ${title} from your agenda` }).click()
-    await expect(page.getByText(/nothing saved yet/i)).toBeVisible()
+    await expect(page.getByText(/nothing on your agenda yet/i)).toBeVisible()
   })
 
   test('an offline NOTE says there is no connection, and keeps the text (FR-218)', async ({

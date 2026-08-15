@@ -118,11 +118,21 @@ export const branchPoint = (repo: string): string => {
   )
 }
 
-/** Files changed since the branch point, optionally narrowed to a pathspec. */
+/**
+ * Files changed since the branch point, optionally narrowed to a pathspec.
+ *
+ * **Diffed against the working tree, not `HEAD`** (T197, tranche 2). This compared
+ * `${base} HEAD` and was blind to uncommitted work: on a developer's machine mid-feature, the
+ * diff-aware guards then judged a tree they were not looking at — `no-admin-surface`'s
+ * non-vacuity check failed against a feature whose files were all modified but none yet
+ * committed, which is the "comparison base is wrong" failure its own message describes. In CI
+ * the tree is clean, so `git diff ${base}` and `git diff ${base} HEAD` are the same set there;
+ * locally, only the working-tree form describes the feature as it stands.
+ */
 export const changedSinceBranchPoint = (repo: string, pathspec?: string): string[] => {
   const base = branchPoint(repo)
   const scope = pathspec ? ` -- ${pathspec}` : ''
-  return git(`git diff --name-only ${base} HEAD${scope}`, repo).split('\n').filter(Boolean)
+  return git(`git diff --name-only ${base}${scope}`, repo).split('\n').filter(Boolean)
 }
 
 /**

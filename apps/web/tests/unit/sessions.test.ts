@@ -32,6 +32,10 @@ const session = (
   startsAt,
   endsAt,
   cancelled,
+  // 014 tranche 2 — defaults matching every pre-tranche session; nothing in this file's two
+  // subjects (day scoping and cancellation) reads either field.
+  kind: 'mandatory',
+  accessLink: null,
   track: { id: 't', name: 'Track', colorToken: 'track-design' },
   room: { id: 'r', name: 'Room' },
   speakers: [],

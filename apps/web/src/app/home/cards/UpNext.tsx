@@ -86,7 +86,9 @@ const UpNextBody = ({
       </div>
 
       <h3 className="font-display text-lg font-medium text-text-primary">{upcoming.title}</h3>
-      <p className="text-sm text-text-muted">{upcoming.room.name}</p>
+      {/* T193 (014 tranche 2) — a virtual session has no room and gets no empty line
+          (SC-1022). A mechanical null guard forced by the type, not a redesign of this card. */}
+      {upcoming.room && <p className="text-sm text-text-muted">{upcoming.room.name}</p>}
       <SpeakerLine speakers={upcoming.speakers} />
 
       {upcoming.summary && <p className="mt-2 text-sm text-text-body">{upcoming.summary}</p>}

@@ -41,6 +41,15 @@ export const PROFILE_LIMITS = {
   headline: 200,
   interest: 60,
   /**
+   * T114 (014 tranche 2) — the taxonomy fields' bounds (FR-1090). `sector` and `subsector`
+   * bound the **vocabulary labels too** (`schema/vocabulary.ts` reads these constants), so an
+   * operator can never author a value no attendee can store — the same single-constant rule
+   * `interest` established for the interest options (R18).
+   */
+  sector: 120,
+  subsector: 120,
+  productiveActivity: 200,
+  /**
    * How many interests one attendee may hold.
    *
    * ───────────────────────────────────────────────────────────────────────────────────────
@@ -106,6 +115,33 @@ export const attendeeProfiles = pgTable(
     role: text('role'),
     headline: text('headline'),
 
+    /**
+     * T114 (014 tranche 2) — the taxonomy fields (FR-1090): a sector and subsector chosen
+     * from the product-wide controlled vocabulary, and a short free-text description of what
+     * this person actually makes or does.
+     *
+     * ═════════════════════════════════════════════════════════════════════════════════════
+     * **ALL NULLABLE, AND THAT IS FR-336 HOLDING** (FR-1091, FR-1097): every field optional,
+     * an incomplete profile valid, no capability gated on completeness. REQ-027's mandatory
+     * completion at sign-up is explicitly NOT granted.
+     *
+     * **Stored as the chosen LABEL, not a reference** (R18's model, extended): vocabulary
+     * membership — and FR-1087's subsector-belongs-to-chosen-sector rule — is enforced at
+     * the profile write in `queries/profiles.ts`, where the choosable set is unioned with
+     * what this attendee already holds (FR-1095b), so a held-but-retired value never blocks
+     * an unrelated save. FR-1094c's refusal to rename a held value is what makes carrying
+     * the label safe from divergence. No administrative tier can write any of these
+     * (FR-1093): maintaining the vocabulary is permitted, correcting somebody's chosen
+     * sector for them is not.
+     *
+     * **Attendee data**, like everything else in this table: cascades with the account,
+     * exported with the profile, governed by the one visibility decision (FR-1097, FR-1098).
+     * ═════════════════════════════════════════════════════════════════════════════════════
+     */
+    sector: text('sector'),
+    subsector: text('subsector'),
+    productiveActivity: text('productive_activity'),
+
     networkingIntent: text('networking_intent').$type<NetworkingIntent>(),
     availability: text('availability').$type<Availability>(),
 
@@ -134,6 +170,15 @@ export const attendeeProfiles = pgTable(
     ),
     check('attendee_profiles_networking_intent', oneOf('networking_intent', NETWORKING_INTENTS)),
     check('attendee_profiles_availability', oneOf('availability', AVAILABILITIES)),
+    check('attendee_profiles_sector_length', boundedOptionalText('sector', PROFILE_LIMITS.sector)),
+    check(
+      'attendee_profiles_subsector_length',
+      boundedOptionalText('subsector', PROFILE_LIMITS.subsector),
+    ),
+    check(
+      'attendee_profiles_productive_activity_length',
+      boundedOptionalText('productive_activity', PROFILE_LIMITS.productiveActivity),
+    ),
   ],
 )
 
@@ -144,9 +189,22 @@ export const attendeeProfiles = pgTable(
  * **A table rather than an array column**, because 006 filters a directory on interests and a
  * join is what makes that an index scan rather than a sequential unnest of every attendee.
  *
- * **A bounded list of short free-text values, not a controlled vocabulary** (Assumptions). A
- * fixed taxonomy would be an organizer-authored artifact, and Principle III puts that out of
- * scope — which is the same reason there is no `interests` reference table here.
+ * **T118 (014 tranche 2)** — this comment used to assert, as current fact, that interests are
+ * *"a bounded list of short free-text values, not a controlled vocabulary"*, because *"a fixed
+ * taxonomy would be an organizer-authored artifact, and Principle III puts that out of
+ * scope"*. **That premise was reversed by constitution v4.0.0**, and v5.3.0's tranche delivers
+ * the vocabulary (FR-1088) — so the sentence is rewritten rather than left to be quietly
+ * contradicted, because in this codebase the comment is the record.
+ *
+ * What holds now: a **new** interest is chosen from the product-wide vocabulary in
+ * `schema/vocabulary.ts` (authored at platform tier), while every value an attendee already
+ * holds — retained free text from before the change, and retired vocabulary values alike — is
+ * **kept, displayed, ranked and re-acceptable on their own writes** (FR-1095, FR-1095b).
+ * Membership is enforced at the write in `queries/profiles.ts`, never by a foreign key: the
+ * vocabulary ships empty, so on day one there is nothing to reference, and the mapping
+ * migration a foreign key would need is an administrative write to attendee records, which
+ * FR-1093 forbids (R18). **This table is otherwise untouched** — same text column, same
+ * composite primary key, same index, same length CHECK.
  * ─────────────────────────────────────────────────────────────────────────────────────────
  */
 export const attendeeInterests = pgTable(

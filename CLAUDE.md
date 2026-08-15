@@ -401,10 +401,13 @@ tests; three helpers named callers that were inlined copies. In a codebase whose
 the comment is the record, a header is a claim that needs a guard like any other — and **three of
 the four already had the executor parameter**, so what looked like design work was wiring.
 
-**Migrations claimed so far run to `0011`** (`0011_conference_authoring.sql`, applied; `0009` is
-013's and 010 added no schema). **012 still reserves `0010`, unclaimed — it adds no schema — and 015
-reserves `0012`.** That numbering was the **third** collision between parallel branches over a
-reservation, and **014 extended the roadmap's reserved-number table rather than correcting it**
+**Migrations claimed so far run to `0012`** (`0012_optional_sessions_and_taxonomy.sql`, claimed by
+014 tranche 2; `0009` is 013's, `0011` tranche 1's, and 010 added no schema). **`0010` is permanently
+unclaimed** — it was reserved for 012, which adds no schema, and **v5.3.0's decision 53 replaced
+reserve-in-advance with claim-at-generation**, so nothing will ever fill it; a gap in the sequence is
+the cheaper artifact than a fourth collision. That numbering was the **third** collision between
+parallel branches over a reservation, and **014 extended the roadmap's reserved-number table rather
+than correcting it**
 (T102): it stopped at the shipped attendee programme and covered neither programme in flight, so a
 feature reserving a number had nothing to read. The rule it gained is that a phase in a *parallel*
 programme must extend that table in the same change, because the branch it would otherwise collide
@@ -421,13 +424,69 @@ generated file is erased by the next regeneration, and putting it on a dedicated
 connection covers *every* migration, including `0003`, whose missing timeout was a recorded
 unclaimed defect from 004's review.
 
-**014 (Conference content authoring) is OPEN, with its first tranche implemented and green.**
-Brainstorm #11 rescoped it from a parallel branch on 2026-08-12, and the owner decided on 2026-08-14
-that **014 stays open and grows** rather than closing at what was built — #11's *"rescoped and kept
-whole"*, honoured literally. Tranche 2 is event types, optional sessions with capacity and enrolment,
-and the profile taxonomy; **two of its three parts are unblocked today**, and only the taxonomy waits
-on the client's interest, sector and subsector lists, which do not exist. It has no tasks and no
-code, and `specs/014-conference-content-authoring/spec.md` carries the scope. Everything below
+**014 (Conference content authoring) is SHIPPED — closed by tranche 2, squash-merged to `develop`
+in [#24](https://github.com/Programa-Semilla/mynet-ps/pull/24) on 2026-08-15.** Brainstorm #11
+rescoped it from a parallel branch on 2026-08-12, and the owner decided on 2026-08-14 that **014
+stays open and grows** rather than closing at what was built — #11's *"rescoped and kept whole"*,
+honoured literally; tranche 2 is what it grew into, and merging it is what closed the feature.
+
+**Tranche 2 is MERGED as of 2026-08-15, on constitution v5.3.0 — ratified 2026-08-14 — and it
+is the change that closed 014.** It carries **all three** outstanding rows: the event model
+(modality and format as two orthogonal axes, an optional room, a validated `https:`-only access link),
+optional sessions (capacity, a relative closing offset, enrolment **replacing** saving, a named
+roster), and the profile taxonomy. 93 requirements (FR-1045–FR-1099), 15 success criteria, 109 tasks
+(T106–T214), one PR, migration `0012`. **T206 and T207 — the by-hand walks of quickstart scenarios
+10–17, the latter needing a person and a phone — are outstanding and join the unwalked scenarios from
+007, 008, 009, 013, tranche 1 and 016.** Everything a machine can check is checked and green,
+including an end-to-end journey in which three attendees race for two places. **A deep review
+preceded the merge and is recorded as Part II of
+`specs/014-conference-content-authoring/review-findings.md`**: 107/107 spec compliance after one
+FR-1047 fix (a guard the `events.ts` header claimed existed and did not — 013's false-header class),
+then 20 findings from five perspectives, 16 fixed, 2 Minor deliberately deferred to a maintenance
+pass, and 2 Notable observations captured to `brainstorm/idea-inbox.md` — one of which, the roster
+read writing no audit entry, touches the fourth privacy exception's disclosure moment and deserves a
+decision rather than a rediscovery.
+
+**Invariants tranche 2 establishes:**
+
+- **The enrolment critical section is one lock with four callers** — enrol, release, a capacity
+  edit, and delete — all under `SELECT … FOR UPDATE` on the session row (research R12). N
+  concurrent takers of the last place produce exactly one refusal, and the refusal says the session
+  is **full**, which is a different sentence from **closed** (FR-1069/FR-1069a): the codes are
+  asserted mutually different, and adding a refusal means a distinct sentence plus updates to the
+  mutual-difference sets in both clients.
+- **`NOT_ENGAGEMENT` carries its first entry, and every future entry must say whose data it is and
+  why losing it silently is acceptable** (decision 51). An enrolment is outside decision 49's four,
+  so a session with held places may be deleted; the dialog states the number held and that nobody
+  will be told. **The held-places figure must never join `EngagementCounts`** (R15) — it would make
+  places-held sessions undeletable and quietly widen decision 49.
+- **The commitment set is one repository with a `saved | place` discriminator**, renamed
+  `CommitmentRepository` rather than grown a second member (R13). Remaining places is a **live
+  `passThrough` read** while the commitment set stays **cached** — deliberately opposite, because a
+  stale place count reads as a promise of a place.
+- **The fan-out is a union of savers and place-holders** — one coalesced notification per attendee,
+  whichever commitment they hold (`dispatch-no-commitments` renames tranche 1's guard to say so).
+- **Discover's filter options split by what the vocabulary is**: a closed choosable vocabulary is
+  offered whole (it is not population data), while roles keep accumulating what the reader has seen
+  (T214; guarded by `discover-filter-options.test.ts`).
+- **A CHECK constraint over an enumerated set is DERIVED from the source of that set**
+  (`ADMIN_AUDIT_ACTIONS`), never hand-copied — a 14-action literal drifted and broke only in
+  cross-file-order runs.
+- **A new integration file that depends on the seed reseeds in `beforeAll`.** Files run in size
+  order, so a tranche that changes file sizes re-exposes D19's weakness in files that never
+  changed; seven new files gained `resetDatabase()`.
+- **A CORS method list is exercised by nothing but a real browser's preflight.** `PATCH` — every
+  administrative update verb — was missing from it while all of T086's route-level tests passed,
+  because `fastify.inject()` performs no preflight; found by T202's end-to-end suite when every
+  admin edit failed as an opaque network error. The list in `app.ts` now carries a comment per
+  method naming its callers.
+
+**The record said the taxonomy was blocked on the client's lists, and that was wrong.** Brainstorm #12
+found REQ-035 names the four sectors verbatim — Servicios, Comercio, Industria, Agro — and that #11
+had already ruled the taxonomy to be authored or seeded data rather than a spec constant. What is
+missing is the *subsector* and *interest* lists: content for a surface, not a prerequisite for building
+one. **It also found two requirements already shipped**: REQ-012's "short description" is
+`sessions.summary`, and REQ-014's "presenters" are `speakers`. Everything below this paragraph
 describes **tranche 1**, which is complete.
 
 **Tranche 1 is implemented**, on constitution **v5.2.0** — the amendment
@@ -1397,6 +1456,59 @@ personal data about people who are not attendees, which is not new, but v5.2.0 m
 attendee typing into a form. **Entry 29 shares a boundary with v5.0.0's entry 27** — both are about
 what the product discloses about a person without asking them — and they are deliberately not merged.
 
+**2026-08-14** (ratified in constitution **v5.3.0**) — **the amendment gating 014 tranche 2, the change
+that closes 014. It is the first amendment to grant a Principle VIII exception that the principle's own
+text had predicted in advance**: that text read *"Three exceptions are recorded; a fourth needs a fourth
+amendment"*, and this is the fourth. MINOR, judged explicitly against a real MAJOR argument — it
+narrows FR-1042, and v3.0.0 was MAJOR for retracting a delivered requirement. It does not carry because
+FR-1042 is **narrowed, not withdrawn**: it survives intact for saved sessions, notes, questions and
+votes, and yields only for enrolment, only to an assigned organizer. Adding a Principle VIII exception
+was MINOR in both v3.3.0 and v4.1.0.
+
+50. **A named enrolment roster is visible to a conference organizer assigned to that conference.** The
+    **fourth** recorded Principle VIII exception, and the first administrative read of attendee state
+    this project has ever permitted. Four conditions bind: **only an assigned organizer**, for their
+    own conferences (a platform operator holds it by the product-wide authority they already have);
+    **only enrolment** — no saved session, private note, question or vote is disclosed to any
+    administrative tier, and FR-1042 survives unnarrowed for all four; **only that conference's
+    sessions**, so it is not a directory, not a cross-conference view of one attendee and not a route
+    into a profile; and **the attendee is told before they enrol**, which makes this the only one of
+    the four exceptions the subject can decline by not acting. Motivated by REQ-086: an organizer told
+    to close enrolment early *because materials must be prepared* cannot prepare them for people they
+    cannot name. **Recorded rather than reasoned away**: an enrolment is arguably not "messages, notes,
+    and appointments" as the private-content clause enumerates them, so a feature could have concluded
+    no exception was needed — which is exactly the shortcut v3.3.0 and v4.1.0 each refused.
+51. **An enrolment is NOT engagement, and a session with places held MAY be deleted.** Decision 49's
+    set stays at four — a saved session, a private note, a question, a vote — and a fifth attachment
+    type is declared **outside** it. **The cost is ratified, not overlooked**: because enrolling
+    *replaces* saving on an optional session, an enrolled attendee holds no saved row, so deleting
+    that session destroys held places **with no notification, no marker and no trace**, and the person
+    finds out by arriving. Delivering it requires the **first entry** in a `NOT_ENGAGEMENT` list that
+    is empty by design and demands each entry say *whose data it is and why losing it silently is
+    acceptable*. This sits against decision 49's own rationale, and that tension is why it is written
+    down. **It is NOT precedent for narrowing decision 49's four**, and whether such a deletion should
+    notify the enrolled is **register entry 31**.
+52. **An attendee may be shown the number of remaining places** — "4 places left". This is **not** the
+    count v5.2.0's N2 forbids: N2's subject is a count of *changes*, and this is a fact about one
+    session's availability at the moment somebody decides whether to take a seat. It is the same
+    *family*, so it is ratified deliberately rather than inherited by silence. **N2 is untouched and
+    unweakened.**
+53. **Migration numbers are claimed at generation, not reserved in advance**, and the claiming feature
+    MUST extend the roadmap's number table in the same change. Reserve-in-advance collided three times
+    and each collision left a permanent artifact rather than a one-off fix — the journal carries
+    `idx: 10` against tag `0011_conference_authoring` and snapshot `0010_snapshot.json`, a three-way
+    skew every future generation must be told about. It also held `0010` for a phase that adds no
+    schema at all. **Reserving only works when branches can see each other's reservations, and the
+    recurring lesson of this project is that they cannot.**
+
+**One register entry opened by v5.3.0, and it blocks nothing**: **31** — whether deleting a session
+should notify the attendees enrolled in it. Decision 51 makes such a deletion silent, and the remedy
+would be a **third** notification trigger and therefore another amendment, so it is opened rather than
+solved — the same reasoning v4.0.0 gave when it predicted the third privacy exception and refused to
+grant it by inference. **It shares a boundary with entry 29** — both are about what the product fails
+to tell somebody about their own commitments — and they are deliberately not merged: a suppression
+preference and a missing trigger are different mechanisms with different costs.
+
 
 ## How work is done here
 
@@ -1578,19 +1690,21 @@ lesson about version numbers three times over. **A third strand now runs beside 
 feedback programme that v5.0.0 opened, of which **016 is delivered and 017 (the Q&A rebuild) is
 not startable**.
 
-**014's tranche 1 is MERGED to `develop`, and 014 itself remains OPEN.** That sentence replaces one
-written a day earlier saying nothing was in flight, and one written hours earlier saying this work
-would be held un-integrated — **the hold was reversed the same day, before it took effect.**
+**014 is CLOSED: both tranches are merged to `develop`.** That sentence replaces one saying tranche
+1 was merged and 014 remained open, which itself replaced one written a day earlier saying nothing
+was in flight, and one written hours earlier saying this work would be held un-integrated — **the
+hold was reversed the same day, before it took effect.**
 
 Tranche 1 landed via PR [#23](https://github.com/Programa-Semilla/mynet-ps/pull/23), squash-merged
 after all eleven CI jobs passed and `verify:clean` ran 13 of 13 green against a database that had
 never existed. It carries constitution **v5.2.0**, migration `0011`, and `deviations.md` **D22**.
 
-**What "open" now means, precisely, because the branch is gone.** The feature is not complete:
-tranche 2 — event types, optional sessions with capacity and enrolment, the profile taxonomy — has no
-code and no tasks. `specs/014-conference-content-authoring/` stays in place and carries that scope.
-**Tranche 2 starts from a fresh branch off `develop`**, against the same spec directory, and it is
-the change that closes 014.
+**Tranche 2 landed via PR [#24](https://github.com/Programa-Semilla/mynet-ps/pull/24)**,
+squash-merged 2026-08-15 from `spec/014-conference-content-authoring-tranche-2` — a fresh branch off
+`develop` against the same spec directory — after all eleven CI jobs passed and its deep review
+(Part II of `review-findings.md`) closed. Delivered as specified: event types, optional sessions
+with capacity and enrolment, the profile taxonomy, migration `0012`. What remains of 014 is the
+by-hand validation (T206/T207) that every feature since 007 has carried forward.
 
 **Merging rather than holding removed a standing obligation, and that is why it was the better
 choice.** Held, this branch would have had to re-merge `develop` on every merge to `develop` —
@@ -1599,11 +1713,12 @@ separate numbering tables: constitution version, standing decisions, register en
 session number, and nearly the migration number. Integrated, that debt is paid and tranche 2 begins
 from a current base. This is the collision itself, recorded where it happened: 016 was authored on
 `develop` while 014 was authored on a branch taken before it, and each artifact honestly described a
-project in which the other did not exist. 014 is implemented and merged `develop` into itself on
-2026-08-14, taking the renumbering described under standing decision 45. **017 is blocked** —
-register entry 27 (Q&A attribution) is the first open question to block a feature since v3.2.0, and
-it is the client's to answer; the case that decides it is two attendees named Ana at one event.
-**012 is blocked** on register entries 22 and 4. **015 is startable.** Choosing among them is an
+project in which the other did not exist. 014 merged `develop` into itself on 2026-08-14, taking
+the renumbering described under standing decision 45, and closed in #24 the next day. **With 014
+done, the administrative programme has one feature left — 015 — and it is the only startable work.**
+**017 is blocked** — register entry 27 (Q&A attribution) is the first open question to block a
+feature since v3.2.0, and it is the client's to answer; the case that decides it is two attendees
+named Ana at one event. **012 is blocked** on register entries 22 and 4. Choosing among them is an
 owner decision, not a planning inference.
 
 The closing sequence for 24, 25 and 26 is worth keeping, because it is the argument for opening
@@ -1629,6 +1744,16 @@ not been opened deliberately.
   attendee typing into a form. Principle VIII has only ever considered attendees, and both coverage
   tests derive from the schema, so the question they cannot ask is who answers for somebody who never
   signed up. **Blocks nothing today; blocks any claim that Principle VIII's coverage is complete.**
+
+- **Register entry 31 — whether deleting a session should notify the attendees enrolled in it.**
+  Opened by v5.3.0. Standing decision 51 places an enrolment outside decision 49's engagement set, so a
+  session with places held may be deleted — and because enrolling **replaces** saving on an optional
+  session, those attendees hold no saved row and are reached by no marker and no push. **A held place
+  can disappear with no trace, and the person learns by arriving.** The obvious remedy is exactly what
+  cannot be done cheaply: a deletion is not one of the three material changes, so notifying on it is a
+  **third trigger** and needs its own amendment. Opened rather than solved, on the reasoning v4.0.0
+  gave when it predicted the third privacy exception and refused to grant it by inference. **Blocks
+  nothing**; the product behaves as decision 51 ratifies.
 
 - **Register entries 19 and 21 are ADDRESSED but NOT closed — by v4.0.0, v4.1.0, or 013 shipping.**
   013 built the first actor capable of moderating an avatar and of reading a report queue, and

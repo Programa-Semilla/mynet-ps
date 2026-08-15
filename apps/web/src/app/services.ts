@@ -18,10 +18,11 @@ import {
   HttpMessageRepository,
   HttpProfileRepository,
   HttpPushSubscriptionRepository,
+  HttpCommitmentRepository,
   HttpQuestionsRepository,
   HttpReportRepository,
-  HttpSavedSessionRepository,
   HttpSessionNotesRepository,
+  HttpVocabularyRepository,
   type CacheScope,
   type LocalCache,
 } from '@mynet/data/http'
@@ -143,29 +144,40 @@ export const createServices = (): PlatformServices => {
 
   /**
    * ═══════════════════════════════════════════════════════════════════════════════════════════
-   * **T075 (014) — `markViewed` IS A WRITE, AND ITS PURGE IS CORRECT RATHER THAN TOLERATED.**
+   * **T197 (014 tranche 2) — ONE REPOSITORY, TWO READS WITH OPPOSITE CACHE RULES, AND BOTH ARE
+   * DECLARED** (FR-1070b, research R13).
    *
-   * The decorator classifies every method not named in `reads` as a write, and a write purges the
-   * whole conference prefix. 008 met that as a defect — `slots` is a *read* that must stay live,
-   * and omitting it silently wiped the cached programme every time the scheduling dialog opened,
-   * which is why `passThrough` exists.
+   * This block used to end *"`passThrough` is deliberately empty: nothing in this repository is
+   * a read that must bypass the cache."* **Tranche 2 falsified that sentence and this rewrite is
+   * FR-1049's obligation discharged**: `places` is exactly such a read, and this repository is
+   * now the first in the product to carry a cached read, a live read and three writes at once.
    *
-   * This is the opposite case, and it needs no declaration at all. `markViewed` genuinely is a
-   * write: it clears the marker on a saved session, so the cached `saved` entry is stale the
-   * instant it succeeds. **The programme it purges alongside is the one that just changed** —
-   * the attendee is opening a session precisely because it moved — so re-reading is what they
-   * want rather than a cost.
+   * - **`listSaved` stays cached, unchanged.** It is the commitment set — saves AND held places,
+   *   one list with a discriminator — and FR-215's offline programme depends on it. The method
+   *   keeps its 005 name because this `reads` map and the cache resource key are configured
+   *   against it; renaming it would silently retire every device's cached entry.
    *
-   * `listSaved` stays the only cached read here. `passThrough` is deliberately empty: nothing in
-   * this repository is a read that must bypass the cache.
+   * - **`places` is `passThrough`, and that is MANDATORY rather than preferred** (FR-1070b).
+   *   Two independent reasons, either alone decisive: a stale seat count reads as a promise of
+   *   a place, so where the figure cannot be read live it is omitted, never served old; and the
+   *   decorator keys on `args[0]` alone, so a per-session `(eventId, sessionId)` read would
+   *   collide EVERY session onto one cache entry and serve the first session's count for the
+   *   second. `passThrough` sidesteps the key entirely, and the decorator's handler binds to
+   *   `target` — 008's `#private`-field lesson, verified rather than assumed.
+   *
+   * - **`enrol`, `release` and `markViewed` are writes, unnamed in both maps, and their purge is
+   *   correct rather than tolerated** (T075's argument, now three times over): the commitment
+   *   set each one purges is the one that just changed. 008 met the write branch as a defect —
+   *   `slots` was a read enrolled in it by omission — and this is the opposite case: these
+   *   three genuinely change what `listSaved` answers.
    * ═══════════════════════════════════════════════════════════════════════════════════════════
    */
-  const savedSessions = cached(
-    new HttpSavedSessionRepository(http),
+  const commitments = cached(
+    new HttpCommitmentRepository(http),
     store,
     identity.scope,
     { listSaved: 'saved' },
-    { freshness },
+    { freshness, passThrough: ['places'] },
   )
 
   const sessionNotes = cached(
@@ -224,7 +236,7 @@ export const createServices = (): PlatformServices => {
       events: new HttpEventsRepository(http),
       activeEvent,
       catalog,
-      savedSessions,
+      commitments,
       sessionNotes,
       // ─────────────────────────────────────────────────────────────────────────────────────
       // 004 — **deliberately NOT decorated with `cached`**, and the absence is a declaration
@@ -348,6 +360,21 @@ export const createServices = (): PlatformServices => {
       // `HttpClient` refuses when connectivity reports offline, and there is no queue in this
       // product to fall into.
       questions: new HttpQuestionsRepository(http),
+      // ─────────────────────────────────────────────────────────────────────────────────────
+      // 014 tranche 2 — **the vocabulary is NOT decorated with `cached`, and the refusal is
+      // written beside the member rather than achieved by leaving a line out** — the Feature
+      // Declarations rule: whether it is cached is a plan-stage decision that must be declared
+      // either way, because an omission and a decision look identical in a composition root.
+      //
+      // The reason differs from every declaration above, and is worth stating on its own: this
+      // is reference data, not personal data, so the privacy argument does not apply — what
+      // applies is FR-1094a. Age is the wrong clock for CHOOSABILITY: a retired value takes
+      // effect on the next request, and a cached list would keep offering a value the platform
+      // tier withdrew, for up to 24 hours, to exactly the people choosing now. The list is a
+      // handful of strings read when the profile editor opens; there is no offline capability
+      // worth buying with a stale one, and no write here to queue or refuse.
+      // ─────────────────────────────────────────────────────────────────────────────────────
+      vocabulary: new HttpVocabularyRepository(http),
     },
     freshness: {
       lastRetrieved: (eventId, content) =>

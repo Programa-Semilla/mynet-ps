@@ -144,12 +144,20 @@ describe('a cancelled session on Home', () => {
             listSessions: async () => [CANCELLED, LATER],
             listTracks: async () => [],
           },
-          savedSessions: {
+          commitments: {
             listSaved: async () =>
-              saved.map((sessionId) => ({ sessionId, changedSinceViewed: false })),
+              saved.map((sessionId) => ({
+                sessionId,
+                changedSinceViewed: false,
+                commitment: 'saved' as const,
+              })),
             save: async () => {},
             unsave: async () => {},
             markViewed: async () => {},
+            // 014 tranche 2 — enrolment no-ops; `places` rejects so the figure is omitted (FR-1070b).
+            enrol: async () => {},
+            release: async () => {},
+            places: async () => Promise.reject(new Error('places not configured in this test')),
           },
         })}
       >

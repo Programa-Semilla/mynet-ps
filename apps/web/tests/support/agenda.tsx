@@ -49,14 +49,26 @@ export const PROGRAMME = [MORNING, AFTERNOON, NEXT_DAY]
 
 export interface AgendaHarness {
   readonly sessions?: TestSession[]
-  /** Session ids already saved when the screen loads. */
+  /** Session ids already committed to when the screen loads (saves, unless listed in `places`). */
   readonly saved?: string[]
   /**
-   * T076 (014) — session ids the attendee has saved and **not yet looked at since they changed**
-   * (FR-1030). A subset of `saved` in practice: the marker is per saved session, and there is no
-   * marker on a session nobody saved.
+   * T196 (014 tranche 2) — the subset of `saved` that are held PLACES rather than saves: those
+   * rows carry `commitment: 'place'` on the one discriminated list (R13). Ids here must also be
+   * in `saved`, because the union is one set.
+   */
+  readonly places?: string[]
+  /**
+   * T076 (014) — session ids the attendee has committed to and **not yet looked at since they
+   * changed** (FR-1030). A subset of `saved` in practice: the marker is per commitment, and
+   * there is no marker on a session nobody committed to.
    */
   readonly changed?: string[]
+  /**
+   * T209 (014 tranche 2) — what the live `places` read answers. An `Error` makes it fail, which
+   * the panel renders as the figure being OMITTED (FR-1070b). Defaults to failing, so a test
+   * that never mentions places renders no figure rather than an invented one.
+   */
+  readonly placesAvailability?: { remaining: number; open: boolean } | Error
   readonly overrides?: Partial<PlatformServices['repositories']>
   readonly devices?: Partial<PlatformServices['devices']>
   /**
@@ -69,28 +81,40 @@ export interface AgendaHarness {
 }
 
 /**
- * A saved-session repository over an in-memory set, recording what it was asked to do.
+ * A commitment repository over an in-memory set, recording what it was asked to do.
  *
- * Real enough that the screen's behaviour is the screen's rather than the double's: `save`
- * and `unsave` actually change what `listSaved` returns, so a component that never re-reads
- * is caught rather than accommodated.
+ * Real enough that the screen's behaviour is the screen's rather than the double's: the four
+ * writes actually change what `listSaved` returns, so a component that never re-reads is
+ * caught rather than accommodated. T196 renamed it from `savedSessionsDouble` with the
+ * repository it doubles: the set carries held places as well as saves.
  */
-export const savedSessionsDouble = (
+export const commitmentsDouble = (
   initial: string[] = [],
   /**
-   * T076 (014) — the saved sessions this attendee has not yet looked at since they changed
+   * T076 (014) — the committed sessions this attendee has not yet looked at since they changed
    * (FR-1030). Empty by default, so every existing test renders the rows it always did.
    */
   changed: string[] = [],
+  /** T196 — the subset of `initial` held as PLACES; their rows carry `commitment: 'place'`. */
+  places: string[] = [],
+  /** T209 — what the live `places` read answers; an Error means the figure is omitted. */
+  placesAvailability: { remaining: number; open: boolean } | Error = new Error(
+    'no places availability configured in this test',
+  ),
 ) => {
   const set = new Set(initial)
+  const held = new Set(places)
   const unviewed = new Set(changed)
-  const calls: Array<{ op: 'save' | 'unsave' | 'viewed'; sessionId: string }> = []
+  const calls: Array<{
+    op: 'save' | 'unsave' | 'viewed' | 'enrol' | 'release' | 'places'
+    sessionId: string
+  }> = []
   let failWith: Error | null = null
 
   return {
     calls,
     set,
+    held,
     unviewed,
     /** Makes the next and every subsequent write fail, for the refusal paths. */
     failWrites: (error: Error | null) => {
@@ -101,6 +125,9 @@ export const savedSessionsDouble = (
         [...set].map((sessionId) => ({
           sessionId,
           changedSinceViewed: unviewed.has(sessionId),
+          // One list, discriminated (R13): a held place is a row of this same read, which is
+          // exactly how the union reaches every consumer with no second request.
+          commitment: (held.has(sessionId) ? 'place' : 'saved') as 'saved' | 'place',
         })),
       save: async (_eventId: string, sessionId: string) => {
         if (failWith) throw failWith
@@ -117,20 +144,45 @@ export const savedSessionsDouble = (
        * marker for a session the attendee has just opened fails rather than being accommodated.
        *
        * **Deliberately not affected by `failWrites`.** A failed `markViewed` is silent by design
-       * (`useSavedSessions`), so making it fail here would assert nothing — the tests that care
-       * about refusal wording are about `save` and `unsave`.
+       * (`useCommitments`), so making it fail here would assert nothing — the tests that care
+       * about refusal wording are about the four commitment writes.
        */
       markViewed: async (_eventId: string, sessionId: string) => {
         calls.push({ op: 'viewed', sessionId })
         unviewed.delete(sessionId)
+      },
+      // T196 (014 tranche 2) — the enrolment writes, as real as `save`/`unsave` above: they
+      // change what `listSaved` returns, so the exclusivity property — an optional session is
+      // committed to by enrolling, never by saving — is observable in `calls` rather than
+      // assumed.
+      enrol: async (_eventId: string, sessionId: string) => {
+        if (failWith) throw failWith
+        calls.push({ op: 'enrol', sessionId })
+        set.add(sessionId)
+        held.add(sessionId)
+      },
+      release: async (_eventId: string, sessionId: string) => {
+        if (failWith) throw failWith
+        calls.push({ op: 'release', sessionId })
+        set.delete(sessionId)
+        held.delete(sessionId)
+      },
+      places: async (_eventId: string, sessionId: string) => {
+        calls.push({ op: 'places', sessionId })
+        if (placesAvailability instanceof Error) throw placesAvailability
+        return placesAvailability
       },
     },
   }
 }
 
 export interface RenderedAgenda {
-  /** The saved-session double, so a test can inspect what the screen actually asked for. */
-  readonly saved: ReturnType<typeof savedSessionsDouble>
+  /**
+   * The commitment double, so a test can inspect what the screen actually asked for. Keyed
+   * `saved` since 005; kept to spare thirty call sites a rename that changes no meaning a test
+   * relies on — the double itself carries the honest name.
+   */
+  readonly saved: ReturnType<typeof commitmentsDouble>
   readonly services: PlatformServices
   readonly unmount: () => void
 }
@@ -145,18 +197,25 @@ export interface RenderedAgenda {
 export const renderAgenda = ({
   sessions = PROGRAMME,
   saved = [],
+  places = [],
   changed = [],
+  placesAvailability,
   overrides = {},
   devices = {},
   services: extraServices = {},
   at = '/agenda',
 }: AgendaHarness = {}): RenderedAgenda => {
-  const savedDouble = savedSessionsDouble(saved, changed)
+  const savedDouble = commitmentsDouble(
+    saved,
+    changed,
+    places,
+    placesAvailability ?? new Error('no places availability configured in this test'),
+  )
 
   const services = testServices(
     {
       catalog: { listSessions: async () => sessions, listTracks: async () => [] },
-      savedSessions: savedDouble.repository,
+      commitments: savedDouble.repository,
       ...overrides,
     },
     Object.keys(devices).length === 0

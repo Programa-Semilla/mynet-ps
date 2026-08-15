@@ -1,5 +1,5 @@
 import { OfflineError, type Session } from '@mynet/data'
-import { useCatalogRepository, useSavedSessionRepository } from '@mynet/platform'
+import { useCatalogRepository, useCommitmentRepository } from '@mynet/platform'
 import { useCallback } from 'react'
 import { Link } from 'react-router'
 
@@ -35,16 +35,25 @@ import type { EventCardProps, HomeCard } from '../contract.js'
  */
 const NextSavedSessionCard = ({ event }: EventCardProps) => {
   const catalog = useCatalogRepository()
-  const savedSessions = useSavedSessionRepository()
+  const commitments = useCommitmentRepository()
 
   const load = useCallback(async () => {
     // ───────────────────────────────────────────────────────────────────────────────────────
     // Both reads are this card's own. Neither is shared with a sibling, and neither is reached
     // through one — the cache makes them cheap without making them coupled.
+    //
+    // T198 (014 tranche 2) — **this card reads held places as well as saves, with NO read
+    // change** (FR-1066). The union arrives on `listSaved` itself: one list, one row per
+    // commitment, with a `saved | place` discriminator this card does not even need to consult
+    // — membership is its only question. That is R13's payoff, and it is why FR-1066's
+    // "the Home card that composes the attendee's own programme MUST read held places" is
+    // discharged by this comment and the renamed copy below rather than by new plumbing.
+    // "Up next" and the rest-of-day timeline read the whole programme and never the commitment
+    // set, so they need no change and are NOT cited here.
     // ───────────────────────────────────────────────────────────────────────────────────────
-    const [sessions, saved] = await Promise.all([
+    const [sessions, committed] = await Promise.all([
       catalog.listSessions(event.id),
-      savedSessions.listSaved(event.id),
+      commitments.listSaved(event.id),
     ])
 
     // =====================================================================================
@@ -64,43 +73,47 @@ const NextSavedSessionCard = ({ event }: EventCardProps) => {
     // one session, and nothing here can total them.
     // =====================================================================================
     const changed = new Set(
-      saved.filter((entry) => entry.changedSinceViewed).map((entry) => entry.sessionId),
+      committed.filter((entry) => entry.changedSinceViewed).map((entry) => entry.sessionId),
     )
-    const savedIds = new Set(saved.map((entry) => entry.sessionId))
+    const committedIds = new Set(committed.map((entry) => entry.sessionId))
 
     return sessions
-      .filter((session) => savedIds.has(session.id))
+      .filter((session) => committedIds.has(session.id))
       .map((session) => ({ ...session, changed: changed.has(session.id) }))
-  }, [catalog, savedSessions, event.id])
+  }, [catalog, commitments, event.id])
 
-  // `emptyWhen: () => false` — "nothing saved" is a state this card renders itself, with its
-  // own wording, because it is different from "nothing left today" and the attendee needs to
-  // be able to tell them apart (FR-225).
-  const saved = useAsync<MarkedSession[]>(load, [load], { emptyWhen: () => false })
+  // `emptyWhen: () => false` — "nothing committed to" is a state this card renders itself, with
+  // its own wording, because it is different from "nothing left today" and the attendee needs
+  // to be able to tell them apart (FR-225).
+  const programme = useAsync<MarkedSession[]>(load, [load], { emptyWhen: () => false })
 
   return (
     <section
-      aria-label="Next saved session"
+      // T194 (014 tranche 2) — was "Next saved session" (FR-1066a): an enrolled session
+      // appears here too, and a heading naming only saves would present the stronger
+      // commitment as a weaker presence. The registry id `next-saved-session` deliberately
+      // does NOT change — it is a stable append-only key four tests pin, not attendee copy.
+      aria-label="Next on your programme"
       className="h-full rounded-md border border-border-subtle bg-surface-raised px-4 py-4 shadow-card tablet:px-5"
     >
       <h2 className="mb-3 font-display text-base font-medium text-text-primary">
-        Next saved session
+        Next on your programme
       </h2>
 
-      {saved.status === 'loading' && <Loading label="Loading your saved sessions…" />}
+      {programme.status === 'loading' && <Loading label="Loading your agenda…" />}
 
-      {saved.status === 'failed' && (
+      {programme.status === 'failed' && (
         <Failed
           message={
-            saved.error instanceof OfflineError
-              ? 'Your saved sessions need a connection, and there is not one right now.'
-              : 'Your saved sessions could not be loaded. This is a problem on our side.'
+            programme.error instanceof OfflineError
+              ? 'Your agenda needs a connection, and there is not one right now.'
+              : 'Your agenda could not be loaded. This is a problem on our side.'
           }
-          onRetry={saved.retry}
+          onRetry={programme.retry}
         />
       )}
 
-      {saved.status === 'ready' && <NextSavedBody saved={saved.data} event={event} />}
+      {programme.status === 'ready' && <NextSavedBody saved={programme.data} event={event} />}
     </section>
   )
 }
@@ -126,9 +139,10 @@ const NextSavedBody = ({
    * FR-225).
    *
    * `nextSession` searches only today because searching the whole programme looks equivalent
-   * and is not: at 20:00 on day one of a four-day conference, the next saved session overall
-   * is tomorrow's 09:30 — and it renders as a bare `09:30` with no date, which reads as *later
-   * today*. The attendee cannot tell it is wrong, which is precisely what FR-225 forbids.
+   * and is not: at 20:00 on day one of a four-day conference, the next committed session
+   * overall is tomorrow's 09:30 — and it renders as a bare `09:30` with no date, which reads
+   * as *later today*. The attendee cannot tell it is wrong, which is precisely what FR-225
+   * forbids.
    *
    * Reused from `sessions.ts` rather than reimplemented, so this card and Agenda cannot come to
    * disagree about what "today" means at 23:50 in one timezone.
@@ -142,11 +156,13 @@ const NextSavedBody = ({
   if (saved.length === 0) {
     return (
       <p className="text-sm text-text-body">
-        You have not saved any sessions yet.{' '}
+        {/* T194 — worded for both commitments (FR-1066a): saving is not the only way onto
+            this card any more, and copy claiming it is would misdescribe an enrolled seat. */}
+        Nothing on your agenda yet.{' '}
         <Link to="/agenda" className="font-medium text-accent-strong underline">
           Browse the programme
         </Link>{' '}
-        and save the ones you intend to attend.
+        and save the sessions you intend to attend — or take a place in the ones that enrol.
       </p>
     )
   }
@@ -188,15 +204,23 @@ const NextSavedBody = ({
           {upcoming.title}
         </Link>
       </h3>
-      <p className="text-sm text-text-muted">{upcoming.room.name}</p>
+      {/* T193 — no room line at all when the session has none (SC-1022). */}
+      {upcoming.room && <p className="text-sm text-text-muted">{upcoming.room.name}</p>}
       <SpeakerLine speakers={upcoming.speakers} />
     </div>
   )
 }
 
 export const nextSavedSessionCard: HomeCard = {
+  /**
+   * T194 (014 tranche 2) — **the id stays while the title changed**, deliberately. The id is
+   * the registry's append-only key: four tests pin it, `card-surfaces-absences` enumerates it,
+   * and it is never rendered to an attendee — FR-1066a's subject is attendee-visible strings,
+   * which the title is and the id is not. Changing a stable key to chase a rename would be a
+   * migration bought for nothing.
+   */
   id: 'next-saved-session',
-  title: 'Next saved session',
+  title: 'Next on your programme',
   slot: 'primary',
   /**
    * After `up-next` (0) and `rest-of-day` (1).

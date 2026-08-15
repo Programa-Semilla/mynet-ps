@@ -1,3 +1,4 @@
+import type { ConferenceFormat, ConferenceModality } from '../contract.js'
 import type {
   AdminCatalogRepository,
   AdminProgramme,
@@ -124,8 +125,14 @@ export class HttpAdminCatalogRepository implements AdminCatalogRepository {
     return { warnings: warningsOf(body) }
   }
 
-  async deleteSession(eventId: string, id: string): Promise<void> {
-    await this.#write(at(eventId, `/sessions/${encodeURIComponent(id)}`), 'DELETE')
+  async deleteSession(eventId: string, id: string, placesSeen: number): Promise<void> {
+    // `placesSeen` is the held-places figure the confirmation showed (FR-1077b). The server
+    // re-reads it under the deleting transaction's lock and refuses with `places_changed` when
+    // it has risen — so the caller re-presents rather than destroying places taken mid-dialog.
+    await this.#write(
+      at(eventId, `/sessions/${encodeURIComponent(id)}?placesSeen=${String(placesSeen)}`),
+      'DELETE',
+    )
   }
 
   async cancelSession(eventId: string, id: string): Promise<void> {
@@ -144,9 +151,24 @@ export class HttpAdminCatalogRepository implements AdminCatalogRepository {
       startsOn: string
       endsOn: string
       timezone: string
+      modality: ConferenceModality
+      format: ConferenceFormat | null
     }>,
   ): Promise<void> {
     await this.#write(at(eventId), 'PATCH', input)
+  }
+
+  async listEnrolments(
+    eventId: string,
+    sessionId: string,
+  ): Promise<readonly { readonly displayName: string }[]> {
+    // Names only (FR-1073, O1). The response shape is the whole disclosure: `displayName` and
+    // nothing beside it, declared by the route's own response schema so anything more is
+    // stripped before it leaves the server.
+    const body = await this.#http.request<{ attendees: { displayName: string }[] }>(
+      at(eventId, `/sessions/${encodeURIComponent(sessionId)}/enrolments`),
+    )
+    return body.attendees
   }
 
   async createConference(input: {
@@ -155,6 +177,8 @@ export class HttpAdminCatalogRepository implements AdminCatalogRepository {
     startsOn: string
     endsOn: string
     timezone: string
+    modality: ConferenceModality
+    format: ConferenceFormat | null
   }): Promise<{ id: string; joinCode: string }> {
     // The one path with no conference in it. `requireOperator` alone guards it, because there is
     // nothing yet to hold authority over (FR-1007, FR-1008).

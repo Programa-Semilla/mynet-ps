@@ -92,12 +92,46 @@ export const stubServices = (overrides: ServiceOverrides = {}): AdminServices =>
     reinstateSession: unexpected('catalog.reinstateSession'),
     patchConference: unexpected('catalog.patchConference'),
     createConference: unexpected('catalog.createConference'),
+    // 014 tranche 2 (T146) — the enrolment roster. Unstubbed like every other member, which
+    // is what proved `patchConference` unreachable for a whole tranche: a screen calling a
+    // method a test did not provide must fail that test, never quietly render nothing.
+    listEnrolments: unexpected('catalog.listEnrolments'),
     ...overrides.catalog,
+  },
+  // 014 tranche 2 — the fifth repository. Every member throws by default, for the reason
+  // `unexpected` records — and it is what makes a screen that quietly calls a vocabulary
+  // method a test failure rather than a silent success (R20's `patchConference` finding).
+  vocabulary: {
+    sectors: unexpected('vocabulary.sectors'),
+    subsectors: unexpected('vocabulary.subsectors'),
+    interests: unexpected('vocabulary.interests'),
+    createSector: unexpected('vocabulary.createSector'),
+    renameSector: unexpected('vocabulary.renameSector'),
+    retireSector: unexpected('vocabulary.retireSector'),
+    unretireSector: unexpected('vocabulary.unretireSector'),
+    deleteSector: unexpected('vocabulary.deleteSector'),
+    createSubsector: unexpected('vocabulary.createSubsector'),
+    renameSubsector: unexpected('vocabulary.renameSubsector'),
+    retireSubsector: unexpected('vocabulary.retireSubsector'),
+    unretireSubsector: unexpected('vocabulary.unretireSubsector'),
+    deleteSubsector: unexpected('vocabulary.deleteSubsector'),
+    createInterest: unexpected('vocabulary.createInterest'),
+    renameInterest: unexpected('vocabulary.renameInterest'),
+    retireInterest: unexpected('vocabulary.retireInterest'),
+    unretireInterest: unexpected('vocabulary.unretireInterest'),
+    deleteInterest: unexpected('vocabulary.deleteInterest'),
+    ...overrides.vocabulary,
   },
 })
 
 /** A programme fixture with sensible defaults, so a test states only what it cares about (014). */
-export const programme = (over: Partial<AdminProgramme> = {}): AdminProgramme => ({
+export const programme = (
+  over: Omit<Partial<AdminProgramme>, 'conference'> & {
+    // Deep-partial for the conference alone (014 tranche 2): a modality test should state the
+    // modality and nothing else, not restate nine fields it does not care about.
+    readonly conference?: Partial<AdminProgramme['conference']>
+  } = {},
+): AdminProgramme => ({
   conference: {
     id: 'event-1',
     name: 'A Conference',
@@ -107,6 +141,10 @@ export const programme = (over: Partial<AdminProgramme> = {}): AdminProgramme =>
     timezone: 'UTC',
     joinCode: 'JOINCODE',
     timezoneEditable: true,
+    // 014 tranche 2 — in-person is the back-filled value every pre-existing programme already
+    // satisfies (FR-1048), so it is the fixture default; a test about links overrides it.
+    modality: 'in-person',
+    format: null,
     ...over.conference,
   },
   tracks: over.tracks ?? [{ id: 'track-1', name: 'Design', colorToken: 'track-design' }],
@@ -124,9 +162,17 @@ export const adminSession = (over: Partial<AdminSession> = {}): AdminSession => 
   endsAt: '2027-03-01T10:00:00.000Z',
   trackId: 'track-1',
   roomId: 'room-1',
+  accessLink: null,
   speakerIds: [],
   cancelledAt: null,
+  // 014 tranche 2 — mandatory with no bounds and no held places, matching the back-fill every
+  // pre-existing session received (FR-1060). `placesHeld` sits BESIDE the engagement counts,
+  // never inside them (research R15).
+  kind: 'mandatory',
+  capacity: null,
+  enrolmentClosingOffsetHours: null,
   engagement: { saved: 0, notes: 0, questions: 0, votes: 0 },
+  placesHeld: 0,
   ...over,
 })
 

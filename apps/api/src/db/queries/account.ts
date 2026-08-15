@@ -62,6 +62,12 @@ export type AccountExport = {
     readonly company: string | null
     readonly role: string | null
     readonly headline: string | null
+    // T114 (014 tranche 2) — the taxonomy fields are attendee data and export with the profile
+    // (FR-1098). Labels, exactly as stored: a chosen value and a retained free-text one export
+    // identically, because the export reproduces what the attendee holds, not its provenance.
+    readonly sector: string | null
+    readonly subsector: string | null
+    readonly productiveActivity: string | null
     readonly networkingIntent: string | null
     readonly availability: string | null
     readonly updatedAt: string
@@ -85,6 +91,18 @@ export type AccountExport = {
      * decides whether their Agenda row carries a change marker. `export-coverage.test.ts`
      * derives from the schema, so the column fails the build by existing until it appears here.
      */
+    readonly viewedAt: string
+  }[]
+  /**
+   * T153 (014 tranche 2) — **held places are attendee data** (FR-1081a): a place records
+   * something the attendee did, and `viewedAt` is FR-1080's marker clock for it. Mirrors
+   * `savedSessions` exactly — the two are the two commitments (FR-1063).
+   */
+  readonly heldPlaces: readonly {
+    readonly sessionId: string
+    readonly sessionTitle: string
+    readonly eventId: string
+    readonly takenAt: string
     readonly viewedAt: string
   }[]
   readonly sessionNotes: readonly {
@@ -360,6 +378,7 @@ export const assembleExport = async (
     registrations,
     active,
     saved,
+    heldPlaces,
     notes,
     sessions,
     authored,
@@ -377,11 +396,15 @@ export const assembleExport = async (
       company: string | null
       role: string | null
       headline: string | null
+      sector: string | null
+      subsector: string | null
+      productive_activity: string | null
       networking_intent: string | null
       availability: string | null
       updated_at: Date
     }>(sql`
-      SELECT company, role, headline, networking_intent, availability, updated_at
+      SELECT company, role, headline, sector, subsector, productive_activity,
+             networking_intent, availability, updated_at
       FROM attendee_profiles WHERE attendee_id = ${attendeeId}::uuid
     `),
     db.execute<{ interest: string }>(sql`
@@ -409,6 +432,18 @@ export const assembleExport = async (
       FROM saved_sessions ss JOIN sessions s ON s.id = ss.session_id
       WHERE ss.attendee_id = ${attendeeId}::uuid
       ORDER BY ss.session_id
+    `),
+    db.execute<{
+      session_id: string
+      title: string
+      event_id: string
+      taken_at: Date
+      viewed_at: Date
+    }>(sql`
+      SELECT se.session_id, s.title, s.event_id, se.taken_at, se.viewed_at
+      FROM session_enrolments se JOIN sessions s ON s.id = se.session_id
+      WHERE se.attendee_id = ${attendeeId}::uuid
+      ORDER BY se.session_id
     `),
     db.execute<{ session_id: string; body: string; updated_at: Date }>(sql`
       SELECT session_id, body, updated_at FROM session_notes
@@ -626,6 +661,9 @@ export const assembleExport = async (
           company: profile.company,
           role: profile.role,
           headline: profile.headline,
+          sector: profile.sector,
+          subsector: profile.subsector,
+          productiveActivity: profile.productive_activity,
           networkingIntent: profile.networking_intent,
           availability: profile.availability,
           updatedAt: iso(profile.updated_at) as string,
@@ -645,6 +683,13 @@ export const assembleExport = async (
       sessionTitle: row.title,
       eventId: row.event_id,
       savedAt: iso(row.saved_at) as string,
+      viewedAt: iso(row.viewed_at) as string,
+    })),
+    heldPlaces: heldPlaces.map((row) => ({
+      sessionId: row.session_id,
+      sessionTitle: row.title,
+      eventId: row.event_id,
+      takenAt: iso(row.taken_at) as string,
       viewedAt: iso(row.viewed_at) as string,
     })),
     sessionNotes: notes.map((row) => ({
@@ -998,6 +1043,20 @@ export const withdrawFromConference = async (unverified: EventScope): Promise<vo
       USING sessions s
       WHERE sn.session_id = s.id
         AND sn.attendee_id = ${scope.attendeeId}::uuid
+        AND s.event_id = ${scope.eventId}::uuid
+    `)
+
+    // T152 (014 tranche 2) — **leaving a conference releases the places you held at it**
+    // (FR-1081). The same gap as the saves and notes above, and it stays invisible in the
+    // schema for the same reason: nothing cascades from a registration. A place left behind
+    // would be held by somebody who now fails `requireEventAccess` — able neither to see it
+    // nor to release it — while the organizer's roster names them and the seat stays consumed
+    // for a person who is not coming.
+    await tx.execute(sql`
+      DELETE FROM session_enrolments se
+      USING sessions s
+      WHERE se.session_id = s.id
+        AND se.attendee_id = ${scope.attendeeId}::uuid
         AND s.event_id = ${scope.eventId}::uuid
     `)
 

@@ -6,6 +6,8 @@ import { classify, describe, detailOf } from '../errors.js'
 import { useAdminSession } from '../session.js'
 import { CancelDialog } from './CancelDialog.js'
 import { RoomSection, SpeakerSection, TrackSection } from './CatalogForms.js'
+import { ConferenceEditor } from './ConferenceEditor.js'
+import { EnrolmentRoster } from './EnrolmentRoster.js'
 import { SessionForm } from './SessionForm.js'
 import { venueSpanOf } from './venue-time.js'
 
@@ -76,6 +78,19 @@ export const ProgrammeEditor = () => {
   const [warnings, setWarnings] = useState<readonly string[]>([])
   const [removing, setRemoving] = useState<AdminSession | null>(null)
   const [removalFailure, setRemovalFailure] = useState<string | null>(null)
+  /**
+   * T149 (014 tranche 2) — **the held-places figure the confirmation is SHOWING**, which is
+   * the figure the delete will send as `placesSeen` (FR-1077b). Its own state rather than a
+   * read off `removing.placesHeld`, because a `places_changed` refusal re-presents with the
+   * SERVER's new figure while the session object in hand still carries the stale one.
+   */
+  const [placesShown, setPlacesShown] = useState(0)
+  // T190 (014 tranche 2) — the conference editor, FR-1059's missing caller (research R20 I11).
+  const [editingConference, setEditingConference] = useState(false)
+  const [conferenceFailure, setConferenceFailure] = useState<string | null>(null)
+  // T146 (014 tranche 2) — which optional session's roster is open, by id. One at a time: the
+  // roster is a deliberate act (FR-1075a's "one deliberate control away"), not a column.
+  const [rosterFor, setRosterFor] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     if (!eventId) return
@@ -162,10 +177,41 @@ export const ProgrammeEditor = () => {
 
   return (
     <div className="mx-auto max-w-3xl">
-      <h1 className="text-2xl font-semibold text-text-primary">{programme.conference.name}</h1>
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <h1 className="text-2xl font-semibold text-text-primary">{programme.conference.name}</h1>
+        {/*
+          T190 (FR-1059) — the control research R20 found missing: the update path existed end
+          to end with no caller, so a modality chosen wrongly at creation was permanently
+          uncorrectable.
+        */}
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => {
+            setEditingConference(true)
+            setConferenceFailure(null)
+          }}
+          className="min-h-11 rounded-lg px-3 text-sm font-medium text-coral-600 hover:bg-coral-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-coral-500"
+        >
+          Edit conference
+        </button>
+      </div>
       <p className="mt-1 text-sm text-text-muted">
         {programme.conference.location} · {programme.conference.startsOn} to{' '}
         {programme.conference.endsOn} · {programme.conference.timezone}
+      </p>
+      {/*
+        FR-1045/FR-1047 — modality and format as data on the header: two independent
+        attributes, rendered and never branched on. The format renders only when given, so a
+        conference without one carries no empty line.
+      */}
+      <p className="mt-1 text-sm text-text-muted">
+        {programme.conference.modality === 'in-person'
+          ? 'In person'
+          : programme.conference.modality === 'virtual'
+            ? 'Virtual'
+            : 'Hybrid'}
+        {programme.conference.format ? ` · ${programme.conference.format.replace(/-/g, ' ')}` : ''}
       </p>
       {/*
         FR-1009 — the join code, so an organizer can distribute it without a second screen. Not a
@@ -175,6 +221,29 @@ export const ProgrammeEditor = () => {
         Join code:{' '}
         <span className="font-mono tracking-widest">{programme.conference.joinCode}</span>
       </p>
+
+      {editingConference ? (
+        <ConferenceEditor
+          /*
+            Keyed on the conference's own values so a successful save — which re-reads the
+            programme — remounts the form with the confirmed state, the same remount contract
+            `SessionForm` documents.
+          */
+          key={`${programme.conference.id}-${programme.conference.name}-${programme.conference.modality}`}
+          conference={programme.conference}
+          busy={busy}
+          failure={conferenceFailure}
+          onSubmit={(input) => {
+            void write(
+              () => services.catalog.patchConference(eventId, input),
+              setConferenceFailure,
+            ).then((result) => {
+              if (result.ok) setEditingConference(false)
+            })
+          }}
+          onCancel={() => setEditingConference(false)}
+        />
+      ) : null}
 
       {failure ? (
         <p role="alert" className="mt-4 rounded-lg bg-danger-100 px-3 py-2 text-sm text-danger-700">
@@ -300,9 +369,36 @@ export const ProgrammeEditor = () => {
                       {session.engagement.saved} saved · {session.engagement.notes} notes ·{' '}
                       {session.engagement.questions} questions · {session.engagement.votes} votes
                     </p>
+                    {/*
+                      T146 — the held-places figure BESIDE the engagement line, never appended
+                      to it: an enrolment is not engagement (v5.3.0 O2, research R15), and a
+                      fifth count in that sentence is how it would quietly become one.
+                    */}
+                    {session.kind === 'optional' ? (
+                      <p className="text-xs text-text-muted">
+                        Optional · {session.placesHeld} of {session.capacity ?? 0} places held
+                      </p>
+                    ) : null}
                   </div>
 
                   <div className="flex shrink-0 flex-wrap gap-1">
+                    {/*
+                      T146 (FR-1073, FR-1075a) — the roster is ONE DELIBERATE CONTROL away,
+                      never a column: the confirmation shows the count, and who holds a place
+                      is asked for on purpose, here, on optional sessions alone.
+                    */}
+                    {session.kind === 'optional' ? (
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() =>
+                          setRosterFor((current) => (current === session.id ? null : session.id))
+                        }
+                        className="min-h-11 rounded-lg px-2 text-xs font-medium text-coral-600 hover:bg-coral-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-coral-500"
+                      >
+                        {rosterFor === session.id ? 'Hide roster' : 'Roster'}
+                      </button>
+                    ) : null}
                     <button
                       type="button"
                       disabled={busy}
@@ -337,6 +433,10 @@ export const ProgrammeEditor = () => {
                         onClick={() => {
                           setRemoving(session)
                           setRemovalFailure(null)
+                          // T149 (FR-1077b) — the figure the confirmation shows is the figure
+                          // the delete will send as `placesSeen`; a `places_changed` refusal
+                          // replaces it with the server's.
+                          setPlacesShown(session.placesHeld)
                         }}
                         className="min-h-11 rounded-lg px-2 text-xs font-medium text-coral-600 hover:bg-coral-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-coral-500"
                       >
@@ -345,6 +445,9 @@ export const ProgrammeEditor = () => {
                     )}
                   </div>
                 </div>
+                {rosterFor === session.id ? (
+                  <EnrolmentRoster eventId={eventId} session={session} />
+                ) : null}
               </li>
             ))}
           </ul>
@@ -389,6 +492,7 @@ export const ProgrammeEditor = () => {
       <CancelDialog
         open={removing !== null}
         session={removing}
+        placesHeld={placesShown}
         busy={busy}
         failure={removalFailure}
         onCancelSession={() => {
@@ -407,25 +511,40 @@ export const ProgrammeEditor = () => {
             if (result.ok) setRemoving(null)
           })
         }}
-        onDeleteSession={() => {
+        onDeleteSession={(placesSeen) => {
           const target = removing
           if (!target) return
-          void write(() => services.catalog.deleteSession(eventId, target.id), setRemovalFailure)
-            // ─────────────────────────────────────────────────────────────────────────────────
-            // **The dialog stays open when the delete is refused**, so the counts and the offer
-            // to cancel instead are still on screen. Closing it would leave the organizer with a
-            // message about a decision they can no longer act on — and FR-1019a means a refusal
-            // is possible even when the counts read zero, because somebody may have saved the
-            // session between this render and the request.
-            //
-            // The condition was `result !== undefined`, which is **never true**: `deleteSession`
-            // resolves to `undefined` on success. So the intent above was inverted in practice —
-            // a successful delete left the organizer staring at a confirmation for a session that
-            // no longer existed, and pressing the button again got a 404.
-            // ─────────────────────────────────────────────────────────────────────────────────
-            .then((result) => {
-              if (result.ok) setRemoving(null)
-            })
+          // ─────────────────────────────────────────────────────────────────────────────────
+          // **The dialog stays open when the delete is refused**, so the counts and the offer
+          // to cancel instead are still on screen. Closing it would leave the organizer with a
+          // message about a decision they can no longer act on — and FR-1019a means a refusal
+          // is possible even when the counts read zero, because somebody may have saved the
+          // session between this render and the request.
+          //
+          // Handled without the shared `write` helper, deliberately: this is the one refusal
+          // in the product whose DETAIL feeds back into the next attempt. On `places_changed`
+          // (FR-1077b) the server's new held count replaces the figure the dialog shows, so
+          // the organizer confirms against reality — `write`'s message-only failure channel
+          // would render the sentence and silently keep offering the stale `placesSeen`.
+          // ─────────────────────────────────────────────────────────────────────────────────
+          void (async () => {
+            setBusy(true)
+            setRemovalFailure(null)
+            try {
+              await services.catalog.deleteSession(eventId, target.id, placesSeen)
+              await load()
+              setRemoving(null)
+            } catch (error) {
+              const failure = classify(error)
+              const detail = detailOf(error)
+              if (failure === 'places_changed' && detail.placesHeld !== undefined) {
+                setPlacesShown(detail.placesHeld)
+              }
+              setRemovalFailure(describe(failure, detail))
+            } finally {
+              setBusy(false)
+            }
+          })()
         }}
         onClose={() => setRemoving(null)}
       />

@@ -100,9 +100,13 @@ export type WriteNoteResponse =
 // relationship to it. That is not session data arriving by the back door — nothing here describes
 // the session — and the binding still fails if a title, a time or a room ever appears.
 // ───────────────────────────────────────────────────────────────────────────────────────────────
+// **T196 (014 tranche 2) — the entry gained a third field, the `saved | place` discriminator,
+// and the rule is still unchanged.** One list with a kind on each row is what makes FR-1064's
+// forbidden state — a saved optional session with no place — unrepresentable on the client
+// (research R13). Still nothing here describes the session itself.
 export type _SavedSessionsAreIdentifiers = Satisfies<
   SavedSessionsResponse['sessions'][number],
-  { sessionId: string; changedSinceViewed: boolean }
+  { sessionId: string; changedSinceViewed: boolean; commitment: 'saved' | 'place' }
 >
 
 // 005 — a note carries its `updatedAt`, and so does the response to writing one. That second
@@ -211,5 +215,27 @@ type ClosednessOf<T> = string extends T ? 'RELAXED_TO_STRING' : 'closed'
 
 export type _TrackColorTokenIsClosed = Satisfies<ClosednessOf<TrackColorToken>, 'closed'>
 export type _TrackColorTokenHasTheDesignToken = Satisfies<'track-design', TrackColorToken>
+
+/**
+ * T190 (014 tranche 2) — **the modality and format sets, derived from the contract rather than
+ * copied** — `TrackColorToken`'s discipline, applied before the third hand-written copy exists
+ * rather than after it was found typed `string`.
+ *
+ * The server's `CONFERENCE_MODALITIES`/`CONFERENCE_FORMATS` generate the route enums; these
+ * derive from the generated contract; the administrative forms consume these. One chain, so a
+ * value added or removed server-side is a compile failure here rather than a select silently
+ * missing an option — or offering one every write refuses.
+ */
+export type CreateConferenceBody =
+  paths['/admin/conferences']['post']['requestBody']['content']['application/json']
+
+/** Exactly three, controlled, and it GOVERNS what a session must carry (FR-1046). */
+export type ConferenceModality = NonNullable<CreateConferenceBody['modality']>
+/** A descriptive label with NO behavioural consequence (FR-1047). Optional on a conference. */
+export type ConferenceFormat = NonNullable<CreateConferenceBody['format']>
+
+export type _ModalityIsClosed = Satisfies<ClosednessOf<ConferenceModality>, 'closed'>
+export type _ModalityHasHybrid = Satisfies<'hybrid', ConferenceModality>
+export type _FormatIsClosed = Satisfies<ClosednessOf<ConferenceFormat>, 'closed'>
 
 export type { components, paths }

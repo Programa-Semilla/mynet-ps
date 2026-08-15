@@ -60,6 +60,13 @@ export interface Speaker {
   readonly company: string | null
 }
 
+/**
+ * T193 (014 tranche 2) — the two kinds of session (FR-1060). The kind decides the identity of
+ * the **one** commitment control an attendee sees: a mandatory session is saved, an optional
+ * one is enrolled in, and enrolment replaces saving (FR-1063).
+ */
+export type SessionKind = 'mandatory' | 'optional'
+
 export interface Session {
   readonly id: string
   readonly title: string
@@ -72,7 +79,15 @@ export interface Session {
   readonly startsAt: string
   readonly endsAt: string
   readonly track: Track
-  readonly room: Room
+  /**
+   * T193 (014 tranche 2) — **nullable, because a virtual session has no room** (FR-1050,
+   * SC-1022). Whether a session is in person, virtual or both is **derived from what it
+   * carries** — a room, an access link, or both — and never stored as a delivery attribute
+   * (FR-1051): a stored flag would be a second source of truth for what these two fields
+   * already answer, and the one that drifted would be the one displayed. A session with no
+   * room renders **no room line at all** — never an empty one.
+   */
+  readonly room: Room | null
   /**
    * T007 (014) — **cancelled, and therefore still on the programme** (FR-1020, FR-1022).
    *
@@ -90,6 +105,21 @@ export interface Session {
    * ─────────────────────────────────────────────────────────────────────────────────────────
    */
   readonly cancelled: boolean
+  /**
+   * T193 (014 tranche 2) — mandatory or optional (FR-1060). Conference content, the same for
+   * every reader; the attendee's own commitment to it lives in `CommitmentRepository`, never
+   * here. **Capacity is deliberately NOT on this payload**: the programme is cached, and a
+   * cached seat count reads as a promise of a place — the live figure comes from
+   * `CommitmentRepository.places` alone (FR-1070b).
+   */
+  readonly kind: SessionKind
+  /**
+   * T193 (014 tranche 2) — where a virtual or hybrid session is attended (FR-1052), `https:`
+   * only, validated at the write path and constrained at the column. Null for an in-person
+   * session, and the client then renders **no link line at all** (SC-1022). Rendered as a
+   * plain anchor — never fetched by the product, never markup in a summary (FR-1054).
+   */
+  readonly accessLink: string | null
   /**
    * **Empty when the session has none** (FR-138) — never null, and never absent.
    *

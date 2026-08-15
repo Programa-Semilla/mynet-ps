@@ -2,7 +2,7 @@ import { and, asc, eq, sql } from 'drizzle-orm'
 
 import { assertVerifiedScope, type EventScope } from '../../plugins/event-access.js'
 import { getDb } from '../client.js'
-import { savedSessions, sessionNotes } from '../schema/agenda.js'
+import { savedSessions, sessionEnrolments, sessionNotes } from '../schema/agenda.js'
 import { sessions } from '../schema/catalog.js'
 
 /**
@@ -53,6 +53,15 @@ import { sessions } from '../schema/catalog.js'
 export type SavedSessionRow = {
   readonly sessionId: string
   readonly changedSinceViewed: boolean
+  /**
+   * T196's server half (014 tranche 2, R13) — which of the two commitments this row is
+   * (FR-1063, FR-1066). One list with a discriminator rather than two reads, and that is not
+   * stylistic: FR-1064 forbids the saved-but-holds-no-place state, and a single row whose kind
+   * is a property of its appearance makes that state **unrepresentable on the client** rather
+   * than merely absent. Two reads would make it a typeable value and put the union in three
+   * consumers.
+   */
+  readonly commitment: 'saved' | 'place'
 }
 
 export type NoteRow = {
@@ -101,34 +110,48 @@ export const listSavedSessions = async (unverified: EventScope): Promise<SavedSe
   // the type system.
   const scope = assertVerifiedScope(unverified)
 
-  const rows = await getDb()
-    .select({
-      sessionId: savedSessions.sessionId,
-      // ─────────────────────────────────────────────────────────────────────────────────────
-      // T074 (014) — **the marker, computed rather than stored** (FR-1030, research R7).
-      //
-      // Two timestamps and a comparison. Nothing is written per change and nothing is written
-      // per saver: the rejected alternative — flagging every saver's row when a session moves —
-      // is one write per saver, so a keynote with a thousand savers would be a thousand row
-      // updates inside an organizer's request. Deriving costs nothing on write.
-      //
-      // `logistics_changed_at` is null until a session's first material change, and `null > x`
-      // is null in SQL rather than false, which would arrive as `null` on the wire and render as
-      // a marker in a client that checked truthiness. `coalesce` is what stops that.
-      // ─────────────────────────────────────────────────────────────────────────────────────
-      changedSinceViewed: sql<boolean>`coalesce(
-        ${sessions.logisticsChangedAt} > ${savedSessions.viewedAt}, false
-      )`,
-    })
-    .from(savedSessions)
-    .innerJoin(sessions, eq(sessions.id, savedSessions.sessionId))
-    .where(and(eq(savedSessions.attendeeId, scope.attendeeId), eq(sessions.eventId, scope.eventId)))
-    // A total order, so two reads cannot disagree and a diff of the response is meaningful.
-    .orderBy(asc(savedSessions.sessionId))
+  // ───────────────────────────────────────────────────────────────────────────────────────────
+  // T074 (014) / T196 (tranche 2) — **the commitment set: saves and held places, one read**
+  // (FR-1030, FR-1066, research R7, R13).
+  //
+  // The marker is computed rather than stored — two timestamps and a comparison. Nothing is
+  // written per change and nothing per committed attendee: the rejected alternative — flagging
+  // every row when a session moves — is one write per saver, so a keynote with a thousand
+  // savers would be a thousand row updates inside an organizer's request.
+  //
+  // `logistics_changed_at` is null until a session's first material change, and `null > x` is
+  // null in SQL rather than false, which would arrive as `null` on the wire and render as a
+  // marker in a client that checked truthiness. `coalesce` is what stops that.
+  //
+  // A `UNION ALL`, and it cannot produce a duplicate: FR-1064 makes saved-and-enrolled a state
+  // with no route (the save write excludes optional sessions, enrolment excludes mandatory
+  // ones), so the two branches partition the commitment space by the session's own kind.
+  // ───────────────────────────────────────────────────────────────────────────────────────────
+  const rows = await getDb().execute<{
+    session_id: string
+    changed: boolean
+    commitment: 'saved' | 'place'
+  }>(sql`
+    SELECT ss.session_id,
+           coalesce(s.logistics_changed_at > ss.viewed_at, false) AS changed,
+           'saved' AS commitment
+    FROM ${savedSessions} ss
+    JOIN ${sessions} s ON s.id = ss.session_id
+    WHERE ss.attendee_id = ${scope.attendeeId}::uuid AND s.event_id = ${scope.eventId}::uuid
+    UNION ALL
+    SELECT se.session_id,
+           coalesce(s.logistics_changed_at > se.viewed_at, false) AS changed,
+           'place' AS commitment
+    FROM ${sessionEnrolments} se
+    JOIN ${sessions} s ON s.id = se.session_id
+    WHERE se.attendee_id = ${scope.attendeeId}::uuid AND s.event_id = ${scope.eventId}::uuid
+    ORDER BY session_id
+  `)
 
   return rows.map((row) => ({
-    sessionId: row.sessionId,
-    changedSinceViewed: row.changedSinceViewed,
+    sessionId: row.session_id,
+    changedSinceViewed: row.changed,
+    commitment: row.commitment,
   }))
 }
 
@@ -155,8 +178,24 @@ export const markSessionViewed = async (
   const scope = assertVerifiedScope(unverified)
   if (!UUID.test(sessionId)) return false
 
+  // T163 (014 tranche 2, FR-1080) — **whichever commitment the attendee holds is stamped.** An
+  // enrolled attendee holds no saved row (FR-1064), so without the second statement a holder
+  // would be notified of a room change and then see a marker nothing could clear. At most one
+  // statement affects a row — the commitments partition by the session's kind — and both stay
+  // no-ops for a session the attendee holds nothing on, for the shipped reason: opening a
+  // session from Agenda's "All" view is not an error.
   await getDb().execute(sql`
     UPDATE ${savedSessions}
+    SET viewed_at = now()
+    WHERE attendee_id = ${scope.attendeeId}::uuid
+      AND session_id = ${sessionId}::uuid
+      AND EXISTS (
+        SELECT 1 FROM ${sessions}
+        WHERE ${sessions.id} = ${sessionId}::uuid AND ${sessions.eventId} = ${scope.eventId}::uuid
+      )
+  `)
+  await getDb().execute(sql`
+    UPDATE ${sessionEnrolments}
     SET viewed_at = now()
     WHERE attendee_id = ${scope.attendeeId}::uuid
       AND session_id = ${sessionId}::uuid
@@ -170,42 +209,64 @@ export const markSessionViewed = async (
 }
 
 /**
- * Save a session. **Idempotent** (FR-187).
+ * T210's server half (014 tranche 2) — what a save attempt can come to (FR-1064).
+ *
+ * `'not-saveable'` is the one explained refusal in this module: the session exists and the
+ * reader may see it, but it is optional and enrolment REPLACES saving there — so the
+ * saved-but-holds-no-place state has **no route by which it can arise**, and the route tells
+ * the attendee what the commitment actually is rather than pretending the session is missing.
+ */
+export type SaveOutcome = 'saved' | 'not-saveable' | 'not-found'
+
+/**
+ * Save a session. **Idempotent** (FR-187), and **mandatory sessions only** (FR-1064).
  *
  * `ON CONFLICT DO NOTHING` against the composite primary key, so saving twice cannot create a
  * second row — the schema enforces it and this expresses it. A double-tap on a slow connection
  * is simply the same request twice.
  *
- * Returns whether the pairing is now saved, which is **not** the same as whether a row was
- * inserted: an already-saved session reports `true` having inserted nothing. The caller needs
- * to distinguish "this session is not in this conference" (refuse) from "already saved"
- * (succeed), and only the first is a refusal.
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ * **The kind is read under `FOR SHARE`, inside the writing transaction, and the insert obeys
+ * what the locked read settled.** This write used to be a single autocommit
+ * `INSERT … SELECT WHERE kind = 'mandatory'`, and that shape had a window FR-1064 forbids: the
+ * feeding SELECT is evaluated against the statement snapshot, so a save racing an organizer's
+ * mandatory→optional kind change (`updateSession` holds the session row `FOR UPDATE` while
+ * `commitmentCountsFor` reads zero) could commit a saved row onto a session that was optional
+ * by the time the insert landed — the "saved but holds no place" state that has no route, on a
+ * row the client could then never remove, because an optional session's toggle only ever
+ * releases a place. `FOR SHARE` conflicts with that `FOR UPDATE` without serialising savers
+ * against each other, so the kind this transaction reads is the settled one, and `takePlace`
+ * one module over is immune to the mirror race for exactly the same reason.
+ *
+ * The locked read carries the same two conditions the feeding SELECT carried, so nothing became
+ * distinguishable: a session outside the verified conference and a session that does not exist
+ * are both `'not-found'` (T008, FR-231).
+ * ─────────────────────────────────────────────────────────────────────────────────────────
  */
-export const saveSession = async (unverified: EventScope, sessionId: string): Promise<boolean> => {
+export const saveSession = async (
+  unverified: EventScope,
+  sessionId: string,
+): Promise<SaveOutcome> => {
   const scope = assertVerifiedScope(unverified)
-  if (!UUID.test(sessionId)) return false
+  if (!UUID.test(sessionId)) return 'not-found'
 
-  // ───────────────────────────────────────────────────────────────────────────────────────
-  // The session-belongs-to-this-conference check IS the `SELECT` feeding the insert. There is
-  // no separate read, so no window and no distinguishable "no such session" (T008, FR-231).
-  //
-  // `RETURNING` cannot answer the caller's question here, because `ON CONFLICT DO NOTHING`
-  // returns no row for an already-saved session — indistinguishable from a session that does
-  // not belong to the conference. The existence probe below is a separate statement rather
-  // than a smarter one, and it is safe to be: it reads only `sessions`, which is not
-  // attendee-scoped, and it runs *after* the write has already been constrained.
-  // ───────────────────────────────────────────────────────────────────────────────────────
-  await getDb().execute(sql`
-    INSERT INTO ${savedSessions} (attendee_id, session_id)
-    SELECT ${scope.attendeeId}::uuid, ${sessionId}::uuid
-    WHERE EXISTS (
-      SELECT 1 FROM ${sessions}
-      WHERE ${sessions.id} = ${sessionId}::uuid AND ${sessions.eventId} = ${scope.eventId}::uuid
-    )
-    ON CONFLICT (attendee_id, session_id) DO NOTHING
-  `)
+  return getDb().transaction(async (tx) => {
+    const settled = await tx.execute<{ kind: string }>(sql`
+      SELECT kind FROM ${sessions}
+      WHERE id = ${sessionId}::uuid AND event_id = ${scope.eventId}::uuid
+      FOR SHARE
+    `)
+    const row = settled[0]
+    if (!row) return 'not-found'
+    if (row.kind !== 'mandatory') return 'not-saveable'
 
-  return sessionBelongsToScope(scope, sessionId)
+    await tx.execute(sql`
+      INSERT INTO ${savedSessions} (attendee_id, session_id)
+      VALUES (${scope.attendeeId}::uuid, ${sessionId}::uuid)
+      ON CONFLICT (attendee_id, session_id) DO NOTHING
+    `)
+    return 'saved'
+  })
 }
 
 /**

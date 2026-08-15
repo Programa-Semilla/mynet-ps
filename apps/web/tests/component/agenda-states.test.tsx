@@ -51,9 +51,9 @@ describe('SC-209 — the filter and the saved list', () => {
     const user = userEvent.setup()
     renderAgenda({ saved: [] })
     await screen.findByText('Opening Keynote')
-    await user.click(screen.getByRole('radio', { name: 'Saved' }))
+    await user.click(screen.getByRole('radio', { name: 'My agenda' }))
 
-    expect(await screen.findByText(/nothing saved yet/i)).toBeInTheDocument()
+    expect(await screen.findByText(/nothing on your agenda yet/i)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /show all sessions/i })).toBeInTheDocument()
   })
 
@@ -75,17 +75,22 @@ describe('SC-209 — the filter and the saved list', () => {
   it('FAILED: the saved set failing does not take the programme down with it', async () => {
     renderAgenda({
       overrides: {
-        savedSessions: {
+        commitments: {
           listSaved: failing,
           save: async () => {},
           unsave: async () => {},
           markViewed: async () => {},
+          // 014 tranche 2 — enrolment no-ops; `places` rejects so the figure is omitted (FR-1070b).
+          enrol: async () => {},
+          release: async () => {},
+          places: async () => Promise.reject(new Error('places not configured in this test')),
         },
       },
     })
 
-    // The personal layer failed; the schedule is still readable. Two facts, both said.
-    expect(await screen.findByRole('alert')).toHaveTextContent(/saved sessions could not be read/i)
+    // The personal layer failed; the schedule is still readable. Two facts, both said —
+    // worded for both commitments since T194 (FR-1066a).
+    expect(await screen.findByRole('alert')).toHaveTextContent(/your agenda could not be read/i)
     expect(screen.getByText('Opening Keynote')).toBeInTheDocument()
   })
 })

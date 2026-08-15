@@ -47,6 +47,9 @@ const ownProfileSchema = {
     'company',
     'role',
     'headline',
+    'sector',
+    'subsector',
+    'productiveActivity',
     'networkingIntent',
     'availability',
     'interests',
@@ -61,6 +64,14 @@ const ownProfileSchema = {
     company: { type: ['string', 'null'] },
     role: { type: ['string', 'null'] },
     headline: { type: ['string', 'null'] },
+    sector: {
+      type: ['string', 'null'],
+      description:
+        'The chosen sector LABEL (014 T2, FR-1090). May be a retired value the attendee still ' +
+        'holds — holding outlives retirement (FR-1094a).',
+    },
+    subsector: { type: ['string', 'null'] },
+    productiveActivity: { type: ['string', 'null'] },
     networkingIntent: { type: ['string', 'null'], enum: [...NETWORKING_INTENTS, null] },
     availability: { type: ['string', 'null'], enum: [...AVAILABILITIES, null] },
     interests: { type: 'array', items: { type: 'string' } },
@@ -123,6 +134,27 @@ export const profileRoutes = async (app: FastifyInstance): Promise<void> => {
             company: { type: ['string', 'null'], maxLength: PROFILE_LIMITS.company },
             role: { type: ['string', 'null'], maxLength: PROFILE_LIMITS.role },
             headline: { type: ['string', 'null'], maxLength: PROFILE_LIMITS.headline },
+            sector: {
+              type: ['string', 'null'],
+              maxLength: PROFILE_LIMITS.sector,
+              description:
+                'A LABEL that must be currently choosable or already held by the caller ' +
+                '(FR-1095b) — the union is enforced in the query layer, with a distinct code ' +
+                'per refusal. Free text is not accepted for values the caller does not hold ' +
+                '(FR-1087).',
+            },
+            subsector: {
+              type: ['string', 'null'],
+              maxLength: PROFILE_LIMITS.subsector,
+              description: 'Must belong to the submitted sector (FR-1087), or be held with it.',
+            },
+            productiveActivity: {
+              type: ['string', 'null'],
+              maxLength: PROFILE_LIMITS.productiveActivity,
+              description:
+                'Free text (FR-1090, REQ-030) — unlike sector and subsector, what somebody ' +
+                'actually makes or does is theirs to word.',
+            },
             networkingIntent: { type: ['string', 'null'], enum: [...NETWORKING_INTENTS, null] },
             availability: { type: ['string', 'null'], enum: [...AVAILABILITIES, null] },
             interests: {
@@ -159,6 +191,9 @@ export const profileRoutes = async (app: FastifyInstance): Promise<void> => {
         company?: string | null
         role?: string | null
         headline?: string | null
+        sector?: string | null
+        subsector?: string | null
+        productiveActivity?: string | null
         networkingIntent?: NetworkingIntent | null
         availability?: Availability | null
         interests?: string[]
@@ -183,6 +218,9 @@ export const profileRoutes = async (app: FastifyInstance): Promise<void> => {
         company: text(body.company),
         role: text(body.role),
         headline: text(body.headline),
+        sector: text(body.sector),
+        subsector: text(body.subsector),
+        productiveActivity: text(body.productiveActivity),
         // An absent field clears — `?? null` rather than leaving it out, which is the whole of
         // whole-profile semantics.
         networkingIntent: body.networkingIntent ?? null,
@@ -190,13 +228,52 @@ export const profileRoutes = async (app: FastifyInstance): Promise<void> => {
         interests: body.interests ?? [],
       })
 
-      // The query layer refuses an over-large interest set as well as the route schema, because
-      // a per-row CHECK cannot see a set and this is therefore the last line of defence.
-      if (!written) {
-        return reply.status(400).send({
-          code: 'validation_failed',
-          message: `A profile may carry at most ${PROFILE_LIMITS.interestCount} interests.`,
-        })
+      // ─────────────────────────────────────────────────────────────────────────────────────
+      // T174 (014 tranche 2) — **each refusal carries its OWN code**, this feature's
+      // twice-recorded lesson: the client renders one sentence per code, and folding the four
+      // membership refusals into `validation_failed` would make the sentence that teaches the
+      // rule — choose from the list, choose a subsector OF your sector — unreachable. Every
+      // message describes the caller's own submission and nothing about anybody else.
+      // ─────────────────────────────────────────────────────────────────────────────────────
+      if (!written.ok) {
+        switch (written.refusal) {
+          case 'interests-out-of-bounds':
+            // The pre-014 refusal, unchanged in code and shape: the interest COUNT bound is
+            // the one limit no column CHECK can see, re-checked here as the last line.
+            return reply.status(400).send({
+              code: 'validation_failed',
+              message: `A profile may carry at most ${PROFILE_LIMITS.interestCount} interests.`,
+            })
+          case 'sector-not-available':
+            return reply.status(400).send({
+              code: 'sector_not_choosable',
+              message:
+                'That sector is not on the list right now. Choose one of the offered sectors, ' +
+                'or leave it unset — every field here is optional.',
+            })
+          case 'subsector-not-available':
+            return reply.status(400).send({
+              code: 'subsector_not_choosable',
+              message:
+                'That subsector is not on the list right now. Choose one of the offered ' +
+                'subsectors of your sector, or leave it unset.',
+            })
+          case 'subsector-outside-sector':
+            return reply.status(400).send({
+              code: 'subsector_outside_sector',
+              message:
+                'That subsector belongs to a different sector than the one you chose. Pick a ' +
+                'subsector of your own sector, or change the sector first (they travel ' +
+                'together).',
+            })
+          case 'interest-not-available':
+            return reply.status(400).send({
+              code: 'interest_not_choosable',
+              message:
+                'One of those interests is not in the vocabulary. New interests are chosen ' +
+                'from the offered list; everything you already had stays yours.',
+            })
+        }
       }
 
       const profile = await readOwnProfile(attendeeId)

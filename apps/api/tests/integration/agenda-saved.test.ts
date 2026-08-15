@@ -28,7 +28,7 @@ import {
  * T074 (014) — the saved-session identifiers out of the agenda payload.
  *
  * The read returned `{ sessionIds: string[] }` until 014 and now returns
- * `{ sessions: { sessionId, changedSinceViewed }[] }`: the marker travels on the existing payload
+ * `{ sessions: { sessionId, changedSinceViewed, commitment }[] }`: the marker travels on the existing payload
  * rather than on a read of its own, because a `listChangedSessions` would be a read whose subject
  * is *things that happened* — the surface FR-1031 forbids (research R7).
  */
@@ -117,7 +117,9 @@ describe('saved sessions', () => {
 
     expect((await save(summitId, first, adaCookie)).statusCode).toBe(204)
     expect((await saved(summitId, adaCookie)).json()).toEqual({
-      sessions: [{ sessionId: first, changedSinceViewed: false }],
+      // T196 (014 tranche 2) — the row carries the `saved | place` discriminator: one list,
+      // both commitments, so the saved-optional state FR-1064 forbids is unrepresentable.
+      sessions: [{ sessionId: first, changedSinceViewed: false, commitment: 'saved' }],
     })
   })
 

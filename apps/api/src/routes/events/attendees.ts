@@ -95,6 +95,13 @@ export const attendeeProfileRoutes = async (app: FastifyInstance): Promise<void>
               company: { type: ['string', 'null'] },
               role: { type: ['string', 'null'] },
               headline: { type: ['string', 'null'] },
+              // 014 T2 (FR-1090, FR-1092) — the taxonomy fields, nullable like company: an
+              // unset field arrives as null and the card shows NO line for it — no placeholder,
+              // no dash. Governed by the one visibility decision this whole response already
+              // answers to (FR-1097): there is no per-field audience and none may be added.
+              sector: { type: ['string', 'null'] },
+              subsector: { type: ['string', 'null'] },
+              productiveActivity: { type: ['string', 'null'] },
               networkingIntent: { type: ['string', 'null'], enum: [...NETWORKING_INTENTS, null] },
               availability: { type: ['string', 'null'], enum: [...AVAILABILITIES, null] },
               interests: { type: 'array', items: { type: 'string' } },

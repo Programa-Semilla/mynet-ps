@@ -51,7 +51,7 @@ describe('the change marker with notification permission denied (FR-1032, SC-100
       services: denied(),
     })
 
-    await user.click(await screen.findByRole('radio', { name: 'Saved' }))
+    await user.click(await screen.findByRole('radio', { name: 'My agenda' }))
 
     const row = (await screen.findByRole('link', { name: 'Opening Keynote' })).closest('li')
     expect(row).not.toBeNull()
@@ -74,7 +74,7 @@ describe('the change marker with notification permission denied (FR-1032, SC-100
       services: denied(),
     })
 
-    await user.click(await screen.findByRole('radio', { name: 'Saved' }))
+    await user.click(await screen.findByRole('radio', { name: 'My agenda' }))
     await screen.findByRole('link', { name: 'Opening Keynote' })
 
     // One marker, on one row. Two would mean the marker is a screen-level state rather than
@@ -86,7 +86,7 @@ describe('the change marker with notification permission denied (FR-1032, SC-100
     const user = userEvent.setup()
 
     renderAgenda({ saved: [MORNING.id], changed: [MORNING.id], services: denied() })
-    await user.click(await screen.findByRole('radio', { name: 'Saved' }))
+    await user.click(await screen.findByRole('radio', { name: 'My agenda' }))
 
     // `getByText` reads the accessible text. A dot, a border colour or a background would fail
     // here and would be invisible to a screen reader and in high contrast — for the attendee who
@@ -98,7 +98,7 @@ describe('the change marker with notification permission denied (FR-1032, SC-100
     const user = userEvent.setup()
 
     renderAgenda({ saved: [MORNING.id], changed: [MORNING.id], services: denied() })
-    await user.click(await screen.findByRole('radio', { name: 'Saved' }))
+    await user.click(await screen.findByRole('radio', { name: 'My agenda' }))
     await screen.findByText('Changed')
 
     // The nag 014 gives somebody a new reason to write. A denial is a complete outcome.

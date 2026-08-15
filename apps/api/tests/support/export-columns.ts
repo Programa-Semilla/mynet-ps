@@ -61,6 +61,12 @@ export const EXPORTED_COLUMNS: Record<string, ExportTarget> = {
   'attendee_profiles.company': { section: 'profile', field: 'company' },
   'attendee_profiles.role': { section: 'profile', field: 'role' },
   'attendee_profiles.headline': { section: 'profile', field: 'headline' },
+  // T114 (014 tranche 2) — the taxonomy fields are attendee data (FR-1098): what somebody chose
+  // to say about themselves, exported as the labels they hold. The VOCABULARY the labels come
+  // from is reference data and sits in NOT_EXPORTED with its reason.
+  'attendee_profiles.sector': { section: 'profile', field: 'sector' },
+  'attendee_profiles.subsector': { section: 'profile', field: 'subsector' },
+  'attendee_profiles.productive_activity': { section: 'profile', field: 'productiveActivity' },
   'attendee_profiles.networking_intent': { section: 'profile', field: 'networkingIntent' },
   'attendee_profiles.availability': { section: 'profile', field: 'availability' },
   'attendee_profiles.updated_at': { section: 'profile', field: 'updatedAt' },
@@ -80,6 +86,13 @@ export const EXPORTED_COLUMNS: Record<string, ExportTarget> = {
   // T003 (014) — attendee data, unlike 014's three columns on `sessions`, which are conference
   // content and are declared as such in `data-model.md`. It records something the attendee did.
   'saved_sessions.viewed_at': { section: 'savedSessions', field: 'viewedAt' },
+
+  // T153 (014 tranche 2) — a held place is attendee data (FR-1081a), mirroring `savedSessions`
+  // exactly: the two are the two commitments (FR-1063), and `viewed_at` is FR-1080's marker
+  // clock for a place as `saved_sessions.viewed_at` is for a save.
+  'session_enrolments.session_id': { section: 'heldPlaces', field: 'sessionId' },
+  'session_enrolments.taken_at': { section: 'heldPlaces', field: 'takenAt' },
+  'session_enrolments.viewed_at': { section: 'heldPlaces', field: 'viewedAt' },
 
   'session_notes.session_id': { section: 'sessionNotes', field: 'sessionId' },
   'session_notes.body': { section: 'sessionNotes', field: 'body' },

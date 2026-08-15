@@ -11,8 +11,9 @@ export { HttpAttendeeRepository } from './attendee-repository.js'
 export { HttpEventsRepository } from './events-repository.js'
 export { HttpActiveEventRepository } from './active-event-repository.js'
 export { HttpCatalogRepository } from './catalog-repository.js'
-// 005 — the attendee's own agenda.
-export { HttpSavedSessionRepository, HttpSessionNotesRepository } from './agenda-repository.js'
+// 005 — the attendee's own agenda. T196 (014 tranche 2) renamed the commitment half: the set
+// carries held places as well as saves (FR-1066a, R13).
+export { HttpCommitmentRepository, HttpSessionNotesRepository } from './agenda-repository.js'
 // 004 — identity and the attendee's own profile.
 export { HttpIdentityRepository } from './identity-repository.js'
 export { HttpProfileRepository } from './profile-repository.js'
@@ -78,3 +79,11 @@ export {
 // It is the only administrative repository whose every path names a conference, because authority
 // over one is the predicate the server checks (FR-1035); the others are guarded by tier alone.
 export { HttpAdminCatalogRepository } from './admin-catalog-repository.js'
+
+// 014 tranche 2 — the vocabulary's two halves, in two modules deliberately (R17): the
+// platform-tier authoring repository beside the other administrative ones, and the attendee
+// read that MyNet composes into `Repositories`. Neither is decorated with `cached` — the
+// administrative one for the reasons every administrative repository states, the attendee one
+// declared undecorated at `apps/web`'s composition root, where the wiring happens.
+export { HttpAdminVocabularyRepository } from './admin-vocabulary-repository.js'
+export { HttpVocabularyRepository } from './vocabulary-repository.js'

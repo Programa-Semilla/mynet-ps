@@ -28,15 +28,38 @@ import { changedSinceBranchPoint, fileAtBranchPoint } from '../support/branch-po
  *      forbids, arrived at through the data layer rather than through a screen.
  *
  * The fourth way is the one taken: the marker rides on `listSaved`, which already existed and is
- * already declared. **What 014 adds is exactly one member and it is a WRITE** — `markViewed`,
- * because clearing the marker is an act the attendee performs. tasks.md words T077 as "no
- * repository member is added"; the accurate invariant, and the one the interface's own header
- * states, is **no new READ**. Recorded in `deviations.md` rather than left as a discrepancy
- * between a task and the code.
+ * already declared. **What 014 tranche 1 added was exactly one member and it was a WRITE** —
+ * `markViewed`, because clearing the marker is an act the attendee performs. tasks.md worded
+ * T077 as "no repository member is added"; the accurate invariant, and the one the interface's
+ * own header states, is **no new READ whose subject is change history**. Recorded in
+ * `deviations.md` rather than left as a discrepancy between a task and the code.
  *
  * A write needs no `passThrough` and cannot meet 008's trap — purging the conference prefix after
  * `markViewed` is **correct rather than tolerated**, because the programme being purged is the
  * one that just changed.
+ * ═════════════════════════════════════════════════════════════════════════════════════════════
+ *
+ * ═════════════════════════════════════════════════════════════════════════════════════════════
+ * **RE-SCOPED BY TRANCHE 2 (T196/T197, research R13 finding 3), DELIBERATELY AND IN WRITING.**
+ *
+ * This file used to pin the repository to exactly `['listSaved','save','unsave','markViewed']`
+ * and its reads to exactly `['listSaved']`. That was the correct property for R7's marker and it
+ * is NOT the property tranche 2 owes: enrolment adds two writes (`enrol`, `release`) and one
+ * **live single-session read** (`places`), none of which is a change list. The guard's stated
+ * subject was always R7's marker claim — *no read whose subject is "things that happened", no
+ * aggregate, no new cached entry* — and that subject survives the amendment intact:
+ *
+ *   - the member set is pinned again, exactly, at its new seven — never "anything goes";
+ *   - `places` is asserted `passThrough` at the composition root, NOT cached (FR-1070b): a
+ *     seat count is a live fact about one session at the moment of deciding, and 008's trap
+ *     is met by declaration rather than by omission;
+ *   - no member name may match a change-history shape (`change|history|inbox`), which is the
+ *     original prohibition stated as the property it always was instead of via a frozen list.
+ *
+ * The old exact-list assertion would have been "fixed" by the first person to hit it — the
+ * failure mode this project records for the brand-audit ceiling and the frozen capability
+ * count — so the re-scope is written here, where the diff shows it, rather than negotiated in
+ * a review thread.
  * ═════════════════════════════════════════════════════════════════════════════════════════════
  */
 
@@ -145,29 +168,73 @@ describe('R7 — the marker adds no read, no capability and no cache entry', () 
   })
 
   /**
-   * **The saved-session repository gained exactly one member, and it is a write.**
+   * **The commitment repository holds exactly its seven members, and none of them is a change
+   * list** (re-scoped by tranche 2 — see the header).
    *
    * Read from the interface rather than from the HTTP implementation, because the interface is
    * what the caching decorator is configured against and what a later implementation must honour.
    */
-  it('adds one member to the saved-session repository, and it is a write (R7)', () => {
+  it('pins the commitment repository to its seven members, none a change-history read (R7, R13)', () => {
     const agenda = codeOf(read('packages/data/src/interfaces/agenda.ts'))
-    const block = /interface SavedSessionRepository\s*\{([\s\S]*?)\n\}/.exec(agenda)?.[1] ?? ''
+    const block = /interface CommitmentRepository\s*\{([\s\S]*?)\n\}/.exec(agenda)?.[1] ?? ''
 
-    expect(block, 'the SavedSessionRepository interface could not be located').not.toBe('')
+    expect(block, 'the CommitmentRepository interface could not be located').not.toBe('')
 
     const members = [...block.matchAll(/^\s{2}(\w+)\s*\(/gm)].map((match) => match[1])
-    expect(members).toEqual(['listSaved', 'save', 'unsave', 'markViewed'])
+    // Exact, not a floor: the next member must edit this file, and editing it is the
+    // conversation — the same rule the notification-trigger guard states for DISPATCH_CALLERS.
+    expect(members).toEqual([
+      'listSaved',
+      'save',
+      'unsave',
+      'markViewed',
+      'enrol',
+      'release',
+      'places',
+    ])
 
-    // The one read is the one that existed. A second read would be the surface FR-1031 forbids
-    // — "things that happened" — reached through the data layer.
-    const reads = members.filter((name) => /^list|^get|^read/.test(name ?? ''))
+    // R7's original prohibition, stated as the property it always was: no read whose subject is
+    // *things that happened*. `places` is a live read about ONE session's availability at the
+    // moment of deciding (FR-1070) — not a change list, not an aggregate. A `listChanged…`,
+    // `history…` or `inbox…` member is the notification centre N2 forbids, reached through the
+    // data layer, whatever it is called on screen.
+    for (const name of members) {
+      expect(
+        /change|history|inbox/i.test(name ?? ''),
+        `Repository member "${name}" is shaped like a change-history read. R7's whole claim is ` +
+          'that the marker travels on the EXISTING read, and once a "things that happened" read ' +
+          'exists, rendering it is a small ask (FR-1031, v5.2.0 N2).',
+      ).toBe(false)
+    }
+  })
+
+  /**
+   * **`places` is a live `passThrough` read at the composition root — never cached, never a
+   * write** (FR-1070b, T197).
+   *
+   * Both misclassifications are silently destructive: cached, a stale seat count reads as a
+   * promise of a place (and the decorator's `args[0]` key would collide every session onto one
+   * entry); unnamed, the write branch purges the attendee's whole cached conference every time
+   * a session panel opens — 008's `slots` defect re-shipped.
+   */
+  it('declares places as passThrough, and not as a cached read (FR-1070b)', () => {
+    const services = codeOf(read('apps/web/src/app/services.ts'))
+    const block =
+      /commitments\s*=\s*cached\([\s\S]{0,1200}?\n {2}\)/.exec(services)?.[0] ?? services
+
     expect(
-      reads,
-      'The saved-session repository gained a read. R7’s whole claim is that the marker travels ' +
-        'on the EXISTING read: a `listChangedSessions` would be a read whose subject is things ' +
-        'that happened, and once the read exists rendering it is a small ask (FR-1031).',
-    ).toEqual(['listSaved'])
+      /passThrough\s*:\s*\[[^\]]*['"]places['"]/.test(block),
+      '`places` is not declared in `passThrough`. Undeclared, the decorator classifies it as a ' +
+        'WRITE and purges the whole conference prefix on every panel open (008’s slots defect); ' +
+        'declared as a cached read instead, it would publish a stale seat count that reads as a ' +
+        'promise of a place (FR-1070b).',
+    ).toBe(true)
+
+    expect(
+      /reads[^)]*places|['"]places['"]\s*:/.test(/\{\s*listSaved[^}]*\}/.exec(block)?.[0] ?? ''),
+      '`places` appears in the `reads` map. It must never be cached: a remaining-places figure ' +
+        'presented from cache is FR-1070b’s named violation.',
+    ).toBe(false)
   })
 
   /**
@@ -181,7 +248,8 @@ describe('R7 — the marker adds no read, no capability and no cache entry', () 
   it('declares markViewed as a write, and reaches for no passThrough (008’s trap)', () => {
     const services = codeOf(read('apps/web/src/app/services.ts'))
 
-    const savedBlock = /savedSessions\s*:[\s\S]{0,600}?\}\s*\)/.exec(services)?.[0] ?? services
+    const savedBlock =
+      /commitments\s*=\s*cached\([\s\S]{0,1200}?\n {2}\)/.exec(services)?.[0] ?? services
 
     expect(
       /reads\s*:\s*\[[^\]]*markViewed/.test(savedBlock),

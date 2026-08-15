@@ -21,14 +21,19 @@
  */
 export type { Attendee, AttendeeRepository } from './attendee.js'
 export type { ActiveEventRepository, Event, EventsRepository } from './events.js'
-export type { CatalogRepository, Room, Session, Speaker, Track } from './catalog.js'
+export type { CatalogRepository, Room, Session, SessionKind, Speaker, Track } from './catalog.js'
 // 005 — the attendee's own agenda. Separate from the catalog on purpose: the catalog is
 // read-only in perpetuity, and these are attendee state *about* its content (FR-191).
 // **Appended, never moved back into this barrel** (FR-235) — the per-domain split is what lets
 // 005 and 006 add interfaces in parallel without contending over these lines.
+//
+// T196 (014 tranche 2) — `SavedSession`/`SavedSessionRepository` became
+// `Commitment`/`CommitmentRepository`: the set carries held places as well as saves, and a name
+// asserting it holds only saves would be a falsified claim (FR-1066a, research R13).
 export type {
-  SavedSession,
-  SavedSessionRepository,
+  Commitment,
+  CommitmentRepository,
+  PlaceAvailability,
   SessionNote,
   SessionNotesRepository,
 } from './agenda.js'
@@ -110,6 +115,20 @@ export type {
 // ─────────────────────────────────────────────────────────────────────────────────────────
 export type { QuestionListItem, QuestionsRepository } from './questions.js'
 
+// ─────────────────────────────────────────────────────────────────────────────────────────
+// 014 tranche 2 — the controlled vocabulary's attendee-side read. **One domain, one file,
+// appended**, for the reason every entry above states. Its own domain rather than a method on
+// `ProfileRepository`, because Discover's interest filter reads the same list and must not
+// reach it through the interface that carries `saveOwn` (R17).
+// ─────────────────────────────────────────────────────────────────────────────────────────
+export type {
+  ChoosableVocabulary,
+  VocabularyInterest,
+  VocabularyRepository,
+  VocabularySector,
+  VocabularySubsector,
+} from './vocabulary.js'
+
 /** The one runtime value 007 contributes: the message limit the composer's counter reads. */
 export { MESSAGE_MAX_LENGTH } from './messages.js'
 
@@ -120,7 +139,7 @@ export {
   SessionExpiredError,
 } from './errors.js'
 
-import type { SavedSessionRepository, SessionNotesRepository } from './agenda.js'
+import type { CommitmentRepository, SessionNotesRepository } from './agenda.js'
 import type { AppointmentRepository } from './appointments.js'
 import type { AttendeeRepository } from './attendee.js'
 import type { CardRepository } from './cards.js'
@@ -133,6 +152,7 @@ import type { PushSubscriptionRepository } from './notifications.js'
 import type { ProfileRepository } from './profile.js'
 import type { QuestionsRepository } from './questions.js'
 import type { BlockRepository, ReportRepository } from './safety.js'
+import type { VocabularyRepository } from './vocabulary.js'
 
 /**
  * Every repository, in one shape (research.md D10).
@@ -147,7 +167,15 @@ export interface Repositories {
   readonly activeEvent: ActiveEventRepository
   readonly catalog: CatalogRepository
   // 005 — appended, not inserted. Two members, one per domain interface.
-  readonly savedSessions: SavedSessionRepository
+  //
+  // T196 (014 tranche 2) — `savedSessions: SavedSessionRepository` became
+  // `commitments: CommitmentRepository`. **A deliberate breaking rename, not an append**: the
+  // repository now carries held places in optional sessions as well as saves (FR-1063,
+  // FR-1066), and a registry key asserting the set is only saves would be the reviewer-facing
+  // half of the falsified copy 016's review found (FR-1066a). It is the SAME repository —
+  // research R13 forbids a separate `EnrolmentRepository`, because only this repository's own
+  // caching Proxy can purge the cached commitment set an enrolment invalidates.
+  readonly commitments: CommitmentRepository
   readonly sessionNotes: SessionNotesRepository
   // 004 — appended likewise. **Neither is cached**, and that is a declaration rather than an
   // omission: the specification states that nothing this feature stores is available offline,
@@ -221,4 +249,11 @@ export interface Repositories {
   // id. 008's cache-purge defect is not merely avoided here — it is unreachable.
   // ───────────────────────────────────────────────────────────────────────────────────────
   readonly questions: QuestionsRepository
+  // ───────────────────────────────────────────────────────────────────────────────────────
+  // 014 tranche 2 — the choosable vocabulary. Appended likewise; read-only reference data,
+  // cross-event, identical for every attendee. **Not cached** — declared at the composition
+  // root, where the wiring happens, per the Feature Declarations rule that the caching
+  // decision must be stated either way.
+  // ───────────────────────────────────────────────────────────────────────────────────────
+  readonly vocabulary: VocabularyRepository
 }

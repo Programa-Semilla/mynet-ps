@@ -28,7 +28,7 @@
  * no `reads` map to omit from and no `args[0]` to misread.
  */
 
-import type { TrackColorToken } from '../contract.js'
+import type { ConferenceFormat, ConferenceModality, TrackColorToken } from '../contract.js'
 
 /** Which tier the signed-in principal holds (FR-900, FR-924). */
 export type OperatorTier = 'platform' | 'organizer'
@@ -213,11 +213,38 @@ export interface AdminSession {
   readonly startsAt: string
   readonly endsAt: string
   readonly trackId: string
-  readonly roomId: string
+  /**
+   * Nullable since 014 tranche 2 (FR-1049): a virtual session carries an access link instead
+   * of a room, and which of the two a session must carry is decided by the conference's
+   * modality (FR-1050a), server-side.
+   */
+  readonly roomId: string | null
+  /**
+   * The dedicated, validated joining link (FR-1052, FR-1053) — `https:` only, never carried
+   * in the summary, published the moment it is written (FR-1055).
+   */
+  readonly accessLink: string | null
   readonly speakerIds: readonly string[]
   /** Stored state, never derived from the clock (FR-1020). Null means it is happening. */
   readonly cancelledAt: string | null
+  /**
+   * 014 tranche 2 (FR-1060–FR-1062a) — mandatory sessions carry neither bound; optional ones
+   * carry both. The form presents the bounds only on an optional session, because a field
+   * that is meaningless on the kind being edited is a field somebody will fill in.
+   */
+  readonly kind: 'mandatory' | 'optional'
+  readonly capacity: number | null
+  readonly enrolmentClosingOffsetHours: number | null
   readonly engagement: AdminEngagementCounts
+  /**
+   * T148 (014 tranche 2) — the held-places figure, **a separate field beside the four
+   * engagement counts and never a fifth member of them** (v5.3.0 O2, FR-1077b, research R15):
+   * the delete decision derives from summing `engagement`, so a fifth count there would make
+   * places-held sessions undeletable — the opposite of what O2 ratifies. This is the figure
+   * the delete-versus-cancel confirmation must present (FR-1077c) and pass back as
+   * `placesSeen` when the organizer confirms.
+   */
+  readonly placesHeld: number
 }
 
 export interface AdminProgramme {
@@ -232,6 +259,14 @@ export interface AdminProgramme {
     readonly joinCode: string
     /** False once any session exists (FR-1015), so the control matches what the server will do. */
     readonly timezoneEditable: boolean
+    /**
+     * 014 tranche 2 (FR-1045, FR-1046) — governs which of room and access link this
+     * conference's sessions carry (FR-1050a), which is what the session form reads to decide
+     * which fields to offer. Correctable after creation through `patchConference` (FR-1059).
+     */
+    readonly modality: ConferenceModality
+    /** A descriptive label with no behavioural consequence (FR-1047). Nothing branches on it. */
+    readonly format: ConferenceFormat | null
   }
   readonly tracks: readonly AdminTrack[]
   readonly rooms: readonly AdminRoom[]
@@ -245,8 +280,15 @@ export interface AdminSessionInput {
   readonly startsAt: string
   readonly endsAt: string
   readonly trackId: string
-  readonly roomId: string
+  /** Null for a link-only session (FR-1049). The server decides validity by modality. */
+  readonly roomId: string | null
+  /** `https:` only, validated server-side and never fetched (FR-1053). */
+  readonly accessLink: string | null
   readonly speakerIds: readonly string[]
+  /** Absent bounds on a mandatory session; both present on an optional one (FR-1062a). */
+  readonly kind: 'mandatory' | 'optional'
+  readonly capacity: number | null
+  readonly enrolmentClosingOffsetHours: number | null
 }
 
 /**
@@ -310,15 +352,28 @@ export interface AdminCatalogRepository {
   /**
    * Permitted only while **zero** attendees have engaged (FR-1018). Otherwise refused with a
    * reason and the counts, and cancellation offered instead (FR-1019).
+   *
+   * **`placesSeen` is the held-places figure the confirmation SHOWED the organizer**
+   * (FR-1077b): held places are not engagement (v5.3.0 O2), so an optional session with
+   * places held stays deletable, and this figure is re-read server-side inside the deleting
+   * transaction under the same lock — a delete whose count has RISEN since refuses with
+   * `places_changed` and the current figure, to be re-presented rather than acted on.
    */
-  deleteSession(eventId: string, id: string): Promise<void>
+  deleteSession(eventId: string, id: string, placesSeen: number): Promise<void>
 
   /** Stored state, and **the one authoring act that reaches attendees' phones** (FR-1026). */
   cancelSession(eventId: string, id: string): Promise<void>
   /** **Dispatches nothing** (FR-1024). */
   reinstateSession(eventId: string, id: string): Promise<void>
 
-  /** Refuses a range that would orphan a session, and a timezone change once one exists. */
+  /**
+   * Refuses a range that would orphan a session, and a timezone change once one exists.
+   *
+   * T190 (014 tranche 2) — also accepts `modality` and `format` (FR-1059), so no value chosen
+   * at creation is permanently uncorrectable. A modality change is refused with
+   * `modality_conflicts_sessions`, **naming the sessions**, while any existing session would
+   * violate FR-1050a under the new value; a format change is always permitted (FR-1047).
+   */
   patchConference(
     eventId: string,
     input: Partial<{
@@ -327,6 +382,8 @@ export interface AdminCatalogRepository {
       startsOn: string
       endsOn: string
       timezone: string
+      modality: ConferenceModality
+      format: ConferenceFormat | null
     }>,
   ): Promise<void>
 
@@ -337,6 +394,9 @@ export interface AdminCatalogRepository {
    *
    * Returns the minted join code so the organizer can distribute it (FR-1009). There is no
    * `deleteConference` at any tier (FR-1011), and its absence is asserted.
+   *
+   * **Modality is required** (FR-1059b): FR-1048 forbids a default, so a creation carrying
+   * none is refused with `modality_missing`. Format stays optional (FR-1047).
    */
   createConference(input: {
     name: string
@@ -344,7 +404,100 @@ export interface AdminCatalogRepository {
     startsOn: string
     endsOn: string
     timezone: string
+    modality: ConferenceModality
+    format: ConferenceFormat | null
   }): Promise<{ id: string; joinCode: string }>
+
+  /**
+   * T146 (014 tranche 2) — the enrolment roster: the names of the attendees holding places in
+   * one optional session (FR-1073, constitution v5.3.0 O1 — the **fourth** recorded Principle
+   * VIII exception, and the first administrative read of attendee state this project has ever
+   * permitted). Four bounds, all server-enforced (FR-1073a): only enrolment — saves, notes,
+   * questions and votes stay counts-only with nobody identified; only an assigned organizer,
+   * or a platform operator by the authority they already hold; only this conference's
+   * sessions; and names only — no identifier, no address, no route to anything further about
+   * the person. The attendee was told before they enrolled (FR-1074). An empty roster is an
+   * ordinary state, not a failure.
+   */
+  listEnrolments(
+    eventId: string,
+    sessionId: string,
+  ): Promise<readonly { readonly displayName: string }[]>
+}
+
+/** One value of the vocabulary, as the administrative screen holds it (014 tranche 2). */
+export interface AdminSector {
+  readonly id: string
+  readonly label: string
+  /**
+   * Set while the value is withdrawn from NEW choice (FR-1094a). Holders keep it either way —
+   * retirement writes to no attendee record — and clearing this reverses the withdrawal with
+   * no repair (FR-1094b). It is an attribute of the value, never a lifecycle: there is no
+   * unpublished vocabulary value and no further state may be added to one.
+   */
+  readonly retiredAt: string | null
+}
+
+export interface AdminSubsector extends AdminSector {
+  /** The sector this refines — exactly one, always (FR-1087). */
+  readonly sectorId: string
+}
+
+export type AdminInterestOption = AdminSector
+
+/** What creating or renaming a value submits: the label, and nothing else. */
+export interface VocabularyValueInput {
+  readonly label: string
+}
+
+/**
+ * T172 (014 tranche 2) — **authoring the product-wide vocabulary, platform tier ONLY**
+ * (FR-1085, FR-1089, FR-1093a, R17).
+ *
+ * ═════════════════════════════════════════════════════════════════════════════════════════════
+ * **NO METHOD HERE NAMES A CONFERENCE, AND NO METHOD NAMES A PERSON — BOTH ABSENCES ARE THE
+ * INTERFACE.**
+ *
+ * The vocabulary is cross-event reference data no conference owns, so unlike every method on
+ * `AdminCatalogRepository` there is no `eventId` operand: the server's predicate is the
+ * platform tier itself, and a conference organizer is refused with the same 404 as a route that
+ * does not exist. And it is reference data rather than anything about a person (FR-1093a): the
+ * addresses name lists — sectors, subsectors, interests — never their holders, there is no
+ * method that could reach an attendee from a value, and no reading of any signature here can
+ * name somebody (FR-1099b). What an attendee CHOSE stays on their own record, editable by them
+ * alone in MyNet, and no member of this interface can touch it (FR-1093).
+ *
+ * Composed only in `apps/admin/src/app/services.ts`, absent from the `Repositories` aggregate,
+ * undecorated — this file's header carries all three arguments and they are unchanged.
+ * ═════════════════════════════════════════════════════════════════════════════════════════════
+ */
+export interface AdminVocabularyRepository {
+  /** Every value, retired ones included — this screen is where retirement is reversed. */
+  sectors(): Promise<readonly AdminSector[]>
+  subsectors(): Promise<readonly AdminSubsector[]>
+  interests(): Promise<readonly AdminInterestOption[]>
+
+  createSector(input: VocabularyValueInput): Promise<void>
+  /** Refused with `vocabulary_rename_held` while any attendee holds the value (FR-1094c). */
+  renameSector(id: string, input: VocabularyValueInput): Promise<void>
+  /** Reversible, and writes to NO attendee record: holders keep the value (FR-1094). */
+  retireSector(id: string): Promise<void>
+  unretireSector(id: string): Promise<void>
+  /** Refused while held (`vocabulary_delete_held`) or refined (`sector_has_subsectors`). */
+  deleteSector(id: string): Promise<void>
+
+  /** Requires an existing, unretired sector — `sector_retired` otherwise (FR-1087). */
+  createSubsector(input: VocabularyValueInput & { sectorId: string }): Promise<void>
+  renameSubsector(id: string, input: VocabularyValueInput): Promise<void>
+  retireSubsector(id: string): Promise<void>
+  unretireSubsector(id: string): Promise<void>
+  deleteSubsector(id: string): Promise<void>
+
+  createInterest(input: VocabularyValueInput): Promise<void>
+  renameInterest(id: string, input: VocabularyValueInput): Promise<void>
+  retireInterest(id: string): Promise<void>
+  unretireInterest(id: string): Promise<void>
+  deleteInterest(id: string): Promise<void>
 }
 
 /**

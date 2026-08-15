@@ -4,10 +4,12 @@ import { useCallback, useEffect, useRef, type ReactNode } from 'react'
 import { useNavigate, useOutletContext, useParams } from 'react-router'
 
 import { Loading } from '../AsyncState.js'
+import { PanelCommitment } from './PanelCommitment.js'
 import { PanelNotes } from './PanelNotes.js'
 import { PanelOverview } from './PanelOverview.js'
 import { PanelQuestions } from './PanelQuestions.js'
 import { PanelSpeakers } from './PanelSpeakers.js'
+import type { Commitments } from './useCommitments.js'
 
 /**
  * T036–T038, T041, T042 (005) — the session detail panel
@@ -64,6 +66,18 @@ export interface AgendaOutletContext {
    * notes cache a single entry per conference (data-model.md, `resource: notes`).
    */
   readonly notes: ReadonlyMap<string, SessionNote>
+  /**
+   * The notes read's own state, consulted BEFORE the map above — because the map alone cannot
+   * distinguish "no note" from "not read yet", and the editor initialises once from what it is
+   * handed and deliberately never adopts a server value afterwards (FR-214). Mounted against
+   * an empty map while the read was still in flight, it stayed empty after the note arrived —
+   * and the attendee's first keystroke into that convincing blank would REPLACE the note the
+   * server still holds. The hook's own header names exactly that hazard; this field is what
+   * lets the panel honour it.
+   */
+  readonly notesStatus: 'loading' | 'ready' | 'failed'
+  /** Retries the notes read after a failure, without re-reading anything else. */
+  readonly retryNotes: () => void
   /** Returns focus to the control that opened the panel (FR-202). */
   readonly restoreFocusTo: (sessionId: string) => void
   /**
@@ -75,6 +89,13 @@ export interface AgendaOutletContext {
    * things that can disagree about it.
    */
   readonly markViewed: (sessionId: string) => void
+  /**
+   * T208 (014 tranche 2) — the attendee's commitment set, handed down whole rather than
+   * re-read here, for `markViewed`'s own reason: the set lives in `useCommitments` at the
+   * programme, and a second instance in the panel would be a second reader that can disagree
+   * with the rows behind the dialog about whether a session is committed.
+   */
+  readonly commitments: Commitments
 }
 
 export const SessionPanel = () => {
@@ -296,18 +317,65 @@ const PanelBody = ({
   return (
     <>
       <PanelOverview session={session} timezone={context.timezone} />
+      {/*
+        T208, T209 (014 tranche 2) — the fifth section, announced by T120's rewritten comment
+        below: the ONE commitment control (FR-1063), and on an optional session the live
+        remaining-places figure beside it (FR-1070). Keyed on the session id like its siblings,
+        so switching sessions cannot carry one session's places figure into another's.
+      */}
+      <PanelCommitment
+        key={`commitment-${session.id}`}
+        session={session}
+        eventId={context.eventId}
+        commitments={context.commitments}
+      />
       <PanelSpeakers speakers={session.speakers} />
       {/*
         The third section. `key` on the session id so switching sessions gives the editor a
         fresh controller rather than carrying one session's draft into another's — the panel
         and its address belong to a single session throughout (Edge Cases).
       */}
-      <PanelNotes
-        key={session.id}
-        eventId={context.eventId}
-        sessionId={session.id}
-        note={context.notes.get(session.id) ?? null}
-      />
+      {/*
+        The editor mounts only once the notes read has SETTLED, and the two other states are
+        each a sentence rather than a blank field. An empty editor over a pending read is not a
+        neutral placeholder here: the controller initialises from what it is handed and never
+        adopts a late-arriving value (FR-214), so a note that resolved after the mount stayed
+        invisible — and typing into that blank would replace it on the server. Found as an
+        intermittent end-to-end failure on a loaded machine, which is exactly the timing a slow
+        connection gives a real attendee.
+      */}
+      {context.notesStatus === 'ready' ? (
+        <PanelNotes
+          key={session.id}
+          eventId={context.eventId}
+          sessionId={session.id}
+          note={context.notes.get(session.id) ?? null}
+        />
+      ) : (
+        <section aria-labelledby="session-panel-notes">
+          <h3
+            id="session-panel-notes"
+            className="mb-2 font-display text-sm font-medium text-text-primary"
+          >
+            Your notes
+          </h3>
+          {context.notesStatus === 'loading' ? (
+            <p className="text-sm text-text-muted">Loading your note…</p>
+          ) : (
+            <p className="text-sm text-text-body">
+              Your notes could not be read, so the editor is not offered — a blank field over a note
+              that exists would invite retyping it over the top.{' '}
+              <button
+                type="button"
+                onClick={context.retryNotes}
+                className="font-medium text-coral-700 underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-coral-500"
+              >
+                Try again
+              </button>
+            </p>
+          )}
+        </section>
+      )}
       {/*
         T035 (009) — the fourth section, which is the whole of this feature's edit to 005's file.
 
@@ -318,8 +386,14 @@ const PanelBody = ({
         questions under the new session's title.
 
         The panel is deliberately **not** converted to a registry to accommodate this (research
-        R3): that would be a larger edit to this file than the line itself, for a fifth section
-        the roadmap says will never arrive.
+        R3): that would be a larger edit to this file than the line itself.
+
+        T120 (014 tranche 2) — the sentence above used to end "…for a fifth section the roadmap
+        says will never arrive". The fifth section arrived: the commitment control (save on a
+        mandatory session, a place on an optional one — FR-1063) renders in this panel, and the
+        rewritten sentence is the record that the registry decision was re-weighed rather than
+        silently outgrown. Still not a registry: five known siblings in one file remain cheaper
+        than an abstraction with five callers.
       */}
       <PanelQuestions
         // Prefixed, because `PanelNotes` above is keyed on the bare session id and the two are

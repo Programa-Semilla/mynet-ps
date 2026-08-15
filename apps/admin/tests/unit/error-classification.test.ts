@@ -128,6 +128,37 @@ const CASES: readonly {
     error: new ApiError(400, { code: 'ends_before_start' }),
     expected: 'ends_before_start',
   },
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // **014 tranche 2 — the vocabulary's five** (contracts/tranche-2.md). The pair that earns its
+  // place here is rename-held versus delete-held: same underlying fact, two different next
+  // steps, and a shared code would render the retire-plus-create sentence unreachable — this
+  // feature's twice-recorded defect, pre-empted rather than re-shipped.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  {
+    label: 'a vocabulary label already in use (FR-1085)',
+    error: new ApiError(409, { code: 'vocabulary_label_taken' }),
+    expected: 'vocabulary_label_taken',
+  },
+  {
+    label: 'renaming a value attendees hold — retire-plus-create instead (FR-1094c)',
+    error: new ApiError(409, { code: 'vocabulary_rename_held' }),
+    expected: 'vocabulary_rename_held',
+  },
+  {
+    label: 'deleting a value attendees hold — retirement instead (FR-1094)',
+    error: new ApiError(409, { code: 'vocabulary_delete_held' }),
+    expected: 'vocabulary_delete_held',
+  },
+  {
+    label: 'a new subsector under a retired sector (FR-1087)',
+    error: new ApiError(409, { code: 'sector_retired' }),
+    expected: 'sector_retired',
+  },
+  {
+    label: 'deleting a sector that still has subsectors',
+    error: new ApiError(409, { code: 'sector_has_subsectors' }),
+    expected: 'sector_has_subsectors',
+  },
   {
     label: 'nothing reached the server',
     error: new OfflineError('Loading admin/reports'),
@@ -334,6 +365,29 @@ const ATTENDEE_ONLY: Record<string, string> = {
   internal_error:
     'an unhandled server fault. It has no actionable explanation by construction, and `unknown` ' +
     'is the honest rendering rather than a fallback',
+  // 014 tranche 2 — the four profile-write membership refusals (FR-1095b, FR-1087, FR-1088).
+  // They answer `PUT /profile`, which no administrative tier may call at any privilege
+  // (FR-1093: maintaining the vocabulary is permitted, correcting somebody's chosen sector for
+  // them is not) — so an operator can never meet them, and MyNet's editor renders their
+  // server-written sentences directly.
+  sector_not_choosable:
+    "an attendee's own profile write, refused for a sector neither held nor on offer. No " +
+    'administrative route writes anybody’s profile (FR-1093)',
+  subsector_not_choosable: "an attendee's own profile write, as above",
+  subsector_outside_sector: "an attendee's own profile write, as above (FR-1087)",
+  interest_not_choosable: "an attendee's own profile write, as above (FR-1088)",
+  // 014 tranche 2 — the enrolment refusals (FR-1069). They answer the attendee-side
+  // take-a-place and withdraw routes; FR-1076 forbids any administrative tier taking,
+  // releasing or moving a place on an attendee's behalf, and no administrative route exists
+  // that could — an operator acts on content and on authority, never on a person (013).
+  session_full:
+    'an attendee taking a place in a full session; no administrative route enrols (FR-1076)',
+  enrolment_closed: 'an attendee taking a place after the deadline, as above',
+  already_enrolled: 'an attendee double-taking a place they already hold, as above',
+  not_optional: 'an attendee enrolling in a mandatory session, as above',
+  not_saveable:
+    'an attendee saving an optional session, where enrolment replaces saving (FR-1064). ' +
+    'MyNet renders its server-written sentence directly; no administrative route saves',
 }
 
 const API_ERRORS = fileURLToPath(new URL('../../../api/src/errors.ts', import.meta.url))

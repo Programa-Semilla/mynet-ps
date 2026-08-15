@@ -106,6 +106,10 @@ describe("the client's copies of the server's validation bounds", () => {
     expect(LIMITS.headline, message).toBe(profile['headline']?.maxLength)
     expect(LIMITS.interestCount, message).toBe(profile['interests']?.maxItems)
     expect(LIMITS.interest, message).toBe(profile['interests']?.items?.maxLength)
+    // 014 T2 — the productive-activity description is typed free text like the headline, so its
+    // bound is held to the contract the same way. Sector and subsector carry no client copy at
+    // all: they are chosen from the vocabulary, and nothing in the editor can type one.
+    expect(LIMITS.productiveActivity, message).toBe(profile['productiveActivity']?.maxLength)
   })
 
   /**

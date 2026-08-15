@@ -2,11 +2,13 @@ import type { FastifyInstance } from 'fastify'
 
 import { adminCatalogRoutes } from './catalog.js'
 import { adminConferenceRoutes } from './conferences.js'
+import { adminEnrolmentRoutes } from './enrolments.js'
 import { adminMeRoutes } from './me.js'
 import { adminModerationRoutes } from './moderation.js'
 import { adminOperatorRoutes } from './operators.js'
 import { adminReportRoutes } from './reports.js'
 import { adminSessionRoutes } from './session.js'
+import { adminVocabularyRoutes } from './vocabulary.js'
 
 /**
  * T041 (013) — the administrative route group (contracts).
@@ -60,4 +62,14 @@ export const adminRoutes = async (app: FastifyInstance): Promise<void> => {
   // than by tier alone, and the first that dispatch a notification.
   // ─────────────────────────────────────────────────────────────────────────────────────────
   await adminCatalogRoutes(app)
+
+  // 014 tranche 2 — the profile-taxonomy vocabulary, appended likewise. Platform tier only
+  // (FR-1089): product-wide reference data no conference owns, so these routes name no
+  // conference and carry `requirePlatformOperator` rather than the authoring guard (R20).
+  await adminVocabularyRoutes(app)
+
+  // 014 tranche 2 — the enrolment roster, appended likewise. The fourth recorded Principle
+  // VIII exception (v5.3.0 O1), in its own module so the disclosure guard can audit its one
+  // projection by name (R16). Conference-authority guarded, like the catalog routes above.
+  await adminEnrolmentRoutes(app)
 }

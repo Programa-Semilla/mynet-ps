@@ -38,6 +38,9 @@ const PROFILE: VisibleProfile = {
   company: 'Peña & Asociados',
   role: 'Designer',
   headline: 'Design systems for large teams.',
+  sector: null,
+  subsector: null,
+  productiveActivity: null,
   networkingIntent: 'open_to_meetings',
   availability: 'available',
   interests: ['Design systems', 'Accessibility', 'Typography'],
@@ -150,6 +153,42 @@ describe('the profile view renders what 004 authored (FR-432)', () => {
     for (const interest of PROFILE.interests) {
       expect(dialog).toHaveTextContent(interest)
     }
+  })
+
+  /**
+   * T179 (014 tranche 2) — **an unset taxonomy field is ABSENT, and a set one is present**
+   * (FR-1092). Both halves in one file, because the absence half alone is vacuously green
+   * against a component that renders nothing at all.
+   */
+  it('shows no line, placeholder or dash for an unset taxonomy field (FR-1092)', async () => {
+    // PROFILE's sector, subsector and productiveActivity are all null.
+    renderDiscover({ at: `/discover/${ATTENDEE_ID}`, overrides: withProfile() })
+
+    const dialog = await screen.findByRole('dialog')
+    await waitFor(() => expect(dialog).toHaveTextContent('Designer · Peña & Asociados'))
+
+    // No label rendered against nothing, and no placeholder for it either. The em-dash the
+    // rule names is checked as a standalone token, because the headline legitimately may
+    // contain one inside prose.
+    expect(dialog.textContent).not.toMatch(/sector/i)
+    expect(dialog.textContent).not.toMatch(/not (set|stated|specified)/i)
+    expect(dialog.textContent).not.toMatch(/(^|\s)[—–-](\s|$)/)
+  })
+
+  it('shows sector, subsector and the activity description where they are set (FR-1090)', async () => {
+    renderDiscover({
+      at: `/discover/${ATTENDEE_ID}`,
+      overrides: withProfile({
+        ...PROFILE,
+        sector: 'Servicios',
+        subsector: 'Consultoría',
+        productiveActivity: 'Asesoría contable para pymes.',
+      }),
+    })
+
+    const dialog = await screen.findByRole('dialog')
+    await waitFor(() => expect(dialog).toHaveTextContent('Servicios · Consultoría'))
+    expect(dialog).toHaveTextContent('Asesoría contable para pymes.')
   })
 
   it('never shows an email address or verification state (FR-406)', async () => {

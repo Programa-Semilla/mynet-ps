@@ -148,7 +148,7 @@ export const buildApp = async (options: BuildAppOptions = {}): Promise<FastifyIn
   // unchanged. The delegator form is what makes this expressible — the static `origin` option
   // cannot vary by request, and this must.
   // ─────────────────────────────────────────────────────────────────────────────────────────
-  const CORS_METHODS = ['GET', 'POST', 'PUT', 'DELETE']
+  const CORS_METHODS = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH']
   await app.register(
     fastifyCors,
     () =>
@@ -172,6 +172,14 @@ export const buildApp = async (options: BuildAppOptions = {}): Promise<FastifyIn
           //
           // DELETE is here for 005: unsaving a session and clearing a note are both `DELETE`
           // (research D6, FR-212), and 011 needs it for sign-out and demotion.
+          //
+          // PATCH is here for 014: every administrative update verb — a session edit, a
+          // conference's modality, an inline track, room or speaker rename — is a `PATCH`,
+          // and only the browser's preflight ever notices its absence. It was missing until
+          // 014 tranche 2's end-to-end suite drove the session editor through a real browser
+          // and every administrative edit failed as an opaque network error, exactly as the
+          // PUT comment above predicts: `fastify.inject()` performs no preflight, so all of
+          // T086's route-level tests were green while no deployed-local edit could land.
           methods: CORS_METHODS,
         })
       },

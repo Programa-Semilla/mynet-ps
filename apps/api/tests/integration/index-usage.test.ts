@@ -96,9 +96,9 @@ describe('the 0005 indexes are reachable by the planner (SC-415)', () => {
     `)
 
     await db.execute(sql`
-      INSERT INTO events (name, location, starts_on, ends_on, timezone, join_code)
+      INSERT INTO events (name, location, starts_on, ends_on, timezone, join_code, modality)
       SELECT ${MARKER} || ' ' || n, 'Nowhere', DATE '2026-01-01', DATE '2026-01-02',
-             'UTC', ${MARKER} || '-' || n
+             'UTC', ${MARKER} || '-' || n, 'in-person'
       FROM generate_series(1, ${ROWS}) AS n
     `)
 

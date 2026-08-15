@@ -1,6 +1,12 @@
 # Brainstorm Overview
 
-Last updated: 2026-08-12 — **#10 and #11 land a client feedback round that reverses two amendments
+Last updated: 2026-08-14 — **#12 scopes tranche 2, the change that closes 014.** All three
+outstanding rows, one PR, one migration, gated on constitution **v5.3.0**. It corrects two things the
+record had wrong: the profile taxonomy was never blocked (REQ-035 supplies the sector list, and #11
+had already made the taxonomy authored data), and two of tranche 2's requirements — REQ-012 and
+REQ-014 — are **already shipped** as `sessions.summary` and `speakers`.
+
+Previously: 2026-08-12 — **#10 and #11 land a client feedback round that reverses two amendments
 ratified in the previous 72 hours** (v3.2.0's one-directional card, v3.3.0's Q&A attribution),
 decomposes `assets/feedback-1.md` — 118 requirements from a 52-minute client conversation — into
 five features, and **absorbs them into the administrative programme** rather than running a third
@@ -50,6 +56,7 @@ win and this is stale.
 | 10 | 2026-08-12 | conference-content-authoring | **decided, and ratified as constitution v5.2.0** (drafted as v5.2.0) the same day — standing decisions 45–49; opens entries 29 and 30. Specified, planned and **implemented**: 51 FRs, 105 tasks. Live editing from day one; **cancel replaces delete once attendees have engaged**; an in-app marker **and** a push for a changed saved session; both tiers create conferences. One PR, migration `0011` | `brainstorm/10-conference-content-authoring.md` |
 | 10 | 2026-08-12 | app-fixes-and-install-icon | **active** — six owner items from using the running product. Two are not what they look like: mutual card exchange **reverses v3.2.0 N2**, and the new icon is a *different mark* rather than a new size. Feeds **016** | `brainstorm/10-app-fixes-and-install-icon.md` |
 | 11 | 2026-08-12 | client-feedback-programme | **active** — decomposes `assets/feedback-1.md` (118 requirements, 19 areas) into five features. **Absorbs into the administrative programme** rather than running beside it. Reverses **v3.3.0** 48 hours after ratification. Feeds **017, 014, 015, 018, 019** | `brainstorm/11-client-feedback-programme.md` |
+| 12 | 2026-08-14 | conference-content-authoring-tranche-2 | **active** — the change that **closes 014**. All three outstanding rows, as a **single PR and a single migration**, gated on **constitution v5.3.0**. Corrects the "blocked on the client's lists" framing: REQ-035 supplies the sectors and #11 already ruled the taxonomy is authored data. Finds **REQ-012 and REQ-014 already shipped** (`sessions.summary`, `speakers`) | `brainstorm/12-conference-content-authoring-tranche-2.md` |
 
 **There are two session 10s, and the duplicate is left in place rather than renumbered.** Both were
 held on 2026-08-12, on branches that could not see each other, and both files exist on disk under the
@@ -127,7 +134,7 @@ requires reversing a Principle III **prohibition** rather than filling an omissi
 | 013 | Administrative foundation — second actor, admin site, **abuse-report queue** | **shipped** — squash-merged to `develop`; amendments ratified as **v4.0.0** and **v4.1.0**. Migration `0009` | ~~24, 25, 26~~ — **all three closed by v4.1.0** |
 | 016 | App fixes, mutual card exchange, install icon | **brainstormed** (#10). Amendment: reverses **v3.2.0 N2**, records the icon-upscale exception, ratifies the admin-counterpart rule. **No migration** | — |
 | 017 | **Q&A rebuilt** — moderation, identity, lifecycle, projection | **brainstormed** (#11). Amendment: reverses **v3.3.0** attribution and retracts shipped 009 FRs | 013 |
-| 014 | Conference content authoring — **rescoped and kept whole** | **OPEN, AND DELIBERATELY SO** (decided 2026-08-14). #10's scope is **implemented and green** on `spec/014-conference-content-authoring` (51 FRs, 105 tasks, migration `0011`, amendment **v5.2.0**), authored before #11 existed. #11's additions — event types, optional sessions with capacity and enrolment, the profile taxonomy — are **in scope and not built**. The feature closes when both are done. See the note below the table | 013 ✓; v5.2.0 ✓. The profile taxonomy is blocked on **the client's interest, sector and subsector lists, which do not exist**; the rest is unblocked |
+| 014 | Conference content authoring — **rescoped and kept whole** | **OPEN, AND DELIBERATELY SO** (decided 2026-08-14). #10's scope is **implemented and green** on `spec/014-conference-content-authoring` (51 FRs, 105 tasks, migration `0011`, amendment **v5.2.0**), authored before #11 existed. #11's additions — event types, optional sessions with capacity and enrolment, the profile taxonomy — are **in scope and not built**. The feature closes when both are done. See the note below the table | 013 ✓; v5.2.0 ✓. **Tranche 2 brainstormed as #12 (2026-08-14) and nothing blocks it** — the taxonomy turned out not to be blocked (REQ-035 supplies the sectors; #11 already made it authored data). It needs **constitution v5.3.0**, which gates its first line of code |
 | 015 | Registration and **invitations** — rescoped | **re-brainstormed** (#11). Completes standing decision 11 rather than reversing it | 013 |
 | ~~015~~ | ~~Registration and attendee management~~ | superseded by the row above; #09's scoping is read as replaced by #11's | — |
 | 018 | Profile QR | **brainstormed** (#11) | 014 |
@@ -199,8 +206,16 @@ to re-merge `develop` on every merge to `develop` — it had already diverged on
 cost a session and collided on five numbering tables. Integrated, that debt is paid.
 
 **Tranche 2 starts from a fresh branch off `develop`**, against `specs/014-conference-content-authoring/`,
-and it is the change that closes 014. Two of its three outstanding rows are unblocked today; only the
-profile taxonomy waits on the client's lists.
+and it is the change that closes 014. It was brainstormed on **2026-08-14 as #12**, and that session
+**corrected the blocking claim above**: the taxonomy is **not** blocked. REQ-035 supplies the sector
+list verbatim (Servicios, Comercio, Industria, Agro), and #11 decision item 6 had already ruled the
+taxonomy to be authored or seeded data rather than a spec constant. What is missing is the *subsector*
+and *interest* lists — content for a surface, not a prerequisite for building one. **All three rows
+are therefore in scope**, and 014 closes in one change.
+
+#12 also found that **two of tranche 2's requirements are already shipped**: REQ-012's "short
+description" is `sessions.summary` (`catalog.ts:176`) and REQ-014's "presenters" are `speakers`,
+already organizer-authored with create/update/delete routes from tranche 1.
 
 **Numbered 011–013 when #09 ran, and delivered as 013–015.** The UAT deployment work took 011 from a
 parallel branch while this programme was in flight, so it shifted rather than renumbering a phase
@@ -323,6 +338,36 @@ named them — a reminder that the inbox ages, and that an entry can be resolved
 does not cite it, exactly as register entry 7 was.
 
 ## Open Threads
+
+### Opened 2026-08-14 by #12 — tranche 2, and what it costs to close 014
+
+- ~~**Constitution v5.3.0 is not drafted and gates the first line of code.**~~ **DRAFTED AND RATIFIED
+  2026-08-14** as standing decisions 50–53; it opened register entry 31. It ratified three
+  things: a **named enrolment roster** for assigned organizers (a bounded reversal of FR-1042 and the
+  shipped `no-attendee-state-disclosure` guard), **enrolment's exclusion from the engagement set**,
+  and the **attendee-visible seat count**.
+- **Deleting an optional session destroys held seats silently, and that is an accepted owner
+  decision.** Enrolment is deliberately **not** a fifth engagement type, so tranche 2 writes the first
+  `NOT_ENGAGEMENT` entry into a list that is empty by design and whose comment demands each entry
+  *"say whose data it is and why losing it silently is acceptable."* Because enrol replaces save,
+  those attendees have no `saved_sessions` row and so receive no notification and no marker. Whether
+  a deletion should at least notify enrollees would be a **third** notification trigger.
+- **Enrolment widens the notification *population* without widening the *trigger set*.**
+  `attendeesToNotify` reads `saved_sessions` alone, so an enrolled attendee is told nothing when their
+  session is cancelled or moved. That distinction — population versus set — is written down nowhere
+  today and tranche 2 must state it.
+- **Moving interests from free text to a controlled vocabulary changes the Discover ranking join and
+  its keyset cursor**, which is validated strictly and refused rather than ignored. It also removes
+  the stated reason for Discover's accumulate-what-you-have-seen filter options, since a closed
+  vocabulary is not population data.
+- **`no-draft-state.test.ts` covers only `catalog.ts` and `events.ts`**, so an `active`/`retired` flag
+  on a new taxonomy table would pass green while arguably breaching decision 48.
+- **Reserve-in-advance migration numbering is abandoned** by owner decision: numbers are claimed at
+  generation and the roadmap's table is extended in the same change. The scheme had collided three
+  times and currently reserves `0010` for a feature that adds no schema.
+- **Pre-existing defect: `hasEngagement` has no caller in the delete path.** `admin-catalog.ts:682`
+  calls it *"the predicate of record"* while `:686` calls `countEngagement`. Same class as the four
+  emphatic-header defects 013's review found; a tranche-2 author extending it would edit dead code.
 
 ### Opened 2026-08-12 by #10 and #11 — the client feedback round
 

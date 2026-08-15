@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 import { renderAgenda } from '../support/agenda.js'
 
 /**
- * T022 (005) — the Saved-filter empty state (FR-195, US1 scenario 4).
+ * T022 (005) — the My-agenda-filter empty state (renamed by T194, FR-1066a) (FR-195, US1 scenario 4).
  *
  * ═════════════════════════════════════════════════════════════════════════════════════════
  * **"Never a blank list and never a spinner that never resolves"** is the requirement's own
@@ -16,22 +16,24 @@ import { renderAgenda } from '../support/agenda.js'
  * be skipped is the one on screen at first run — deliberately (data-model.md).
  * ═════════════════════════════════════════════════════════════════════════════════════════
  */
-describe('the Saved filter with nothing saved', () => {
+describe('the My-agenda filter with nothing committed', () => {
   const switchToSaved = async () => {
     const user = userEvent.setup()
     renderAgenda({ saved: [] })
     await screen.findByText('Opening Keynote')
-    await user.click(screen.getByRole('radio', { name: /saved/i }))
+    await user.click(screen.getByRole('radio', { name: /my agenda/i }))
     return user
   }
 
   it('invites the attendee to explore the programme (FR-195)', async () => {
     await switchToSaved()
 
-    expect(await screen.findByText(/nothing saved yet/i)).toBeInTheDocument()
+    expect(await screen.findByText(/nothing on your agenda yet/i)).toBeInTheDocument()
     // Says what to *do*, not merely that there is nothing — the difference between an
     // invitation to explore the programme and a bare "no results".
-    expect(screen.getByText(/browse the programme and save the sessions/i)).toBeInTheDocument()
+    // T194 — the invitation names BOTH commitments (FR-1066a): saving, and taking a place.
+    expect(screen.getByText(/browse the programme and commit to the sessions/i)).toBeInTheDocument()
+    expect(screen.getByText(/take a\s+place in the ones that enrol/i)).toBeInTheDocument()
   })
 
   it('offers an action that returns to the full programme (FR-195)', async () => {
@@ -46,7 +48,7 @@ describe('the Saved filter with nothing saved', () => {
 
   it('is NOT a blank list and NOT a spinner (FR-195)', async () => {
     await switchToSaved()
-    await screen.findByText(/nothing saved yet/i)
+    await screen.findByText(/nothing on your agenda yet/i)
 
     // No session rows.
     expect(screen.queryAllByRole('heading', { level: 3 })).toHaveLength(0)
@@ -58,7 +60,7 @@ describe('the Saved filter with nothing saved', () => {
 
   it('is not announced as a failure', async () => {
     await switchToSaved()
-    await screen.findByText(/nothing saved yet/i)
+    await screen.findByText(/nothing on your agenda yet/i)
 
     // An empty agenda is a valid answer. Announcing it as an alert would tell the attendee
     // something is wrong when the truth is that they have not saved anything yet.
@@ -74,7 +76,7 @@ describe('the Saved filter with nothing saved', () => {
 
     // The filter is still operable, and Saved says the same true thing rather than repeating
     // the programme's wording (Edge Cases: "a conference with no published programme").
-    await user.click(screen.getByRole('radio', { name: /saved/i }))
-    expect(await screen.findByText(/nothing saved yet/i)).toBeInTheDocument()
+    await user.click(screen.getByRole('radio', { name: /my agenda/i }))
+    expect(await screen.findByText(/nothing on your agenda yet/i)).toBeInTheDocument()
   })
 })

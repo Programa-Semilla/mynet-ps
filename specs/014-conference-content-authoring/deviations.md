@@ -748,3 +748,245 @@ declines to judge a development bundle by design, so the production shell was me
 
 **T105 is unaffected and still outstanding.** The merge changes nothing about what a person and a
 phone still have to walk.
+
+---
+
+# Part II — Tranche 2 deviations (D23 onward)
+
+**Added 2026-08-14.** Everything above is tranche 1's. These record where tranche 2's
+implementation departed from the letter of a task or a research sketch — following D14's rule that
+"scoped deliberately" and "weakened until it passed" are indistinguishable in a diff unless the
+deliberation is written down.
+
+## D23 — T113's index and primary-key order, corrected to what the reasons ask for
+
+T113's letter says `session_enrolments` takes a composite PK `(sessionId, attendeeId)` **and** an
+explicit `index(sessionId)`. Written literally, `session_id` would be covered twice (a PK's
+leading column serves a single-column predicate) while `attendee_id` — the column the commitment
+read and the deletion cascade probe on — would be covered by nothing, which is exactly the 004
+token-table defect the task cites in its own justification. The table instead mirrors
+`saved_sessions` exactly: **PK `(attendee_id, session_id)` plus `index(session_id)`**. Every
+reason the task states is satisfied — the count inside the exclusive lock and the roster read use
+the explicit index; the attendee-side read and the cascade use the PK; `ON CONFLICT` infers the PK
+regardless of column order in the conflict target.
+
+## D24 — T114 names `company`, which has existed since 004
+
+The task reads "Add `sector`, `subsector`, `productiveActivity` and `company` to
+`attendee_profiles`". `company` has been a column of that table since migration `0003`, and
+FR-1090's own wording knows it ("the **optional company name it already holds**"). Three columns
+were added; the fourth item was a task-authoring slip, recorded rather than silently absorbed.
+
+## D25 — T123's file is wrong: `NOT_ENGAGEMENT` lives in the guard, not the query module
+
+T123 says to add the enrolment entry "in `apps/api/src/db/queries/session-changes.ts`". The list
+it describes — `Record<string, string>`, snake_case table-name keys, the >80-character reason —
+exists in exactly one place, `apps/api/tests/unit/engagement-coverage.test.ts`, where research R15
+verified it line by line. The entry went where the list is. Everything else the task demands (the
+four required clauses: whose data, why silent loss is acceptable, the O2 citation, not-precedent,
+register entry 31) is in the entry verbatim.
+
+## D26 — `hasEngagement` deleted, per R15's "should carry an explicit task" note
+
+No task number covers it, but research R15's "changes the shape" section asks for it explicitly:
+the function named itself "the predicate of record" and had **zero callers and zero importers** —
+013's four-times-found defect class, a header asserting a call relationship that does not exist.
+Deleted; `ENGAGEMENT_TABLES` survives in `session-changes.ts` as the guard's source of truth; the
+two comments that asserted the function was live (`admin-catalog.ts`'s delete note, the module's
+own header) were rewritten in the same change, and a tombstone comment marks the site so the next
+reader does not "restore" a second expression of one predicate.
+
+## D27 — T138 is discharged structurally, not by a test
+
+"Ensure a lock-wait timeout surfaces as a 500 and is never classified as full or closed." The
+enrolment module catches no database errors, so a `55P03` propagates to the generic 500 with its
+correlation id — the outcome union has no member for "we do not know", which is `client.ts`'s own
+design for the application pool. A test inducing a real lock timeout would need to hold the
+session-row lock for the full 3s `lock_timeout` inside the integration suite, serially, per run;
+the property it would prove — "no catch block folds 55P03 into a domain code" — is visible in the
+module and stated in its header and the route's. Recorded because a reviewer should find this
+reasoning, not an omission.
+
+## D28 — T191's server half was pulled forward into the foundational phase
+
+Adding `events.modality NOT NULL` broke conference creation the moment migration `0012` applied —
+`createConference` inserted no modality — so the input extension, the `modality_missing` refusal
+(FR-1059b) and the shipped-test updates could not wait for US8's phase without leaving the
+integration suite red across two user-story phases. The remainder of T191 (the client half, the
+FR-1007 rewording) stayed with US8.
+
+## D29 — the profile's sector and subsector are stored as LABELS, not foreign keys
+
+Research R19's lock inventory sketched `sector_id`/`subsector_id` uuid columns referencing the
+vocabulary. The shipped model stores the chosen **label** in nullable text columns, mirroring
+`attendee_interests` exactly, because R18's later findings apply with equal force here: membership
+is enforced at the write against the choosable-or-already-held union (FR-1095b), FR-1094c's
+rename refusal is what makes a carried label safe from divergence, and a foreign key would make
+"keep a retired value" (FR-1094a) a referential special case instead of the default. It also
+avoids an import cycle R19's sketch would have forced (`vocabulary.ts` reads `PROFILE_LIMITS`
+from `profiles.ts`, so `profiles.ts` must not import `vocabulary.ts`), and keeps the export a
+projection instead of a join.
+
+## D30 — the vocabulary's held-value refusals carry existence, never a number
+
+T173's brief said the delete/rename refusals name "that attendees hold it (count only, never
+who)". FR-1099b forbids the administrative product any per-value attendee count — a vocabulary
+surface must not become a census — and research R17 requires the holder check to return
+existence rather than a count or a roster. The refusals therefore say *that* attendees hold the
+value and never *how many*; the tests assert no digit appears in those messages. An existence
+answer satisfies both readings of the task; a count satisfies only one, and the one it fails is
+the ratified bound. (Found and resolved by the vocabulary implementation; `contracts/tranche-2.md`
+is not amended because its wording — "naming that attendees hold it" — already reads correctly.)
+
+## D31 — six shipped integration fixtures typed free-text interests, and FR-1088 refuses that now
+
+`PUT /profile` accepted arbitrary interest strings until this tranche; FR-1088 makes a NEW
+interest choosable-only, with FR-1095b keeping every already-held value writable. Six integration
+files whose fixtures typed fresh free text were adapted with an `ensureInterestOptions` helper
+that authors the values at platform tier first — the honest fixture under the new rule, since a
+retained value cannot be fabricated through the API by construction. `profile-persistence`'s
+whole-profile draft gained the three taxonomy fields because the export-coverage guard demanded
+the document carry them.
+
+## D32 — how far the T196 rename reaches, and the three names that deliberately keep their old identity
+
+T196 orders the repository renamed "from saved-sessions naming to commitment naming", and R13
+names the trap: a reviewer-visible name asserting the set holds only saves is FR-1066a's defect
+one layer down. The rename was carried through every load-bearing identity: the interface
+(`SavedSessionRepository` → `CommitmentRepository`), the row (`SavedSession` → `Commitment`,
+growing `commitment: 'saved' | 'place'`), the HTTP class (`HttpSavedSessionRepository` →
+`HttpCommitmentRepository`), the registry key (`savedSessions` → `commitments`), the hook
+(`useSavedSessionRepository` → `useCommitmentRepository`), the client hook and its file
+(`useSavedSessions`/`useSavedSessions.ts` → `useCommitments`/`useCommitments.ts`), the empty
+state (`SavedEmptyState` → `MyAgendaEmptyState`), and the row affordance (`SaveAffordance` →
+`CommitmentAffordance`, `SaveControl` → `CommitmentControl`).
+
+**Three names keep their old identity, each for a stated reason rather than by omission:**
+
+- **`listSaved` (the method).** The caching decorator's `reads` map and the cache resource key
+  (`saved`) are configured against the method name; renaming it would silently retire every
+  device's cached commitment set and re-cache under a new resource — a migration bought for a
+  name. Documented on the interface, per T196's own instruction.
+- **`next-saved-session` (the Home card's registry id).** Four tests pin it, it is the
+  registry's append-only key, and it is never rendered to an attendee — FR-1066a's subject is
+  attendee-visible strings, which the title (renamed to "Next on your programme") is and the id
+  is not. The card's file and component names follow the id and also stay.
+- **`RenderedAgenda.saved` (the test harness key).** Test-internal, read at ~30 call sites, and
+  the double it exposes carries the honest name (`commitmentsDouble`).
+
+## D33 — the FR-1074 notice confirms on EVERY enrolment, not once per attendee
+
+T147 permits a remembered notice only "if you find a recorded pattern for remembered notices";
+none exists in this product — `NotificationPrompt` renders nothing once *the platform* records
+an answer, which is browser state, not a per-attendee product preference. A remembered notice
+would be new durable per-attendee state nobody specified, with a cross-device hole (told on the
+phone, never told on the laptop). So the notice is a confirm step in front of every enrolment:
+one extra activation for a repeat enroller, against a disclosure somebody was told about once,
+months ago, on another device. Releasing a place asks nothing — the disclosure happens on
+taking a place, and withdrawing reduces what is shared.
+
+## D34 — two tranche-1 guards were re-scoped in writing, and one support helper corrected
+
+- **`marker-not-cached.test.ts`** pinned the repository to exactly four members and one read;
+  R13 finding 3 orders the amendment. Re-scoped to the property the guard always owned: the
+  member set is pinned again exactly (at seven), `places` is asserted `passThrough`-not-cached
+  (FR-1070b), and no member may match a change-history shape (`change|history|inbox`) — never
+  weakened to "anything goes".
+- **`no-admin-surface.test.ts`** gained one documented exemption: the pre-enrolment notice's
+  copy names "the organizers of this conference" because FR-1074 requires exactly that
+  disclosure, and a word-match heuristic for tier-branching flagged required copy. The
+  categorical suite still scans the exempted file for every real branching pattern. It also now
+  skips files the feature *deleted* (a rename's old path), which cannot carry a surface and
+  cannot be read.
+- **`branch-point.ts`'s `changedSinceBranchPoint`** diffed `base..HEAD` and was blind to
+  uncommitted work, so the diff-aware guards judged a tree they were not looking at. It now
+  diffs the working tree; in CI (clean tree) the two are identical.
+
+## D35 — the attendee programme read changed more than the task's letter, because SC-1022 forced it
+
+The brief for T193 named `kind` and `accessLink`. Delivering SC-1022 also required `room` to
+become nullable on the attendee read: `sessions.room_id` is nullable since T111, and the read's
+**inner** join on `rooms` would have silently dropped every virtual session from the programme —
+a session that exists and cannot be seen. The join is now a left join, `room` is `Room | null`
+on the wire and in `Session`, and every render site gained a null guard rendering **no room
+line at all**. Two of those sites are other features' Home cards (`UpNext`, `RestOfDay`'s shared
+row): the edit is a mechanical null guard forced by the type, recorded here so it is not read as
+this feature redesigning cards it does not own. Capacity is deliberately NOT on the read
+(FR-1070b), asserted by integration test.
+
+## D36 — T202's end-to-end run found the CORS method list missing PATCH, and fixed one file beyond its brief
+
+The e2e spec for quickstart scenarios 10–13 (`e2e/enrolment.spec.ts`) failed at the room-change
+step with the admin client reporting "MyNet could not be reached": `CORS_METHODS` in
+`apps/api/src/app.ts` was `['GET', 'POST', 'PUT', 'DELETE']`, and every administrative update
+verb — the session edit, the conference editor, the inline track/room/speaker renames — is a
+`PATCH`. In the local cross-origin topology (5174 → 3000) the browser's preflight refused all of
+them, so **no administrative edit could land in dev or preview at all**, while every route-level
+test stayed green — `fastify.inject()` performs no preflight, exactly as the PUT comment beside
+that list has warned since 002. In the deployed topology the admin site's `/api/*` is
+reverse-proxied same-origin (decision 37), so production was never affected; what was broken was
+every local validation of the update verbs, which is the environment T105/T206's by-hand walks
+would have used. `PATCH` is added with a comment naming its callers, and the spec now arms a
+`waitForResponse` on the PATCH before clicking Save, so a recurrence names itself instead of
+surfacing 55 seconds later as a missing marker.
+
+Two smaller e2e repairs travelled with T202, both consequences of tranche 2 reaching tranche 1's
+helpers: `authoring.spec.ts`'s `createConference` gained the now-required modality selection
+(FR-1059b made the field mandatory with no safe default, so the old helper would stall waiting
+for a join code), and the enrolment spec chooses its venue timezone at runtime — a fixed-offset
+zone in which the venue clock reads ~05:00 — because the Home card it asserts composes the
+attendee's programme for the venue's **today**, and a suite that only passed in some UTC hours
+would be the order-dependent flake `attendees.ts` warns about, one clock removed.
+
+## D37 — the post-implementation deep review's fix round, and a second deliberate hand-edit to migration 0012
+
+The tranche-2 deep review (review-findings.md Part II) closed sixteen findings after both full
+gates were already green; the changes that need a record here rather than there are two. First,
+**migration `0012` was edited by hand a second time**, with its snapshot: the
+`sessions_kind_fields` CHECK gained `IS NOT NULL` guards in its optional branch, because the
+old expression evaluated to NULL — and therefore passed — for an optional session carrying
+neither capacity nor offset. Safe under `0009`'s precedent: `0012` has been applied to no
+database beyond this branch's local ones, all three representations (schema, SQL, snapshot)
+were changed to byte-identical expressions, and `verify:clean` re-proves fresh-and-twice
+application. Second, **`saveSession` abandoned its one-statement shape** — the shape its own
+comment defended — for a locked transaction, because the snapshot-read guard it relied on is
+exactly what a concurrent kind change slips past; the comment now records the race that forced
+the change, so the one-statement version cannot be "restored" as a tidying.
+
+## D38 — the durability redeploy specs gained a reload loop, for a defect of the harness's connection pool rather than of the product
+
+`durability.spec.ts`'s two redeployment tests failed intermittently — twice in three full-suite
+runs on this machine, never in isolation — with the workspace cards settled into their offline
+failure state after a reload the test performed once. `redeployApi` does wait for `/ready`; what
+it cannot control is the browser's keep-alive pool, which may hand the first post-restart fetch
+a socket to the dead process. The rejection classifies as offline, the card renders "Try again"
+and — by design — never retries itself. The product is behaving exactly as a real deploy window
+demands; the spec's one-shot reload was the fragile half. Both tests now look again in a
+`toPass` loop, which asserts the durability guarantee as stated — the data is there when the
+attendee looks — rather than the stronger, false claim that a restart drops no in-flight
+connection.
+
+## D39 — CI's one red job led to a real data-loss path in the notes editor, and the flake was the product
+
+The PR's first CI run failed one job: `session-notes.spec.ts`, on a step that had passed three
+consecutive local full runs. Chasing it as a flake found a defect instead, in tranche-1-era
+wiring this tranche never touched. The Agenda hands the session panel an **empty notes map
+while `listNotes` is still loading or failed**, the panel consulted the map without the read's
+status, and the autosave controller initialises once and — deliberately, FR-214 — never adopts
+a late-arriving server value. So on a slow read the editor mounted blank, stayed blank when the
+note arrived, and the attendee's first keystroke into that convincing blank would **replace the
+note the server still holds**. The comment beside the map called the blank display *"acceptable
+only because a write replaces whatever is on the server"* — which is precisely why it was not.
+CI's loaded two-core runner supplied the latency a slow connection gives a real attendee; the
+suite was right and the shrug would have been wrong.
+
+The fix gates only the notes **section** on the read's own state — `Loading your note…` while
+pending, a stated refusal with a retry when failed, the editor only once settled — which is the
+arrangement `useSessionNotes`'s header always described ("this reports its own state and the
+caller decides"). `note-late-read.test.tsx` holds the read open and drives both states, with
+the late-arriving note shown rather than ignored as the headline assertion.
+
+Two test repairs travelled with it: both note texts in the e2e spec are now salted with the
+retry number, because a retry re-filling identical text over a note the first attempt had
+already persisted changes nothing, schedules no autosave, and could never pass — CI's
+`retries: 1` was a guaranteed second failure rather than a second chance.

@@ -53,6 +53,21 @@ const SOURCE = readFileSync(
 )
 
 /**
+ * T172 (014 tranche 2, R20 gap 2) — **the vocabulary module joins the audited population.**
+ *
+ * This guard read exactly one source file, so a NEW admin route module sat entirely outside it:
+ * no test required a vocabulary write to charge any throttle action at all — the exact "every
+ * write route could charge any action with all three guards green" hole the header above
+ * describes, reopened one file over. R20 records the gap; widening the source set (with its own
+ * hand-maintained table, each entry a decision) is the repair taken, deliberately, rather than
+ * accepting an unbound write.
+ */
+const VOCABULARY_SOURCE = readFileSync(
+  fileURLToPath(new URL('../../src/routes/admin/vocabulary.ts', import.meta.url)),
+  'utf8',
+)
+
+/**
  * Every write route in the authoring module and the action it must charge.
  *
  * **Each entry is a decision, not a transcription.** If one of these fails, the question is not
@@ -110,18 +125,66 @@ const EXPECTED: readonly {
 ]
 
 /**
+ * Every vocabulary write and the one action it charges — one counter for all three lists, on
+ * `catalog_write`'s reasoning: naming a value in a product-wide list is the same act at the
+ * same scale whichever list it lands in. The GET lists charge nothing and are exempted with a
+ * written reason in `throttle-route-audit.test.ts`.
+ */
+const VOCABULARY_EXPECTED: readonly {
+  readonly method: string
+  readonly path: string
+  readonly action: string
+}[] = [
+  { method: 'POST', path: '/admin/vocabulary/sectors', action: 'vocabulary_write' },
+  { method: 'PATCH', path: '/admin/vocabulary/sectors/:id', action: 'vocabulary_write' },
+  { method: 'POST', path: '/admin/vocabulary/sectors/:id/retirement', action: 'vocabulary_write' },
+  {
+    method: 'DELETE',
+    path: '/admin/vocabulary/sectors/:id/retirement',
+    action: 'vocabulary_write',
+  },
+  { method: 'DELETE', path: '/admin/vocabulary/sectors/:id', action: 'vocabulary_write' },
+  { method: 'POST', path: '/admin/vocabulary/subsectors', action: 'vocabulary_write' },
+  { method: 'PATCH', path: '/admin/vocabulary/subsectors/:id', action: 'vocabulary_write' },
+  {
+    method: 'POST',
+    path: '/admin/vocabulary/subsectors/:id/retirement',
+    action: 'vocabulary_write',
+  },
+  {
+    method: 'DELETE',
+    path: '/admin/vocabulary/subsectors/:id/retirement',
+    action: 'vocabulary_write',
+  },
+  { method: 'DELETE', path: '/admin/vocabulary/subsectors/:id', action: 'vocabulary_write' },
+  { method: 'POST', path: '/admin/vocabulary/interests', action: 'vocabulary_write' },
+  { method: 'PATCH', path: '/admin/vocabulary/interests/:id', action: 'vocabulary_write' },
+  {
+    method: 'POST',
+    path: '/admin/vocabulary/interests/:id/retirement',
+    action: 'vocabulary_write',
+  },
+  {
+    method: 'DELETE',
+    path: '/admin/vocabulary/interests/:id/retirement',
+    action: 'vocabulary_write',
+  },
+  { method: 'DELETE', path: '/admin/vocabulary/interests/:id', action: 'vocabulary_write' },
+]
+
+/**
  * The action charged by each route registration, read from the source.
  *
  * Registrations are located by `app.<method>(` followed by the path literal; the action is the
  * first `throttle(request, '<action>'` appearing before the next registration. A route that charges
  * nothing yields `undefined`, which is a failure rather than a skip — that is the whole point.
  */
-const chargedActions = (): Map<string, string | undefined> => {
+const chargedActions = (source: string = SOURCE): Map<string, string | undefined> => {
   const registration = /\n {2}app\.(get|post|patch|delete)\(\s*\n\s*'([^']+)',/g
   const found: { key: string; from: number }[] = []
 
   let match: RegExpExecArray | null
-  while ((match = registration.exec(SOURCE)) !== null) {
+  while ((match = registration.exec(source)) !== null) {
     found.push({
       key: `${(match[1] as string).toUpperCase()} ${match[2] as string}`,
       from: match.index,
@@ -130,12 +193,44 @@ const chargedActions = (): Map<string, string | undefined> => {
 
   const charged = new Map<string, string | undefined>()
   found.forEach((entry, index) => {
-    const until = found[index + 1]?.from ?? SOURCE.length
-    const block = SOURCE.slice(entry.from, until)
+    const until = found[index + 1]?.from ?? source.length
+    const block = source.slice(entry.from, until)
     charged.set(entry.key, /throttle\(request, '([a-z_]+)'/.exec(block)?.[1])
   })
 
   return charged
+}
+
+/**
+ * The vocabulary module fixes its one action inside a local `throttle(request)` helper rather
+ * than at eighteen call sites, so the binding to audit is the helper's own `action:` literal —
+ * plus the fact that every write registration calls it. Reading the helper is reading the
+ * binding; a second helper charging a different action would be a second `action:` literal and
+ * fails the single-binding assertion below.
+ */
+const vocabularyChargedAction = (): string | undefined =>
+  /action:\s*'([a-z_]+)' as const/.exec(VOCABULARY_SOURCE)?.[1]
+
+const vocabularyCallsThrottle = (): Map<string, boolean> => {
+  const registration = /\n {2}app\.(get|post|patch|delete)\(\s*\n\s*'([^']+)',/g
+  const found: { key: string; from: number }[] = []
+
+  let match: RegExpExecArray | null
+  while ((match = registration.exec(VOCABULARY_SOURCE)) !== null) {
+    found.push({
+      key: `${(match[1] as string).toUpperCase()} ${match[2] as string}`,
+      from: match.index,
+    })
+  }
+
+  const calls = new Map<string, boolean>()
+  found.forEach((entry, index) => {
+    const until = found[index + 1]?.from ?? VOCABULARY_SOURCE.length
+    const block = VOCABULARY_SOURCE.slice(entry.from, until)
+    calls.set(entry.key, /await throttle\(request\)/.test(block))
+  })
+
+  return calls
 }
 
 describe('every authoring write route charges the action it was given (FR-1039)', () => {
@@ -198,6 +293,33 @@ describe('every authoring write route charges the action it was given (FR-1039)'
       'Cancellation is charged the same or more than an ordinary edit. It is the act most likely ' +
         'to reach every saver’s lock screen, and an unthrottled cancel loop is a push amplifier.',
     ).toBeLessThan(write)
+  })
+
+  it.each(VOCABULARY_EXPECTED)('charges $action on $method $path', ({ method, path }) => {
+    // Two halves, because the module binds once: the helper's fixed action is `vocabulary_write`,
+    // and this registration actually calls the helper. Either failing is an unbound write.
+    expect(
+      vocabularyChargedAction(),
+      'The vocabulary throttle helper no longer charges `vocabulary_write` — or a second ' +
+        '`action:` literal appeared. Every vocabulary write spends this one counter (FR-1039).',
+    ).toBe('vocabulary_write')
+
+    expect(
+      vocabularyCallsThrottle().get(`${method} ${path}`),
+      `\`${method} ${path}\` does not call the vocabulary throttle helper, so this write is ` +
+        'bounded by nothing — the exact hole R20 records this guard as having had for a new ' +
+        'admin route module.',
+    ).toBe(true)
+  })
+
+  it('audits a vocabulary route that this application actually registers', () => {
+    for (const entry of VOCABULARY_EXPECTED) {
+      expect(
+        registered.has(`${entry.method} ${entry.path}`),
+        `This file audits \`${entry.method} ${entry.path}\`, which the application does not ` +
+          'register — a stale entry audits nothing while reading as though it does.',
+      ).toBe(true)
+    }
   })
 
   it('does not let the conference edit share the tracks-rooms-speakers bucket', () => {

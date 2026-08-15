@@ -9,6 +9,7 @@ import { attendeeCredentials, attendees } from '../../src/db/schema/attendees.js
 import { authSessions } from '../../src/db/schema/auth-sessions.js'
 import { events, registrations } from '../../src/db/schema/events.js'
 import { signInAttempts } from '../../src/db/schema/sign-in-attempts.js'
+import { interestOptions } from '../../src/db/schema/vocabulary.js'
 import { seed } from '../../src/db/seed/index.js'
 
 /**
@@ -211,6 +212,25 @@ export const seededAttendeeId = async (email: string): Promise<string> => {
 
 export const clearThrottle = async (): Promise<void> => {
   await getDb().delete(signInAttempts)
+}
+
+/**
+ * T174 (014 tranche 2) — makes the given interest labels **choosable**, for suites that write
+ * interests through `PUT /profile`.
+ *
+ * A new interest is chosen from the vocabulary rather than typed (FR-1088), and the vocabulary
+ * ships with an EMPTY interest list (FR-1086) — so a test that types a fresh label through the
+ * route is refused, exactly as a client would be. Suites whose subject is something else
+ * (persistence, deletion, whole-profile semantics) call this in their setup rather than each
+ * inserting vocabulary rows by hand. Idempotent, because the label column is unique and the
+ * files share one database.
+ */
+export const ensureInterestOptions = async (labels: readonly string[]): Promise<void> => {
+  if (labels.length === 0) return
+  await getDb()
+    .insert(interestOptions)
+    .values(labels.map((label) => ({ label })))
+    .onConflictDoNothing()
 }
 
 export const teardown = async (app: FastifyInstance): Promise<void> => {

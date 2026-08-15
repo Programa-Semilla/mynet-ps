@@ -132,6 +132,30 @@ const PLATFORM_TIER_ONLY: readonly string[] = [
   'POST /admin/conferences/:eventId/organizers',
   'DELETE /admin/conferences/:eventId/organizers/:attendeeId',
   'POST /admin/operators/:operatorId/deactivation',
+  // ─────────────────────────────────────────────────────────────────────────────────────────
+  // 014 tranche 2 — the vocabulary, every verb of it (FR-1089, R20). Product-wide reference
+  // data no conference owns, so a conference organizer may not create, rename, retire or
+  // delete any value — nor even LIST them: the destination does not exist for their tier, and
+  // a readable list behind an unwritable surface would still tell them it exists (SC-1020).
+  // ─────────────────────────────────────────────────────────────────────────────────────────
+  'GET /admin/vocabulary/sectors',
+  'POST /admin/vocabulary/sectors',
+  'PATCH /admin/vocabulary/sectors/:id',
+  'POST /admin/vocabulary/sectors/:id/retirement',
+  'DELETE /admin/vocabulary/sectors/:id/retirement',
+  'DELETE /admin/vocabulary/sectors/:id',
+  'GET /admin/vocabulary/subsectors',
+  'POST /admin/vocabulary/subsectors',
+  'PATCH /admin/vocabulary/subsectors/:id',
+  'POST /admin/vocabulary/subsectors/:id/retirement',
+  'DELETE /admin/vocabulary/subsectors/:id/retirement',
+  'DELETE /admin/vocabulary/subsectors/:id',
+  'GET /admin/vocabulary/interests',
+  'POST /admin/vocabulary/interests',
+  'PATCH /admin/vocabulary/interests/:id',
+  'POST /admin/vocabulary/interests/:id/retirement',
+  'DELETE /admin/vocabulary/interests/:id/retirement',
+  'DELETE /admin/vocabulary/interests/:id',
 ]
 
 const methodsOf = (route: RouteOptions): string[] =>

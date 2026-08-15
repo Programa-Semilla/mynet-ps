@@ -7,6 +7,7 @@ import { getDb } from '../../src/db/client.js'
 import {
   clearThrottle,
   cookieHeader,
+  ensureInterestOptions,
   resetDatabase,
   SEED_EVENTS,
   sessionCookieFrom,
@@ -43,6 +44,9 @@ describe('deleting an account removes every row attributable to it (SC-306)', ()
   beforeAll(async () => {
     app = await setupTestApp()
     await resetDatabase()
+    // T174 (014 tranche 2) — FR-1088: the interest this suite attributes before deleting is
+    // written through the route, so it has to be choosable.
+    await ensureInterestOptions(['Leaving'])
   })
 
   afterAll(async () => {

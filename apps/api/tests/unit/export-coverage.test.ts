@@ -141,6 +141,24 @@ const NOT_EXPORTED: Record<string, string> = {
     'The report itself IS exported to the reporter (007, the `reports` section), which is the ' +
     'part that is theirs — what they said, when, about whom. What an operator then concluded is ' +
     'not, and FR-946 keeps the reporter told nothing at all about it.',
+
+  /**
+   * T213 (014 tranche 2) — **the vocabulary is REFERENCE DATA, not attendee data** (FR-1085a).
+   * It names no attendee and holds nothing anybody authored about themselves; an attendee's
+   * CHOSEN sector, subsector, activity and interests ARE exported — as the labels they hold, on
+   * the `profile` and `interests` sections — and nothing survives a deletion de-attributed
+   * (FR-1098). Reproducing the whole product vocabulary in a personal export would be
+   * exporting the product, not the person.
+   */
+  vocabulary_sectors:
+    'Product-wide reference data (FR-1085a): labels, authored at platform tier, naming no ' +
+    'attendee. The value an attendee chose IS exported, on the profile section.',
+  vocabulary_subsectors:
+    'Product-wide reference data (FR-1085a), as vocabulary_sectors. The chosen value is on the ' +
+    'profile section.',
+  vocabulary_interests:
+    'Product-wide reference data (FR-1085a). The interests an attendee holds ARE exported, on ' +
+    'the interests section, as the labels they hold — chosen and retained free text alike.',
 }
 
 /**
@@ -212,6 +230,11 @@ const NOT_EXPORTED_COLUMNS: Record<string, string> = {
     "The requester. `attendee_id = the requester` is the export query's WHERE clause, which is " +
     'what makes the scoping structural rather than a filter applied afterwards.',
   'question_votes.attendee_id': 'The requester, on every row of the votes section.',
+
+  // T153 (014 tranche 2). The requester, exactly as `saved_sessions.attendee_id` above.
+  'session_enrolments.attendee_id':
+    "The requester. The export is keyed on one attendee, so this column is the query's WHERE " +
+    'clause rather than a projection — the same structural scoping every commitment section has.',
 
   // T026 (013). The requester, exactly as `registrations.attendee_id` above — the export is
   // keyed on one attendee, so this column is the same value on every row and is a WHERE clause
@@ -344,6 +367,7 @@ describe('export coverage (T095, FR-377)', () => {
       registrations: true,
       activeConference: true,
       savedSessions: true,
+      heldPlaces: true,
       sessionNotes: true,
       signInSessions: true,
       avatar: true,
@@ -397,6 +421,7 @@ describe('export coverage (T095, FR-377)', () => {
       registrations: true,
       activeConference: true,
       savedSessions: true,
+      heldPlaces: true,
       sessionNotes: true,
       signInSessions: true,
       avatar: true,

@@ -200,8 +200,8 @@ test.describe('accessibility', () => {
       ).toEqual([])
 
       // The Saved view with its empty state, which is what a reviewer sees first.
-      await page.getByRole('radio', { name: 'Saved' }).check()
-      await expect(page.getByText(/nothing saved yet/i)).toBeVisible()
+      await page.getByRole('radio', { name: 'My agenda' }).check()
+      await expect(page.getByText(/nothing on your agenda yet/i)).toBeVisible()
 
       const saved = await scan(page)
       expect(
@@ -309,7 +309,7 @@ ${describeViolations(blocking(nested.violations))}`,
     // 005 appends a card to the first viewport, which Principle III makes a success criterion.
     await page.goto('/')
     await signIn(page, ADA)
-    await expect(page.getByRole('region', { name: 'Next saved session' })).toBeVisible()
+    await expect(page.getByRole('region', { name: 'Next on your programme' })).toBeVisible()
 
     const { violations } = await scan(page)
     expect(blocking(violations), describeViolations(blocking(violations))).toEqual([])

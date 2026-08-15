@@ -102,7 +102,12 @@ test.describe('a person becomes an attendee', () => {
     await page.getByRole('link', { name: /complete your profile/i }).click()
     await page.getByLabel(/^headline$/i).fill('Here to meet people who ship things.')
     await page.getByLabel(/^company$/i).fill('Journey & Co')
-    await page.getByLabel(/^interests$/i).fill('Design systems, Accessibility')
+    // T178 (014 tranche 2) — interests are CHOSEN from a curated vocabulary (FR-1088), and the
+    // list ships EMPTY (FR-1086): a fresh deployment offers nothing to pick, the form explains
+    // the curated list rather than offering free text in its place, and the profile must work
+    // fully without one. This journey is the guarantee's proof: everything below succeeds for
+    // an attendee who could not choose an interest.
+    await expect(page.getByText(/no interests are defined yet/i)).toBeVisible()
     await page.getByRole('button', { name: /save profile/i }).click()
 
     await expect(page.getByText('Here to meet people who ship things.')).toBeVisible()

@@ -7,6 +7,7 @@ import { conversationSeed } from './conversations.js'
 import { eventSeed } from './events.js'
 import { networkSeed } from './network.js'
 import { operatorSeed } from './operators.js'
+import { vocabularySeed } from './vocabulary.js'
 
 /**
  * T003 (002) — the seed registry, replacing the single `db/seed.ts` (FR-182).
@@ -94,6 +95,16 @@ export const SEED_MODULES: readonly SeedModule[] = [
   // is deliberately not this.
   // ─────────────────────────────────────────────────────────────────────────────────────────
   operatorSeed,
+  // ─────────────────────────────────────────────────────────────────────────────────────────
+  // 014 tranche 2 — the profile-taxonomy vocabulary, appended **last** per the registry's own
+  // rule. It references nothing and nothing references it by key — an attendee's chosen sector
+  // is a LABEL on their own row, not a foreign key (R18) — so its position carries no ordering
+  // obligation; last is simply where an appended module belongs. Its `clear` empties the whole
+  // vocabulary domain, operator-authored values included, following `network.ts`'s recorded
+  // lesson; its `run` inserts exactly the client's four sectors and deliberately nothing else
+  // (FR-1086). See `vocabulary.ts`.
+  // ─────────────────────────────────────────────────────────────────────────────────────────
+  vocabularySeed,
 ]
 
 /**

@@ -85,6 +85,16 @@ export const AttendeeCard = ({
 
       {attendee.headline && <p className="mt-3 text-sm text-text-body">{attendee.headline}</p>}
 
+      {/*
+        T180 (014 tranche 2) — the productive-activity description (FR-1099d): searchable, so it
+        must be readable where the search lands. Rendered ONLY where set (FR-1092) — no empty
+        line, no placeholder, no dash — like company above. Sector and subsector are
+        deliberately not on this card: their route into Discover is the open filter question.
+      */}
+      {attendee.productiveActivity && (
+        <p className="mt-2 text-sm text-text-muted">{attendee.productiveActivity}</p>
+      )}
+
       {attendee.interests.length > 0 && (
         <ul className="mt-3 flex flex-wrap gap-1.5">
           {attendee.interests.map((interest) => (

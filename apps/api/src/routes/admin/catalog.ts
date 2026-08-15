@@ -15,6 +15,8 @@ import {
   type ThrottleAction,
 } from '../../auth/throttle.js'
 import { getDb } from '../../db/client.js'
+import { SESSION_KINDS } from '../../db/schema/catalog.js'
+import { CONFERENCE_FORMATS, CONFERENCE_MODALITIES } from '../../db/schema/events.js'
 import {
   cancelSession,
   createConference,
@@ -148,6 +150,21 @@ const detailedRefusal = {
         type: 'object',
         properties: { id: { type: 'string' }, title: { type: 'string' } },
       },
+    },
+    placesHeld: {
+      type: 'integer',
+      description:
+        '014 tranche 2 — the held-places figure behind `capacity_below_held` and ' +
+        '`places_changed` (FR-1061a, FR-1077b). A count only, never identity: deliberately ' +
+        'NOT a member of `engagement`, because an enrolment is not engagement (v5.3.0 O2) and ' +
+        'a fifth count there would make places-held sessions undeletable.',
+    },
+    saved: {
+      type: 'integer',
+      description:
+        '014 tranche 2 — the saved-session count beside `placesHeld` on ' +
+        '`access_link_committed` (FR-1058a): clearing a link is refused while EITHER kind of ' +
+        'commitment exists, so the refusal names both. A count only, never identity.',
     },
   },
 } as const
@@ -310,6 +327,118 @@ const refuse = (result: Extract<WriteResult<unknown>, { ok: false }>): AppError 
       )
     case 'malformed-time':
       return new AppError('malformed_time', 400, 'That is not a time this server can read.')
+    case 'modality-missing':
+      return new AppError(
+        'modality_missing',
+        400,
+        'Say whether this conference is in person, virtual or hybrid. There is no default, ' +
+          'deliberately — a conference whose modality nobody chose is one whose sessions ' +
+          'nobody can validate.',
+      )
+    case 'capacity-invalid':
+      return new AppError(
+        'capacity_invalid',
+        400,
+        'An optional session needs a maximum number of places — a whole number of at least ' +
+          'one. A session nobody may take a place in is a cancelled session, and cancellation ' +
+          'already exists and preserves everything.',
+      )
+    case 'closing-offset-invalid':
+      return new AppError(
+        'closing_offset_invalid',
+        400,
+        'An optional session needs an enrolment-closing offset: how many whole hours before ' +
+          'it starts enrolment stops. Zero keeps it open until the session begins.',
+      )
+    case 'mandatory-carries-no-places':
+      return new AppError(
+        'mandatory_carries_no_places',
+        400,
+        'A mandatory session takes no enrolment, so it carries neither a capacity nor a ' +
+          'closing offset. Make it optional if attendees should take places in it.',
+      )
+    case 'capacity-below-held':
+      return new AppError(
+        'capacity_below_held',
+        409,
+        `Attendees already hold ${String(result.placesHeld ?? 0)} place${
+          (result.placesHeld ?? 0) === 1 ? '' : 's'
+        } in this session, so the capacity cannot drop below that. Nobody is evicted — ` +
+          'releasing a place is theirs to do, not yours or the product’s.',
+        { placesHeld: result.placesHeld ?? 0 },
+      )
+    case 'kind-committed':
+      return new AppError(
+        'kind_committed',
+        409,
+        'Attendees have already committed to this session as it is — saved it, or taken a ' +
+          'place — so its kind cannot change under them. Create the session you meant and let ' +
+          'this one stand, or wait until nothing is attached.',
+      )
+    case 'places-changed':
+      return new AppError(
+        'places_changed',
+        409,
+        `More places were taken while you decided: attendees now hold ${String(
+          result.placesHeld ?? 0,
+        )}. Deleting destroys every held place with no notification and no trace — check the ` +
+          'figure again, and consider cancelling instead, which preserves everything.',
+        { placesHeld: result.placesHeld ?? 0 },
+      )
+    // ─────────────────────────────────────────────────────────────────────────────────────
+    // T188, T189 (014 tranche 2) — the modality and access-link refusals, each its own code
+    // and each a different sentence (FR-1050b's mutual difference, asserted pairwise in
+    // `session-modality.test.ts` rather than intended).
+    // ─────────────────────────────────────────────────────────────────────────────────────
+    case 'room-or-link-missing':
+      return new AppError(
+        'session_needs_room_or_link',
+        400,
+        'A session needs a room, a joining link, or both — with neither, nobody can attend ' +
+          'it. Give it whichever this conference uses.',
+      )
+    case 'modality-forbids-link':
+      return new AppError(
+        'modality_forbids_link',
+        400,
+        'This conference is in person, so its sessions carry a room and no joining link. To ' +
+          'stream some sessions, make the conference hybrid first — that permits both.',
+      )
+    case 'modality-forbids-room':
+      return new AppError(
+        'modality_forbids_room',
+        400,
+        'This conference is virtual, so its sessions carry a joining link and no room — a ' +
+          'room on a virtual session sends people somewhere nobody will be. To hold some ' +
+          'sessions in person, make the conference hybrid first.',
+      )
+    case 'access-link-invalid':
+      return new AppError(
+        'access_link_invalid',
+        400,
+        'That is not a link this product can publish. A joining link must be a complete ' +
+          'https:// address — nothing else is accepted, and the link is never followed to ' +
+          'find out whether it works.',
+      )
+    case 'access-link-committed':
+      return new AppError(
+        'access_link_committed',
+        409,
+        `Attendees are committed to this session — ${String(result.saved ?? 0)} saved it and ` +
+          `${String(result.placesHeld ?? 0)} hold a place — so its joining link cannot be ` +
+          'removed: they would arrive with nowhere to go and no notice. Correcting the link ' +
+          'to a new address is always allowed.',
+        { placesHeld: result.placesHeld ?? 0, saved: result.saved ?? 0 },
+      )
+    case 'modality-conflicts-sessions':
+      return new AppError(
+        'modality_conflicts_sessions',
+        409,
+        'That change would leave sessions carrying the wrong thing for the new modality. ' +
+          'Hybrid permits both a room and a link, so move through hybrid: switch to it, give ' +
+          'each session what the destination modality needs, then switch again.',
+        { sessions: result.sessions },
+      )
   }
 }
 
@@ -684,7 +813,11 @@ export const adminCatalogRoutes = async (app: FastifyInstance): Promise<void> =>
 
   const sessionBody = {
     type: 'object',
-    required: ['title', 'startsAt', 'endsAt', 'trackId', 'roomId'],
+    // T188 (014 tranche 2) — `roomId` left `required` in FR-1049's wake: whether a session
+    // must carry a room is decided by the conference's MODALITY, which a static schema cannot
+    // consult. The named refusals (`room-or-link-missing`, the two forbids) come from the
+    // query layer, which is the only place that holds both the input and the modality.
+    required: ['title', 'startsAt', 'endsAt', 'trackId'],
     additionalProperties: false,
     properties: {
       title: { type: 'string', minLength: 1, maxLength: 200 },
@@ -692,8 +825,25 @@ export const adminCatalogRoutes = async (app: FastifyInstance): Promise<void> =>
       startsAt: { type: 'string', format: 'date-time' },
       endsAt: { type: 'string', format: 'date-time' },
       trackId: { type: 'string', format: 'uuid' },
-      roomId: { type: 'string', format: 'uuid' },
+      roomId: { type: ['string', 'null'], format: 'uuid' },
+      accessLink: {
+        type: ['string', 'null'],
+        maxLength: 2048,
+        description:
+          'A virtual or hybrid session’s joining link (FR-1052) — a dedicated, validated ' +
+          'field, never carried in the summary. `https:` only, well-formedness and scheme ' +
+          'checked and NEVER fetched (FR-1053); refused with `access_link_invalid` otherwise. ' +
+          'Published to every attendee holding the join code the moment it is written ' +
+          '(FR-1055), and nothing records whether anybody used it (FR-1057).',
+      },
       speakerIds: { type: 'array', items: { type: 'string', format: 'uuid' }, maxItems: 20 },
+      // 014 tranche 2 (FR-1060–FR-1062a). The kind is optional in the SCHEMA — a session
+      // created without one is mandatory (FR-1060) — and the capacity/offset pairing rules are
+      // refused by the query layer with their own codes, which a schema `required` cannot
+      // produce. Loose numeric bounds here; the meaningful refusals are named ones.
+      kind: { type: 'string', enum: [...SESSION_KINDS] },
+      capacity: { type: ['integer', 'null'], minimum: 0, maximum: 100000 },
+      enrolmentClosingOffsetHours: { type: ['integer', 'null'], minimum: 0, maximum: 8760 },
     },
   } as const
 
@@ -704,8 +854,12 @@ export const adminCatalogRoutes = async (app: FastifyInstance): Promise<void> =>
       startsAt: string
       endsAt: string
       trackId: string
-      roomId: string
+      roomId?: string | null
+      accessLink?: string | null
       speakerIds?: string[]
+      kind?: 'mandatory' | 'optional'
+      capacity?: number | null
+      enrolmentClosingOffsetHours?: number | null
     }
     return {
       title: raw.title,
@@ -713,8 +867,13 @@ export const adminCatalogRoutes = async (app: FastifyInstance): Promise<void> =>
       startsAt: raw.startsAt,
       endsAt: raw.endsAt,
       trackId: raw.trackId,
-      roomId: raw.roomId,
+      roomId: raw.roomId ?? null,
+      accessLink: raw.accessLink ?? null,
       speakerIds: raw.speakerIds ?? [],
+      // FR-1060: absent a stated kind, mandatory — as every session that predates the kind is.
+      kind: raw.kind ?? 'mandatory',
+      capacity: raw.capacity ?? null,
+      enrolmentClosingOffsetHours: raw.enrolmentClosingOffsetHours ?? null,
     }
   }
 
@@ -783,6 +942,9 @@ export const adminCatalogRoutes = async (app: FastifyInstance): Promise<void> =>
           400: refusal,
           401: refusal,
           404: refusal,
+          // 014 tranche 2: `capacity_below_held` and `kind_committed`, the first carrying the
+          // held count (FR-1061a, FR-1065).
+          409: detailedRefusal,
           ...throttled,
         },
       },
@@ -881,8 +1043,8 @@ export const adminCatalogRoutes = async (app: FastifyInstance): Promise<void> =>
    * `tasks.md` registers create and edit in US1 and this route in US2, and the ordering is a
    * safety property rather than a schedule: `saved_sessions`, `session_notes`,
    * `session_questions` and `question_votes` all cascade from `sessions.id`, so a `DELETE`
-   * registered before `hasEngagement` and the `FOR UPDATE` lock existed would have been an
-   * unguarded route that destroys other people's private writing.
+   * registered before the engagement refusal and the `FOR UPDATE` lock existed would have been
+   * an unguarded route that destroys other people's private writing.
    */
   app.delete(
     '/admin/conferences/:eventId/sessions/:id',
@@ -895,8 +1057,22 @@ export const adminCatalogRoutes = async (app: FastifyInstance): Promise<void> =>
           'Permitted only while **zero** attendees have engaged with it (FR-1018), checked under ' +
           '`SELECT … FOR UPDATE` **inside** the deleting transaction so a save arriving mid-delete ' +
           'blocks rather than being destroyed (FR-1019a). Otherwise 409 with counts and an offer ' +
-          'to cancel instead (FR-1019, FR-1025).',
+          'to cancel instead (FR-1019, FR-1025).\n\n**Held places are NOT engagement** (v5.3.0 O2, ' +
+          'FR-1077): an optional session with places held stays deletable, the held places are ' +
+          'destroyed with no notification and no marker (register entry 31 is open on that), and ' +
+          'the confirming client MUST pass `placesSeen` — the figure it showed the organizer. The ' +
+          'count is re-read inside the deleting transaction under the same lock, and if it has ' +
+          'RISEN the delete refuses with `places_changed` and the current figure, to be ' +
+          're-presented (FR-1077b). Omitting `placesSeen` refuses whenever any place exists, ' +
+          'which is the honest floor for a client that showed no figure.',
         params: eventAndId,
+        querystring: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            placesSeen: { type: 'integer', minimum: 0 },
+          },
+        },
         response: {
           204: { type: 'null' },
           401: refusal,
@@ -909,8 +1085,9 @@ export const adminCatalogRoutes = async (app: FastifyInstance): Promise<void> =>
     async (request, reply) => {
       await throttle(request, 'session_delete', 'changes')
       const { id } = request.params as { id: string }
+      const { placesSeen } = request.query as { placesSeen?: number }
       const result = await getDb().transaction((tx) =>
-        deleteSession(conferenceAuthorityOf(request), id, tx),
+        deleteSession(conferenceAuthorityOf(request), id, tx, placesSeen ?? 0),
       )
       if (!result.ok) throw refuse(result)
       return reply.status(204).send()
@@ -944,6 +1121,26 @@ export const adminCatalogRoutes = async (app: FastifyInstance): Promise<void> =>
             startsOn: { type: 'string', format: 'date' },
             endsOn: { type: 'string', format: 'date' },
             timezone: { type: 'string', minLength: 1, maxLength: 80 },
+            modality: {
+              type: 'string',
+              enum: [...CONFERENCE_MODALITIES],
+              description:
+                'T190 (014 tranche 2) — correctable after creation (FR-1059). Refused with ' +
+                '`modality_conflicts_sessions`, naming the sessions, while any existing ' +
+                'session would violate FR-1050a under the new value (FR-1059a). Hybrid is ' +
+                'the transitional modality: every move between in-person and virtual routes ' +
+                'through it. Changing it dispatches nothing.',
+            },
+            format: {
+              // `type: ['string','null']` with null IN the enum, not ajv's `nullable` keyword
+              // — this Fastify configuration validates strictly, so `nullable: true` alone
+              // still refused the null the client legitimately sends to clear the field.
+              type: ['string', 'null'],
+              enum: [...CONFERENCE_FORMATS, null],
+              description:
+                'Always permitted, because nothing branches on a format (FR-1047). Null ' +
+                'clears it.',
+            },
           },
         },
         response: {
@@ -991,6 +1188,10 @@ export const adminCatalogRoutes = async (app: FastifyInstance): Promise<void> =>
           'delete** at any tier (FR-1011).',
         body: {
           type: 'object',
+          // `modality` is deliberately NOT in `required`: a creation carrying none must be
+          // refused with its OWN named code (`modality_missing`, FR-1059b), which the schema
+          // validator cannot produce — it folds every omission into `validation_failed`. The
+          // query layer refuses it by name instead.
           required: ['name', 'location', 'startsOn', 'endsOn', 'timezone'],
           additionalProperties: false,
           properties: {
@@ -999,6 +1200,9 @@ export const adminCatalogRoutes = async (app: FastifyInstance): Promise<void> =>
             startsOn: { type: 'string', format: 'date' },
             endsOn: { type: 'string', format: 'date' },
             timezone: { type: 'string', minLength: 1, maxLength: 80 },
+            modality: { type: 'string', enum: [...CONFERENCE_MODALITIES] },
+            // Null in the enum rather than ajv's `nullable` keyword — see the PATCH schema.
+            format: { type: ['string', 'null'], enum: [...CONFERENCE_FORMATS, null] },
           },
         },
         response: {

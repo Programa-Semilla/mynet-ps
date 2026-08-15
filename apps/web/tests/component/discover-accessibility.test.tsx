@@ -51,9 +51,26 @@ describe('Discover: labelling and announcement', () => {
     expect(field).toHaveAttribute('placeholder')
   })
 
+  /**
+   * T214 (014 tranche 2) — the interest options come from the CHOOSABLE VOCABULARY now, not
+   * from the attendees on screen (FR-1096), so these two tests supply one. "Accessibility" is
+   * deliberately a value the rendered attendee does not need to hold: every choosable value is
+   * offered whether or not anybody at the conference holds it — an option list that shrinks to
+   * what exists is population data again, which is the bound the relaxation rests on.
+   */
+  const CHOOSABLE_INTEREST = {
+    vocabulary: {
+      choosable: async () => ({
+        sectors: [],
+        subsectors: [],
+        interests: [{ id: 'interest-a11y', label: 'Accessibility' }],
+      }),
+    },
+  }
+
   it('labels both filters, and each exposes its own selected state', async () => {
     const user = userEvent.setup()
-    renderDiscover()
+    renderDiscover({ overrides: CHOOSABLE_INTEREST })
     await screen.findByRole('heading', { level: 3, name: 'Sofía Muñoz' })
 
     const role = screen.getByRole('combobox', { name: /^role$/i })
@@ -63,13 +80,16 @@ describe('Discover: labelling and announcement', () => {
     await user.selectOptions(role, 'Designer')
     expect(role).toHaveValue('Designer')
 
+    await waitFor(() =>
+      expect(screen.getByRole('option', { name: 'Accessibility' })).toBeInTheDocument(),
+    )
     await user.selectOptions(interest, 'Accessibility')
     expect(interest).toHaveValue('Accessibility')
   })
 
   it('states how many narrowings are applied, and offers one control that clears them all', async () => {
     const user = userEvent.setup()
-    renderDiscover()
+    renderDiscover({ overrides: CHOOSABLE_INTEREST })
     await screen.findByRole('heading', { level: 3, name: 'Sofía Muñoz' })
 
     // Absent while nothing is set, rather than present and disabled: a permanently disabled

@@ -9,11 +9,16 @@ export type {
   Attendee,
   AttendeeRepository,
   CatalogRepository,
+  // T196 (014 tranche 2) — the agenda pair renamed: the set carries held places as well as
+  // saves, so `SavedSession(Repository)` became `Commitment(Repository)` (FR-1066a, R13).
+  Commitment,
+  CommitmentRepository,
   Event,
   EventsRepository,
+  PlaceAvailability,
   Room,
-  SavedSessionRepository,
   Session,
+  SessionKind,
   SessionNote,
   SessionNotesRepository,
   Speaker,
@@ -98,6 +103,17 @@ export type {
 // attendee state *about* conference content (FR-710, FR-772).
 export type { QuestionListItem, QuestionsRepository } from './interfaces/index.js'
 
+// 014 tranche 2 — the controlled vocabulary's attendee-side read. Appended likewise; its own
+// domain because Discover's interest filter reads the same list as the profile editor and must
+// not reach it through the profile interface (R17).
+export type {
+  ChoosableVocabulary,
+  VocabularyInterest,
+  VocabularyRepository,
+  VocabularySector,
+  VocabularySubsector,
+} from './interfaces/index.js'
+
 export {
   MESSAGE_MAX_LENGTH,
   NotAuthenticatedError,
@@ -115,6 +131,11 @@ export {
 // ═══════════════════════════════════════════════════════════════════════════════════════════
 export type {
   AdminCatalogRepository,
+  AdminInterestOption,
+  AdminSector,
+  AdminSubsector,
+  AdminVocabularyRepository,
+  VocabularyValueInput,
   AdminConference,
   AdminConferenceRepository,
   AdminEngagementCounts,
@@ -135,3 +156,6 @@ export type {
 // T-review (014) — the closed track colour set, derived from the generated contract so the
 // administrative form cannot hold a fourth hand-maintained copy of it. See `contract.ts`.
 export type { TrackColorToken } from './contract.js'
+// 014 tranche 2 (T190) — derived from the generated contract, `TrackColorToken`'s discipline:
+// one chain from the server's constant to the administrative form, so neither set can drift.
+export type { ConferenceFormat, ConferenceModality } from './contract.js'

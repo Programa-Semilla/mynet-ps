@@ -203,3 +203,131 @@ foundation and the densest; Phase 5 is the part that needs the amendment most di
 - [ ] Both new dialogs are centred, Escape-dismissible, and restore focus (T052, T086, T096)
 - [ ] The seed's two disjoint programmes and empty third conference survive (T098)
 - [ ] Migration `0011`, and `meta/README.md` was moved aside before generation and restored (T001, T005)
+
+---
+
+# Review Guide: Conference Content Authoring — Tranche 2
+
+**Date**: 2026-08-14 | **Spec**: [spec.md](spec.md) Part II | **Branch**: `spec/014-conference-content-authoring-tranche-2`
+
+Everything above is tranche 1's guide, for the work merged in PR #23. This covers **tranche 2**, which
+closes 014: 109 tasks (T106–T214), 93 requirements (FR-1045–FR-1099), 15 success criteria
+(SC-1013–SC-1026), four user stories, one PR, one migration (`0012`).
+
+> ## ✅ Ratified — implementation is licensed
+>
+> **Constitution v5.3.0 was RATIFIED 2026-08-14.** It records the **fourth** Principle VIII privacy
+> exception — the named enrolment roster — and it gated this tranche's first line of code, as v5.2.0
+> gated tranche 1 and v4.0.0 gated 013. **Reviewing the amendment on its merits is still the first
+> item on the checklist below**, because ratification is what makes it binding, not what makes it
+> beyond question.
+
+## Why This Change
+
+014 shipped an organizer's ability to author a programme, and stopped there. A workshop with twenty
+places, a virtual conference, and a profile that says what somebody actually does were all in the
+client's original conversation and none of them exists. Attendees cannot commit to a bounded session,
+organizers cannot cap one, and a conference that happens online has no way to say so — its sessions
+are required to name a room nobody will walk to.
+
+## What Changes
+
+A conference gains a **modality** that governs what its sessions must carry, so a virtual session can
+hold a joining link instead of a room. A session may be **optional with a limited number of places**,
+which attendees take and release, which organizers cap and close on a deadline, and whose holders
+appear to that conference's organizers by name. A profile gains a **controlled vocabulary** —
+sector, subsector, interests — plus a free-text description of what somebody makes or does.
+
+**One behaviour changes for existing attendees**: on an optional session, enrolling **replaces**
+saving. There is one commitment control, not two, and no state in which somebody has bookmarked a
+session without holding a place in it.
+
+## How It Works
+
+The administrative side is new construction — a fifth destination for the vocabulary, a conference
+editor, a roster — and the attendee side is **surgery**, because enrolment does not sit beside saving:
+it replaces it, so the read path every attendee surface already depends on changes underneath them.
+That is the opposite of tranche 1's shape and is worth holding in mind while reading the diff.
+
+Enrolment's correctness core is a three-statement critical section: `SELECT … FOR UPDATE` on the
+session row, then a count, then the insert. Enrolment-closing derives in SQL from the session's start
+and a stored hours offset — nothing is scheduled, swept, or stored as an instant.
+
+## When It Applies
+
+**Applies when** a conference is authored with a modality; a session is marked optional; an attendee
+takes or releases a place; an organizer caps, closes, cancels or deletes such a session; or anybody
+edits a profile's taxonomy fields.
+
+**Does not apply when** a session is mandatory (saving is unchanged), or to Discover's directory —
+see the note under Areas Needing Attention.
+
+## Key Decisions
+
+1. **Enrolment replaces saving on optional sessions**, rather than sitting beside it. The alternative
+   permits "saved but holds no place", which is the state somebody glances at and believes they have
+   a seat. Cost accepted: there is no way to bookmark an optional session you have not committed to.
+2. **Capacity is enforced under an exclusive session-row lock, not lock-free.** Both lock-free shapes
+   were evaluated and neither expresses a *cardinality* bound: insert-then-judge admits an over-count
+   under commit reordering and would require deleting a committed row, which FR-1068 forbids by name;
+   a unique index enforces a key, not a count.
+3. **Enrolment is deliberately NOT engagement** (O2), so a session with places held may be deleted.
+   This is an owner decision taken after the consequence was put to them and reaffirmed, and the
+   consequence is recorded rather than softened.
+4. **The enrolment deadline is relative and derived**, never stored as an instant, so it follows a
+   rescheduled session with no repair step — 008's `lapsed` precedent.
+5. **The taxonomy vocabulary is product-wide, not per-conference**, because a profile describes the
+   person rather than their presence at one conference.
+
+## Areas Needing Attention
+
+**Read these first. They are where this is most likely to be wrong, or most expensive to get wrong.**
+
+1. **T135 — the critical section is three statements and deliberately NOT one CTE.** A
+   `WITH locked AS (… FOR UPDATE), held AS (SELECT count(*) …)` looks like the right shape and is
+   wrong: every part of one statement shares one snapshot, so two writers serialise on the lock and
+   then both compute the same **pre-lock** count. If you see this collapsed into one statement during
+   implementation, that is the bug.
+2. **T144–T147 — the roster is the first administrative read of attendee state this project has ever
+   permitted.** All four bounds must be individually testable: only enrolment, only an assigned
+   organizer, only that conference's sessions, and the attendee told before they enrol.
+3. **T121 must FAIL before T122 is written.** The shipped disclosure guard does not match `enrolments`
+   today, so a roster route ships green. An exemption written before the guard is widened is a
+   decorative constant beside a check that never fires.
+4. **T148 — a separate held-places field, never a fifth engagement count.** `countEngagement`'s
+   boolean is a sum of four; adding places to it makes places-held sessions **undeletable**, which is
+   the opposite of O2, and no existing guard catches it.
+5. **T149 and T212 — the delete confirmation currently lies.** It decides "is anything attached?" from
+   the four engagement counts, so a session with twenty places held renders *"Nobody has saved this
+   session… It can be deleted outright."* This was the Critical finding at the spec-review gate.
+6. **T196/T197 — the commitment set rides the EXISTING cached payload; remaining places is a SEPARATE
+   live `passThrough` read.** A new `EnrolmentRepository` is the natural guess and is a silent
+   staleness bug: only the repository owning the cached read can purge what an enrolment invalidates.
+7. **Anything reintroducing a scheduler, a stored open/closed state, or a third notification trigger.**
+   All three are forbidden and each has a guard, but two of the guards are weaker than they look.
+
+**A note for reviewers expecting a Discover migration: there isn't one, and that is deliberate.**
+Phase 0 (R18) found that interests must **not** become foreign keys — the vocabulary is a reference
+table of labels, membership enforced at the write. `attendee_interests` needs **no migration** and
+`listDirectory` is **not touched**. This shrank the tranche; it was not forgotten.
+
+## Open Questions
+
+- **Register entry 31** — whether deleting a session should notify the attendees enrolled in it. Open,
+  blocking nothing, and answerable only by a third notification trigger and therefore another
+  amendment.
+- **Register entry 4** — desktop and tablet layouts remain unvalidated, and this tranche escalates it
+  again with a fifth administrative destination and a new attendee control at the width that already
+  truncates.
+
+## Review Checklist
+
+- [ ] Constitution v5.3.0 read, and its fourth privacy exception judged on its merits
+- [ ] The critical section is three statements, not one
+- [ ] The roster's four bounds are each asserted separately
+- [ ] The guard widening lands before its exemption
+- [ ] Held places are counted in their own field, never in the engagement sum
+- [ ] The delete confirmation no longer claims nothing is attached
+- [ ] No new repository for enrolment; remaining places declared `passThrough`
+- [ ] No scheduler, no stored open/closed state, no third trigger
+- [ ] Every falsified comment rewritten, and attendee-visible copy with it

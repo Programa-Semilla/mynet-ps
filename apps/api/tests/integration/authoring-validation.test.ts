@@ -195,14 +195,15 @@ describe('session validation (T027, FR-1012, FR-1013)', () => {
     // the same rejection and the assertion above would be proving nothing.
     await expect(
       getDb().execute(sql`
-        INSERT INTO sessions (event_id, track_id, room_id, title, starts_at, ends_at)
+        INSERT INTO sessions (event_id, track_id, room_id, title, starts_at, ends_at, kind)
         VALUES (
           ${fixture.assigned.eventId}::uuid,
           ${fixture.assigned.trackId}::uuid,
           ${fixture.assigned.roomId}::uuid,
           'Bypassed and valid',
           '2027-03-01T09:00:00Z'::timestamptz,
-          '2027-03-01T10:00:00Z'::timestamptz
+          '2027-03-01T10:00:00Z'::timestamptz,
+          'mandatory'
         )
       `),
     ).resolves.toBeDefined()

@@ -53,12 +53,15 @@ export const useCatalogRepository = (): PlatformServices['repositories']['catalo
 /**
  * 005 — the attendee's own agenda.
  *
- * Two hooks rather than one, matching the two interfaces, because saving and noting are
+ * Two hooks rather than one, matching the two interfaces, because committing and noting are
  * independent capabilities (FR-207) and a surface that only notes should not be handed the
- * ability to save.
+ * ability to commit.
+ *
+ * T196 (014 tranche 2) — was `useSavedSessionRepository`, renamed with the repository it
+ * serves: the set carries held places as well as saves (FR-1066a, research R13).
  */
-export const useSavedSessionRepository = (): PlatformServices['repositories']['savedSessions'] =>
-  usePlatform().repositories.savedSessions
+export const useCommitmentRepository = (): PlatformServices['repositories']['commitments'] =>
+  usePlatform().repositories.commitments
 
 export const useSessionNotesRepository = (): PlatformServices['repositories']['sessionNotes'] =>
   usePlatform().repositories.sessionNotes
@@ -174,6 +177,21 @@ export const useAppointmentRepository = (): PlatformServices['repositories']['ap
  */
 export const useQuestionsRepository = (): PlatformServices['repositories']['questions'] =>
   usePlatform().repositories.questions
+
+/**
+ * 014 tranche 2 — the choosable vocabulary (FR-1085, FR-1086).
+ *
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ * **`registry.tsx` needed no edit**, as it has not since T009 (006) replaced its hand-mirrored
+ * declarations with `@mynet/data`'s own `Repositories`.
+ *
+ * Its own hook rather than a read folded into the profile's, for R17's reason: Discover's
+ * interest filter reads the same list as the profile editor, and a directory surface must not
+ * reach reference data through the interface that carries `saveOwn`.
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ */
+export const useVocabularyRepository = (): PlatformServices['repositories']['vocabulary'] =>
+  usePlatform().repositories.vocabulary
 
 /**
  * 005 — when the content on screen was retrieved, or `null` when it is live (FR-216).

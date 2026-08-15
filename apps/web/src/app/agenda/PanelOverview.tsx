@@ -34,8 +34,36 @@ export const PanelOverview = ({ session, timezone }: { session: Session; timezon
         this is the one piece of information that, missed, sends somebody to an empty room.
       */}
       {session.cancelled && <CancelledChip />}
-      <span className="text-sm text-text-muted">{session.room.name}</span>
+      {/*
+        T193 (014 tranche 2) — no room line at all when the session has none (SC-1022): a
+        virtual session's whereabouts is its access link below, and an empty room line would be
+        the placeholder the summary's own comment forbids. In person, virtual or both is
+        DERIVED from what the session carries — never a stored delivery attribute (FR-1051).
+      */}
+      {session.room && <span className="text-sm text-text-muted">{session.room.name}</span>}
     </div>
+
+    {/*
+      T193 (014 tranche 2) — the access link, where a virtual or hybrid session is attended
+      (FR-1052, SC-1022). A plain anchor and nothing more: the URL comes validated `https:`-only
+      from the server, the product never fetches it, and this dedicated field is the ONLY route
+      by which a link reaches an attendee — the summary stays a plain paragraph (FR-1054).
+      `rel` and `target` because it leaves the product for an organizer-chosen destination.
+      Absent entirely for an in-person session: no link line, not an empty one.
+    */}
+    {session.accessLink && (
+      <p className="mb-3 text-sm">
+        <a
+          href={session.accessLink}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="font-medium text-accent-strong underline"
+        >
+          Join session
+        </a>{' '}
+        <span className="break-all text-text-muted">({session.accessLink})</span>
+      </p>
+    )}
 
     <p className="mb-3 text-sm text-text-body">
       <span className="font-medium text-text-primary">

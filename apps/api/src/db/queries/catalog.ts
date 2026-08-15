@@ -62,8 +62,29 @@ export type SessionRow = {
    * misremembered. Home's "Up next" is the single exception and skips it (FR-1022a).
    */
   readonly cancelled: boolean
+  /**
+   * T193 (014 tranche 2) — mandatory or optional (FR-1060): the kind decides the identity of
+   * the one commitment control an attendee sees (FR-1063).
+   *
+   * **Capacity is deliberately NOT here.** The programme is a cached read on the client, and a
+   * cached seat count reads as a promise of a place — the live figure is served by the places
+   * route alone (FR-1070b). Adding `capacity` to this projection would put a stale number on
+   * every offline programme; do not.
+   */
+  readonly kind: 'mandatory' | 'optional'
+  /**
+   * T193 (014 tranche 2) — where a virtual or hybrid session is attended (FR-1052). `https:`
+   * only, enforced at the write path and by the column constraint; this read only carries it.
+   * Whether the session is in person, virtual or both is DERIVED from room and link — never
+   * stored (FR-1051).
+   */
+  readonly accessLink: string | null
   readonly track: { readonly id: string; readonly name: string; readonly colorToken: string }
-  readonly room: { readonly id: string; readonly name: string }
+  /**
+   * T193 (014 tranche 2) — nullable: a virtual session has no room (SC-1022), and the schema's
+   * `sessions_room_or_link` constraint is what guarantees at least one of room and link exists.
+   */
+  readonly room: { readonly id: string; readonly name: string } | null
   readonly speakers: ReadonlyArray<{
     readonly id: string
     readonly name: string
@@ -107,6 +128,8 @@ export const listSessions = async (unverified: EventScope): Promise<SessionRow[]
       startsAt: sessions.startsAt,
       endsAt: sessions.endsAt,
       cancelledAt: sessions.cancelledAt,
+      kind: sessions.kind,
+      accessLink: sessions.accessLink,
       trackId: tracks.id,
       trackName: tracks.name,
       trackColorToken: tracks.colorToken,
@@ -115,7 +138,10 @@ export const listSessions = async (unverified: EventScope): Promise<SessionRow[]
     })
     .from(sessions)
     .innerJoin(tracks, eq(tracks.id, sessions.trackId))
-    .innerJoin(rooms, eq(rooms.id, sessions.roomId))
+    // T193 (014 tranche 2) — a LEFT join, because `sessions.room_id` became nullable: a virtual
+    // session has no room, and an inner join would silently drop it from the programme — a
+    // session that exists and cannot be seen, which no empty state explains.
+    .leftJoin(rooms, eq(rooms.id, sessions.roomId))
     // The scope's event id, not one the handler passed separately — there is no second value
     // that could disagree with what was verified.
     .where(eq(sessions.eventId, scope.eventId))
@@ -159,8 +185,13 @@ export const listSessions = async (unverified: EventScope): Promise<SessionRow[]
     // A boolean rather than the instant. **When** it was cancelled is the organizer's business
     // and answers no question an attendee surface asks; `whether` is the whole of FR-1022.
     cancelled: row.cancelledAt !== null,
+    kind: row.kind,
+    accessLink: row.accessLink,
     track: { id: row.trackId, name: row.trackName, colorToken: row.trackColorToken },
-    room: { id: row.roomId, name: row.roomName },
+    // Null when the session carries no room (virtual), never an empty-named placeholder: the
+    // client renders no room line at all for it (SC-1022).
+    room:
+      row.roomId !== null && row.roomName !== null ? { id: row.roomId, name: row.roomName } : null,
     speakers: bySession.get(row.id) ?? [],
   }))
 }

@@ -478,7 +478,7 @@ test.describe('responsive layout', () => {
 
     // FR-197 — 44px is the floor. Measured at 320px, where a target that only *looks* big
     // enough at 375px is actually squeezed.
-    for (const name of ['All sessions', 'Saved']) {
+    for (const name of ['All sessions', 'My agenda']) {
       const label = page.getByText(name, { exact: true })
       const box = await label.boundingBox()
       expect(box, name).not.toBeNull()

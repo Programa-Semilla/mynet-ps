@@ -219,4 +219,71 @@ describe('session catalog', () => {
       expect(Date.parse(session.endsAt)).toBeGreaterThan(Date.parse(session.startsAt))
     }
   })
+
+  /**
+   * T193 (014 tranche 2) — the attendee read carries `kind` and `accessLink`, and a virtual
+   * session arrives with a NULL room rather than being dropped or placeholdered
+   * (FR-1060, FR-1052, SC-1022).
+   *
+   * **Capacity is asserted ABSENT, deliberately** (FR-1070b): the programme is a cached read on
+   * the client, and a cached seat count reads as a promise of a place. The live figure has its
+   * own uncached route.
+   */
+  it('carries kind and accessLink, keeps capacity off the cached programme, and serves a virtual session with a null room (T193)', async () => {
+    // Insert a virtual optional session directly — the seed carries none, and the property
+    // under test is the READ's projection, not the authoring path.
+    const db = getDb()
+    const [track] = await db.execute<{ id: string }>(
+      sql`SELECT id FROM tracks WHERE event_id = ${summitId} LIMIT 1`,
+    )
+    if (!track) throw new Error('The seeded summit has no track; the fixture cannot be built.')
+
+    await db.execute(sql`
+      INSERT INTO sessions
+        (event_id, track_id, room_id, title, summary, starts_at, ends_at,
+         kind, capacity, enrolment_closing_offset_hours, access_link)
+      VALUES
+        (${summitId}, ${track.id}, NULL, 'Remote Hands-on', NULL,
+         now() + interval '1 day', now() + interval '25 hours',
+         'optional', 5, 0, 'https://example.com/join-remote')
+    `)
+
+    const sessions = (await sessionsFor(summitId, adaCookie)).json() as Array<{
+      title: string
+      kind: string
+      accessLink: string | null
+      room: { id: string; name: string } | null
+      capacity?: unknown
+    }>
+
+    // Every pre-existing session is mandatory and in person: the defaults every session had
+    // before the column existed, now explicit on the wire.
+    const seeded = sessions.filter((s) => s.title !== 'Remote Hands-on')
+    expect(seeded.length).toBeGreaterThan(0)
+    for (const session of seeded) {
+      expect(session.kind).toBe('mandatory')
+      expect(session.accessLink).toBeNull()
+      expect(session.room).not.toBeNull()
+    }
+
+    // The virtual optional session is PRESENT — a left join, because an inner join would
+    // silently drop a roomless session from the programme — with its link and no room at all.
+    const virtual = sessions.find((s) => s.title === 'Remote Hands-on')
+    expect(
+      virtual,
+      'the virtual session vanished from the programme (inner-join regression)',
+    ).toBeDefined()
+    expect(virtual?.kind).toBe('optional')
+    expect(virtual?.accessLink).toBe('https://example.com/join-remote')
+    expect(virtual?.room, 'a virtual session carries no room, and never a placeholder').toBeNull()
+
+    // FR-1070b — no session on the cached programme carries a seat count, of either kind.
+    for (const session of sessions) {
+      expect(
+        'capacity' in session,
+        'capacity reached the cached programme read. A stale seat count reads as a promise ' +
+          'of a place; the live figure is served by the places route alone (FR-1070b).',
+      ).toBe(false)
+    }
+  })
 })

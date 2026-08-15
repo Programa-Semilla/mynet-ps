@@ -4,10 +4,10 @@ import { useCallback, useId, useMemo, useRef, useState } from 'react'
 import { Outlet } from 'react-router'
 
 import { ActiveEventFailure, NoConferencesNotice, useActiveEvent } from '../active-event.js'
-import { SavedEmptyState } from '../agenda/SavedEmptyState.js'
+import { MyAgendaEmptyState } from '../agenda/MyAgendaEmptyState.js'
 import { StalenessStamp } from '../agenda/StalenessStamp.js'
 import type { AgendaOutletContext } from '../agenda/SessionPanel.js'
-import { useSavedSessions } from '../agenda/useSavedSessions.js'
+import { useCommitments } from '../agenda/useCommitments.js'
 import { useSessionNotes } from '../agenda/useSessionNotes.js'
 import { Failed, Loading, useAsync } from '../AsyncState.js'
 import { SessionRow } from '../SessionPresentation.js'
@@ -26,7 +26,8 @@ import { groupByVenueDay } from '../sessions.js'
  * right then and it is spent now: **005 is the feature that makes the capability exist.**
  *
  * Every session now carries a save control, and the filter above the programme narrows it to
- * the saved ones. No stale statement that saving does not exist may remain in this source, and
+ * the attendee's own — since tranche 2, saves AND held places (FR-1066). No stale statement
+ * that saving does not exist may remain in this source, and
  * the 002 scenario asserting the absence was *updated* rather than deleted, so the history
  * records that the absence was deliberate and is now deliberately ended (FR-236).
  * ═════════════════════════════════════════════════════════════════════════════════════════
@@ -37,7 +38,7 @@ import { groupByVenueDay } from '../sessions.js'
  * to disagree about what "today" means at 23:50 in one timezone. 005 adds a filter above it and
  * a control on each row; it does not re-implement the programme.
  *
- * The saved view keeps that same grouping (FR-194) — it is the same schedule with fewer rows,
+ * The "My agenda" view keeps that same grouping (FR-194) — the same schedule with fewer rows,
  * not a list of bookmarks.
  */
 export const Agenda = () => {
@@ -72,13 +73,20 @@ export const Agenda = () => {
   )
 }
 
-/** Which sessions the programme is showing. Defaults to `all` (FR-193). */
-type Filter = 'all' | 'saved'
+/**
+ * Which sessions the programme is showing. Defaults to `all` (FR-193).
+ *
+ * T194 (014 tranche 2) — `saved` became `mine`, and the label "Saved" became "My agenda"
+ * (FR-1066a): the filtered set carries held places as well as saves, so a label asserting it
+ * holds only saves would lie about what it contains — the specification renamed it rather
+ * than leaving that to implementation.
+ */
+type Filter = 'all' | 'mine'
 
 const Programme = ({ event }: { event: { id: string; timezone: string } }) => {
   const catalog = useCatalogRepository()
   const freshness = useFreshness()
-  const saved = useSavedSessions(event.id)
+  const committed = useCommitments(event.id)
   const notes = useSessionNotes(event.id)
   const [filter, setFilter] = useState<Filter>('all')
 
@@ -109,8 +117,8 @@ const Programme = ({ event }: { event: { id: string; timezone: string } }) => {
   const openers = useRef(new Map<string, HTMLAnchorElement>())
 
   const restoreFocusTo = useCallback((sessionId: string) => {
-    // Absent when the row is no longer rendered — the attendee unsaved it from the panel, or
-    // switched to Saved while it was open. Focus then simply stays where the browser put it,
+    // Absent when the row is no longer rendered — the attendee withdrew it from the panel, or
+    // switched to "My agenda" while it was open. Focus then stays where the browser put it,
     // which is the honest outcome: there is no longer a control to return to.
     openers.current.get(sessionId)?.focus()
   }, [])
@@ -128,22 +136,33 @@ const Programme = ({ event }: { event: { id: string; timezone: string } }) => {
       sessions: programmeState === 'ready' ? sessions.data : [],
       timezone: event.timezone,
       eventId: event.id,
-      // An empty map while the notes are still loading or have failed: the panel then shows an
-      // empty editor, which is the same thing it shows for a session with no note. That is
-      // acceptable *only* because a note write is non-optimistic and never merges — the
-      // attendee's first keystroke replaces whatever is on the server, which is FR-214's rule
-      // rather than a loss introduced here.
+      // The map AND the read's own state, because the map alone cannot say "not read yet".
+      // A sentence here used to call the empty-map-while-loading display acceptable *because*
+      // a write replaces whatever is on the server — which is precisely why it was not: an
+      // editor mounted over a pending read stayed empty when the note arrived (the controller
+      // never adopts a late value, FR-214), and the replace-on-keystroke rule then made that
+      // convincing blank a data-loss path. The panel now mounts the editor only once this
+      // status reads `ready`, which is the arrangement the hook's header always described —
+      // "this reports its own state and the caller decides".
       notes: notes.bySession,
+      notesStatus: notes.status,
+      retryNotes: notes.retry,
       restoreFocusTo,
       /**
        * T075 (014) — opening the panel is what clears this session's change marker (FR-1030).
        *
        * The panel is the surface an attendee reads to find out **what** changed, so viewing it
        * is what "they have looked at it" means. Handed down rather than called from the panel's
-       * own repository, because the marker lives in `useSavedSessions` here — one owner for the
-       * saved set and the markers on it, rather than two readers that can disagree.
+       * own repository, because the marker lives in `useCommitments` here — one owner for the
+       * commitment set and the markers on it, rather than two readers that can disagree.
        */
-      markViewed: saved.markViewed,
+      markViewed: committed.markViewed,
+      /**
+       * T208 (014 tranche 2) — the commitment set, handed down whole so the panel's fifth
+       * section operates the same instance the rows do: one owner for the set, its markers and
+       * its refusals, rather than two readers that can disagree.
+       */
+      commitments: committed,
     }),
     [
       programmeState,
@@ -151,8 +170,10 @@ const Programme = ({ event }: { event: { id: string; timezone: string } }) => {
       event.timezone,
       event.id,
       notes.bySession,
+      notes.status,
+      notes.retry,
       restoreFocusTo,
-      saved.markViewed,
+      committed,
     ],
   )
 
@@ -187,13 +208,16 @@ const Programme = ({ event }: { event: { id: string; timezone: string } }) => {
 
   // ───────────────────────────────────────────────────────────────────────────────────────
   // FR-139 — a conference with no published programme is a valid answer, not a failure. The
-  // filter is still rendered below it, because an attendee who switches to Saved must be told
-  // they have saved nothing rather than shown the programme's wording again.
+  // filter is still rendered below it, because an attendee who switches to "My agenda" must be
+  // told they have committed to nothing rather than shown the programme's wording again.
   // ───────────────────────────────────────────────────────────────────────────────────────
   const programme = sessions.status === 'empty' ? [] : sessions.data
 
+  // T194 — the "Mine" filter shows the UNION of both commitments: `ids` already carries saves
+  // and held places from one discriminated list (R13), so widening the set cost no second read
+  // and no second predicate — this line is byte-for-byte the membership test 005 shipped.
   const visible =
-    filter === 'saved' ? programme.filter((session) => saved.ids.has(session.id)) : programme
+    filter === 'mine' ? programme.filter((session) => committed.ids.has(session.id)) : programme
 
   return (
     <>
@@ -206,31 +230,36 @@ const Programme = ({ event }: { event: { id: string; timezone: string } }) => {
       <AgendaFilter value={filter} onChange={setFilter} />
 
       {/*
-        The saved set failing is not the programme failing, so it is reported beside the
+        The commitment set failing is not the programme failing, so it is reported beside the
         programme rather than instead of it: the whole schedule is still readable, and only the
-        personal layer is missing. Announced, because the attendee is about to see save controls
-        whose state we do not actually know.
+        personal layer is missing. Announced, because the attendee is about to see commitment
+        controls whose state we do not actually know. Worded for both commitments (FR-1066a).
       */}
-      {saved.status === 'failed' && (
+      {committed.status === 'failed' && (
         <div className="mb-4">
           <Failed
             message={
-              saved.error instanceof OfflineError
-                ? 'Your saved sessions need a connection, and there is not one right now. The programme below is still readable.'
-                : 'Your saved sessions could not be read. This is a problem on our side — the programme below is still readable.'
+              committed.error instanceof OfflineError
+                ? 'Your agenda needs a connection, and there is not one right now. The programme below is still readable.'
+                : 'Your agenda could not be read. This is a problem on our side — the programme below is still readable.'
             }
-            onRetry={saved.retry}
+            onRetry={committed.retry}
           />
         </div>
       )}
 
-      {/* FR-217 — a refused write is explained, and the displayed state did not change. */}
-      {saved.refusal && (
+      {/*
+        FR-217, FR-1069 — a refused write is explained, and the displayed state did not change.
+        The message is the server's own sentence wherever one was written to be read: each of
+        the five commitment refusals carries its own code and its own explanation, classified on
+        `error.code` and never on the class (FR-1069a).
+      */}
+      {committed.refusal && (
         <div
           role="alert"
           className="mb-4 rounded-md border border-warning-500 bg-warning-100 px-4 py-3 text-sm text-warning-700"
         >
-          {saved.refusal.message}
+          {committed.refusal.message}
         </div>
       )}
 
@@ -245,8 +274,8 @@ const Programme = ({ event }: { event: { id: string; timezone: string } }) => {
         </div>
       )}
 
-      {/* FR-195 — nothing saved, said explicitly, with the way back to the full programme. */}
-      {filter === 'saved' && visible.length === 0 && <SavedEmptyState onShowAll={showAll} />}
+      {/* FR-195 — nothing committed to, said explicitly, with the way back to the programme. */}
+      {filter === 'mine' && visible.length === 0 && <MyAgendaEmptyState onShowAll={showAll} />}
 
       {visible.length > 0 && (
         <div className="grid gap-6">
@@ -261,11 +290,13 @@ const Programme = ({ event }: { event: { id: string; timezone: string } }) => {
                     key={session.id}
                     session={session}
                     timezone={event.timezone}
-                    save={{
-                      saved: saved.ids.has(session.id),
-                      onToggle: () => saved.toggle(session.id),
+                    commitment={{
+                      committed: committed.ids.has(session.id),
+                      // The whole session, not its id: the KIND is what decides which write
+                      // runs (FR-1063), and the hook must not re-derive it from membership.
+                      onToggle: () => committed.toggle(session),
                     }}
-                    changed={saved.changed.has(session.id)}
+                    changed={committed.changed.has(session.id)}
                     openHref={`/agenda/${session.id}`}
                     registerOpener={(element) => {
                       if (element) openers.current.set(session.id, element)
@@ -290,7 +321,12 @@ const Programme = ({ event }: { event: { id: string; timezone: string } }) => {
 }
 
 /**
- * T026 (005) — the All/Saved filter (FR-193, FR-197).
+ * T026 (005), T194 (014 tranche 2) — the All/Mine filter (FR-193, FR-197, FR-1066a).
+ *
+ * The second option was labelled "Saved" until tranche 2 made that label false: the set it
+ * shows is the union of both commitments — saved mandatory sessions and held places in
+ * optional ones — and FR-1066 requires an enrolled session to appear here exactly as a saved
+ * one does. "My agenda" is true of both.
  *
  * ─────────────────────────────────────────────────────────────────────────────────────────
  * **A radio group, not a pair of toggle buttons.** The two states are mutually exclusive, so
@@ -353,7 +389,7 @@ const AgendaFilter = ({ value, onChange }: { value: Filter; onChange: (next: Fil
       <legend className="sr-only">Which sessions to show</legend>
       <div className="flex gap-1 rounded-md border border-border-subtle bg-surface p-1">
         {option('all', 'All sessions')}
-        {option('saved', 'Saved')}
+        {option('mine', 'My agenda')}
       </div>
     </fieldset>
   )

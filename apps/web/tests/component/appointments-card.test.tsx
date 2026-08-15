@@ -75,11 +75,15 @@ const AWAITING_THE_READER: Appointment = {
 
 const healthy = {
   catalog: { listSessions: async () => PROGRAMME, listTracks: async () => [] },
-  savedSessions: {
+  commitments: {
     listSaved: async () => [],
     save: async () => {},
     unsave: async () => {},
     markViewed: async () => {},
+    // 014 tranche 2 — enrolment no-ops; `places` rejects so the figure is omitted (FR-1070b).
+    enrol: async () => {},
+    release: async () => {},
+    places: async () => Promise.reject(new Error('places not configured in this test')),
   },
 }
 
@@ -232,7 +236,7 @@ describe('the appointment summary card', () => {
           throw new Error('server fault')
         },
       },
-      savedSessions: {
+      commitments: {
         listSaved: async () => {
           throw new Error('server fault')
         },
@@ -240,6 +244,10 @@ describe('the appointment summary card', () => {
         unsave: async () => {},
 
         markViewed: async () => {},
+        // 014 tranche 2 — enrolment no-ops; `places` rejects so the figure is omitted (FR-1070b).
+        enrol: async () => {},
+        release: async () => {},
+        places: async () => Promise.reject(new Error('places not configured in this test')),
       },
       appointments: appointmentsDouble(async () => [CONFIRMED_EARLY]),
     })

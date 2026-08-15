@@ -13,6 +13,7 @@ import {
 } from '../discover/DirectoryEmptyStates.js'
 import type { DirectoryOutletContext } from '../discover/AttendeeProfile.js'
 import { useDirectory } from '../discover/useDirectory.js'
+import { useVocabularyRepository } from '@mynet/platform'
 
 /**
  * T051 (006) — Discover: who is at this conference (FR-401–FR-415).
@@ -69,44 +70,66 @@ export const Discover = () => {
   }, [])
 
   /**
-   * The options the two filters offer, derived from what has been on screen.
+   * The options the two filters offer — and **T214 (014 tranche 2) is where they stopped
+   * sharing one rule.** This comment is FR-1096a's named subject: it used to argue
+   * accumulate-what-you-have-seen for both filters, and the tranche made it half true. The
+   * decision T214 demands is taken here, stated rather than left ambiguous:
    *
    * ───────────────────────────────────────────────────────────────────────────────────────
-   * **Not a separate endpoint, deliberately.** A list of every role and interest at the
-   * conference would be a second read of the same personal data with its own visibility rules to
-   * get right, and it would disclose the shape of the population — including of attendees the
-   * three conditions exclude from the listing itself. Deriving them from what has been shown
-   * keeps the disclosure identical to what the reader can already see.
+   * **ROLES still accumulate from what has been on screen, and that half of the old argument
+   * still governs** (FR-1096a). A role is free text somebody typed, so a conference-wide list
+   * of them would be a second read of the same personal data and would disclose the shape of
+   * the population — including of attendees the three visibility conditions exclude from the
+   * listing itself. Deriving them from what has been shown keeps the disclosure identical to
+   * what the reader can already see; the options grow as pages load, and they reset on a
+   * conference switch because a role seen at the previous conference is not a value seen HERE.
    *
-   * The consequence is honest and worth stating: the options grow as more pages load. That is
-   * better than offering a filter for a value the reader has no way to have seen.
+   * **INTERESTS are offered from the whole choosable vocabulary** (FR-1096, T214). The
+   * accumulate design existed because a conference-wide list would disclose the population
+   * shape — and a closed vocabulary the product publishes identically to every attendee is not
+   * population data, so the reason is gone and keeping the cost (a filter that removes its own
+   * alternatives the moment it is used) would be restraint without a subject. Two bounds hold
+   * the relaxation, both asserted by tests: **no option carries a count** or any other signal
+   * of how many attendees hold it, and **every choosable value is offered whether or not
+   * anybody at this conference holds it** — an option list that shrinks to what exists is
+   * population data again. The vocabulary is cross-event, so the interest options deliberately
+   * do NOT reset on a conference switch; re-keying them on the event would rebuild the
+   * population-shaped list under a new name (research R18).
+   *
+   * Two consequences are accepted and stated: a retained free-text interest (FR-1095) is no
+   * longer offered as a filter option — it was never choosable, and offering it was a
+   * disclosure of what somebody typed; and an empty vocabulary (the shipped condition,
+   * FR-1086) leaves the interest filter with only its "any" option, which is the specified
+   * empty state rather than an error. A failed vocabulary read degrades the same way.
    * ───────────────────────────────────────────────────────────────────────────────────────
-   *
-   * ═══════════════════════════════════════════════════════════════════════════════════════
-   * **ACCUMULATED, NOT RECOMPUTED FROM THE CURRENT PAGE — AND THAT IS A FIX, NOT AN
-   * OPTIMISATION.**
-   *
-   * Derived from `directory.attendees` alone, the option list is the roles *of the results the
-   * current filter produced*. So selecting "Designer" leaves "Designer" as the only role on
-   * offer, and the reader cannot switch to another — only clear and start again, which they have
-   * to guess. The control removes its own alternatives the moment it is used.
-   *
-   * Accumulating across loads keeps every value the reader has actually seen available to choose
-   * again. It is reset on a conference switch, because a role that existed at the previous
-   * conference is not a value this reader has seen *here* — offering it would both mislead and
-   * widen the disclosure beyond the current conference.
-   * ═══════════════════════════════════════════════════════════════════════════════════════
    */
   const [seen, setSeen] = useState<SeenOptions>({
     eventId: directory.eventId,
     roles: [],
-    interests: [],
   })
+
+  const vocabulary = useVocabularyRepository()
+  const [choosableInterests, setChoosableInterests] = useState<readonly string[]>([])
+  useEffect(() => {
+    let cancelled = false
+    vocabulary
+      .choosable()
+      .then((choosable) => {
+        if (!cancelled) setChoosableInterests(choosable.interests.map((entry) => entry.label))
+      })
+      .catch(() => {
+        // The filter is a convenience over a directory that works without it. An unavailable
+        // vocabulary leaves the select with its "any" option alone — the FR-1086 empty state —
+        // rather than failing a destination whose data all loaded.
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [vocabulary])
 
   const observed = useMemo(
     () => ({
       roles: directory.attendees.map((a) => a.role).filter((r): r is string => !!r),
-      interests: directory.attendees.flatMap((a) => a.interests),
     }),
     [directory.attendees],
   )
@@ -118,20 +141,20 @@ export const Discover = () => {
    * `react-hooks/refs` refuses outright.
    *
    * Comparing lengths is enough because the union only ever grows, so this converges after a
-   * single extra render rather than looping.
+   * single extra render rather than looping. Roles only, since T214: the interest options come
+   * from the vocabulary read above and have no per-conference half to adjust.
    */
   if (seen.eventId !== directory.eventId) {
-    setSeen({ eventId: directory.eventId, roles: [], interests: [] })
+    setSeen({ eventId: directory.eventId, roles: [] })
   } else {
     const roles = union(seen.roles, observed.roles)
-    const interests = union(seen.interests, observed.interests)
-    if (roles.length !== seen.roles.length || interests.length !== seen.interests.length) {
-      setSeen({ eventId: directory.eventId, roles, interests })
+    if (roles.length !== seen.roles.length) {
+      setSeen({ eventId: directory.eventId, roles })
     }
   }
 
   const roleOptions = seen.roles
-  const interestOptions = seen.interests
+  const interestOptions = choosableInterests
 
   /** Held by attendee id so focus returns to the exact card that opened the profile (FR-433). */
   const openers = useRef(new Map<string, HTMLAnchorElement>())
@@ -295,11 +318,14 @@ export const Discover = () => {
   )
 }
 
-/** Which filter values this reader has seen at this conference. See `seen` for why it accumulates. */
+/**
+ * Which ROLE values this reader has seen at this conference. See `seen` for why it accumulates —
+ * and why, since T214, interests are no longer a member: they are offered from the closed
+ * vocabulary, which is not population data and is not per-conference (FR-1096).
+ */
 interface SeenOptions {
   readonly eventId: string | null
   readonly roles: readonly string[]
-  readonly interests: readonly string[]
 }
 
 /**

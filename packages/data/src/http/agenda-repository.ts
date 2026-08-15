@@ -1,6 +1,7 @@
 import type {
-  SavedSession,
-  SavedSessionRepository,
+  Commitment,
+  CommitmentRepository,
+  PlaceAvailability,
   SessionNote,
   SessionNotesRepository,
 } from '../interfaces/agenda.js'
@@ -26,7 +27,11 @@ import type { HttpClient } from './client.js'
 const agendaPath = (eventId: string, rest: string): string =>
   `/events/${encodeURIComponent(eventId)}/agenda${rest}`
 
-export class HttpSavedSessionRepository implements SavedSessionRepository {
+/**
+ * T196 (014 tranche 2) — was `HttpSavedSessionRepository`; renamed with the interface, because
+ * from tranche 2 the set it serves carries held places as well as saves (FR-1066a, R13).
+ */
+export class HttpCommitmentRepository implements CommitmentRepository {
   readonly #http: HttpClient
 
   constructor(http: HttpClient) {
@@ -39,12 +44,14 @@ export class HttpSavedSessionRepository implements SavedSessionRepository {
    * This read `{ sessionIds: [...] }` and returned the bare list; 005's comment said the object
    * wrapper existed "so the response has somewhere to grow without becoming a breaking change".
    * 014 is that growth: `sessions` carries the identifier **and** the marker, computed
-   * server-side from two timestamps (FR-1030, research R7).
+   * server-side from two timestamps (FR-1030, research R7). T196 grew it a second time, the
+   * same move: each row now carries the `saved | place` discriminator (FR-1066, R13).
+   *
+   * The method keeps its name — it is the identity the cache's `reads` map and resource key
+   * are configured against; see the interface for why renaming it is not a tidy-up.
    */
-  async listSaved(eventId: string): Promise<SavedSession[]> {
-    const body = await this.#http.request<{ sessions: SavedSession[] }>(
-      agendaPath(eventId, '/saved'),
-    )
+  async listSaved(eventId: string): Promise<Commitment[]> {
+    const body = await this.#http.request<{ sessions: Commitment[] }>(agendaPath(eventId, '/saved'))
     return body.sessions
   }
 
@@ -76,6 +83,38 @@ export class HttpSavedSessionRepository implements SavedSessionRepository {
     await this.#http.request<void>(
       agendaPath(eventId, `/saved/${encodeURIComponent(sessionId)}/viewed`),
       { method: 'POST' },
+    )
+  }
+
+  /**
+   * T196 (014 tranche 2) — `PUT` on the place, mirroring `save`: the address IS the pairing,
+   * which is where a double-tap's safety comes from — though here the server answers the second
+   * tap with `already_enrolled` rather than silence, because the attendee holding a place is a
+   * fact worth telling them (FR-1069a).
+   */
+  async enrol(eventId: string, sessionId: string): Promise<void> {
+    await this.#http.request<void>(
+      agendaPath(eventId, `/places/${encodeURIComponent(sessionId)}`),
+      { method: 'PUT' },
+    )
+  }
+
+  /** T196 (014 tranche 2) — `DELETE` on the place, mirroring `unsave`. Idempotent (FR-1067). */
+  async release(eventId: string, sessionId: string): Promise<void> {
+    await this.#http.request<void>(
+      agendaPath(eventId, `/places/${encodeURIComponent(sessionId)}`),
+      { method: 'DELETE' },
+    )
+  }
+
+  /**
+   * T196, T209 (014 tranche 2) — the live places figure (FR-1070). **Not** under `/agenda`:
+   * remaining places are a fact about the session, the same for every reader, so the address
+   * says so. Declared `passThrough` at the composition root (FR-1070b) — see the interface.
+   */
+  async places(eventId: string, sessionId: string): Promise<PlaceAvailability> {
+    return this.#http.request<PlaceAvailability>(
+      `/events/${encodeURIComponent(eventId)}/sessions/${encodeURIComponent(sessionId)}/places`,
     )
   }
 }

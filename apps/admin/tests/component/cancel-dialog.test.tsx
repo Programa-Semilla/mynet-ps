@@ -48,6 +48,7 @@ const renderDialog = (over: Parameters<typeof adminSession>[0] = {}, props = {})
     <CancelDialog
       open
       session={adminSession(over)}
+      placesHeld={0}
       busy={false}
       failure={null}
       onCancelSession={onCancelSession}
@@ -130,6 +131,7 @@ describe('a session attendees have engaged with', () => {
       <CancelDialog
         open
         session={adminSession({ engagement: { saved: 12, notes: 4, questions: 3, votes: 9 } })}
+        placesHeld={0}
         busy={false}
         failure={null}
         onCancelSession={vi.fn()}
@@ -168,6 +170,7 @@ describe('the dialog’s other required states', () => {
       <CancelDialog
         open
         session={adminSession()}
+        placesHeld={0}
         busy={false}
         failure="Attendees have engaged with this session — cancel it instead."
         onCancelSession={vi.fn()}
@@ -186,6 +189,7 @@ describe('the dialog’s other required states', () => {
       <CancelDialog
         open
         session={adminSession()}
+        placesHeld={0}
         busy
         failure={null}
         onCancelSession={vi.fn()}
@@ -215,6 +219,7 @@ describe('the dialog’s other required states', () => {
       <CancelDialog
         open={false}
         session={null}
+        placesHeld={0}
         busy={false}
         failure={null}
         onCancelSession={vi.fn()}

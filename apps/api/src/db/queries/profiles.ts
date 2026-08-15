@@ -1,4 +1,4 @@
-import { asc, eq, sql } from 'drizzle-orm'
+import { and, asc, eq, isNull, sql } from 'drizzle-orm'
 
 import { assertVerifiedScope, type EventScope } from '../../plugins/event-access.js'
 import { getDb } from '../client.js'
@@ -10,6 +10,7 @@ import {
   type Availability,
   type NetworkingIntent,
 } from '../schema/profiles.js'
+import { interestOptions, sectors, subsectors } from '../schema/vocabulary.js'
 
 /**
  * T028 (004) — reads and writes of attendee profiles (FR-334–FR-363, research D5).
@@ -33,6 +34,13 @@ export interface ProfileFields {
   readonly company: string | null
   readonly role: string | null
   readonly headline: string | null
+  /**
+   * T174 (014 tranche 2) — the taxonomy fields (FR-1090), all optional (FR-1091). Stored as
+   * chosen LABELS — see `schema/profiles.ts` for why there is no reference to the vocabulary.
+   */
+  readonly sector: string | null
+  readonly subsector: string | null
+  readonly productiveActivity: string | null
   readonly networkingIntent: NetworkingIntent | null
   readonly availability: Availability | null
   readonly interests: readonly string[]
@@ -86,6 +94,9 @@ export const readOwnProfile = async (attendeeId: string): Promise<OwnProfile | n
       company: attendeeProfiles.company,
       role: attendeeProfiles.role,
       headline: attendeeProfiles.headline,
+      sector: attendeeProfiles.sector,
+      subsector: attendeeProfiles.subsector,
+      productiveActivity: attendeeProfiles.productiveActivity,
       networkingIntent: attendeeProfiles.networkingIntent,
       availability: attendeeProfiles.availability,
     })
@@ -109,6 +120,9 @@ export const readOwnProfile = async (attendeeId: string): Promise<OwnProfile | n
     company: row.company,
     role: row.role,
     headline: row.headline,
+    sector: row.sector,
+    subsector: row.subsector,
+    productiveActivity: row.productiveActivity,
     networkingIntent: row.networkingIntent,
     availability: row.availability,
     interests: await listInterests(attendeeId),
@@ -119,10 +133,33 @@ export interface ProfileInput {
   readonly company: string | null
   readonly role: string | null
   readonly headline: string | null
+  readonly sector: string | null
+  readonly subsector: string | null
+  readonly productiveActivity: string | null
   readonly networkingIntent: NetworkingIntent | null
   readonly availability: Availability | null
   readonly interests: readonly string[]
 }
+
+/**
+ * Why a profile write was refused, when it was. Each value maps to its own `ErrorCode` at the
+ * route — never a shared one, per this feature's twice-recorded lesson — because each is a
+ * different fact about the writer's own submission with a different next step.
+ */
+export type ProfileWriteRefusal =
+  /** The interest set exceeds `PROFILE_LIMITS.interestCount` or a value exceeds its length. */
+  | 'interests-out-of-bounds'
+  /** FR-1095b — a sector neither held by this attendee nor currently choosable. */
+  | 'sector-not-available'
+  /** FR-1095b — a subsector neither held (with its held sector) nor currently choosable. */
+  | 'subsector-not-available'
+  /** FR-1087 — a real, choosable subsector, but of a different sector than the one submitted. */
+  | 'subsector-outside-sector'
+  /** FR-1088, FR-1095b — an interest neither held by this attendee nor in the vocabulary. */
+  | 'interest-not-available'
+
+export type ProfileWriteResult =
+  { readonly ok: true } | { readonly ok: false; readonly refusal: ProfileWriteRefusal }
 
 /**
  * Writes the attendee's whole profile (FR-334, FR-335, FR-336).
@@ -137,14 +174,32 @@ export interface ProfileInput {
  * second verb.
  * ─────────────────────────────────────────────────────────────────────────────────────────
  *
- * Returns `false` when the interest set exceeds its bound, which the route turns into a
- * refusal. That bound is checked here as well as at the route because a per-row `CHECK` cannot
- * see a set — see `PROFILE_LIMITS.interestCount` for why there is no column constraint.
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ * **T174 (014 tranche 2) — VOCABULARY MEMBERSHIP IS ENFORCED HERE, AS THE UNION OF THE
+ * CHOOSABLE AND THE HELD** (FR-1095b, FR-1087, FR-1088, R18).
+ *
+ * Every submitted sector, subsector and interest must be **currently choosable** (an unretired
+ * vocabulary value) **or already held by this attendee** — retained free text and retired
+ * choices alike. The held half is what lets somebody holding a retired value save an unrelated
+ * change to their own profile: whole-profile semantics re-submit everything, so a
+ * choosable-only rule would lock their profile the day a value they hold was retired. The
+ * choosable half is FR-1088: a NEW value is chosen from the vocabulary, never typed.
+ *
+ * A subsector must additionally belong to the submitted sector (FR-1087) — held pairs count as
+ * a pair, so a held (sector, subsector) survives whole, and a subsector carried to a different
+ * sector is refused. There is deliberately **no foreign key** behind any of this: the interest
+ * list ships empty, the mapping migration a key would need is the administrative write FR-1093
+ * forbids, and the exact-match ranking is satisfied by text and broken by ids (R18).
+ *
+ * This read of the vocabulary and of the attendee's own held values is a **write-path check**;
+ * no read of what an attendee holds ever consults retirement (`no-draft-state.test.ts` names
+ * this module as one of the three permitted to read the stamp, for exactly this check).
+ * ═════════════════════════════════════════════════════════════════════════════════════════
  */
 export const writeOwnProfile = async (
   attendeeId: string,
   input: ProfileInput,
-): Promise<boolean> => {
+): Promise<ProfileWriteResult> => {
   // Normalised before the count, so twelve interests that collapse to three duplicates are
   // three rather than a refusal — the primary key would have deduplicated them anyway, and
   // refusing on the pre-deduplication count would be arbitrary.
@@ -152,10 +207,92 @@ export const writeOwnProfile = async (
     ...new Set(input.interests.map((interest) => interest.trim()).filter((i) => i.length > 0)),
   ]
 
-  if (interests.length > PROFILE_LIMITS.interestCount) return false
-  if (interests.some((interest) => interest.length > PROFILE_LIMITS.interest)) return false
+  if (interests.length > PROFILE_LIMITS.interestCount) {
+    return { ok: false, refusal: 'interests-out-of-bounds' }
+  }
+  if (interests.some((interest) => interest.length > PROFILE_LIMITS.interest)) {
+    return { ok: false, refusal: 'interests-out-of-bounds' }
+  }
 
-  await getDb().transaction(async (tx) => {
+  const db = getDb()
+
+  // ───────────────────────────────────────────────────────────────────────────────────────
+  // The held set: what this attendee's own records already say. Read before the transaction —
+  // a retirement or rename racing this write cannot invalidate holding (retirement writes to
+  // no attendee record, and a held value cannot be renamed), so there is nothing here a lock
+  // would protect.
+  // ───────────────────────────────────────────────────────────────────────────────────────
+  const [heldRow] = await db
+    .select({ sector: attendeeProfiles.sector, subsector: attendeeProfiles.subsector })
+    .from(attendeeProfiles)
+    .where(eq(attendeeProfiles.attendeeId, attendeeId))
+    .limit(1)
+  const heldInterests = new Set(
+    (
+      await db
+        .select({ interest: attendeeInterests.interest })
+        .from(attendeeInterests)
+        .where(eq(attendeeInterests.attendeeId, attendeeId))
+    ).map((row) => row.interest),
+  )
+
+  if (input.sector !== null || input.subsector !== null) {
+    const holdsSector = heldRow !== undefined && heldRow.sector === input.sector
+    const holdsPair =
+      holdsSector && heldRow.subsector !== null && heldRow.subsector === input.subsector
+
+    if (input.sector !== null && !holdsSector) {
+      const choosable = await db
+        .select({ id: sectors.id })
+        .from(sectors)
+        .where(and(eq(sectors.label, input.sector), isNull(sectors.retiredAt)))
+        .limit(1)
+      if (choosable.length === 0) return { ok: false, refusal: 'sector-not-available' }
+    }
+
+    if (input.subsector !== null && !holdsPair) {
+      // A subsector means nothing without a sector to refine (FR-1087).
+      if (input.sector === null) return { ok: false, refusal: 'subsector-outside-sector' }
+
+      // Choosable means: an unretired subsector row whose PARENT's label is the submitted
+      // sector. The parent's own retirement is deliberately not consulted — an attendee keeping
+      // a held (retired) sector may still refine it with a live subsector of it.
+      const rows = await db
+        .select({ id: subsectors.id, sectorLabel: sectors.label, retiredAt: subsectors.retiredAt })
+        .from(subsectors)
+        .innerJoin(sectors, eq(sectors.id, subsectors.sectorId))
+        .where(eq(subsectors.label, input.subsector))
+      const ofThisSector = rows.filter((row) => row.sectorLabel === input.sector)
+
+      if (ofThisSector.some((row) => row.retiredAt === null)) {
+        // Choosable, of the right sector.
+      } else if (rows.length > 0 && ofThisSector.length === 0) {
+        // The label names a real refinement — of a different sector (FR-1087).
+        return { ok: false, refusal: 'subsector-outside-sector' }
+      } else {
+        // Unknown, or retired and not held: not on offer (FR-1094a).
+        return { ok: false, refusal: 'subsector-not-available' }
+      }
+    }
+  }
+
+  // Each interest: held (FR-1095's retained free text, and retired choices) or choosable.
+  const unknown = interests.filter((interest) => !heldInterests.has(interest))
+  if (unknown.length > 0) {
+    const listed = new Set(
+      (
+        await db
+          .select({ label: interestOptions.label })
+          .from(interestOptions)
+          .where(isNull(interestOptions.retiredAt))
+      ).map((row) => row.label),
+    )
+    if (unknown.some((interest) => !listed.has(interest))) {
+      return { ok: false, refusal: 'interest-not-available' }
+    }
+  }
+
+  await db.transaction(async (tx) => {
     await tx
       .insert(attendeeProfiles)
       .values({
@@ -163,6 +300,9 @@ export const writeOwnProfile = async (
         company: input.company,
         role: input.role,
         headline: input.headline,
+        sector: input.sector,
+        subsector: input.subsector,
+        productiveActivity: input.productiveActivity,
         networkingIntent: input.networkingIntent,
         availability: input.availability,
       })
@@ -172,6 +312,9 @@ export const writeOwnProfile = async (
           company: input.company,
           role: input.role,
           headline: input.headline,
+          sector: input.sector,
+          subsector: input.subsector,
+          productiveActivity: input.productiveActivity,
           networkingIntent: input.networkingIntent,
           availability: input.availability,
           updatedAt: new Date(),
@@ -188,7 +331,7 @@ export const writeOwnProfile = async (
     }
   })
 
-  return true
+  return { ok: true }
 }
 
 /**
@@ -304,6 +447,9 @@ export const readCoAttendeeProfile = async (
     company: string | null
     role: string | null
     headline: string | null
+    sector: string | null
+    subsector: string | null
+    productive_activity: string | null
     networking_intent: NetworkingIntent | null
     availability: Availability | null
   }>(sql`
@@ -314,6 +460,9 @@ export const readCoAttendeeProfile = async (
       p.company                         AS company,
       p.role                            AS role,
       p.headline                        AS headline,
+      p.sector                          AS sector,
+      p.subsector                       AS subsector,
+      p.productive_activity             AS productive_activity,
       p.networking_intent               AS networking_intent,
       p.availability                    AS availability
     FROM attendees a
@@ -336,6 +485,9 @@ export const readCoAttendeeProfile = async (
     company: row.company,
     role: row.role,
     headline: row.headline,
+    sector: row.sector,
+    subsector: row.subsector,
+    productiveActivity: row.productive_activity,
     networkingIntent: row.networking_intent,
     availability: row.availability,
     interests: await listInterests(row.attendee_id),
