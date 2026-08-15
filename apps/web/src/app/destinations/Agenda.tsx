@@ -136,12 +136,17 @@ const Programme = ({ event }: { event: { id: string; timezone: string } }) => {
       sessions: programmeState === 'ready' ? sessions.data : [],
       timezone: event.timezone,
       eventId: event.id,
-      // An empty map while the notes are still loading or have failed: the panel then shows an
-      // empty editor, which is the same thing it shows for a session with no note. That is
-      // acceptable *only* because a note write is non-optimistic and never merges — the
-      // attendee's first keystroke replaces whatever is on the server, which is FR-214's rule
-      // rather than a loss introduced here.
+      // The map AND the read's own state, because the map alone cannot say "not read yet".
+      // A sentence here used to call the empty-map-while-loading display acceptable *because*
+      // a write replaces whatever is on the server — which is precisely why it was not: an
+      // editor mounted over a pending read stayed empty when the note arrived (the controller
+      // never adopts a late value, FR-214), and the replace-on-keystroke rule then made that
+      // convincing blank a data-loss path. The panel now mounts the editor only once this
+      // status reads `ready`, which is the arrangement the hook's header always described —
+      // "this reports its own state and the caller decides".
       notes: notes.bySession,
+      notesStatus: notes.status,
+      retryNotes: notes.retry,
       restoreFocusTo,
       /**
        * T075 (014) — opening the panel is what clears this session's change marker (FR-1030).
@@ -165,6 +170,8 @@ const Programme = ({ event }: { event: { id: string; timezone: string } }) => {
       event.timezone,
       event.id,
       notes.bySession,
+      notes.status,
+      notes.retry,
       restoreFocusTo,
       committed,
     ],

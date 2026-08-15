@@ -41,6 +41,16 @@ const editor = (page: Page) => page.getByRole('textbox', { name: /private notes/
 
 test.describe('personal notes', () => {
   test('type, pause, saved, reload, read back, clear, gone', async ({ page }) => {
+    // ─────────────────────────────────────────────────────────────────────────────────────
+    // **Unique per ATTEMPT, or a CI retry can never pass.** A first attempt that saved the
+    // note and then failed later leaves the note in the database; the retry reopens the same
+    // session, the editor loads that note, and `fill()` with the identical text changes
+    // nothing — a controlled input with an unchanged value schedules no autosave, so
+    // "Saved." never appears and the retry times out on the very step the first attempt
+    // passed. Salting the text with the retry number makes every attempt a real edit.
+    // ─────────────────────────────────────────────────────────────────────────────────────
+    const note = `Ask the speaker about the migration path. (attempt ${test.info().retry})`
+
     await page.goto('/')
     await signIn(page, ADA)
     await goToAgenda(page)
@@ -48,7 +58,7 @@ test.describe('personal notes', () => {
     const { href } = await openFirstSession(page)
 
     // ── Type, and stop. There is no save control, and there must not be one ───────────────
-    await editor(page).fill('Ask the speaker about the migration path.')
+    await editor(page).fill(note)
     await expect(
       page.getByRole('dialog').getByRole('button', { name: /^save$/i }),
       'The note must persist without any explicit save action (FR-209).',
@@ -62,12 +72,12 @@ test.describe('personal notes', () => {
     // ── Reload — the unexpected loss of the page ──────────────────────────────────────────
     await page.reload()
     await expect(page.getByRole('dialog')).toBeVisible()
-    await expect(editor(page)).toHaveValue('Ask the speaker about the migration path.')
+    await expect(editor(page)).toHaveValue(note)
 
     // ── And on a different device, since the note is server-side state ────────────────────
     await page.goto('/agenda')
     await page.goto(href)
-    await expect(editor(page)).toHaveValue('Ask the speaker about the migration path.')
+    await expect(editor(page)).toHaveValue(note)
 
     // ── Clear it entirely: the note is removed, not stored blank (FR-212) ─────────────────
     await editor(page).fill('')
@@ -110,6 +120,10 @@ test.describe('personal notes', () => {
   test('an in-flight write is NOT cancelled when the panel closes (US3 scenario 6)', async ({
     page,
   }) => {
+    // Unique per attempt, for the first test's reason: a retry re-filling identical text is
+    // no change, schedules no write, and the `waitForResponse` below then never resolves.
+    const dismissed = `Typed and dismissed straight away. (attempt ${test.info().retry})`
+
     await page.goto('/')
     await signIn(page, ADA)
     await goToAgenda(page)
@@ -136,7 +150,7 @@ test.describe('personal notes', () => {
       { timeout: 15_000 },
     )
 
-    await editor(page).fill('Typed and dismissed straight away.')
+    await editor(page).fill(dismissed)
     await page.keyboard.press('Escape')
     await expect(page.getByRole('dialog')).toHaveCount(0)
 
@@ -145,7 +159,7 @@ test.describe('personal notes', () => {
 
     // And it really did store the note: reopen by address and read it back.
     await page.goto(href)
-    await expect(editor(page)).toHaveValue('Typed and dismissed straight away.', {
+    await expect(editor(page)).toHaveValue(dismissed, {
       timeout: 15_000,
     })
 

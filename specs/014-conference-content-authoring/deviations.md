@@ -965,3 +965,28 @@ demands; the spec's one-shot reload was the fragile half. Both tests now look ag
 `toPass` loop, which asserts the durability guarantee as stated — the data is there when the
 attendee looks — rather than the stronger, false claim that a restart drops no in-flight
 connection.
+
+## D39 — CI's one red job led to a real data-loss path in the notes editor, and the flake was the product
+
+The PR's first CI run failed one job: `session-notes.spec.ts`, on a step that had passed three
+consecutive local full runs. Chasing it as a flake found a defect instead, in tranche-1-era
+wiring this tranche never touched. The Agenda hands the session panel an **empty notes map
+while `listNotes` is still loading or failed**, the panel consulted the map without the read's
+status, and the autosave controller initialises once and — deliberately, FR-214 — never adopts
+a late-arriving server value. So on a slow read the editor mounted blank, stayed blank when the
+note arrived, and the attendee's first keystroke into that convincing blank would **replace the
+note the server still holds**. The comment beside the map called the blank display *"acceptable
+only because a write replaces whatever is on the server"* — which is precisely why it was not.
+CI's loaded two-core runner supplied the latency a slow connection gives a real attendee; the
+suite was right and the shrug would have been wrong.
+
+The fix gates only the notes **section** on the read's own state — `Loading your note…` while
+pending, a stated refusal with a retry when failed, the editor only once settled — which is the
+arrangement `useSessionNotes`'s header always described ("this reports its own state and the
+caller decides"). `note-late-read.test.tsx` holds the read open and drives both states, with
+the late-arriving note shown rather than ignored as the headline assertion.
+
+Two test repairs travelled with it: both note texts in the e2e spec are now salted with the
+retry number, because a retry re-filling identical text over a note the first attempt had
+already persisted changes nothing, schedules no autosave, and could never pass — CI's
+`retries: 1` was a guaranteed second failure rather than a second chance.

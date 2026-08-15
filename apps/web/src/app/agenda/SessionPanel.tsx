@@ -66,6 +66,18 @@ export interface AgendaOutletContext {
    * notes cache a single entry per conference (data-model.md, `resource: notes`).
    */
   readonly notes: ReadonlyMap<string, SessionNote>
+  /**
+   * The notes read's own state, consulted BEFORE the map above — because the map alone cannot
+   * distinguish "no note" from "not read yet", and the editor initialises once from what it is
+   * handed and deliberately never adopts a server value afterwards (FR-214). Mounted against
+   * an empty map while the read was still in flight, it stayed empty after the note arrived —
+   * and the attendee's first keystroke into that convincing blank would REPLACE the note the
+   * server still holds. The hook's own header names exactly that hazard; this field is what
+   * lets the panel honour it.
+   */
+  readonly notesStatus: 'loading' | 'ready' | 'failed'
+  /** Retries the notes read after a failure, without re-reading anything else. */
+  readonly retryNotes: () => void
   /** Returns focus to the control that opened the panel (FR-202). */
   readonly restoreFocusTo: (sessionId: string) => void
   /**
@@ -323,12 +335,47 @@ const PanelBody = ({
         fresh controller rather than carrying one session's draft into another's — the panel
         and its address belong to a single session throughout (Edge Cases).
       */}
-      <PanelNotes
-        key={session.id}
-        eventId={context.eventId}
-        sessionId={session.id}
-        note={context.notes.get(session.id) ?? null}
-      />
+      {/*
+        The editor mounts only once the notes read has SETTLED, and the two other states are
+        each a sentence rather than a blank field. An empty editor over a pending read is not a
+        neutral placeholder here: the controller initialises from what it is handed and never
+        adopts a late-arriving value (FR-214), so a note that resolved after the mount stayed
+        invisible — and typing into that blank would replace it on the server. Found as an
+        intermittent end-to-end failure on a loaded machine, which is exactly the timing a slow
+        connection gives a real attendee.
+      */}
+      {context.notesStatus === 'ready' ? (
+        <PanelNotes
+          key={session.id}
+          eventId={context.eventId}
+          sessionId={session.id}
+          note={context.notes.get(session.id) ?? null}
+        />
+      ) : (
+        <section aria-labelledby="session-panel-notes">
+          <h3
+            id="session-panel-notes"
+            className="mb-2 font-display text-sm font-medium text-text-primary"
+          >
+            Your notes
+          </h3>
+          {context.notesStatus === 'loading' ? (
+            <p className="text-sm text-text-muted">Loading your note…</p>
+          ) : (
+            <p className="text-sm text-text-body">
+              Your notes could not be read, so the editor is not offered — a blank field over a note
+              that exists would invite retyping it over the top.{' '}
+              <button
+                type="button"
+                onClick={context.retryNotes}
+                className="font-medium text-coral-700 underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-coral-500"
+              >
+                Try again
+              </button>
+            </p>
+          )}
+        </section>
+      )}
       {/*
         T035 (009) — the fourth section, which is the whole of this feature's edit to 005's file.
 
