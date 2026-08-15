@@ -139,3 +139,106 @@ protection is the refusal plus the lock (R6), not a change to the referential ru
   would be a second source of truth for a fact the trail already answers — 009's reasoning for
   refusing a denormalised vote counter.
 - **No conference deletion** (FR-1011), so no soft-delete column on `events`.
+
+---
+
+# Part II — Tranche 2 (migration `0012`)
+
+**Added 2026-08-14.** Everything above is tranche 1's `0011`, applied. This part is tranche 2's
+`0012`, unwritten.
+
+## The number, and why it is not `0010`
+
+**`0012`, claimed at generation** per constitution v5.3.0 (O4). On disk: `0000`–`0009` and `0011`;
+there is no `0010_*.sql`. O4 voids the roadmap's reservations, so `0010` and `0012` are both free —
+and `0010` is the literal reading of "next free" and the wrong one.
+
+**Tranche 2 depends on tranche 1.** It must redefine `admin_audit_entries_action_valid` to admit the
+vocabulary actions, and that is the same named CHECK constraint `0011` drops and re-adds. Numbering
+tranche 2 `0010` would place a dependent migration *before* its dependency in filename order while
+the journal applies them the other way round — the exact three-way skew `meta/README.md` exists to
+explain. `0010` stays empty, and the README gains a fourth section saying so.
+
+**Two departures to state** (CLAUDE.md's roadmap rule): the roadmap reserves `0012` for 015 and
+directs 012 to `0010`. O4 voids both, and the roadmap's table is extended in this same change.
+
+## New tables
+
+| Table | Holds | Scoping | Why that scoping |
+|---|---|---|---|
+| `session_enrolments` | which attendee holds a place in which optional session, when they took it, when they last viewed it | **Per-event** | A session belongs to exactly one conference, so a place in it cannot mean anything at another (standing decision 7). Deliberately the opposite of a held card, which is cross-event because it describes a relationship rather than a presence |
+| `sectors` | the product-wide sector labels, seeded with Servicios, Comercio, Industria, Agro | **Product-wide** | An attendee profile is cross-event because it describes the person, not their presence at one conference. A per-conference list would make somebody's sector reset on event switch |
+| `subsectors` | the subsector labels under each sector; **ships empty** | **Product-wide** | Same reason. The client's list does not exist yet, and the surface must be useful without it |
+| `interest_options` | the networking-interest labels; **ships empty** | **Product-wide** | Same reason |
+
+**`session_enrolments` carries two obligations that are not optional** (R12): an index on
+`session_id`, because PostgreSQL creates none for a foreign key and the `count(*)` runs **inside the
+exclusive lock**; and a composite primary key on `(session_id, attendee_id)`, which is what makes the
+insert's `ON CONFLICT … DO NOTHING` idempotent and what makes a double-tap the same request twice.
+
+**`attendee_interests` is NOT modified** (R18). The vocabulary is a reference table of **labels**, not
+a foreign-key target. Membership is enforced at the *write* — every submitted value must be currently
+choosable **or** already held by that attendee (FR-1095b) — so there is no referential integrity to
+add, no mapping migration to write, and nothing in `listDirectory` to change.
+
+## New columns
+
+| Table | Column | Note |
+|---|---|---|
+| `events` | modality | Controlled, three values, **no neutral default**. Back-filled `in-person` and the default **dropped in the same migration** (FR-1048) |
+| `events` | format | Optional descriptive label; nothing branches on it (FR-1047) |
+| `sessions` | kind | mandatory or optional; existing rows become mandatory (FR-1060) |
+| `sessions` | capacity | Present only on optional sessions (FR-1061, FR-1062a) |
+| `sessions` | enrolment-closing offset | **Hours before start, never an instant** (FR-1071) |
+| `sessions` | access link | Dedicated and validated, `https:` only. **Not the summary** (FR-1052) |
+| `sessions` | room | **Becomes nullable** (FR-1049) |
+| `attendee_profiles` | sector, subsector, productive activity, company | All optional. FR-336 holds |
+
+## Derived, never stored
+
+- **The enrolment-closing instant**, from the session's start and its offset (FR-1071).
+- **Whether enrolment is open** (FR-1071a) — a stored open flag is how a lifecycle arrives wearing a
+  different name, which `no-draft-state.test.ts` bans on conference content.
+- **Remaining places**, as capacity minus a live count.
+- **Whether a session is in person, virtual or both**, from what it carries (FR-1051).
+
+Both derivations live **in SQL against the database clock**, never in JavaScript against `Date.now()`
+inside any file the time-driven guard scans — and that guard's population is `\.push\b`, which is
+fifteen files rather than three, so the constraint is on the **SQL text and the naming**, not on where
+the code sits (R14).
+
+## Deletion, export, and retention
+
+- **A held place is attendee data.** It cascades from the attendee, appears in the personal-data
+  export, and is **additionally released by withdrawal from the conference** — which needs writing by
+  hand, because nothing cascades from a registration and `account.ts` calls that gap "invisible in the
+  schema" (FR-1081).
+- **The per-attendee viewed state on a held place** is attendee data under the same cascade and export
+  coverage (FR-1080).
+- **Modality, format, kind, capacity, the closing offset and the access link are conference content**:
+  no cascade, no export, declared with that reason rather than allow-listed.
+- **The vocabulary is reference data**, not attendee data: no cascade, no export. It needs a
+  `NOT_EXPORTED` entry with a stated reason.
+- **An attendee's chosen sector, subsector, activity and company are attendee data** and export with
+  the profile.
+
+## The engagement predicate, and the entry that must be written
+
+**Enrolment is deliberately NOT engagement** (v5.3.0 O2). `session_enrolments` references both
+`sessions` and `attendees`, so it **fails the build by existing** until it is classified — which is
+the guard working. It is classified into `NOT_ENGAGEMENT`, whose only mechanical requirement is a
+reason longer than 80 characters and whose real requirement is that the sentence be true: whose data
+it is, and why losing it silently is acceptable. **`ENGAGEMENT_TABLES` is not touched and its
+four-table pin never fires** (R15).
+
+**The live delete predicate is `countEngagement`, not `hasEngagement`** — which has **zero callers and
+zero importers**, despite naming itself the predicate of record. FR-1077b's held-places figure
+therefore needs its **own field beside the four counts**, never a fifth member of them: adding it to
+the sum would make places-held sessions undeletable, which is the opposite of O2, and no guard catches
+it (R15).
+
+## What is deliberately absent
+
+No waitlist (FR-1082). No automatic enrolment (FR-1083). No attendance, check-in or no-show record
+(FR-1084). No stored open/closed state on a session. No foreign key from `attendee_interests` to the
+vocabulary. No administrative write path to any attendee's own selections (FR-1093).

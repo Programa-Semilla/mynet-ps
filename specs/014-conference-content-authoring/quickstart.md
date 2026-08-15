@@ -179,3 +179,68 @@ it.** The programme editor is the largest desktop-first surface built since 013.
 - **The physical iPhone test**, outstanding since 012's scope was set.
 - **The outstanding walkthroughs from 007, 008, 009 and 013**, which this one joins rather than
   discharges.
+
+---
+
+# Part II — Tranche 2 scenarios
+
+**Added 2026-08-14.** Scenarios 1–9 above are tranche 1's. These are tranche 2's, and they continue
+the numbering. **Scenarios 14–17 need a person and cannot be automated.**
+
+## Scenario 10 — A place is taken, and the last one is contested (US5, FR-1068)
+
+Create an optional session with capacity 2. From three browser profiles, take a place in the same
+session at the same moment. **Exactly one of the third pair fails**, and the failure says the session
+is full — not that something went wrong. Confirm no place exists beyond the capacity, in every
+ordering.
+
+## Scenario 11 — Full and closed are different sentences (FR-1069, FR-1069a, SC-1015)
+
+Fill a session, and separately let a session's closing offset pass. Confirm the two refusals are
+**different from each other** and that a reader can tell which happened without a second request.
+
+## Scenario 12 — Enrolment replaces saving (FR-1063, FR-1064, FR-1066)
+
+On an optional session, confirm there is exactly **one** commitment control and that no route exists
+to save it. Confirm the session then appears in the Agenda and on the Home card that composes the
+attendee's own programme. Confirm no "saved but no place" state is reachable.
+
+## Scenario 13 — A held place is notified, and deletion is silent (FR-1079, FR-1077a, SC-1025)
+
+Take a place, then change the session's room as an organizer: the attendee is notified and the row is
+marked. Then delete a different session that has places held: confirm the organizer is shown the
+number held **and told those attendees will not be notified**, and confirm nothing reaches them.
+
+**This is the tranche's only irreversible act.** Confirm the confirmation does not say nothing is
+attached (FR-1077c).
+
+## Scenario 14 — The roster, and what it must not show *(needs a person)*
+
+As an organizer assigned to the conference, open an optional session and read the names of the people
+holding places. Then confirm there is **no** equivalent anywhere for who saved a session, wrote a
+note, asked a question or voted. As an organizer **not** assigned to that conference, confirm the
+roster is refused identically to a conference that does not exist.
+
+## Scenario 15 — A virtual conference *(needs a person)*
+
+Create a conference, mark it virtual, author a session with a joining link and no room. Confirm the
+attendee sees the link and no empty room line. Correct the conference's format afterwards and confirm
+it holds. Then attempt in-person → virtual directly and confirm it is refused; route through hybrid.
+
+## Scenario 16 — The vocabulary, empty and then filled *(needs a person)*
+
+With subsector and interest lists empty, complete a profile leaving every taxonomy field blank and
+confirm the product works fully. Then, as a platform operator, add a subsector and an interest and
+confirm they become selectable **with no deployment**. As a conference organizer, confirm the
+vocabulary destination is not reachable at all.
+
+## Scenario 17 — The three widths, and a screen-reader pass *(needs a person)*
+
+The fifth administrative destination and the roster at 390px, 768px and 1280px. The remaining-places
+figure on an Agenda row at 390px **without truncating the session title**. Confirm remaining places is
+conveyed as text rather than by colour or a bar alone.
+
+## What this walkthrough does not cover
+
+The lock-wait path under real contention, which needs load rather than a walkthrough; and register
+entry 4's underlying question, which this escalates rather than answers.
