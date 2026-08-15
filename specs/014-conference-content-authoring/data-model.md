@@ -162,6 +162,38 @@ explain. `0010` stays empty, and the README gains a fourth section saying so.
 **Two departures to state** (CLAUDE.md's roadmap rule): the roadmap reserves `0012` for 015 and
 directs 012 to `0010`. O4 voids both, and the roadmap's table is extended in this same change.
 
+## Lock strategy (T109, R19)
+
+Drizzle wraps **all pending migrations and all their statements in one transaction**
+(`dialect.cjs`), so every lock is held from the statement that takes it until COMMIT of the whole
+run, `CREATE INDEX CONCURRENTLY` is unavailable, and splitting into two files buys nothing. The
+migration connection carries `lock_timeout` 10s (`migrate.ts`) and deliberately **no**
+`statement_timeout` — a migration prefers to abort loudly on a *wait* while its own work may
+legitimately take time. `deploy.sh` migrates while the old container still serves, so an
+`ACCESS EXCLUSIVE` on `sessions` or `events` is a read outage for the run's duration; the strategy
+is therefore **short enough that the hold does not matter**, achieved by five clauses:
+
+1. Every added `NOT NULL` column takes a **constant** default (`'in-person'`, `'mandatory'`) —
+   PG 11's missing-value fast path, no rewrite — and drops it in the same migration.
+2. **No statement scales with attendee-generated data.** `attendee_interests` is untouched (its
+   PK contains the text column, and any model nulling it would rebuild a unique index over every
+   interest row in the product under `ACCESS EXCLUSIVE`). The largest scan is the audit-action
+   CHECK re-add, bounded by the 365-day retention sweep.
+3. `DROP NOT NULL` on `sessions.room_id` flips `pg_attribute.attnotnull` — catalog-only, no scan,
+   no index rebuild.
+4. New tables and their indexes lock only objects nobody else can see; the one lock on a hot
+   table they add is `SHARE ROW EXCLUSIVE` on `attendees` for `session_enrolments`' FK, which
+   blocks attendee writes (not reads) for the remainder of the run.
+5. **No `CONCURRENTLY`, no `NOT VALID`, no hand-split index migration** — the first two are
+   unavailable inside the single transaction / not emitted by drizzle-kit, and the table sizes
+   (events: one row per conference; sessions: hundreds) do not justify hand-edited SQL that the
+   next regeneration would erase.
+
+Two rules are **not** CHECK constraints and are write-path-only by necessity: FR-1050a (modality
+decides room-vs-link — a CHECK cannot reference `events.modality`) and FR-1061a (capacity floor —
+cross-table aggregate, prescribed as a locked read inside the updating transaction). Both are
+tested as write-path rules; only FR-1050's room-or-link half is a table CHECK.
+
 ## New tables
 
 | Table | Holds | Scoping | Why that scoping |

@@ -69,6 +69,9 @@ describe('creating a conference (T079, T080, FR-1007, FR-1008, FR-1010)', () => 
     startsOn: '2028-05-01',
     endsOn: '2028-05-03',
     timezone: 'Europe/Madrid',
+    // T191 (014 tranche 2, FR-1059b): creation now collects an explicit modality — FR-1007's
+    // field list is extended by the tranche, not contradicted. Omitting it is its own test.
+    modality: 'in-person',
   })
 
   const create = (cookie: string, name: string) =>
@@ -92,6 +95,37 @@ describe('creating a conference (T079, T080, FR-1007, FR-1008, FR-1010)', () => 
       .where(eq(events.id, response.json().id as string))
     expect(row?.name).toBe('A Platform-Created Conference')
     expect(row?.timezone).toBe('Europe/Madrid')
+  })
+
+  /**
+   * T186 (014 tranche 2) — **creation without an explicit modality refuses with its OWN code**
+   * (FR-1059b), never a generic `validation_failed`: the route schema deliberately does not
+   * list `modality` as `required`, because the schema validator folds every omission into one
+   * code and FR-1048's no-default rule deserves a refusal that says which omission it means.
+   * This is the write path that makes "no neutral default and no fourth value" real — without
+   * it, dropping the column default would just have moved the silent default into the route.
+   */
+  it('refuses creation without an explicit modality, with modality_missing (FR-1059b)', async () => {
+    const cookie = await platformSession(app)
+    const { modality: _omitted, ...withoutModality } = body('No Modality Chosen')
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/admin/conferences',
+      headers: { cookie },
+      payload: withoutModality,
+    })
+
+    expect(response.statusCode).toBe(400)
+    const refusal = response.json() as { code: string; message: string }
+    expect(refusal.code).toBe('modality_missing')
+    // The sentence explains the rule rather than restating the omission: there is no default,
+    // deliberately, and the reader is told why rather than told "required".
+    expect(refusal.message).toMatch(/no default/i)
+
+    // And nothing was created: the refusal happened before the insert.
+    const rows = await getDb().select().from(events).where(eq(events.name, 'No Modality Chosen'))
+    expect(rows).toHaveLength(0)
   })
 
   it('lets a CONFERENCE ORGANIZER create one (FR-1008, decision 47)', async () => {

@@ -384,6 +384,9 @@ export const catalogSeed: SeedModule = {
             summary: session.summary,
             startsAt: instantAt(dates.startsOn, dates.timezone, session.day, session.startsAt),
             endsAt: instantAt(dates.startsOn, dates.timezone, session.day, session.endsAt),
+            // FR-1060: the seeded programme predates optional sessions; every session that
+            // existed before the kind arrived is mandatory.
+            kind: 'mandatory',
           })
           .returning()
 

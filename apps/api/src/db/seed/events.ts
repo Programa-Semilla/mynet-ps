@@ -59,6 +59,11 @@ export const SEED_EVENTS = [
     endsOn: '2026-09-17',
     timezone: 'Europe/Madrid',
     joinCode: 'PDS-2026',
+    // FR-1048: every conference carries an explicit modality; the seeded programmes all carry
+    // rooms, which is what in-person requires (FR-1050a). Virtual/hybrid fixtures are created
+    // by the tests that need them rather than seeded, so the two disjoint programmes and the
+    // deliberately empty third conference keep their shipped meaning.
+    modality: 'in-person',
   },
   {
     name: 'Frontend Horizons',
@@ -67,6 +72,7 @@ export const SEED_EVENTS = [
     endsOn: '2026-10-07',
     timezone: 'Europe/Lisbon',
     joinCode: 'FH-2026',
+    modality: 'in-person',
   },
   {
     name: 'Systems & Scale',
@@ -75,6 +81,7 @@ export const SEED_EVENTS = [
     endsOn: '2026-11-13',
     timezone: 'Europe/Berlin',
     joinCode: 'SS-2026',
+    modality: 'in-person',
   },
 ] as const
 

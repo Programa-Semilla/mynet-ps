@@ -139,6 +139,7 @@ describe('conference isolation in authoring (T028, FR-1005)', () => {
         title: 'Not yours',
         startsAt: new Date('2027-03-01T09:00:00.000Z'),
         endsAt: new Date('2027-03-01T10:00:00.000Z'),
+        kind: 'mandatory',
       })
       .returning({ id: sessions.id })
 

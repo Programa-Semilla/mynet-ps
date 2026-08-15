@@ -522,6 +522,26 @@ export const THRESHOLDS: Record<ThrottleAction, ActionThreshold> = {
   },
 
   /**
+   * T139 (014 tranche 2) — **taking a place in an optional session** (research R12).
+   *
+   * ─────────────────────────────────────────────────────────────────────────────────────────
+   * The one entry in this table whose subject is a LOCK rather than work: enrolment
+   * serialises on an exclusive session-row lock, and this bounds how fast one account can
+   * queue on it. Sixty an hour is a person changing their mind all afternoon; a script
+   * hammering the last place is what the bound is for, because the failure it produces — a
+   * `lock_timeout` — surfaces as a 500 the client must never mistake for "full".
+   *
+   * `mayDeny: true` on the standard authenticated reasoning: keyed on the acting attendee, so
+   * a denial can only ever fall on the person doing the thing.
+   * ─────────────────────────────────────────────────────────────────────────────────────────
+   */
+  session_enrol: {
+    identifier: { freeAttempts: 60, ceilingMs: IDENTIFIER_MAX_DELAY_MS },
+    source: { freeAttempts: 600, ceilingMs: SOURCE_MAX_DELAY_MS },
+    mayDeny: true,
+  },
+
+  /**
    * T071 (009) — submitting a report (FR-746, research R8).
    *
    * ═════════════════════════════════════════════════════════════════════════════════════════
@@ -861,6 +881,22 @@ export const THRESHOLDS: Record<ThrottleAction, ActionThreshold> = {
    * creates every room and every speaker in one sitting.
    */
   catalog_write: {
+    identifier: { freeAttempts: 120, ceilingMs: IDENTIFIER_MAX_DELAY_MS },
+    source: { freeAttempts: 600, ceilingMs: SOURCE_MAX_DELAY_MS },
+    mayDeny: true,
+  },
+
+  /**
+   * 014 tranche 2 — writing the vocabulary: sectors, subsectors and interest options
+   * (FR-1089, R20).
+   *
+   * As generous as `catalog_write` and for its reason: an operator entering the client's
+   * subsector and interest lists when they finally arrive types them in one sitting, and that
+   * sitting is the whole legitimate workload this surface will ever see. Platform tier only and
+   * keyed on the operator's own identity, so a denial can only inconvenience the person
+   * authoring — which is what makes `mayDeny: true` legitimate here as on every act bound.
+   */
+  vocabulary_write: {
     identifier: { freeAttempts: 120, ceilingMs: IDENTIFIER_MAX_DELAY_MS },
     source: { freeAttempts: 600, ceilingMs: SOURCE_MAX_DELAY_MS },
     mayDeny: true,

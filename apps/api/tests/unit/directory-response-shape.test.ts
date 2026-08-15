@@ -128,6 +128,10 @@ describe('the directory response cannot carry an address or verification state (
       (page['attendees'] as Record<string, unknown>)['items'] as Record<string, unknown>
     )['properties'] as Record<string, unknown>
 
+    // T180 (014 tranche 2) — `productiveActivity` joined the card deliberately (FR-1099d): the
+    // description is searchable, so it must be readable. Sector and subsector are deliberately
+    // NOT here — their route into Discover is the open filter question (FR-1099, T214), and a
+    // field added to this list is how that question would get answered by accident.
     expect(Object.keys(entry).sort()).toEqual(
       [
         'attendeeId',
@@ -138,6 +142,7 @@ describe('the directory response cannot carry an address or verification state (
         'headline',
         'interests',
         'networkingIntent',
+        'productiveActivity',
         'role',
         'sharedInterestCount',
       ].sort(),

@@ -235,6 +235,32 @@ export const THROTTLE_ACTIONS = [
   'session_delete',
   'catalog_write',
   'session_notify',
+
+  // ───────────────────────────────────────────────────────────────────────────────────────
+  // 014 tranche 2 — T139, research R12. **This one exists to bound a LOCK, not work.**
+  //
+  // Taking a place serialises on an exclusive session-row lock (the only shape that can
+  // express a cardinality bound), and the one failure that design cannot make distinguishable
+  // is a `lock_timeout` — which surfaces as a 500 and must never be classified as "full".
+  // This action bounds the rate at which one account can queue on that lock, so a stampede
+  // that matters resolves in well under the 3s ceiling and a scripted one is delayed before
+  // it can turn anybody's enrolment into a 500. Authenticated, keyed on the acting attendee,
+  // `mayDeny: true` — `question_vote`'s reasoning: a denial can only fall on the actor.
+  // ───────────────────────────────────────────────────────────────────────────────────────
+  'session_enrol',
+
+  // ───────────────────────────────────────────────────────────────────────────────────────
+  // 014 tranche 2 — the vocabulary (FR-1089, R20). **One counter for all three lists**, on
+  // `catalog_write`'s reasoning for tracks, rooms and speakers: naming a value in a product-wide
+  // list is the same act at the same scale whichever list it lands in, and nothing distinguishes
+  // what a denial on one would cost from another. Platform tier only, keyed on the operator's
+  // own authenticated identity, so `mayDeny: true` can only inconvenience the person authoring.
+  //
+  // Its own counter rather than riding `catalog_write`, for the reason `conference_write` split
+  // off: that bucket is named for one conference's tracks, rooms and speakers, and a setup burst
+  // there must not spend the allowance for maintaining reference data the whole product reads.
+  // ───────────────────────────────────────────────────────────────────────────────────────
+  'vocabulary_write',
 ] as const
 
 export type ThrottleAction = (typeof THROTTLE_ACTIONS)[number]

@@ -329,3 +329,126 @@ turned out to be defects.)*
    misleads the next reader.
 6. **S1, S2, I11, I12, I13** — the compliance gaps. Each needs a decision about spec or code.
 7. The test findings (I19, I21–I24, M16) alongside whichever fix they cover.
+
+---
+
+# Part II — Deep Review Findings, Tranche 2
+
+**Date:** 2026-08-15
+**Branch:** spec/014-conference-content-authoring-tranche-2 (working tree, pre-commit)
+**Rounds:** 1 fix round + a narrowed round-2 re-review of every file the fixes touched
+**Gate Outcome:** PASS
+**Invocation:** quality-gate (review-code → deep review; ultracode authorized)
+
+Everything above this line is tranche 1's record, kept because CLAUDE.md and the constitution
+cite it. This part is tranche 2's, run after the full gates (`pnpm verify` and `verify:clean`,
+13/13) were green.
+
+## Stage 1 — spec compliance
+
+107 items (93 FRs, 14 SCs) reviewed by seven parallel agents, every non-compliance claim
+adversarially verified. **One deviation found and upheld: FR-1047** — format's behavioural
+inertness was required to be *asserted as an absence*, no guard existed, and the `events.ts`
+header claimed one did (`authoring-absences`) — 013's false-header class. **Fixed before Stage
+2**: a three-prong guard now exists (write-path allow-list over `apps/api/src` with a
+calibrated pattern and self-tested exclusions; a contract walk proving only `/admin` paths
+declare a `format` property; a both-clients scan confining the admin product to its three
+carrying surfaces), in `apps/api/tests/unit/authoring-absences.test.ts` and
+`apps/web/tests/unit/authoring-absences.test.tsx`, which makes the header true as written.
+Compliance after fix: **107/107**.
+
+## Stage 2 — five perspectives
+
+| Agent | Found | Fixed | Remaining | Status |
+|---|---|---|---|---|
+| Correctness | 5 (1 Imp, 3 Min, 1 Not) | 4 | 1 Notable | completed |
+| Architecture & Idioms | 4 (3 Imp, 1 Min) | 3 | 1 Minor | completed |
+| Security | 1 (1 Not) | 0 | 1 Notable | completed |
+| Production Readiness | 2 (1 Imp, 1 Min) | 2 | 0 | completed |
+| Test Quality | 8 (4 Imp, 4 Min) | 7 | 1 Minor | completed |
+| CodeRabbit (external) | — | — | — | skipped (CLI not installed) |
+| Copilot (external) | — | — | — | skipped (CLI not installed) |
+| Test Suite (regression) | 0 | — | — | passed (976 unit / 814 component / 1250 integration) |
+| **Total** | **20** | **16** | **2 Minor + 2 Notable** | |
+
+MVP: Test Quality (8 findings). The correctness and production-readiness agents independently
+converged on the same root cause from different ends (the unlocked conference-level checks),
+which is the same signal three agents gave 010 about its skipped test.
+
+## What was found and fixed — most transferable first
+
+1. **`saveSession` could commit a saved row onto an optional session** (Important,
+   correctness). The single-statement `INSERT … SELECT WHERE kind = 'mandatory'` evaluated its
+   guard against the statement snapshot, so a save racing an organizer's mandatory→optional
+   kind change could land after the flip — creating the exact "saved but holds no place" state
+   FR-1064 declares has no route, on a row the client could never remove (an optional session's
+   toggle only ever releases a place). `takePlace` was immune because it locks first;
+   `saveSession` locked nothing. **The commitment pair now share one discipline: the kind is
+   read under a lock inside the writing transaction, on both sides.**
+2. **The conference-level invariants had no lock, and a comment claimed MVCC provided one**
+   (Important, prod-readiness + correctness converging). `patchConference`'s orphan, timezone
+   and modality checks and the session writes' `conferenceModality`/`withinConferenceDays`
+   reads ran as plain SELECTs in READ COMMITTED — two transactions touching no common row, so a
+   room-only session validated against `hybrid` could commit beside a conference concurrently
+   patched to `in-person`, a state the product declares unrepresentable with no CHECK able to
+   catch it. The comment said "a modality change in flight blocks on ordinary MVCC" — MVCC
+   never blocks readers. **The conference row is now taken `FOR UPDATE` by `patchConference`
+   and `FOR SHARE` by both session-write readers**; share locks keep session writes concurrent
+   among themselves, and acquisition order stays events → sessions everywhere.
+3. **`sessions_kind_fields` passed NULL** (Minor, correctness — the `trim()`/`btrim` class).
+   `"capacity" >= 1` against NULL is NULL, and a CHECK passes on NULL — so the "last line of
+   defence" admitted an optional session with no capacity (which `refusalFor` reads as
+   unlimited enrolment) or no offset (which `enrolmentOpen` reads as permanently closed). The
+   optional branch now names presence explicitly, in all three representations (schema,
+   migration 0012, snapshot) — edited by hand under 0009's precedent, safe because 0012 has
+   reached no database beyond this branch.
+4. **Four fix-worthy false records** (Important ×3 + residues, architecture): four comment
+   clusters edited this tranche still cited the deleted `hasEngagement` as current fact —
+   including the coverage guard's own repair instructions, which directed the next feature to
+   extend a predicate that no longer exists; the admin option lists were declared "no
+   hand-typed copy exists to drift" while a hand-typed copy one file away had **already
+   diverged** (two hybrid labels); and `SESSION_KINDS` claimed a single-source relationship
+   nothing consumed. All rewritten or wired: the option lists live once in
+   `event-type-options.ts`, the route enum spreads `SESSION_KINDS`, and every surviving
+   `hasEngagement` mention is explicitly historical.
+5. **Concurrency polish**: `cancelSession` gained the `cancelledAt IS NULL` predicate its own
+   header claimed (two racing cancels no longer double-audit and double-dispatch);
+   `deleteTrack`/`deleteRoom` lock the parent row so a mundane two-editors race refuses tidily
+   instead of surfacing a raw 23503 as a 500.
+6. **Five test-coverage gaps closed** (test-quality): FR-1077b's `places_changed` refusal is
+   now driven server-side (stale figure, omitted figure, success control) plus a real
+   delete-vs-enrol race; the capacity-lowering race is proven against `updateSession`'s own
+   lock site (its header had claimed another file's proof covered it); SC-1025's deletion
+   silence is asserted both as a source-level absence over the DELETE handler (mutation-checked)
+   and as an observed empty sink; `not_saveable` joined the server's mutual-difference matrix
+   as its fifth member (the near-twin of `not_optional` the doctrine exists for); the
+   FR-1087×FR-1095b held-pair edge case has its test; the roster's "stable order" name has an
+   order assertion; `NOT_ENGAGEMENT` reasons are checked for FR-1078's mandated elements
+   rather than for length.
+
+## Remaining, deliberately
+
+- **Minor — vocabulary triplication** (`admin-vocabulary.ts`, nine near-identical functions):
+  a real divergence risk, but the refactor over a table descriptor is a structural change out
+  of proportion to a gate fix round; recorded here and left for a maintenance pass.
+- **Minor — two line-window absence guards** (`tranche2-absences.test.ts` FR-1056/T201
+  patterns match single-line co-occurrence): the guards hold today and their failure mode is
+  false-negative-under-reformat, not vacuous-by-construction; widening to statement scope is
+  noted for the same maintenance pass.
+
+## Notable observations (captured to brainstorm/idea-inbox.md)
+
+- **The roster read writes no audit entry** — the fourth privacy exception's disclosure moment
+  has no counterpart to 013's `disclose_report_content` precedent, and the audit-action CHECK
+  could not record one; either an action or a recorded reason should be decided.
+- **A held-retired-sector attendee cannot reach the live-subsector flow two server comments
+  say the client supports** — the choosable payload lacks the held sector's id↔label mapping,
+  so the delivered subsectors can never be shown.
+
+## Post-fix spec coverage
+
+The fix round deleted two things: `sessionKindInScope` (its behaviour moved inside
+`saveSession`'s locked read) and the admin dialogs' local option constants (moved to the shared
+module). Both compliance-relevant behaviours are re-verified by the suites that pin them
+(`agenda-saved`, `enrolment-refusals`, admin component tests) — **no requirement dropped;
+107/107 stands**, and the full unit/component/integration suites pass post-fix.

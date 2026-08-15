@@ -3,7 +3,7 @@ import type { FastifyInstance } from 'fastify'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 
 import { getDb } from '../../src/db/client.js'
-import { adminAuditEntries } from '../../src/db/schema/admin-audit.js'
+import { ADMIN_AUDIT_ACTIONS, adminAuditEntries } from '../../src/db/schema/admin-audit.js'
 import { sessions, tracks } from '../../src/db/schema/catalog.js'
 import { events } from '../../src/db/schema/events.js'
 import {
@@ -13,7 +13,14 @@ import {
   sessionBody,
   type AuthoringFixture,
 } from './authoring-fixtures.js'
-import { ADA, clearThrottle, SEED_PASSWORD, setupTestApp, teardown } from './helpers.js'
+import {
+  ADA,
+  clearThrottle,
+  SEED_PASSWORD,
+  resetDatabase,
+  setupTestApp,
+  teardown,
+} from './helpers.js'
 
 /**
  * T024 (014) — **an authoring act whose audit entry fails leaves no trace of the act** (FR-1037,
@@ -45,6 +52,9 @@ describe('an act and its audit entry commit together (T024, FR-1037, SC-1010)', 
 
   beforeAll(async () => {
     app = await setupTestApp()
+    // Shared-database prerequisite, stated rather than hoped for — the D19-recorded isolation
+    // weakness; see the identical note in the enrolment suites.
+    await resetDatabase()
   })
 
   afterAll(async () => {
@@ -86,13 +96,19 @@ describe('an act and its audit entry commit together (T024, FR-1037, SC-1010)', 
     await getDb().execute(sql`
       ALTER TABLE admin_audit_entries DROP CONSTRAINT IF EXISTS admin_audit_entries_action_valid
     `)
+    // ─────────────────────────────────────────────────────────────────────────────────────────
+    // **Derived from `ADMIN_AUDIT_ACTIONS`, never hand-copied** (014 tranche 2). This repair
+    // shipped as a fourteen-action literal, and the moment `0012` widened the real constraint
+    // to seventeen, every file that ran AFTER this one met a database whose constraint was two
+    // migrations old — the first vocabulary write 500'd in a suite that never touched this
+    // file. A restore that restores a copy is the drift the schema's own derived CHECK was
+    // rebuilt to kill, wearing a test's clothes.
+    // ─────────────────────────────────────────────────────────────────────────────────────────
     await getDb().execute(sql`
       ALTER TABLE admin_audit_entries
-      ADD CONSTRAINT admin_audit_entries_action_valid CHECK (action in (
-        'promote', 'demote', 'resolve_report', 'remove_question', 'deactivate_operator',
-        'disclose_report_content', 'create_conference', 'update_conference', 'write_catalog',
-        'delete_catalog', 'write_session', 'cancel_session', 'reinstate_session', 'delete_session'
-      ))
+      ADD CONSTRAINT admin_audit_entries_action_valid CHECK (action in (${sql.raw(
+        ADMIN_AUDIT_ACTIONS.map((action) => `'${action}'`).join(', '),
+      )}))
     `)
   }
 
@@ -200,6 +216,8 @@ describe('an act and its audit entry commit together (T024, FR-1037, SC-1010)', 
         startsOn: '2027-06-01',
         endsOn: '2027-06-02',
         timezone: 'UTC',
+        // T191 (014 tranche 2, FR-1059b): creation collects an explicit modality.
+        modality: 'in-person',
       },
     })
 

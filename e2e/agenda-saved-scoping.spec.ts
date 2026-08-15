@@ -44,9 +44,9 @@ test('a save made at one conference does not follow the attendee to another', as
   await expect(page.getByRole('heading', { level: 1, name: 'Agenda' })).toBeVisible()
 
   // The other conference's programme, with the other conference's saved set — which is empty.
-  await page.getByRole('radio', { name: 'Saved' }).check()
+  await page.getByRole('radio', { name: 'My agenda' }).check()
   await expect(
-    page.getByText(/nothing saved yet/i),
+    page.getByText(/nothing on your agenda yet/i),
     'A save made at one conference is meaningless at another, so this set must be empty.',
   ).toBeVisible()
   await expect(
@@ -61,14 +61,14 @@ test('a save made at one conference does not follow the attendee to another', as
   await page.getByRole('button', { name: `Save ${there} to your agenda` }).click()
   await expect(page.getByRole('button', { name: `Remove ${there} from your agenda` })).toBeVisible()
 
-  await page.getByRole('radio', { name: 'Saved' }).check()
+  await page.getByRole('radio', { name: 'My agenda' }).check()
   await expect(page.getByRole('heading', { level: 3 })).toHaveCount(1)
   await expect(page.getByRole('heading', { level: 3, name: there })).toBeVisible()
 
   // ── Switch back: the first conference's save is restored unchanged ─────────────────────
   await switchToAnotherConference(page, ADA)
   await goToAgenda(page)
-  await page.getByRole('radio', { name: 'Saved' }).check()
+  await page.getByRole('radio', { name: 'My agenda' }).check()
 
   await expect(page.getByRole('heading', { level: 3 })).toHaveCount(1)
   await expect(

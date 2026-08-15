@@ -6,6 +6,7 @@ import { ConferenceList } from './conferences/ConferenceList.js'
 import { OperatorList } from './conferences/OperatorList.js'
 import { ProgrammeEditor } from './conferences/ProgrammeEditor.js'
 import { ReportQueue } from './reports/ReportQueue.js'
+import { VocabularyScreen } from './vocabulary/VocabularyScreen.js'
 import { useAdminSession } from './session.js'
 import { AdminHome } from './shell/AdminHome.js'
 import { AdminShell } from './shell/AdminShell.js'
@@ -76,6 +77,12 @@ export const AdminRoutes = () => {
         <Route path="/reports" element={<ReportQueue />} />
         <Route path="/reports/:reportId" element={<ReportQueue />} />
         <Route path="/operators" element={<OperatorList />} />
+        {/*
+          014 tranche 2 — the vocabulary (FR-1089). No tier check here either, per the header:
+          an organizer who types the address renders the screen and every request it makes is
+          answered 404 by the server, exactly as /reports behaves for them.
+        */}
+        <Route path="/vocabulary" element={<VocabularyScreen />} />
         {/* Anything else returns to the overview rather than rendering a blank page. */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

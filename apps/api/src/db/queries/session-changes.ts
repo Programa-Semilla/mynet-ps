@@ -1,19 +1,21 @@
-import { and, eq, sql } from 'drizzle-orm'
+import { sql } from 'drizzle-orm'
 
 import { getDb } from '../client.js'
-import { savedSessions, sessionNotes } from '../schema/agenda.js'
+import { savedSessions, sessionEnrolments } from '../schema/agenda.js'
 import { sessions } from '../schema/catalog.js'
-import { questionVotes, sessionQuestions } from '../schema/questions.js'
 
 /**
  * T016, T068, T070 (014) — **what counts as engagement, what counts as a material change, and
  * who has to be told** (FR-1018a, FR-1026, FR-1028, FR-1034, research R4, R5).
  *
  * ═════════════════════════════════════════════════════════════════════════════════════════════
- * **THREE FUNCTIONS, AND THEY ARE HERE TOGETHER BECAUSE THEY ARE THE THREE QUESTIONS AN
- * ORGANIZER'S EDIT ASKS ABOUT ATTENDEES — NONE OF WHICH DISCLOSES ANYTHING ABOUT ONE.**
+ * **THE QUESTIONS AN ORGANIZER'S EDIT ASKS ABOUT ATTENDEES — NONE OF WHICH DISCLOSES ANYTHING
+ * ABOUT ONE.**
  *
- *   - `hasEngagement` — *may this session be deleted at all?* A boolean.
+ *   - `ENGAGEMENT_TABLES` — *which tables decide whether a session may be deleted.* The list
+ *     the coverage guard compares against the schema; the live counting happens in
+ *     `admin-catalog.ts`'s `countEngagement` (tranche 2 deleted the caller-less boolean probe
+ *     that used to sit beside it — see the note below `ENGAGEMENT_TABLES`).
  *   - `materialChangeOf` — *does this edit reach anybody's phone?* Pure; touches no database.
  *   - `attendeesToNotify` — *whose phone?* Identifiers, used to dispatch and never returned to
  *     any administrative surface.
@@ -52,7 +54,9 @@ export type MaterialChange = 'cancelled' | 'time' | 'room' | null
 /** The shape `materialChangeOf` compares. A subset of the session row, so callers can pass rows. */
 export interface SessionLogistics {
   readonly startsAt: Date
-  readonly roomId: string
+  // Nullable since 014 tranche 2 (FR-1049). A room appearing, disappearing or changing are all
+  // "the room changed" to somebody deciding where to go — the `!==` below covers all three.
+  readonly roomId: string | null
   readonly cancelledAt: Date | null
 }
 
@@ -131,39 +135,17 @@ export const ENGAGEMENT_TABLES = [
   'question_votes',
 ] as const
 
-/**
- * Whether anybody has engaged with this session.
+/*
+ * T148 (014 tranche 2, research R15) — **`hasEngagement` was DELETED here, deliberately.**
  *
- * **Takes an executor**, and every caller passes its transaction: the whole point of FR-1019a is
- * that this runs *inside* the deleting transaction, after the session row is locked. Called on
- * the pool it is still correct and no longer race-free, so the parameter is required rather than
- * defaulted — a default would make the unsafe call the shorter one to write.
- *
- * Four `EXISTS` sub-queries under one `SELECT`, short-circuiting left to right, rather than four
- * round trips: this runs while holding a row lock, and the lock is held for as long as the
- * statements take.
+ * It named itself the delete predicate and had zero callers and zero importers anywhere in the
+ * repository — a header asserting a call relationship that did not exist, which is 013's
+ * four-times-found defect class. The live predicate is `countEngagement` in `admin-catalog.ts`,
+ * whose boolean is derived by summing the four counts; `ENGAGEMENT_TABLES` above is what the
+ * coverage guard reads, and it survives on its own. Restoring a boolean probe would mean two
+ * expressions of one predicate again, which is what let them diverge in table coverage before
+ * the review composed them into one fragment.
  */
-export const hasEngagement = async (
-  sessionId: string,
-  tx: Pick<ReturnType<typeof getDb>, 'execute'>,
-): Promise<boolean> => {
-  const rows = await tx.execute<{ engaged: boolean }>(sql`
-    SELECT (
-      EXISTS (SELECT 1 FROM ${savedSessions} WHERE ${savedSessions.sessionId} = ${sessionId}::uuid)
-      OR EXISTS (SELECT 1 FROM ${sessionNotes} WHERE ${sessionNotes.sessionId} = ${sessionId}::uuid)
-      OR EXISTS (
-        SELECT 1 FROM ${sessionQuestions} WHERE ${sessionQuestions.sessionId} = ${sessionId}::uuid
-      )
-      OR EXISTS (
-        SELECT 1 FROM ${questionVotes}
-        JOIN ${sessionQuestions} ON ${sessionQuestions.id} = ${questionVotes.questionId}
-        WHERE ${sessionQuestions.sessionId} = ${sessionId}::uuid
-      )
-    ) AS engaged
-  `)
-
-  return rows[0]?.engaged === true
-}
 
 /** One attendee's share of an act: who to interrupt, and which of their saved sessions moved. */
 export interface NotifiableAttendee {
@@ -213,34 +195,60 @@ export interface NotifiableAttendee {
  * **Runs after the transaction commits** (research R3, R4). The audit entry must be committed
  * before this reads what points at it, or a dispatch could notify about an act that then rolled
  * back — and a fan-out held inside a transaction puts an HTTP push service's hang on a row lock.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────────────────────
+ * **T159 (014 tranche 2) — THE UNION WIDENS THE POPULATION, NOT THE TRIGGER SET, AND THE
+ * DISTINCTION IS WRITTEN DOWN NOWHERE ELSE IN THE SHIPPED PRODUCT** (FR-1079, FR-1079a).
+ *
+ * An attendee holding a PLACE in a session is notified on exactly the same terms as one who
+ * saved it — same three material changes, same one-notification-per-act coalescing, same
+ * silence for their own act. Without this, taking a place would mean being told LESS than
+ * bookmarking, and enrolment replaces saving (FR-1064), so a place-holder would be the only
+ * person in the conference told nothing when the room changed.
+ *
+ * What does NOT move: there are still exactly TWO triggers (a received message; a material
+ * change to a session the attendee has saved **or enrolled in**), and the second still means
+ * exactly three changes — cancelled, start time, room. Enrolling, withdrawing, enrolment
+ * closing, a capacity change and a change of closing offset all dispatch nothing: none of them
+ * changes where or whether the attendee must be somewhere, and a third trigger needs another
+ * amendment. `trigger-set-pinned.test.ts` asserts both halves over the source, because the
+ * module-counting guard cannot see a fourth change added to the predicate.
+ *
+ * `UNION ALL`, not `UNION`: the two branches cannot produce a duplicate pair — a session's kind
+ * decides which commitment exists (FR-1064), so no attendee holds both on one session — and
+ * the per-attendee grouping below would absorb one anyway. The mixed attendee — a save on one
+ * changed session and a place in another, both touched by one act — is the case the coalescing
+ * arithmetic could get wrong silently, and SC-1016a pins it: one notification, count = saves
+ * plus places.
+ * ─────────────────────────────────────────────────────────────────────────────────────────────
  */
 export const attendeesToNotify = async (
   actId: string,
   actorAttendeeId: string | null,
   eventId: string,
 ): Promise<NotifiableAttendee[]> => {
-  const rows = await getDb()
-    .select({ attendeeId: savedSessions.attendeeId, sessionId: savedSessions.sessionId })
-    .from(savedSessions)
-    .innerJoin(sessions, eq(sessions.id, savedSessions.sessionId))
-    .where(
-      and(
-        eq(sessions.eventId, eventId),
-        eq(sessions.lastChangeActId, actId),
-        actorAttendeeId === null
-          ? undefined
-          : sql`${savedSessions.attendeeId} <> ${actorAttendeeId}::uuid`,
-      ),
-    )
-    // A total order, so a coalesced payload's session list is stable between reads and a failing
-    // dispatch retried by hand produces the same body.
-    .orderBy(savedSessions.attendeeId, savedSessions.sessionId)
+  const rows = await getDb().execute<{ attendee_id: string; session_id: string }>(sql`
+    SELECT ss.attendee_id, ss.session_id
+    FROM ${savedSessions} ss
+    JOIN ${sessions} s ON s.id = ss.session_id
+    WHERE s.event_id = ${eventId}::uuid
+      AND s.last_change_act_id = ${actId}::uuid
+      AND (${actorAttendeeId}::uuid IS NULL OR ss.attendee_id <> ${actorAttendeeId}::uuid)
+    UNION ALL
+    SELECT se.attendee_id, se.session_id
+    FROM ${sessionEnrolments} se
+    JOIN ${sessions} s ON s.id = se.session_id
+    WHERE s.event_id = ${eventId}::uuid
+      AND s.last_change_act_id = ${actId}::uuid
+      AND (${actorAttendeeId}::uuid IS NULL OR se.attendee_id <> ${actorAttendeeId}::uuid)
+    ORDER BY attendee_id, session_id
+  `)
 
   const byAttendee = new Map<string, string[]>()
   for (const row of rows) {
-    const list = byAttendee.get(row.attendeeId) ?? []
-    list.push(row.sessionId)
-    byAttendee.set(row.attendeeId, list)
+    const list = byAttendee.get(row.attendee_id) ?? []
+    list.push(row.session_id)
+    byAttendee.set(row.attendee_id, list)
   }
 
   return [...byAttendee].map(([attendeeId, sessionIds]) => ({ attendeeId, sessionIds }))

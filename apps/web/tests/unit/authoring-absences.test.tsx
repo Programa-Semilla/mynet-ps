@@ -197,3 +197,69 @@ describe('014 — no aggregate and no change list in either client (FR-1031, SC-
     ).toBe(false)
   })
 })
+
+/**
+ * T110 (014 tranche 2) — **the client half of FR-1047: nothing in either product branches on
+ * the conference format.** The server half — the write-path allow-list and the contract walk
+ * proving no attendee route serialises it — is in `apps/api/tests/unit/authoring-absences.test.ts`.
+ *
+ * The attendee client cannot reference a value its contract never carries, so for `apps/web`
+ * this asserts a total absence. The administrative client legitimately COLLECTS and DISPLAYS
+ * the label — that is what a descriptive label is for — so its three carrying surfaces are
+ * named, and anything beyond them (a filter, an ordering, a conditional render keyed on it)
+ * fails here by existing.
+ *
+ * The pattern excludes the three unrelated meanings of the word this codebase already has: the
+ * `Intl` formatter CALL (`.format(instant)`), the JSON-schema KEYWORD (`format: 'uuid'`), and
+ * hyphenated flags (`--path-format`). The exclusions are self-tested, per 009's rule that a
+ * guard exercised only by the code that happens to exist stops guarding when it changes.
+ */
+describe('014 tranche 2 — no client branches on the conference format (FR-1047)', () => {
+  const CONFERENCE_FORMAT_REFERENCE = /(?<!-)\bformat\b(?!\s*\()(?!\s*:\s*['"])/
+
+  const ADMIN_FORMAT_SURFACES = [
+    'admin/app/conferences/CreateConferenceDialog.tsx',
+    'admin/app/conferences/ConferenceEditor.tsx',
+    'admin/app/conferences/ProgrammeEditor.tsx',
+  ]
+
+  it('recognises the shapes it exists to catch, and ignores the three legitimate ones', () => {
+    expect(CONFERENCE_FORMAT_REFERENCE.test('conference.format ?? null')).toBe(true)
+    expect(CONFERENCE_FORMAT_REFERENCE.test("format === 'hackathon'")).toBe(true)
+    expect(CONFERENCE_FORMAT_REFERENCE.test('sessions.filter((s) => s.format)')).toBe(true)
+
+    expect(CONFERENCE_FORMAT_REFERENCE.test('formatter.format(instant)')).toBe(false)
+    expect(CONFERENCE_FORMAT_REFERENCE.test("id: { type: 'string', format: 'uuid' }")).toBe(false)
+    expect(CONFERENCE_FORMAT_REFERENCE.test("['--path-format=absolute']")).toBe(false)
+  })
+
+  it('keeps the attendee client entirely free of the conference format', () => {
+    const web = BOTH_CLIENTS.filter(({ name }) => name.startsWith('web/'))
+    expect(
+      offenders(CONFERENCE_FORMAT_REFERENCE, web),
+      'The attendee client references the conference format — a value its contract never ' +
+        'carries. FR-1047 forbids anything branching on it, and the attendee product has no ' +
+        'legitimate use for the label at all.',
+    ).toEqual([])
+  })
+
+  it('confines the administrative client to its three carrying surfaces', () => {
+    const admin = BOTH_CLIENTS.filter(({ name }) => name.startsWith('admin/'))
+    const referencing = offenders(CONFERENCE_FORMAT_REFERENCE, admin)
+
+    expect(
+      referencing.filter((name) => !ADMIN_FORMAT_SURFACES.includes(name)),
+      'A new administrative surface references the conference format. Collecting and ' +
+        'displaying the label is its purpose; a filter, an ordering or a conditional keyed on ' +
+        'it is the second modality FR-1047 forbids. If this is a new display surface, adding ' +
+        'it to ADMIN_FORMAT_SURFACES is the conversation.',
+    ).toEqual([])
+
+    // Non-vacuity: the named surfaces do carry it, or the pattern has rotted.
+    for (const surface of ADMIN_FORMAT_SURFACES) {
+      expect(referencing, `${surface} no longer references format — the list is stale`).toContain(
+        surface,
+      )
+    }
+  })
+})

@@ -1,10 +1,14 @@
+import { eq } from 'drizzle-orm'
 import type { FastifyInstance } from 'fastify'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 
+import { getDb } from '../../src/db/client.js'
+import { sectors, subsectors } from '../../src/db/schema/vocabulary.js'
 import {
   ADA,
   clearThrottle,
   cookieHeader,
+  ensureInterestOptions,
   resetDatabase,
   SEED_PASSWORD,
   sessionCookieFrom,
@@ -35,6 +39,11 @@ describe('authored profile fields are durable (SC-302)', () => {
     company: 'Analytical Engines & Co',
     role: 'Principal Analyst',
     headline: 'Notes on the Analytical Engine, and what follows from them.',
+    // T174 (014 tranche 2) — the taxonomy fields are attendee-authored too, so SC-302's 100%
+    // covers them. Sector is a seeded value; the subsector is made choosable in `beforeAll`.
+    sector: 'Servicios',
+    subsector: 'Consultoría',
+    productiveActivity: 'Notes, mostly, and the occasional engine.',
     networkingIntent: 'open_to_meetings',
     availability: 'available',
     interests: ['Numerical methods', 'Poetry', 'Compilers'],
@@ -43,6 +52,17 @@ describe('authored profile fields are durable (SC-302)', () => {
   beforeAll(async () => {
     app = await setupTestApp()
     await resetDatabase()
+    // T174 (014 tranche 2) — a new interest is chosen, not typed (FR-1088); the labels this
+    // suite writes through the route are made choosable so its subject stays persistence.
+    await ensureInterestOptions(['Numerical methods', 'Poetry', 'Compilers'])
+    // And one choosable subsector of the seeded "Servicios", for DRAFT's taxonomy fields.
+    const servicios = (
+      await getDb().select().from(sectors).where(eq(sectors.label, 'Servicios'))
+    )[0]!
+    await getDb()
+      .insert(subsectors)
+      .values({ sectorId: servicios.id, label: 'Consultoría' })
+      .onConflictDoNothing()
   })
 
   afterAll(async () => {

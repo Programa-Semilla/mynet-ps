@@ -28,6 +28,7 @@ export const anAttendee = (overrides: Partial<DirectoryEntry> = {}): DirectoryEn
   company: 'Peña & Asociados',
   role: 'Designer',
   headline: 'Design systems for large teams.',
+  productiveActivity: null,
   networkingIntent: 'open_to_meetings',
   availability: 'available',
   interests: ['Design systems', 'Accessibility'],

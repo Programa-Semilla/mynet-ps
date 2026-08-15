@@ -55,6 +55,20 @@ const NOT_ATTENDEE_DATA: Record<string, string> = {
   session_speakers: 'A join between two pieces of seeded conference content (002).',
 
   /**
+   * T213 (014 tranche 2) — **reference data, not attendee data** (FR-1085a): product-wide
+   * labels authored at platform tier, naming no attendee and cascading from none. An attendee's
+   * CHOSEN sector/subsector/interests live on `attendee_profiles` and `attendee_interests`,
+   * both of which cascade — so erasure destroys the selection while the vocabulary survives,
+   * which is the correct asymmetry: retiring or deleting a label must never write to an
+   * attendee record (FR-1094), and deleting an attendee must never edit the product's
+   * vocabulary. Nothing survives a deletion de-attributed (FR-1098): no per-sector count and no
+   * aggregate exists to retain a trace.
+   */
+  vocabulary_sectors: 'Product-wide reference data (FR-1085a) — see the block comment above.',
+  vocabulary_subsectors: 'Product-wide reference data (FR-1085a) — see the block comment above.',
+  vocabulary_interests: 'Product-wide reference data (FR-1085a) — see the block comment above.',
+
+  /**
    * T017 (007) — **the only one of 007's seven tables that needs an entry here, and the
    * emptiness that earns it is deliberate rather than incidental** (FR-575, FR-576,
    * data-model.md).

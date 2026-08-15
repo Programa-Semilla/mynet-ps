@@ -74,6 +74,14 @@ export interface DirectoryEntry {
   readonly company: string | null
   readonly role: string | null
   readonly headline: string | null
+  /**
+   * T180 (014 tranche 2) — the productive-activity description (FR-1099d): on the card because
+   * it joined the free-text search, and a description somebody can search for is one they must
+   * also be able to read. Absent entirely when unset — no empty line, no placeholder (FR-1092).
+   * Sector and subsector are deliberately NOT here: their route into Discover is the open
+   * filter question (FR-1099, T214).
+   */
+  readonly productiveActivity: string | null
   readonly networkingIntent: string | null
   readonly availability: 'available' | 'busy' | null
   readonly interests: readonly string[]
@@ -141,6 +149,14 @@ export interface VisibleProfile {
   readonly company: string | null
   readonly role: string | null
   readonly headline: string | null
+  /**
+   * T179 (014 tranche 2) — the taxonomy, shown only where set (FR-1092): an unset field is
+   * absent from the view, never a blank row or a dash. Governed by the one visibility decision
+   * this whole shape already answers to (FR-1097) — no field here has its own audience.
+   */
+  readonly sector: string | null
+  readonly subsector: string | null
+  readonly productiveActivity: string | null
   readonly networkingIntent: string | null
   readonly availability: 'available' | 'busy' | null
   readonly interests: readonly string[]

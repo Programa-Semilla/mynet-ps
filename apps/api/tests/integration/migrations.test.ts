@@ -701,3 +701,117 @@ describe('migration 0005 — the directory indexes', () => {
     expect(rows[0]?.folded).toBe('munoz')
   })
 })
+
+/**
+ * T115 (014 tranche 2) — **migration `0012`'s structural truths, over `pg_catalog`** (research
+ * R19's own prescription: assertions in this file's established shape, because a behavioural
+ * test can pass against a table that acquired its constraints some other way).
+ *
+ * Numbered `0012` while `0010` stays permanently empty — the journal's fourth recorded skew,
+ * documented in `migrations/meta/README.md` §4. What this block pins is the half a hand-edited
+ * migration could silently lose on regeneration: the nullable room, the constant-default
+ * back-fills having DROPPED their defaults, the new CHECKs, and the enrolment cascades from
+ * BOTH parents.
+ */
+describe('migration 0012 — conference authoring, tranche 2', () => {
+  it('made sessions.room_id nullable (FR-1049) and dropped both back-fill defaults (FR-1048, FR-1060)', async () => {
+    const rows = await getDb().execute<{ attname: string; attnotnull: boolean; hasdef: boolean }>(
+      sql`
+        SELECT a.attname, a.attnotnull, (d.adbin IS NOT NULL) AS hasdef
+        FROM pg_attribute a
+        LEFT JOIN pg_attrdef d ON d.adrelid = a.attrelid AND d.adnum = a.attnum
+        WHERE a.attrelid IN ('sessions'::regclass, 'events'::regclass)
+          AND a.attname IN ('room_id', 'kind', 'modality')
+      `,
+    )
+    const byName = new Map(rows.map((row) => [row.attname, row]))
+
+    expect(byName.get('room_id')?.attnotnull, 'room_id must be nullable').toBe(false)
+    // The back-fill pattern: a CONSTANT default applied so existing rows stay valid, dropped in
+    // the same migration — a column that keeps a silent default is how a wrong value ships
+    // unnoticed (the events.timezone precedent, FR-1048's own words).
+    expect(byName.get('kind')?.attnotnull).toBe(true)
+    expect(byName.get('kind')?.hasdef, 'sessions.kind must not keep its back-fill default').toBe(
+      false,
+    )
+    expect(byName.get('modality')?.attnotnull).toBe(true)
+    expect(
+      byName.get('modality')?.hasdef,
+      'events.modality must not keep its back-fill default',
+    ).toBe(false)
+  })
+
+  it('carries every tranche-2 CHECK, including the two-layer last lines of defence', async () => {
+    const rows = await getDb().execute<{ conname: string }>(sql`
+      SELECT conname FROM pg_constraint
+      WHERE conname IN (
+        'sessions_room_or_link', 'sessions_kind_fields', 'sessions_access_link_https',
+        'events_modality_valid', 'events_format_valid',
+        'attendee_profiles_sector_length', 'attendee_profiles_subsector_length',
+        'attendee_profiles_productive_activity_length',
+        'vocabulary_sectors_label_length', 'vocabulary_subsectors_label_length',
+        'vocabulary_interests_label_length'
+      )
+    `)
+    expect(rows.map((row) => row.conname).sort()).toHaveLength(11)
+  })
+
+  it('cascades session_enrolments from BOTH parents, and keys it as the idempotency (FR-1081a)', async () => {
+    const rows = await getDb().execute<{ conname: string; confdeltype: string; def: string }>(sql`
+      SELECT conname, confdeltype, pg_get_constraintdef(oid) AS def
+      FROM pg_constraint
+      WHERE conrelid = 'session_enrolments'::regclass AND contype = 'f'
+      ORDER BY conname
+    `)
+
+    // Two foreign keys, both `ON DELETE CASCADE` ('c'): erasure reaches a held place through the
+    // attendee, and deleting a session destroys its places — the ratified O2 cost, which the
+    // referential rules must not quietly soften into RESTRICT.
+    expect(rows).toHaveLength(2)
+    for (const row of rows) expect(row.confdeltype).toBe('c')
+
+    const pk = await getDb().execute<{ def: string }>(sql`
+      SELECT pg_get_constraintdef(oid) AS def
+      FROM pg_constraint
+      WHERE conrelid = 'session_enrolments'::regclass AND contype = 'p'
+    `)
+    expect(pk[0]?.def).toContain('(attendee_id, session_id)')
+  })
+
+  it('refuses the kind/fields combinations at the database, with the route bypassed (FR-1062a)', async () => {
+    // 009's btrim lesson: the two layers are asserted separately. A mandatory session carrying
+    // a capacity must be refused by the COLUMN constraint even when the write path is not the
+    // one holding the rule.
+    const [event] = await getDb().execute<{ id: string; track: string; room: string }>(sql`
+      SELECT e.id, t.id AS track, r.id AS room
+      FROM events e
+      JOIN tracks t ON t.event_id = e.id
+      JOIN rooms r ON r.event_id = e.id
+      LIMIT 1
+    `)
+
+    expect(
+      await refusedBy(
+        getDb().execute(sql`
+          INSERT INTO sessions (event_id, track_id, room_id, title, starts_at, ends_at, kind,
+                                capacity)
+          VALUES (${event?.id}::uuid, ${event?.track}::uuid, ${event?.room}::uuid,
+                  'Mandatory With Capacity', now(), now() + interval '1 hour',
+                  'mandatory', 10)
+        `),
+      ),
+    ).toBe('sessions_kind_fields')
+
+    expect(
+      await refusedBy(
+        getDb().execute(sql`
+          INSERT INTO sessions (event_id, track_id, room_id, title, starts_at, ends_at, kind,
+                                capacity, enrolment_closing_offset_hours, access_link)
+          VALUES (${event?.id}::uuid, ${event?.track}::uuid, ${event?.room}::uuid,
+                  'Insecure Link', now(), now() + interval '1 hour',
+                  'optional', 10, 0, 'http://not-https.example')
+        `),
+      ),
+    ).toBe('sessions_access_link_https')
+  })
+})

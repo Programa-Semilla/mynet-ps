@@ -64,6 +64,8 @@ export const catalogRoutes = async (app: FastifyInstance): Promise<void> => {
                 'startsAt',
                 'endsAt',
                 'cancelled',
+                'kind',
+                'accessLink',
                 'track',
                 'room',
                 'speakers',
@@ -80,6 +82,17 @@ export const catalogRoutes = async (app: FastifyInstance): Promise<void> => {
                   description:
                     'T053 (014), FR-1020 and FR-1022. A cancelled session is **presented, not withheld**: it stays in the programme, in Agenda, in the detail panel and in Home’s rest-of-day timeline, marked. An attendee who saved it needs to see that it will not happen, and a session that simply vanished would be indistinguishable from one they misremembered. Home’s "Up next" is the single exception and skips it (FR-1022a), because that card answers *where do I go now*.',
                 },
+                kind: {
+                  type: 'string',
+                  enum: ['mandatory', 'optional'],
+                  description:
+                    'T193 (014 tranche 2), FR-1060/FR-1063. The kind decides the identity of the ONE commitment control an attendee sees: a mandatory session is saved, an optional one is enrolled in, and enrolment replaces saving. **Capacity is deliberately absent from this payload**: the programme is cached client-side, and a cached seat count reads as a promise of a place — the live figure comes from `GET …/sessions/{sessionId}/places` alone (FR-1070b).',
+                },
+                accessLink: {
+                  type: ['string', 'null'],
+                  description:
+                    'T193 (014 tranche 2), FR-1052. Where a virtual or hybrid session is attended — `https:` only, validated at the write path. Null for an in-person session, and the client renders no link line at all for it (SC-1022). In person, virtual or both is DERIVED from room and link, never stored (FR-1051).',
+                },
                 track: {
                   type: 'object',
                   required: ['id', 'name', 'colorToken'],
@@ -95,7 +108,9 @@ export const catalogRoutes = async (app: FastifyInstance): Promise<void> => {
                   },
                 },
                 room: {
-                  type: 'object',
+                  type: ['object', 'null'],
+                  description:
+                    'T193 (014 tranche 2) — null when the session carries no room (a virtual session, SC-1022). Never an empty-named placeholder: the client renders no room line at all. The schema constraint `sessions_room_or_link` guarantees at least one of room and accessLink exists.',
                   required: ['id', 'name'],
                   additionalProperties: false,
                   properties: {

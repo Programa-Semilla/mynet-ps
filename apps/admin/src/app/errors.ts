@@ -66,6 +66,34 @@ export type AdminFailure =
   | 'unknown_timezone'
   | 'conference_ends_before_start'
   | 'malformed_time'
+  // 014 tranche 2 — the five vocabulary refusals (contracts/tranche-2.md). Each its own code,
+  // per this file's whole thesis: the two "held" refusals differ in what to do next (retire
+  // versus retire-plus-create), and folding them would hide exactly the sentence that teaches
+  // FR-1094's rule at the moment an operator meets it.
+  | 'vocabulary_label_taken'
+  | 'vocabulary_rename_held'
+  | 'vocabulary_delete_held'
+  | 'sector_retired'
+  | 'sector_has_subsectors'
+  // 014 tranche 2 — the optional-session refusals (FR-1059b, FR-1061–FR-1065, FR-1077b) and
+  // US8's modality and access-link refusals (FR-1050–FR-1053, FR-1058a, FR-1059a). Every one
+  // its own outcome: the derived-population test reads the server's `ErrorCode` union, so a
+  // code rendered as "Something went wrong" fails the build until somebody decides what an
+  // operator should read instead — the mechanism that would have caught this feature's own
+  // six-into-two collapse without anybody noticing first.
+  | 'modality_missing'
+  | 'capacity_invalid'
+  | 'closing_offset_invalid'
+  | 'mandatory_carries_no_places'
+  | 'capacity_below_held'
+  | 'kind_committed'
+  | 'places_changed'
+  | 'session_needs_room_or_link'
+  | 'modality_forbids_link'
+  | 'modality_forbids_room'
+  | 'access_link_invalid'
+  | 'access_link_committed'
+  | 'modality_conflicts_sessions'
   | 'unreachable'
   | 'unknown'
 
@@ -113,6 +141,45 @@ export const classify = (error: unknown): AdminFailure => {
         return 'conference_ends_before_start'
       case 'malformed_time':
         return 'malformed_time'
+      // 014 tranche 2 — the vocabulary's five. Their own codes are what make this switch able
+      // to tell them apart at all.
+      case 'vocabulary_label_taken':
+        return 'vocabulary_label_taken'
+      case 'vocabulary_rename_held':
+        return 'vocabulary_rename_held'
+      case 'vocabulary_delete_held':
+        return 'vocabulary_delete_held'
+      case 'sector_retired':
+        return 'sector_retired'
+      case 'sector_has_subsectors':
+        return 'sector_has_subsectors'
+      // 014 tranche 2 — the optional-session and modality refusals, one case per code.
+      case 'modality_missing':
+        return 'modality_missing'
+      case 'capacity_invalid':
+        return 'capacity_invalid'
+      case 'closing_offset_invalid':
+        return 'closing_offset_invalid'
+      case 'mandatory_carries_no_places':
+        return 'mandatory_carries_no_places'
+      case 'capacity_below_held':
+        return 'capacity_below_held'
+      case 'kind_committed':
+        return 'kind_committed'
+      case 'places_changed':
+        return 'places_changed'
+      case 'session_needs_room_or_link':
+        return 'session_needs_room_or_link'
+      case 'modality_forbids_link':
+        return 'modality_forbids_link'
+      case 'modality_forbids_room':
+        return 'modality_forbids_room'
+      case 'access_link_invalid':
+        return 'access_link_invalid'
+      case 'access_link_committed':
+        return 'access_link_committed'
+      case 'modality_conflicts_sessions':
+        return 'modality_conflicts_sessions'
       default:
         return 'unknown'
     }
@@ -148,7 +215,10 @@ export const classify = (error: unknown): AdminFailure => {
  * ═════════════════════════════════════════════════════════════════════════════════════════════
  */
 export interface RefusalDetail {
-  /** Named sessions a date-range change would orphan (FR-1014). The caller's own content. */
+  /**
+   * Named sessions a change would leave invalid: a date range that orphans them (FR-1014), or
+   * a modality they would violate (FR-1059a). The caller's own content in both cases.
+   */
   readonly sessions?: readonly { readonly id: string; readonly title: string }[]
   /** Counts behind a refused deletion (FR-1019, FR-1025). Counts only — nobody is identified. */
   readonly engagement?: {
@@ -157,6 +227,14 @@ export interface RefusalDetail {
     readonly questions: number
     readonly votes: number
   }
+  /**
+   * T149 (014 tranche 2) — the held-places figure behind `capacity_below_held` and
+   * `places_changed` (FR-1061a, FR-1077b). On `places_changed` it is load-bearing beyond the
+   * sentence: the confirmation must RE-PRESENT this figure and pass it back as `placesSeen`,
+   * or the organizer can never complete a delete while enrolment is moving. A count only,
+   * never identity (FR-1075a).
+   */
+  readonly placesHeld?: number
 }
 
 export const detailOf = (error: unknown): RefusalDetail => {
@@ -170,8 +248,13 @@ export const detailOf = (error: unknown): RefusalDetail => {
     details.engagement && typeof details.engagement === 'object'
       ? (details.engagement as RefusalDetail['engagement'])
       : undefined
+  const placesHeld = typeof details.placesHeld === 'number' ? details.placesHeld : undefined
 
-  return { ...(sessions ? { sessions } : {}), ...(engagement ? { engagement } : {}) }
+  return {
+    ...(sessions ? { sessions } : {}),
+    ...(engagement ? { engagement } : {}),
+    ...(placesHeld === undefined ? {} : { placesHeld }),
+  }
 }
 
 /**
@@ -243,6 +326,75 @@ export const describe = (failure: AdminFailure, detail: RefusalDetail = {}): str
       return 'The last day cannot be before the first. A one-day conference has the same date for both.'
     case 'malformed_time':
       return 'That is not a time this server can read. Check the date and time you entered.'
+
+    // ─────────────────────────────────────────────────────────────────────────────────────────
+    // 014 tranche 2 — the vocabulary's five. The two "held" sentences say THAT attendees hold
+    // the value and never how many: a number would be the per-value census FR-1099b forbids.
+    // ─────────────────────────────────────────────────────────────────────────────────────────
+    case 'vocabulary_label_taken':
+      return 'A value with that name already exists in this list. Reuse it, or rename the existing one.'
+    case 'vocabulary_rename_held':
+      return 'Attendees hold this value on their profiles, so its wording cannot change under them. Retire it and create the new wording instead — holders keep what they chose.'
+    case 'vocabulary_delete_held':
+      return 'Attendees hold this value on their profiles, so it cannot be deleted. Retire it instead — it stops being offered, and what anybody chose stays theirs.'
+    case 'sector_retired':
+      return 'That sector is retired, so a new subsector of it could never be chosen. Un-retire the sector first.'
+    case 'sector_has_subsectors':
+      return 'This sector still has subsectors. Delete or move them first, then remove it.'
+
+    // ─────────────────────────────────────────────────────────────────────────────────────────
+    // 014 tranche 2 — the optional-session and modality refusals. Same discipline as 014's
+    // six: each names the caller's own content and the next step, and every sentence differs
+    // from every other because the derived-population test asserts mutual difference.
+    // ─────────────────────────────────────────────────────────────────────────────────────────
+    case 'modality_missing':
+      return 'Say whether this conference is in person, virtual or hybrid. There is no default — a conference whose modality nobody chose is one whose sessions nobody can validate.'
+    case 'capacity_invalid':
+      return 'An optional session needs a maximum number of places — a whole number of at least one. A session nobody may take a place in is a cancelled session, and cancellation already exists.'
+    case 'closing_offset_invalid':
+      return 'An optional session needs an enrolment-closing offset: how many whole hours before it starts enrolment stops. Zero keeps it open until the session begins.'
+    case 'mandatory_carries_no_places':
+      return 'A mandatory session takes no enrolment, so it carries neither a capacity nor a closing offset. Make it optional if attendees should take places in it.'
+    case 'capacity_below_held': {
+      // FR-1061a — the server names how many places are held; nobody is evicted.
+      const held = detail.placesHeld
+      const figure =
+        held === undefined ? 'more places than that' : `${held} place${held === 1 ? '' : 's'}`
+      return `Attendees already hold ${figure} in this session, so the capacity cannot drop below that. Nobody is evicted — releasing a place is theirs to do, not yours.`
+    }
+    case 'kind_committed':
+      return 'Attendees have already committed to this session as it is — saved it, or taken a place — so its kind cannot change under them. Create the session you meant and let this one stand.'
+    case 'places_changed': {
+      // FR-1077b — re-presented rather than merely reported: the caller reads `placesHeld`
+      // from the detail and shows the new figure before asking again.
+      const held = detail.placesHeld
+      const figure = held === undefined ? 'more places' : `${held} place${held === 1 ? '' : 's'}`
+      return `More places were taken while you decided: attendees now hold ${figure}. Check the new figure before deleting — cancelling preserves everything.`
+    }
+    case 'session_needs_room_or_link':
+      return 'A session needs a room, a joining link, or both — with neither, nobody can attend it. Give it whichever this conference uses.'
+    case 'modality_forbids_link':
+      return 'This conference is in person, so its sessions carry a room and no joining link. To stream some sessions, make the conference hybrid first.'
+    case 'modality_forbids_room':
+      return 'This conference is virtual, so its sessions carry a joining link and no room. To hold some sessions in person, make the conference hybrid first.'
+    case 'access_link_invalid':
+      return 'That is not a link this product can publish. A joining link must be a complete https:// address — nothing else is accepted.'
+    case 'access_link_committed':
+      return 'Attendees have saved this session or hold places in it, so its joining link cannot be removed — they would arrive with nowhere to go and no notice. Correcting it to a new address is always allowed.'
+    case 'modality_conflicts_sessions': {
+      const named = detail.sessions ?? []
+      // FR-1059a — named, FR-1014's shape: an organizer told only "no" has to find the
+      // sessions by eye. Bounded at five, remainder counted, as `would_orphan_sessions` does.
+      const shown = named
+        .slice(0, 5)
+        .map((one) => one.title)
+        .join(', ')
+      const rest = named.length > 5 ? ` and ${named.length - 5} more` : ''
+
+      return named.length === 0
+        ? 'That change would leave sessions carrying the wrong thing for the new modality. Switch to hybrid first, adjust each session, then switch again.'
+        : `That change would leave these sessions carrying the wrong thing for the new modality: ${shown}${rest}. Switch to hybrid first, adjust them, then switch again.`
+    }
     case 'unreachable':
       return 'MyNet could not be reached. Nothing was changed — try again when you have a connection.'
     case 'unknown':

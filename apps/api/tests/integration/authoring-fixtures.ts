@@ -4,7 +4,7 @@ import type { FastifyInstance } from 'fastify'
 import { ADMIN_SESSION_COOKIE } from '../../src/admin/cookie.js'
 import { hashPassword } from '../../src/auth/password.js'
 import { getDb } from '../../src/db/client.js'
-import { savedSessions, sessionNotes } from '../../src/db/schema/agenda.js'
+import { savedSessions, sessionEnrolments, sessionNotes } from '../../src/db/schema/agenda.js'
 import { adminAuditEntries } from '../../src/db/schema/admin-audit.js'
 import { rooms, sessions, sessionSpeakers, speakers, tracks } from '../../src/db/schema/catalog.js'
 import { events, registrations } from '../../src/db/schema/events.js'
@@ -161,6 +161,10 @@ export const clearAuthoringFixture = async (app?: FastifyInstance): Promise<void
   await db.delete(sessionQuestions)
   await db.delete(sessionNotes)
   await db.delete(savedSessions)
+  // 014 tranche 2 — held places, cleared for the same reason as saves: enrolments on SEEDED
+  // sessions survive the fixture-conference sweep below (that sweep cascades only its own),
+  // and a dispatch assertion counting recipients must start from a known-empty commitment set.
+  await db.delete(sessionEnrolments)
   // Push subscriptions accumulate across a suite because `anEndpoint` mints a fresh one per call
   // — deliberately, so a re-registration test is testing a real second device. A dispatch
   // assertion counting deliveries therefore has to start from a known-empty set, or it counts
@@ -216,7 +220,16 @@ let codeCounter = 0
  */
 export const createConference = async (
   name: string,
-  options: { startsOn?: string; endsOn?: string; timezone?: string } = {},
+  options: {
+    startsOn?: string
+    endsOn?: string
+    timezone?: string
+    // 014 tranche 2 (US8) — a modality per conference, defaulting to the back-fill value every
+    // pre-existing test was written against (FR-1048). The fixture still builds a room either
+    // way: a virtual conference legitimately HAS rooms in its catalog; FR-1050a governs what a
+    // session carries, not what exists.
+    modality?: 'in-person' | 'virtual' | 'hybrid'
+  } = {},
 ): Promise<Conference> => {
   const db = getDb()
   codeCounter += 1
@@ -230,6 +243,7 @@ export const createConference = async (
       endsOn: options.endsOn ?? '2027-03-03',
       timezone: options.timezone ?? 'UTC',
       joinCode: `FIXTURE${codeCounter}`,
+      modality: options.modality ?? 'in-person',
     })
     .returning({ id: events.id })
 
@@ -264,8 +278,14 @@ export const sessionBody = (
     startsAt: string
     endsAt: string
     trackId: string
-    roomId: string
+    // 014 tranche 2 — nullable (FR-1049), and the link beside it (FR-1052); which of the two a
+    // session must carry follows the conference's modality (FR-1050a).
+    roomId: string | null
+    accessLink: string | null
     speakerIds: string[]
+    kind: 'mandatory' | 'optional'
+    capacity: number | null
+    enrolmentClosingOffsetHours: number | null
   }> = {},
 ): Record<string, unknown> => ({
   title: 'Opening Keynote',

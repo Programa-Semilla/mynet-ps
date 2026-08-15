@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
 import type { FastifyInstance } from 'fastify'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 
@@ -29,31 +29,37 @@ import {
 } from './helpers.js'
 
 /**
- * T064 (014) — **the boundary of the fan-out: a material change nobody saved reaches nobody**
- * (FR-1028).
+ * T064 (014) / T162 (tranche 2) — **the boundary of the fan-out: a material change to a session
+ * with NO SAVER AND NO HOLDER OF A PLACE reaches nobody** (FR-1028 as reworded by FR-1079b).
  *
  * ═════════════════════════════════════════════════════════════════════════════════════════════
- * **THE SAVED SET IS THE SUBSCRIPTION, AND THIS IS THE TEST THAT SAYS SO.**
+ * **THE COMMITMENT SET IS THE SUBSCRIPTION, AND THIS IS THE TEST THAT SAYS SO.**
  *
- * Constitution v5.2.0's N1 admits the second notification trigger for *a material change to a
- * session the attendee has **SAVED***, and the emphasis is the requirement. A conference has a
- * whole programme; an attendee has saved a handful of it. Dispatching on the programme rather
- * than on the saved set would turn one organizer fixing a room number into an interruption for
- * every registrant — which is the product v3.1.0's exclusion existed to prevent, arrived at from
- * a different direction.
+ * This file shipped as `dispatch-no-savers.test.ts`, guarding "a session no attendee has saved
+ * dispatches nothing" — and FR-1079 CONTRADICTED that sentence: a holder of a place is notified
+ * too, so the shipped rule read literally would have kept a place-held session silent. It was
+ * **re-scoped and renamed in the same change that widened the population** (T162, FR-1079b),
+ * because a guard written for one rule must not be mistaken for enforcement of the other: the
+ * boundary is now *no saver AND no holder*, and the fixture asserts both halves of that
+ * emptiness rather than assuming the second.
+ *
+ * What is unchanged is the reason the boundary matters. A conference has a whole programme; an
+ * attendee has committed to a handful of it. Dispatching on the programme rather than on the
+ * commitment set would turn one organizer fixing a room number into an interruption for every
+ * registrant — the product v3.1.0's exclusion existed to prevent.
  *
  * The failure mode this catches is **quiet and plausible**: a fan-out that joined registrations
- * instead of saves, or that fell back to "everybody at the conference" when the saved set came
- * back empty, would pass every other test in this feature. `dispatch-coalescing.test.ts` asserts
- * one notification per attendee; `dispatch-excludes-actor.test.ts` asserts the actor is left out.
- * Neither notices a fan-out that is too **wide**, because both give their attendee a save.
+ * instead of commitments, or that fell back to "everybody at the conference" when the set came
+ * back empty, would pass every other test in this feature — `dispatch-coalescing` and
+ * `dispatch-excludes-actor` both give their attendee a commitment, so neither notices a fan-out
+ * that is too **wide**. `notify-enrolled.test.ts` holds the positive half for places.
  *
- * So the assertion is the empty one, and it is made twice over: against the fan-out directly, and
- * against the sink after a real cancellation — because "nobody is notified" can be true of the
- * query and false of the route, and the route is where a well-meaning `else` branch would live.
+ * So the assertion is the empty one, and it is made twice over: against the fan-out directly,
+ * and against the sink after a real cancellation — because "nobody is notified" can be true of
+ * the query and false of the route, and the route is where a well-meaning `else` would live.
  * ═════════════════════════════════════════════════════════════════════════════════════════════
  */
-describe('a material change nobody saved (T064, FR-1028)', () => {
+describe('a material change nobody committed to (T064, T162, FR-1028, FR-1079b)', () => {
   let app: FastifyInstance
   const push = new SinkPushService()
 
@@ -132,7 +138,15 @@ describe('a material change nobody saved (T064, FR-1028)', () => {
     return row?.actId as string
   }
 
-  it('dispatches nothing when the changed session is in nobody’s saved set (FR-1028)', async () => {
+  it('dispatches nothing when the changed session is in nobody’s COMMITMENT set (FR-1028, T162)', async () => {
+    // T162 — the boundary is "no saver AND no holder of a place", and the second half must be
+    // asserted rather than assumed: a fixture that only proved the saved set empty would let an
+    // enrolment-joining fan-out pass this test for the wrong reason.
+    const held = await getDb().execute<{ n: number }>(sql`
+      SELECT count(*)::int AS n FROM session_enrolments WHERE session_id = ${unsavedId}::uuid
+    `)
+    expect(held[0]?.n, 'the fixture must hold no places on the session under test').toBe(0)
+
     const cancelled = await app.inject({
       method: 'POST',
       url: at(`/sessions/${unsavedId}/cancel`),
@@ -140,14 +154,15 @@ describe('a material change nobody saved (T064, FR-1028)', () => {
     })
 
     // The act itself succeeds. Nothing about the fan-out may gate the organizer's own work — a
-    // session nobody saved is the ordinary case early in a conference's life.
+    // session nobody committed to is the ordinary case early in a conference's life.
     expect(cancelled.statusCode).toBe(200)
 
     expect(
       push.delivered(),
-      'A material change to a session nobody saved produced a notification. The saved set IS ' +
-        'the subscription (v5.2.0 N1): dispatching on the programme instead would make one room ' +
-        'change an interruption for every registrant.',
+      'A material change to a session nobody saved or holds a place in produced a ' +
+        'notification. The commitment set IS the subscription (v5.2.0 N1, population widened ' +
+        'by FR-1079): dispatching on the programme instead would make one room change an ' +
+        'interruption for every registrant.',
     ).toHaveLength(0)
   })
 

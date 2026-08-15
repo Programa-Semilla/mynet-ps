@@ -6,6 +6,7 @@ import { getDb } from '../../src/db/client.js'
 import {
   clearThrottle,
   cookieHeader,
+  ensureInterestOptions,
   resetDatabase,
   SEED_EVENTS,
   sessionCookieFrom,
@@ -47,6 +48,9 @@ describe('withdrawing from a conference (FR-317c)', () => {
   beforeAll(async () => {
     app = await setupTestApp()
     await resetDatabase()
+    // T174 (014 tranche 2) — FR-1088: the profile this suite writes must survive withdrawal,
+    // so its interest label has to be choosable to be written at all.
+    await ensureInterestOptions(['Still interested'])
   })
 
   afterAll(async () => {

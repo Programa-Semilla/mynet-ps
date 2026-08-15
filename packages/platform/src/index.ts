@@ -69,8 +69,11 @@ export {
   // public to the conference, which are opposites worth keeping apart at the call site.
   useQuestionsRepository,
   // 007 — reporting conduct out of the product. Write-only (FR-548).
+  // T196 (014 tranche 2) — was `useSavedSessionRepository`; the set carries held places too.
+  useCommitmentRepository,
   useReportRepository,
-  useSavedSessionRepository,
   useSecureStorage,
   useSessionNotesRepository,
+  // 014 tranche 2 — the choosable vocabulary: cross-event reference data, deliberately uncached.
+  useVocabularyRepository,
 } from './hooks.js'

@@ -205,10 +205,10 @@ that difference is the scheduling slack available if D4 is ever relaxed.
 | 009 | Session Q&A | 005 | `0008` | — |
 | 010 | Brand Mark and Application Icons | — | — | — |
 | 011 | UAT Deployment and Pre-Public Hardening | all | — | — |
-| 012 | Launch Readiness and Production | 011 | `0010` *(reserved, unclaimed)* | — |
+| 012 | Launch Readiness and Production | 011 | — *(adds no schema; `0010` stays permanently empty — see below)* | — |
 | 013 | Administrative Foundation and the Report Queue | 009 | `0009` | — |
-| 014 | Conference Content Authoring | 013 | `0011` | — |
-| 015 | Registration and Attendee Management | 014 | `0012` *(reserved)* | — |
+| 014 | Conference Content Authoring | 013 | `0011` (tranche 1) · `0012` (tranche 2, claimed at generation 2026-08-14) | — |
+| 015 | Registration and Attendee Management | 014 | *claims at generation (O4); next free on disk is `0013`* | — |
 
 > ### The numbering above is **not** what this document originally reserved, and correcting it is
 > T102's whole point.
@@ -230,13 +230,19 @@ that difference is the scheduling slack available if D4 is ever relaxed.
 > **Two programmes are now interleaved and the table has to carry both**, which is exactly the
 > situation a reservation table exists for and the one it was silently failing at: it covered
 > neither programme in flight, so a feature reserving a number had nothing to read. `0009` is
-> 013's, `0010` is **reserved by 012 and still unclaimed** (it adds no schema yet), `0011` is 014's
-> and is applied, and `0012` is 015's.
+> 013's, `0011` is 014 tranche 1's, and `0012` is **014 tranche 2's, claimed at generation on
+> 2026-08-14** under O4 — the fourth numbering collision resolved by this table, extended here in
+> the same change per O4's rule.
 >
-> A phase still claims its number **when its spec is written**, not when its migration is
-> generated. What 013 and 014 add is that a phase in a *parallel programme* must read this table
-> and extend it in the same change, because the branch it would otherwise collide with is one
-> nobody can see from here.
+> **`0010` stays permanently empty, and it must not be "filled".** O4 voided 012's reservation of
+> it (012 adds no schema), and tranche 2 could not take it: `0012` redefines
+> `admin_audit_entries_action_valid` — the same named CHECK `0011` drops and re-adds — so the
+> literal "next free number" would have ordered a dependent migration before its dependency in
+> filename order. `apps/api/migrations/meta/README.md` section 4 records the skew this produced
+> (journal `idx: 11` ↔ tag `0012_…` ↔ `0011_snapshot.json`) and what the next generator must do.
+>
+> A phase in a *parallel programme* must read this table and extend it in the same change, because
+> the branch it would otherwise collide with is one nobody can see from here.
 
 **Messages (007) is the one difference.** Its hard dependency is 004 alone — it needs profiles to
 render participants, not Discover. It is scheduled after 006 because Discover is where a conversation

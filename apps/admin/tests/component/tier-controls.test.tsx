@@ -73,6 +73,31 @@ describe('what each tier is offered', () => {
     expect(screen.queryByRole('link', { name: /operators/i })).not.toBeInTheDocument()
   })
 
+  /**
+   * T176 (014 tranche 2) — the fifth destination follows the report queue's rule exactly
+   * (FR-1089, SC-1020). These two cases are hand-written per destination like the four above,
+   * because nothing derives them from `ADMIN_DESTINATIONS` — a platform-only entry added to the
+   * list without its pair here would be tier-hidden by the shell and asserted by nobody (R20).
+   */
+  it('offers a platform operator the vocabulary destination (FR-1089)', async () => {
+    renderShell('platform')
+
+    expect(await screen.findByRole('link', { name: /vocabulary/i })).toBeInTheDocument()
+  })
+
+  it('offers a conference organizer NO vocabulary destination (SC-1020)', async () => {
+    renderShell('organizer')
+
+    await screen.findByRole('link', { name: /conferences/i })
+    expect(
+      screen.queryByRole('link', { name: /vocabulary/i }),
+      'a conference organizer was offered the vocabulary. It is product-wide reference data ' +
+        'their per-conference authority does not reach (FR-1089), and the server answers their ' +
+        'direct attempts with the 404 a nonexistent route gives — offering the door would tell ' +
+        'them it exists.',
+    ).not.toBeInTheDocument()
+  })
+
   it('offers a platform operator the promotion and demotion controls', async () => {
     renderShell('platform')
 

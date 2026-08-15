@@ -517,6 +517,13 @@ export interface paths {
                             endsAt: string;
                             /** @description T053 (014), FR-1020 and FR-1022. A cancelled session is **presented, not withheld**: it stays in the programme, in Agenda, in the detail panel and in Home’s rest-of-day timeline, marked. An attendee who saved it needs to see that it will not happen, and a session that simply vanished would be indistinguishable from one they misremembered. Home’s "Up next" is the single exception and skips it (FR-1022a), because that card answers *where do I go now*. */
                             cancelled: boolean;
+                            /**
+                             * @description T193 (014 tranche 2), FR-1060/FR-1063. The kind decides the identity of the ONE commitment control an attendee sees: a mandatory session is saved, an optional one is enrolled in, and enrolment replaces saving. **Capacity is deliberately absent from this payload**: the programme is cached client-side, and a cached seat count reads as a promise of a place — the live figure comes from `GET …/sessions/{sessionId}/places` alone (FR-1070b).
+                             * @enum {string}
+                             */
+                            kind: "mandatory" | "optional";
+                            /** @description T193 (014 tranche 2), FR-1052. Where a virtual or hybrid session is attended — `https:` only, validated at the write path. Null for an in-person session, and the client renders no link line at all for it (SC-1022). In person, virtual or both is DERIVED from room and link, never stored (FR-1051). */
+                            accessLink: null | string;
                             track: {
                                 /** Format: uuid */
                                 id: string;
@@ -524,7 +531,8 @@ export interface paths {
                                 /** @description A theme token NAME, e.g. track-design. Never a colour value — the palette lives in the client theme and nowhere else (FR-136). */
                                 colorToken: string;
                             };
-                            room: {
+                            /** @description T193 (014 tranche 2) — null when the session carries no room (a virtual session, SC-1022). Never an empty-named placeholder: the client renders no room line at all. The schema constraint `sessions_room_or_link` guarantees at least one of room and accessLink exists. */
+                            room: null | {
                                 /** Format: uuid */
                                 id: string;
                                 name: string;
@@ -678,8 +686,13 @@ export interface paths {
                             sessions: {
                                 /** Format: uuid */
                                 sessionId: string;
-                                /** @description Computed server-side as `sessions.logistics_changed_at > saved_sessions.viewed_at` — two timestamps and a comparison, with nothing stored per change. That is what keeps FR-1031 structural: there is no per-change record to list and no counter to sum. */
+                                /** @description Computed server-side as `sessions.logistics_changed_at > viewed_at` on whichever commitment row this is — two timestamps and a comparison, with nothing stored per change. That is what keeps FR-1031 structural: there is no per-change record to list and no counter to sum. */
                                 changedSinceViewed: boolean;
+                                /**
+                                 * @description 014 tranche 2 (FR-1063, FR-1066): which of the two commitments this row is. One list with a discriminator, so the saved-but-holds-no-place state FR-1064 forbids is unrepresentable rather than merely absent — the envelope grown a second time, exactly as it was grown for the marker.
+                                 * @enum {string}
+                                 */
+                                commitment: "saved" | "place";
                             }[];
                         };
                     };
@@ -1580,6 +1593,10 @@ export interface paths {
                             company: null | string;
                             role: null | string;
                             headline: null | string;
+                            /** @description The chosen sector LABEL (014 T2, FR-1090). May be a retired value the attendee still holds — holding outlives retirement (FR-1094a). */
+                            sector: null | string;
+                            subsector: null | string;
+                            productiveActivity: null | string;
                             /** @enum {null|string} */
                             networkingIntent: "open_to_meetings" | "open_to_messages" | "not_networking" | null;
                             /** @enum {null|string} */
@@ -1624,6 +1641,12 @@ export interface paths {
                         company?: string | null;
                         role?: string | null;
                         headline?: string | null;
+                        /** @description A LABEL that must be currently choosable or already held by the caller (FR-1095b) — the union is enforced in the query layer, with a distinct code per refusal. Free text is not accepted for values the caller does not hold (FR-1087). */
+                        sector?: string | null;
+                        /** @description Must belong to the submitted sector (FR-1087), or be held with it. */
+                        subsector?: string | null;
+                        /** @description Free text (FR-1090, REQ-030) — unlike sector and subsector, what somebody actually makes or does is theirs to word. */
+                        productiveActivity?: string | null;
                         /** @enum {string|null} */
                         networkingIntent?: "open_to_meetings" | "open_to_messages" | "not_networking" | null;
                         /** @enum {string|null} */
@@ -1646,6 +1669,10 @@ export interface paths {
                             company: null | string;
                             role: null | string;
                             headline: null | string;
+                            /** @description The chosen sector LABEL (014 T2, FR-1090). May be a retired value the attendee still holds — holding outlives retirement (FR-1094a). */
+                            sector: null | string;
+                            subsector: null | string;
+                            productiveActivity: null | string;
                             /** @enum {null|string} */
                             networkingIntent: "open_to_meetings" | "open_to_messages" | "not_networking" | null;
                             /** @enum {null|string} */
@@ -1967,6 +1994,9 @@ export interface paths {
                             company?: null | string;
                             role?: null | string;
                             headline?: null | string;
+                            sector?: null | string;
+                            subsector?: null | string;
+                            productiveActivity?: null | string;
                             /** @enum {null|string} */
                             networkingIntent?: "open_to_meetings" | "open_to_messages" | "not_networking" | null;
                             /** @enum {null|string} */
@@ -2278,7 +2308,7 @@ export interface paths {
         get: {
             parameters: {
                 query?: {
-                    /** @description Free text over display name, company, role and headline — case- and accent-insensitively, so "Munoz" finds "Muñoz". NEVER matches email address (FR-407). */
+                    /** @description Free text over display name, company, role, headline and the productive-activity description (FR-1099d) — case- and accent-insensitively, so "Munoz" finds "Muñoz". NEVER matches email address (FR-407), and deliberately not sector or subsector: those are controlled values whose route into Discover is the open filter question, not the search box. */
                     q?: string;
                     role?: string;
                     interest?: string;
@@ -2308,6 +2338,8 @@ export interface paths {
                                 company: null | string;
                                 role: null | string;
                                 headline: null | string;
+                                /** @description What this person makes or does (FR-1099d, REQ-030). On the card so a description somebody can search for is one they can also read; absent entirely — never a placeholder — when unset (FR-1092). Sector and subsector are deliberately NOT in this payload. */
+                                productiveActivity: null | string;
                                 /** @enum {null|string} */
                                 networkingIntent: "open_to_meetings" | "open_to_messages" | "not_networking" | null;
                                 /** @enum {null|string} */
@@ -5298,6 +5330,10 @@ export interface paths {
                         /** Format: date */
                         endsOn: string;
                         timezone: string;
+                        /** @enum {string} */
+                        modality?: "in-person" | "virtual" | "hybrid";
+                        /** @enum {string|null} */
+                        format?: "seminar" | "hackathon" | "workshop" | "congress" | "networking-breakfast" | "corporate-event" | null;
                     };
                 };
             };
@@ -6406,8 +6442,14 @@ export interface paths {
                         /** Format: uuid */
                         trackId: string;
                         /** Format: uuid */
-                        roomId: string;
+                        roomId?: string | null;
+                        /** @description A virtual or hybrid session’s joining link (FR-1052) — a dedicated, validated field, never carried in the summary. `https:` only, well-formedness and scheme checked and NEVER fetched (FR-1053); refused with `access_link_invalid` otherwise. Published to every attendee holding the join code the moment it is written (FR-1055), and nothing records whether anybody used it (FR-1057). */
+                        accessLink?: string | null;
                         speakerIds?: string[];
+                        /** @enum {string} */
+                        kind?: "mandatory" | "optional";
+                        capacity?: number | null;
+                        enrolmentClosingOffsetHours?: number | null;
                     };
                 };
             };
@@ -6493,10 +6535,14 @@ export interface paths {
         /**
          * Delete a session
          * @description Permitted only while **zero** attendees have engaged with it (FR-1018), checked under `SELECT … FOR UPDATE` **inside** the deleting transaction so a save arriving mid-delete blocks rather than being destroyed (FR-1019a). Otherwise 409 with counts and an offer to cancel instead (FR-1019, FR-1025).
+         *
+         *     **Held places are NOT engagement** (v5.3.0 O2, FR-1077): an optional session with places held stays deletable, the held places are destroyed with no notification and no marker (register entry 31 is open on that), and the confirming client MUST pass `placesSeen` — the figure it showed the organizer. The count is re-read inside the deleting transaction under the same lock, and if it has RISEN the delete refuses with `places_changed` and the current figure, to be re-presented (FR-1077b). Omitting `placesSeen` refuses whenever any place exists, which is the honest floor for a client that showed no figure.
          */
         delete: {
             parameters: {
-                query?: never;
+                query?: {
+                    placesSeen?: number;
+                };
                 header?: never;
                 path: {
                     eventId: string;
@@ -6558,6 +6604,10 @@ export interface paths {
                                 id?: string;
                                 title?: string;
                             }[];
+                            /** @description 014 tranche 2 — the held-places figure behind `capacity_below_held` and `places_changed` (FR-1061a, FR-1077b). A count only, never identity: deliberately NOT a member of `engagement`, because an enrolment is not engagement (v5.3.0 O2) and a fifth count there would make places-held sessions undeletable. */
+                            placesHeld?: number;
+                            /** @description 014 tranche 2 — the saved-session count beside `placesHeld` on `access_link_committed` (FR-1058a): clearing a link is refused while EITHER kind of commitment exists, so the refusal names both. A count only, never identity. */
+                            saved?: number;
                         };
                     };
                 };
@@ -6604,8 +6654,14 @@ export interface paths {
                         /** Format: uuid */
                         trackId: string;
                         /** Format: uuid */
-                        roomId: string;
+                        roomId?: string | null;
+                        /** @description A virtual or hybrid session’s joining link (FR-1052) — a dedicated, validated field, never carried in the summary. `https:` only, well-formedness and scheme checked and NEVER fetched (FR-1053); refused with `access_link_invalid` otherwise. Published to every attendee holding the join code the moment it is written (FR-1055), and nothing records whether anybody used it (FR-1057). */
+                        accessLink?: string | null;
                         speakerIds?: string[];
+                        /** @enum {string} */
+                        kind?: "mandatory" | "optional";
+                        capacity?: number | null;
+                        enrolmentClosingOffsetHours?: number | null;
                     };
                 };
             };
@@ -6654,6 +6710,34 @@ export interface paths {
                         "application/json": {
                             code?: string;
                             message?: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                            /** @description Counts only, with nobody identified (FR-1025). Present when a deletion is refused because attendees have engaged with the session — it is what turns "no" into "cancel instead". No attendee identity accompanies it, at any tier (FR-1042). */
+                            engagement?: {
+                                saved?: number;
+                                notes?: number;
+                                questions?: number;
+                                votes?: number;
+                            };
+                            /** @description The sessions a date-range change would orphan, named (FR-1014). They are the caller's own content, and an organizer told only "no" would have to guess which of forty sessions is in the way. */
+                            sessions?: {
+                                id?: string;
+                                title?: string;
+                            }[];
+                            /** @description 014 tranche 2 — the held-places figure behind `capacity_below_held` and `places_changed` (FR-1061a, FR-1077b). A count only, never identity: deliberately NOT a member of `engagement`, because an enrolment is not engagement (v5.3.0 O2) and a fifth count there would make places-held sessions undeletable. */
+                            placesHeld?: number;
+                            /** @description 014 tranche 2 — the saved-session count beside `placesHeld` on `access_link_committed` (FR-1058a): clearing a link is refused while EITHER kind of commitment exists, so the refusal names both. A count only, never identity. */
+                            saved?: number;
                         };
                     };
                 };
@@ -6872,6 +6956,16 @@ export interface paths {
                         /** Format: date */
                         endsOn?: string;
                         timezone?: string;
+                        /**
+                         * @description T190 (014 tranche 2) — correctable after creation (FR-1059). Refused with `modality_conflicts_sessions`, naming the sessions, while any existing session would violate FR-1050a under the new value (FR-1059a). Hybrid is the transitional modality: every move between in-person and virtual routes through it. Changing it dispatches nothing.
+                         * @enum {string}
+                         */
+                        modality?: "in-person" | "virtual" | "hybrid";
+                        /**
+                         * @description Always permitted, because nothing branches on a format (FR-1047). Null clears it.
+                         * @enum {string|null}
+                         */
+                        format?: "seminar" | "hackathon" | "workshop" | "congress" | "networking-breakfast" | "corporate-event" | null;
                     };
                 };
             };
@@ -6932,6 +7026,10 @@ export interface paths {
                                 id?: string;
                                 title?: string;
                             }[];
+                            /** @description 014 tranche 2 — the held-places figure behind `capacity_below_held` and `places_changed` (FR-1061a, FR-1077b). A count only, never identity: deliberately NOT a member of `engagement`, because an enrolment is not engagement (v5.3.0 O2) and a fifth count there would make places-held sessions undeletable. */
+                            placesHeld?: number;
+                            /** @description 014 tranche 2 — the saved-session count beside `placesHeld` on `access_link_committed` (FR-1058a): clearing a link is refused while EITHER kind of commitment exists, so the refusal names both. A count only, never identity. */
+                            saved?: number;
                         };
                     };
                 };
@@ -6950,6 +7048,1679 @@ export interface paths {
                 };
             };
         };
+        trace?: never;
+    };
+    "/admin/vocabulary/sectors": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Every sector, including retired ones
+         * @description Retired values are listed because this screen is where retirement is reversed; the attendee-side read (`GET /vocabulary`) offers only the choosable (FR-1094a). No value carries any figure about who holds it — the vocabulary surface is not a census (FR-1099b).
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** Format: uuid */
+                            id: string;
+                            label: string;
+                            /** @description Set while the value is withdrawn from NEW choice (FR-1094a). Holders keep it either way, and clearing this reverses the withdrawal with no repair (FR-1094b). */
+                            retiredAt: null | string;
+                        }[];
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        /** Add a sector */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        label: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** Format: uuid */
+                            id: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Throttled on `vocabulary_write`, keyed on the acting operator's own identity so a refusal can only inconvenience the person authoring. */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                            retryAfterSeconds?: number;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/vocabulary/sectors/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete a sector nobody holds and nothing refines
+         * @description Refused with `vocabulary_delete_held` while any attendee holds the value (FR-1094) and with `sector_has_subsectors` while subsectors refine it. Retirement is the mechanism for a held value, because it writes to no attendee record.
+         */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Throttled on `vocabulary_write`, keyed on the acting operator's own identity so a refusal can only inconvenience the person authoring. */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                            retryAfterSeconds?: number;
+                        };
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        /**
+         * Rename a sector nobody holds
+         * @description Refused with `vocabulary_rename_held` while any attendee holds the value (FR-1094c) — a rename would change what every holder’s profile asserts about them without writing to any attendee record. Retire-plus-create is the offered alternative.
+         */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        label: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** Format: uuid */
+                            id: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Throttled on `vocabulary_write`, keyed on the acting operator's own identity so a refusal can only inconvenience the person authoring. */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                            retryAfterSeconds?: number;
+                        };
+                    };
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/admin/vocabulary/sectors/{id}/retirement": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Retire a sector — withdraw it from new choice, keeping every holder’s
+         * @description Writes to NO attendee record (FR-1094): holders keep the value, it keeps displaying and ranking, and it simply stops being offered to anybody choosing now (FR-1094a). Reversible via DELETE on this address, with no repair, because nothing was written.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Throttled on `vocabulary_write`, keyed on the acting operator's own identity so a refusal can only inconvenience the person authoring. */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                            retryAfterSeconds?: number;
+                        };
+                    };
+                };
+            };
+        };
+        /** Un-retire a sector, making it choosable again */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Throttled on `vocabulary_write`, keyed on the acting operator's own identity so a refusal can only inconvenience the person authoring. */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                            retryAfterSeconds?: number;
+                        };
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/vocabulary/subsectors": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Every subsector, with the sector it refines */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** Format: uuid */
+                            id: string;
+                            /** Format: uuid */
+                            sectorId: string;
+                            label: string;
+                            retiredAt: null | string;
+                        }[];
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        /**
+         * Add a subsector to an existing, unretired sector
+         * @description Refused with `sector_retired` when the named sector is withdrawn from choice (FR-1087, FR-1094a): a subsector of a retired sector could never be selected alongside its own sector.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        sectorId: string;
+                        label: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** Format: uuid */
+                            id: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Throttled on `vocabulary_write`, keyed on the acting operator's own identity so a refusal can only inconvenience the person authoring. */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                            retryAfterSeconds?: number;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/vocabulary/subsectors/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete a subsector nobody holds */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Throttled on `vocabulary_write`, keyed on the acting operator's own identity so a refusal can only inconvenience the person authoring. */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                            retryAfterSeconds?: number;
+                        };
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        /** Rename a subsector nobody holds */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        label: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** Format: uuid */
+                            id: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Throttled on `vocabulary_write`, keyed on the acting operator's own identity so a refusal can only inconvenience the person authoring. */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                            retryAfterSeconds?: number;
+                        };
+                    };
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/admin/vocabulary/subsectors/{id}/retirement": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Retire a subsector */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Throttled on `vocabulary_write`, keyed on the acting operator's own identity so a refusal can only inconvenience the person authoring. */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                            retryAfterSeconds?: number;
+                        };
+                    };
+                };
+            };
+        };
+        /** Un-retire a subsector */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Throttled on `vocabulary_write`, keyed on the acting operator's own identity so a refusal can only inconvenience the person authoring. */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                            retryAfterSeconds?: number;
+                        };
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/vocabulary/interests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Every networking-interest option, including retired ones */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** Format: uuid */
+                            id: string;
+                            label: string;
+                            /** @description Set while the value is withdrawn from NEW choice (FR-1094a). Holders keep it either way, and clearing this reverses the withdrawal with no repair (FR-1094b). */
+                            retiredAt: null | string;
+                        }[];
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        /** Add a networking-interest option */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        label: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** Format: uuid */
+                            id: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Throttled on `vocabulary_write`, keyed on the acting operator's own identity so a refusal can only inconvenience the person authoring. */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                            retryAfterSeconds?: number;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/vocabulary/interests/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete an interest option nobody holds */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Throttled on `vocabulary_write`, keyed on the acting operator's own identity so a refusal can only inconvenience the person authoring. */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                            retryAfterSeconds?: number;
+                        };
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        /**
+         * Rename an interest option nobody holds
+         * @description The holder check matches the LABEL, so a retained free-text value an attendee wrote before the vocabulary listed it protects the option too (FR-1094c, FR-1095).
+         */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        label: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** Format: uuid */
+                            id: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Throttled on `vocabulary_write`, keyed on the acting operator's own identity so a refusal can only inconvenience the person authoring. */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                            retryAfterSeconds?: number;
+                        };
+                    };
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/admin/vocabulary/interests/{id}/retirement": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Retire an interest option */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Throttled on `vocabulary_write`, keyed on the acting operator's own identity so a refusal can only inconvenience the person authoring. */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                            retryAfterSeconds?: number;
+                        };
+                    };
+                };
+            };
+        };
+        /** Un-retire an interest option */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Throttled on `vocabulary_write`, keyed on the acting operator's own identity so a refusal can only inconvenience the person authoring. */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                            retryAfterSeconds?: number;
+                        };
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/conferences/{eventId}/sessions/{id}/enrolments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The names of the attendees holding places in one optional session
+         * @description **The fourth recorded Principle VIII exception** (constitution v5.3.0, O1), and the first administrative read of attendee state this project has ever permitted. Four bounds, each structural: only enrolment (no saved sessions, notes, questions or votes at any tier — FR-1042 survives unnarrowed for all four); only an assigned organizer, or a platform operator by the authority they already hold; only this conference’s sessions; and names only — no identifier, no email, no route into a profile. The attendee was told before they enrolled (FR-1074). An empty roster is 200 with an empty list — “nobody yet” is a state, not a failure.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    eventId: string;
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            attendees: {
+                                displayName: string;
+                            }[];
+                        };
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/events/{eventId}/agenda/places/{sessionId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Take a place in an optional session
+         * @description The optional-session commitment (FR-1063): enrolment REPLACES saving there, so this is the counterpart of `PUT …/agenda/saved/:sessionId` for the other kind. Capacity is enforced under an exclusive session-row lock — in no ordering can more attendees hold places than the capacity admits (FR-1068) — and each refusal carries its own code: `session_full`, `enrolment_closed`, `already_enrolled`, `not_optional` (FR-1069a). Before taking a place the attendee is told their name becomes visible to this conference’s organizers (FR-1074) — the client’s obligation, stated here so the contract records it.
+         */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    eventId: string;
+                    sessionId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The place is held. */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Not registered, no such conference, no such session, or a session that is not part of this conference — deliberately indistinguishable (FR-204’s rule, inherited). */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Refused, with a code naming which fact refused it — full, closed, already held, or not an optional session. The four are mutually distinguishable (FR-1069a). */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+            };
+        };
+        post?: never;
+        /**
+         * Release a held place. Idempotent
+         * @description The place returns to the session’s availability immediately (FR-1067). Available after enrolment closes too — the deadline governs taking a place, not holding one (FR-1071b) — though a place released after closing stays untakeable, which is the honest state rather than a seat quietly reserved for nobody.
+         */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    eventId: string;
+                    sessionId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Not registered, no such conference, no such session, or a session that is not part of this conference — deliberately indistinguishable (FR-204’s rule, inherited). */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/events/{eventId}/sessions/{sessionId}/places": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Remaining places in an optional session, live
+         * @description Derived at read time — capacity minus a live count, and whether enrolment is open against the server’s own clock (FR-1070, FR-1071a). **Never served from cache** (FR-1070b): a stale number reads as a promise of a place, so the client declares this read `passThrough` and omits the figure entirely where it cannot be read live. A fact about ONE session at the moment of deciding — not the count of changes N2 forbids, and no read aggregates it across sessions (FR-1070a).
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    eventId: string;
+                    sessionId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            remaining: number;
+                            open: boolean;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Not registered, no such conference, no such session, or a session that is not part of this conference — deliberately indistinguishable (FR-204’s rule, inherited). */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/vocabulary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The controlled vocabulary currently on offer: sectors, subsectors, interests
+         * @description Cross-event reference data, identical for every signed-in attendee — which is what makes offering the whole list not a disclosure: a closed vocabulary the product publishes is not population data (FR-1096). Retired values are absent; values the caller already holds come from their own profile read (FR-1095b). No value carries any figure about who holds it (FR-1099b).
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            sectors: {
+                                /** Format: uuid */
+                                id: string;
+                                label: string;
+                            }[];
+                            subsectors: {
+                                /** Format: uuid */
+                                id: string;
+                                /**
+                                 * Format: uuid
+                                 * @description The sector this refines (FR-1087). The editor filters the subsector chooser by the selected sector; the server re-checks at the write.
+                                 */
+                                sectorId: string;
+                                label: string;
+                            }[];
+                            interests: {
+                                /** Format: uuid */
+                                id: string;
+                                label: string;
+                            }[];
+                        };
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code?: string;
+                            message?: string;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
 }

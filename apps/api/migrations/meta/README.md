@@ -1,10 +1,13 @@
 # Migration metadata — read this before regenerating
 
-Everything in this directory is written by `drizzle-kit generate`, except this file and the three
+Everything in this directory is written by `drizzle-kit generate`, except this file and the four
 deliberate deviations it records. The first two exist because **004 claims migration number `0003`,
 which 005 skipped and left free** (delivery roadmap; 004 spec, FR-396). The third exists because
 **014 claims `0011` while `0010` is reserved by a feature on another branch** — the same shape,
-arriving from the other direction.
+arriving from the other direction. The fourth exists because **014 tranche 2 claims `0012` and
+`0010` stays permanently empty** — constitution v5.3.0 (O4) abolished reservations after the
+scheme collided a third time, and the section below explains why the literal "next free number"
+was the wrong one here.
 
 ## The journal is not in `when` order, and that is on purpose
 
@@ -69,6 +72,30 @@ whatever it names itself), leave its `idx` at 11, and leave `0011_snapshot.json`
 before `0010_…`, with `0010_…` carrying the later `when`. That is the same shape as `0003`/`0004`
 above and it is correct for the same reason: array position orders a fresh database, `when` decides
 what an existing one receives, and the two migrations are independent.
+
+## `0010` stays permanently empty, and `0012` is tranche 2's — do not "fix" either
+
+Constitution v5.3.0 (O4, 2026-08-14) replaced reserve-in-advance with **claim at generation**:
+reserving only works when branches can see each other's reservations, and three collisions proved
+they cannot. That voided both outstanding reservations — 012's `0010` and 015's `0012` — so when
+014's tranche 2 generated, `0010` and `0012` were both free. **It took `0012`, and `0010` must
+never be filled**, for a reason the `0003`/`0004` section above states as its own safety
+condition: an inversion is safe **only when the two migrations are independent**, and this pair is
+not. `0012` redefines `admin_audit_entries_action_valid` — the same named CHECK that `0011` drops
+and re-adds — to admit the vocabulary actions (FR-1089a). Numbered `0010`, the dependent migration
+would precede its dependency in filename order while the journal applied them the other way round;
+anything trusting filenames would apply the full action list, then let `0011` re-add the shorter
+one, and the failure would surface as a refused vocabulary write with nothing naming its cause.
+
+The generation followed the `0011` procedure above exactly, which produces the **fourth skew**:
+the journal entry carries **`idx: 11`**, its tag is **`0012_conference_authoring_tranche_2`**, and
+the snapshot `drizzle-kit` wrote stays **`0011_snapshot.json`**. Same rules as before: the
+migrator reads `${tag}.sql` and never `idx`; array position orders a fresh database; the snapshot
+filename follows `idx` and must not be renamed. **Consequence for the next feature to generate**:
+`drizzle-kit` will offer journal index 12 and the tag `0012_…`, which is taken — rename the tag to
+the next free *number on disk* (`0013_…` as of this writing), leave `idx` alone, leave the
+snapshot where it lands, extend the roadmap's number table in the same change (O4 makes that
+mandatory), and add your own section here.
 
 ## This file breaks `drizzle-kit generate`, and you have to move it
 

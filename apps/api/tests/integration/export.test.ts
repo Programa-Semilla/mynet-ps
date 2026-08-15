@@ -5,6 +5,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 
 import { getDb } from '../../src/db/client.js'
 import { attendeeBlocks } from '../../src/db/schema/blocks.js'
+import { sessionEnrolments } from '../../src/db/schema/agenda.js'
 import {
   conversationPairs,
   conversationParticipants,
@@ -92,6 +93,25 @@ describe('personal-data export', () => {
       headers: { cookie: cookieHeader(ada) },
       payload: { body: 'A private note nobody else can read.' },
     })
+
+    // T153 (014 tranche 2) — a held place, so the `heldPlaces` section is populated and its
+    // columns checkable (FR-1081a). Written directly for the same reason 007's sections are:
+    // populating through the real enrolment route requires an optional session authored first,
+    // and the columns this guard checks are the table's own either way. A second session, so
+    // the save above and the place are two different commitments on two different sessions.
+    {
+      const secondSessionId = (sessions.json() as Array<{ id: string }>)[1]?.id as string
+      const adaId = (
+        await getDb()
+          .select({ id: attendees.id })
+          .from(attendees)
+          .where(eq(attendees.email, ADA))
+          .limit(1)
+      )[0]?.id as string
+      await getDb()
+        .insert(sessionEnrolments)
+        .values({ attendeeId: adaId, sessionId: secondSessionId })
+    }
     await app.inject({
       method: 'PUT',
       url: '/workspace/active-event',

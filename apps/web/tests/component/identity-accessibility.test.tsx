@@ -149,7 +149,15 @@ describe('accessibility of the surfaces 004 introduces (SC-310)', () => {
       expect(screen.getByLabelText(/^role$/i)).toBeInTheDocument()
       expect(screen.getByLabelText(/networking intent/i)).toBeInTheDocument()
       expect(screen.getByLabelText(/availability/i)).toBeInTheDocument()
-      expect(screen.getByLabelText(/^interests$/i)).toBeInTheDocument()
+      // 014 tranche 2 (T178) — the taxonomy fields joined the form, each named.
+      expect(screen.getByLabelText(/^sector$/i)).toBeInTheDocument()
+      expect(screen.getByLabelText(/what you do/i)).toBeInTheDocument()
+      // Interests became a GROUP: a legend names the fieldset, and the chooser inside it
+      // carries its own label ("Add an interest") — rendered only when the vocabulary offers
+      // values, which the default harness deliberately does not (FR-1086's shipped condition).
+      // A legend is not a control label, so the query moved from label-text to the group role;
+      // the property under test — every field is NAMED — is unchanged.
+      expect(screen.getByRole('group', { name: /^interests$/i })).toBeInTheDocument()
     })
 
     it('marks a field over its limit as invalid, not merely coloured', async () => {

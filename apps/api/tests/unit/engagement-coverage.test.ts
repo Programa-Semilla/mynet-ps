@@ -25,10 +25,13 @@ import { ENGAGEMENT_TABLES } from '../../src/db/queries/session-changes.js'
  * session cascades from `sessions.id` — one `DELETE` and the database silently destroys other
  * people's private writing, with no confirmation and no record.
  *
- * `hasEngagement` decides that, and an **enumerated** predicate is a list that ages. Its failure
- * mode is the worst available: a later feature adds `session_reactions`, nobody remembers this
- * function, and deletions resume destroying attendee data **with every existing test still
- * green**. Nothing about adding a table makes anybody open `session-changes.ts`.
+ * Two enumerated expressions decide that — `ENGAGEMENT_TABLES` in `session-changes.ts` (the
+ * table set of record, feeding the fan-out) and `engagementCountsFor`/`countEngagement` in
+ * `admin-catalog.ts` (the delete refusal's live predicate) — and an **enumerated** list is a
+ * list that ages. Its failure mode is the worst available: a later feature adds
+ * `session_reactions`, nobody remembers either expression, and deletions resume destroying
+ * attendee data **with every existing test still green**. Nothing about adding a table makes
+ * anybody open `session-changes.ts` or `admin-catalog.ts`.
  * ═════════════════════════════════════════════════════════════════════════════════════════════
  *
  * ─────────────────────────────────────────────────────────────────────────────────────────────
@@ -62,11 +65,29 @@ const ONE_HOP: Record<string, string> = {
 /**
  * Tables referencing both `sessions` and `attendees` that are nevertheless **not** engagement.
  *
- * Empty today, and it is the category that most needs to stay empty: an entry here is a table
+ * One entry, and it is the category that most needs to stay that way: an entry here is a table
  * whose rows may be destroyed by an organizer's delete. Any addition must say whose data it is
  * and why losing it silently is acceptable — which is a hard sentence to write, deliberately.
  */
-const NOT_ENGAGEMENT: Record<string, string> = {}
+const NOT_ENGAGEMENT: Record<string, string> = {
+  // T123 (014 tranche 2, FR-1077/FR-1078). The keeper of this list wrote the paragraph below to
+  // be copied badly: the second entry will be modelled on this one, and the second entry is the
+  // one this list exists to make hard.
+  session_enrolments:
+    "A held place in an optional session. It is the ATTENDEE'S data — their claim on a seat, " +
+    'taken by their own act — and deleting such a session destroys every held place with no ' +
+    'notification, no marker and no trace: the person who reserved one finds out by arriving. ' +
+    'That silence is acceptable only because the OWNER ratified it, in constitution v5.3.0 (O2, ' +
+    'standing decision 51), after it was put to them with the cost stated: an enrolled attendee ' +
+    'holds no saved row (enrolling REPLACES saving, FR-1064), so no marker and no push can ' +
+    "reach them, and the organizer's delete confirmation is the only warning anybody receives " +
+    '(FR-1077b/c). The engagement set stays at exactly four — a saved session, a private note, ' +
+    'a question, a vote — and this entry is NOT precedent for a second one: O2 declares this ' +
+    'one attachment type outside the set and nothing else, and narrowing the four is forbidden. ' +
+    'Register entry 31 is OPEN against this entry — whether deleting a session should notify ' +
+    'the enrolled — and its remedy would be a third notification trigger, i.e. another ' +
+    'amendment; until then the deletion is silent by ratified decision, not by oversight.',
+}
 
 interface TableFacts {
   readonly name: string
@@ -126,12 +147,12 @@ describe('engagement coverage (T017, FR-1018a)', () => {
     expect(
       uncovered,
       'These tables reference both `sessions` and `attendees`, so they hold attendee state ' +
-        'about a session — and `hasEngagement` does not consult them. Every one of them ' +
-        'cascades from `sessions.id`, which means an organizer deleting a session would ' +
+        'about a session — and the engagement expressions do not consult them. Every one of ' +
+        'them cascades from `sessions.id`, which means an organizer deleting a session would ' +
         'silently destroy what they contain (FR-1018, FR-1019). Add the table to ' +
-        '`ENGAGEMENT_TABLES` and to the predicate in `session-changes.ts`, or add it to ' +
-        'NOT_ENGAGEMENT with a written reason for why losing those rows without warning is ' +
-        'acceptable.',
+        '`ENGAGEMENT_TABLES` in `session-changes.ts` AND to `engagementCountsFor` in ' +
+        '`admin-catalog.ts` (the live delete predicate), or add it to NOT_ENGAGEMENT with a ' +
+        'written reason for why losing those rows without warning is acceptable.',
     ).toEqual([])
   })
 
@@ -165,7 +186,8 @@ describe('engagement coverage (T017, FR-1018a)', () => {
       expect(
         ENGAGEMENT_TABLES as readonly string[],
         `${name} reaches a session through ${through} and holds attendee data, so deleting the ` +
-          'session destroys it. `hasEngagement` must consult it (FR-1018a).',
+          'session destroys it. `ENGAGEMENT_TABLES` and `engagementCountsFor` must consult ' +
+          'it (FR-1018a).',
       ).toContain(name)
     }
   })
@@ -185,7 +207,20 @@ describe('engagement coverage (T017, FR-1018a)', () => {
 
     for (const [name, reason] of Object.entries(NOT_ENGAGEMENT)) {
       expect(names.has(name), `${name} is excluded from engagement but no longer exists`).toBe(true)
-      expect(reason.length, `${name} is excluded without a written reason`).toBeGreaterThan(80)
+
+      // FR-1078's floor, not style: each mandated element of the written reason is checked for,
+      // because a length check verifies that A sentence exists rather than that the required
+      // claims do — an 81-character reason omitting every one of them would have passed.
+      expect(reason, `${name}'s reason must say WHOSE data it is`).toMatch(/attendee|their/i)
+      expect(
+        reason,
+        `${name}'s reason must cite the decision that ratified the silent loss`,
+      ).toMatch(/v5\.\d+\.\d+|O\d|decision \d+|ratified/)
+      expect(reason, `${name}'s reason must state it is not precedent`).toMatch(/not precedent/i)
+      expect(
+        reason,
+        `${name}'s reason must say why losing the rows silently is acceptable`,
+      ).toMatch(/acceptable|accepted/i)
     }
   })
 
@@ -194,8 +229,9 @@ describe('engagement coverage (T017, FR-1018a)', () => {
    * **THE COUNTS MUST COVER THE SAME TABLES AS THE BOOLEAN, AND THIS GUARD USED TO CHECK ONLY
    * THE BOOLEAN.**
    *
-   * Added by the deep review. `hasEngagement` in `session-changes.ts` is one expression of the
-   * table set; `admin-catalog.ts` had **two more** — a count keyed to a literal id for the delete
+   * Added by the deep review. `hasEngagement` in `session-changes.ts` was one expression of the
+   * table set (since deleted — `ENGAGEMENT_TABLES` survives there on its own); `admin-catalog.ts`
+   * had **two more** — a count keyed to a literal id for the delete
    * refusal, and a correlated one for the programme read — and neither was covered here. So a
    * later feature adding an attendee-state table would get a correctly-refusing delete and two
    * count queries that silently under-report.

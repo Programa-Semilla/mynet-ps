@@ -3,6 +3,7 @@ import {
   HttpAdminConferenceRepository,
   HttpAdminReportRepository,
   HttpAdminSessionRepository,
+  HttpAdminVocabularyRepository,
   HttpClient,
 } from '@mynet/data/http'
 import type {
@@ -10,6 +11,7 @@ import type {
   AdminConferenceRepository,
   AdminReportRepository,
   AdminSessionRepository,
+  AdminVocabularyRepository,
 } from '@mynet/data'
 
 /**
@@ -62,6 +64,17 @@ export interface AdminServices {
    * server's refusal would contradict the screen in front of them.
    */
   readonly catalog: AdminCatalogRepository
+  /**
+   * T172 (014 tranche 2) — the vocabulary (FR-1089).
+   *
+   * A fifth repository and still no new mechanism: undecorated like the other four, and here
+   * the stale value would be the WORST kind — a cached "nobody holds this" would present
+   * deletion as safe for a value somebody chose a minute ago, and the server's refusal would
+   * contradict the screen. Platform tier only; a conference organizer's requests are refused
+   * server-side with the 404 a nonexistent route gives, and the rail never offers them the
+   * destination (`AdminShell`).
+   */
+  readonly vocabulary: AdminVocabularyRepository
 }
 
 export const createAdminServices = (): AdminServices => {
@@ -86,5 +99,6 @@ export const createAdminServices = (): AdminServices => {
     reports: new HttpAdminReportRepository(http),
     conferences: new HttpAdminConferenceRepository(http),
     catalog: new HttpAdminCatalogRepository(http),
+    vocabulary: new HttpAdminVocabularyRepository(http),
   }
 }

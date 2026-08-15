@@ -91,10 +91,13 @@ describe('clearing a note', () => {
     await openNotePanel()
 
     expect(screen.getByRole('textbox', { name: /private notes/i })).toBeInTheDocument()
-    // Noting and saving are independent: the save control still offers to save.
+    // Noting and committing are independent: the commitment control still offers to save.
+    // T208 — TWO controls now match by name: the row's, and the panel's fifth section's. The
+    // row is inert behind the modal for a real user (jsdom has no top layer), so presence of
+    // at least one offering control is the assertion, not uniqueness across surfaces.
     expect(
-      screen.getByRole('button', { name: /save Opening Keynote to your agenda/i }),
-    ).toBeInTheDocument()
+      screen.getAllByRole('button', { name: /save Opening Keynote to your agenda/i }).length,
+    ).toBeGreaterThan(0)
   })
 
   it('tells the attendee they are approaching the limit BEFORE they hit it (FR-213)', async () => {

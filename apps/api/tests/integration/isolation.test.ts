@@ -292,6 +292,27 @@ describe('attendee data isolation', () => {
       // registered for, which is the same 404 as everything else.
       // ─────────────────────────────────────────────────────────────────────────────────────
       { template: '/events/:eventId/agenda/saved/:sessionId/viewed', method: 'POST', ok: 204 },
+      // ─────────────────────────────────────────────────────────────────────────────────────
+      // 014 tranche 2 — the other commitment. **These three entries exist because the coverage
+      // assertion above demanded them**, which is the guard working exactly as 006's, 008's and
+      // 009's entries record.
+      //
+      // **`ok: 409` on the take, and the 409 is what proves the event guard let the request
+      // through** — 008's `ok: 400` reasoning: the seeded session is mandatory, so the
+      // legitimate answer is the explained `not_optional` refusal, which only the HANDLER can
+      // produce. A 404 would be indistinguishable from the guard refusing. It also holds no
+      // place, so this entry needs no `undo`.
+      //
+      // The RELEASE and the places READ legitimately answer 404 — the appointments
+      // answer-routes' position: a mandatory session has no places surface at all, and the
+      // uniform refusal makes that deliberately indistinguishable from a session in another
+      // conference. The non-over-refusal half is proven with real optional-session fixtures in
+      // `enrolment-refusals.test.ts` and `enrolment-capacity.test.ts`, the only place it can
+      // honestly be proven.
+      // ─────────────────────────────────────────────────────────────────────────────────────
+      { template: '/events/:eventId/agenda/places/:sessionId', method: 'PUT', ok: 409 },
+      { template: '/events/:eventId/agenda/places/:sessionId', method: 'DELETE', ok: 404 },
+      { template: '/events/:eventId/sessions/:sessionId/places', method: 'GET', ok: 404 },
       { template: '/events/:eventId/agenda/notes', method: 'GET', ok: 200 },
       {
         template: '/events/:eventId/agenda/notes/:sessionId',

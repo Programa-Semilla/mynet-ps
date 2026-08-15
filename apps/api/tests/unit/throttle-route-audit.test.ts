@@ -139,6 +139,48 @@ const UNTHROTTLED_READS: Record<string, string> = {
     'engagement COUNTS per session and no attendee identity (FR-1025, FR-1042), so there is ' +
     'nothing here to collect in bulk. Every write on this surface is throttled on its own ' +
     'action instead.',
+
+  // ─────────────────────────────────────────────────────────────────────────────────────────
+  // **014 tranche 2 — the vocabulary reads.** The administrative three inherit the whole
+  // administrative argument above (platform tier only, no self sign-up, nothing in
+  // `apps/admin/src` polls); all carry reference-data LABELS and no attendee identity, no
+  // count and no roster (FR-1099b), so there is nothing to collect in bulk. Every vocabulary
+  // WRITE is throttled on its own `vocabulary_write` action.
+  // ─────────────────────────────────────────────────────────────────────────────────────────
+  'GET /admin/vocabulary/sectors':
+    'the sector list for the vocabulary screen, read when the destination is opened. Labels ' +
+    'and retirement stamps only — reference data, no attendee anywhere in it (FR-1085a).',
+  'GET /admin/vocabulary/subsectors':
+    'the subsector list, read with the sectors. Same reference-data argument.',
+  'GET /admin/vocabulary/interests':
+    'the interest-option list, read with the sectors. Same reference-data argument.',
+
+  // The attendee-side half. FR-803a's harm is bulk collection of PEOPLE — a directory paged at
+  // a hundred faces a request is why `directory_read` exists. This is a closed list of labels
+  // the product publishes identically to every signed-in attendee (FR-1096's reasoning: a
+  // closed vocabulary is not population data), read once when the profile editor or Discover's
+  // filters open, and nothing polls it. A rogue client rereading it collects the same handful
+  // of strings forever.
+  'GET /vocabulary':
+    'the choosable vocabulary: cross-event reference data, identical for every attendee, no ' +
+    'personal data to collect. Read when the profile editor opens; nothing polls it.',
+
+  // ─────────────────────────────────────────────────────────────────────────────────────────
+  // **014 tranche 2 — enrolment's two reads.** Person-driven, one session at a time; the WRITE
+  // that matters — taking a place — is bounded on its own `session_enrol` action, which exists
+  // to bound the exclusive session-row lock rather than work (research R12).
+  // ─────────────────────────────────────────────────────────────────────────────────────────
+  'GET /events/:eventId/sessions/:sessionId/places':
+    'the remaining-places figure for ONE optional session, read when its detail opens and while ' +
+    'a person decides (FR-1070). Live rather than cached because a stale number reads as a ' +
+    'promise of a place (FR-1070b) — live is about freshness, not frequency: nothing polls it, ' +
+    'no surface aggregates it across sessions (FR-1070a), and it carries a number and a boolean ' +
+    'about conference content, with no attendee anywhere in it.',
+  'GET /admin/conferences/:eventId/sessions/:id/enrolments':
+    'the enrolment roster, opened from one session by an organizer preparing materials — the ' +
+    'fourth Principle VIII exception (v5.3.0 O1), names only, bounded to an assigned ' +
+    'conference. Inherits the whole administrative argument above: no self sign-up into either ' +
+    'tier, and nothing in apps/admin/src polls.',
 }
 
 const methodsOf = (route: RouteOptions): string[] =>

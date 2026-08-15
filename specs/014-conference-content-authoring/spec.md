@@ -247,7 +247,9 @@ conference they were not assigned to.
 #### Conference creation
 
 - **FR-1007**: A platform operator MUST be able to create a conference with a name, location, start
-  date, end date and timezone.
+  date, end date and timezone. *Extended by tranche 2, not contradicted (FR-1059b): creation now
+  also collects an explicit **modality** — refused with its own named code when absent, because
+  FR-1048 forbids a default — and an optional **format**.*
 - **FR-1008**: A conference organizer MUST be able to create a conference, and MUST be assigned to
   the conference they create, in the same transaction.
 - **FR-1009**: Creating a conference MUST mint a join code that is unique product-wide and usable
@@ -309,12 +311,17 @@ conference they were not assigned to.
 
 #### Telling the attendee
 
-- **FR-1026**: A **material change** to a session an attendee has saved MUST dispatch exactly one
-  notification to that attendee. Material means exactly three things: **the session is cancelled,
-  its start time changes, or its room changes** (constitution v5.2.0, N1).
+- **FR-1026**: A **material change** to a session an attendee has saved *— or, since tranche 2,
+  holds a place in (FR-1079; reworded by T161 under FR-1079b so Part I and Part II cannot
+  disagree inside one document) —* MUST dispatch exactly one notification to that attendee.
+  Material means exactly three things: **the session is cancelled, its start time changes, or its
+  room changes** (constitution v5.2.0, N1).
 - **FR-1027**: A change to a session's title, summary, track or speakers MUST NOT dispatch a
   notification.
-- **FR-1028**: A change to a session **no** attendee has saved MUST dispatch nothing.
+- **FR-1028**: A change to a session **no** attendee has saved *— and, since tranche 2, no
+  attendee holds a place in (FR-1079b): as shipped this sentence read "no attendee has saved",
+  which FR-1079 directly contradicted, and the guard enforcing it was re-scoped AND renamed to
+  `dispatch-no-commitments.test.ts` in the same change —* MUST dispatch nothing.
 - **FR-1028a**: The **acting principal MUST NOT be notified of their own act.** An organizer who is
   also an attendee registered for their own conference, and who has saved the session they are
   changing, receives no notification and no marker for that change. They already know.
@@ -325,9 +332,11 @@ conference they were not assigned to.
   prevent.
 - **FR-1029**: A notification covering a **single** changed session MUST name that session and what
   changed, and activating it MUST open that session.
-- **FR-1030**: A materially changed saved session MUST carry an **in-app marker** on its row in
-  Agenda and on Home, distinguishing it from unchanged rows, and the marker MUST clear once the
-  attendee has viewed the session.
+- **FR-1030**: A materially changed saved session *— or held place: tranche 2 widens the marker to
+  both commitments (FR-1080), with the held place carrying its own `viewed_at` because an enrolled
+  attendee holds no saved row (reworded by T161 under FR-1079b) —* MUST carry an **in-app marker**
+  on its row in Agenda and on Home, distinguishing it from unchanged rows, and the marker MUST
+  clear once the attendee has viewed the session.
 - **FR-1031**: The marker MUST be **per-row state about one saved session**. Neither product may
   gain an aggregate count of changes, a list of changes, a notification bell, or any surface whose
   subject is "things that happened" (constitution v5.2.0, N2). This MUST be asserted as an absence.

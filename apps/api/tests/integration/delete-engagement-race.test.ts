@@ -12,7 +12,18 @@ import {
   sessionBody,
   type AuthoringFixture,
 } from './authoring-fixtures.js'
-import { ADA, attendees, clearThrottle, SEED_PASSWORD, setupTestApp, teardown } from './helpers.js'
+import {
+  ADA,
+  attendees,
+  clearThrottle,
+  cookieHeader,
+  GRACE,
+  registrations,
+  SEED_PASSWORD,
+  sessionCookieFrom,
+  setupTestApp,
+  teardown,
+} from './helpers.js'
 
 /**
  * T044 (014) — **the race FR-1019a exists to close, driven against a real PostgreSQL**
@@ -225,5 +236,107 @@ describe('the delete/engagement race (T044, FR-1019a)', () => {
     expect(
       await getDb().select({ id: sessions.id }).from(sessions).where(eq(sessions.id, sessionId)),
     ).toHaveLength(1)
+  })
+
+  it('serialises a concurrent ENROLMENT against the delete — a place never lands in a deleted session, and a delete never destroys a place placesSeen did not cover (T150, FR-1077b)', async () => {
+    // ─────────────────────────────────────────────────────────────────────────────────────────
+    // The tranche-2 variant of the race above, with the SAVE replaced by an ENROLMENT — the
+    // commitment that replaces saving on an optional session (FR-1064). The lock is the same
+    // `FOR UPDATE` on the session row (both `deleteSession` and `takePlace` take it, one mode,
+    // one lock — `queries/enrolments.ts`'s header), so the two requests cannot interleave: the
+    // loser waits and then re-reads a settled world.
+    //
+    // Driven through both REAL routes concurrently rather than by holding a transaction open,
+    // because an enrolment cannot be held mid-flight from outside — `takePlace` owns its
+    // transaction end to end. `Promise.all` against a real pool gives the race genuine
+    // opportunities to land both ways, and the invariant must hold in whichever order it does
+    // (enrolment-capacity.test.ts's own repetition argument):
+    //
+    //   - delete wins → the enrolment finds no session and is the uniform 404; no row exists.
+    //   - enrolment wins → the delete's re-read under the lock sees a place `placesSeen` (the
+    //     pre-race count, zero) did not cover, and refuses `places_changed` (FR-1077b); the
+    //     place survives.
+    //
+    // In NO ordering is a place written into a deleted session, and in NO ordering is a
+    // committed place destroyed unseen — which is FR-1019a's guarantee extended to the
+    // commitment FR-1077b exists to protect.
+    // ─────────────────────────────────────────────────────────────────────────────────────────
+    const db = getDb()
+    const graceId = (
+      await db.select({ id: attendees.id }).from(attendees).where(eq(attendees.email, GRACE))
+    )[0]?.id as string
+    await db
+      .insert(registrations)
+      .values({ attendeeId: graceId, eventId: fixture.assigned.eventId })
+    const signIn = await app.inject({
+      method: 'POST',
+      url: '/auth/sign-in',
+      payload: { email: GRACE, password: SEED_PASSWORD },
+    })
+    const grace = cookieHeader(sessionCookieFrom(signIn) as string)
+
+    for (let round = 0; round < 6; round += 1) {
+      const created = await app.inject({
+        method: 'POST',
+        url: `/admin/conferences/${fixture.assigned.eventId}/sessions`,
+        headers: { cookie },
+        payload: sessionBody(fixture.assigned, {
+          title: 'Contended Optional',
+          kind: 'optional',
+          capacity: 2,
+          enrolmentClosingOffsetHours: 0,
+        } as never),
+      })
+      expect(created.statusCode, created.body).toBe(201)
+      const optionalId = created.json().id as string
+
+      // `placesSeen=0` IS the correct figure for the pre-race count: nobody holds a place when
+      // the two requests are fired.
+      const [removed, enrolled] = await Promise.all([
+        app.inject({
+          method: 'DELETE',
+          url: `/admin/conferences/${fixture.assigned.eventId}/sessions/${optionalId}?placesSeen=0`,
+          headers: { cookie },
+        }),
+        app.inject({
+          method: 'PUT',
+          url: `/events/${fixture.assigned.eventId}/agenda/places/${optionalId}`,
+          headers: { cookie: grace },
+        }),
+      ])
+
+      const places = await getDb().execute<{ n: number }>(sql`
+        SELECT count(*)::int AS n FROM session_enrolments WHERE session_id = ${optionalId}::uuid
+      `)
+      const held = places[0]?.n ?? 0
+      const survivors = await getDb()
+        .select({ id: sessions.id })
+        .from(sessions)
+        .where(eq(sessions.id, optionalId))
+
+      if (removed.statusCode === 204) {
+        // The delete won the lock. The enrolment waited, re-read a world with no session, and
+        // was refused with the uniform 404 — never a place written into a session that is gone.
+        expect(
+          enrolled.statusCode,
+          `round ${round}: the delete committed, so the enrolment must have found nothing`,
+        ).toBe(404)
+        expect(survivors).toHaveLength(0)
+        expect(held, `round ${round}: no place may survive a committed delete`).toBe(0)
+      } else {
+        // The enrolment won the lock. The delete's re-read saw a place its `placesSeen` did
+        // not cover and refused — never a committed place destroyed.
+        expect(
+          removed.statusCode,
+          `round ${round}: with a place landed first, the delete must refuse`,
+        ).toBe(409)
+        const body = removed.json() as { code: string; placesHeld?: number }
+        expect(body.code).toBe('places_changed')
+        expect(body.placesHeld, 'the refusal re-presents the risen figure').toBe(1)
+        expect(enrolled.statusCode).toBe(204)
+        expect(survivors).toHaveLength(1)
+        expect(held, `round ${round}: the place that refused the delete survives it`).toBe(1)
+      }
+    }
   })
 })

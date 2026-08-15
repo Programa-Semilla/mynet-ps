@@ -401,10 +401,13 @@ tests; three helpers named callers that were inlined copies. In a codebase whose
 the comment is the record, a header is a claim that needs a guard like any other — and **three of
 the four already had the executor parameter**, so what looked like design work was wiring.
 
-**Migrations claimed so far run to `0011`** (`0011_conference_authoring.sql`, applied; `0009` is
-013's and 010 added no schema). **012 still reserves `0010`, unclaimed — it adds no schema — and 015
-reserves `0012`.** That numbering was the **third** collision between parallel branches over a
-reservation, and **014 extended the roadmap's reserved-number table rather than correcting it**
+**Migrations claimed so far run to `0012`** (`0012_optional_sessions_and_taxonomy.sql`, claimed by
+014 tranche 2; `0009` is 013's, `0011` tranche 1's, and 010 added no schema). **`0010` is permanently
+unclaimed** — it was reserved for 012, which adds no schema, and **v5.3.0's decision 53 replaced
+reserve-in-advance with claim-at-generation**, so nothing will ever fill it; a gap in the sequence is
+the cheaper artifact than a fourth collision. That numbering was the **third** collision between
+parallel branches over a reservation, and **014 extended the roadmap's reserved-number table rather
+than correcting it**
 (T102): it stopped at the shipped attendee programme and covered neither programme in flight, so a
 feature reserving a number had nothing to read. The rule it gained is that a phase in a *parallel*
 programme must extend that table in the same change, because the branch it would otherwise collide
@@ -426,12 +429,49 @@ Brainstorm #11 rescoped it from a parallel branch on 2026-08-12, and the owner d
 that **014 stays open and grows** rather than closing at what was built — #11's *"rescoped and kept
 whole"*, honoured literally.
 
-**Tranche 2 is SPECIFIED, PLANNED and TASKED as of 2026-08-14, on constitution v5.3.0 — ratified the
-same day — and no code is written.** It carries **all three** outstanding rows: the event model
+**Tranche 2 is IMPLEMENTED as of 2026-08-15, on constitution v5.3.0 — ratified 2026-08-14 — and it
+is the change that closes 014.** It carries **all three** outstanding rows: the event model
 (modality and format as two orthogonal axes, an optional room, a validated `https:`-only access link),
 optional sessions (capacity, a relative closing offset, enrolment **replacing** saving, a named
 roster), and the profile taxonomy. 93 requirements (FR-1045–FR-1099), 15 success criteria, 109 tasks
-(T106–T214), one PR, migration `0012`.
+(T106–T214), one PR, migration `0012`. **T206 and T207 — the by-hand walks of quickstart scenarios
+10–17, the latter needing a person and a phone — are outstanding and join the unwalked scenarios from
+007, 008, 009, 013, tranche 1 and 016.** Everything a machine can check is checked and green,
+including an end-to-end journey in which three attendees race for two places.
+
+**Invariants tranche 2 establishes:**
+
+- **The enrolment critical section is one lock with four callers** — enrol, release, a capacity
+  edit, and delete — all under `SELECT … FOR UPDATE` on the session row (research R12). N
+  concurrent takers of the last place produce exactly one refusal, and the refusal says the session
+  is **full**, which is a different sentence from **closed** (FR-1069/FR-1069a): the codes are
+  asserted mutually different, and adding a refusal means a distinct sentence plus updates to the
+  mutual-difference sets in both clients.
+- **`NOT_ENGAGEMENT` carries its first entry, and every future entry must say whose data it is and
+  why losing it silently is acceptable** (decision 51). An enrolment is outside decision 49's four,
+  so a session with held places may be deleted; the dialog states the number held and that nobody
+  will be told. **The held-places figure must never join `EngagementCounts`** (R15) — it would make
+  places-held sessions undeletable and quietly widen decision 49.
+- **The commitment set is one repository with a `saved | place` discriminator**, renamed
+  `CommitmentRepository` rather than grown a second member (R13). Remaining places is a **live
+  `passThrough` read** while the commitment set stays **cached** — deliberately opposite, because a
+  stale place count reads as a promise of a place.
+- **The fan-out is a union of savers and place-holders** — one coalesced notification per attendee,
+  whichever commitment they hold (`dispatch-no-commitments` renames tranche 1's guard to say so).
+- **Discover's filter options split by what the vocabulary is**: a closed choosable vocabulary is
+  offered whole (it is not population data), while roles keep accumulating what the reader has seen
+  (T214; guarded by `discover-filter-options.test.ts`).
+- **A CHECK constraint over an enumerated set is DERIVED from the source of that set**
+  (`ADMIN_AUDIT_ACTIONS`), never hand-copied — a 14-action literal drifted and broke only in
+  cross-file-order runs.
+- **A new integration file that depends on the seed reseeds in `beforeAll`.** Files run in size
+  order, so a tranche that changes file sizes re-exposes D19's weakness in files that never
+  changed; seven new files gained `resetDatabase()`.
+- **A CORS method list is exercised by nothing but a real browser's preflight.** `PATCH` — every
+  administrative update verb — was missing from it while all of T086's route-level tests passed,
+  because `fastify.inject()` performs no preflight; found by T202's end-to-end suite when every
+  admin edit failed as an opaque network error. The list in `app.ts` now carries a comment per
+  method naming its callers.
 
 **The record said the taxonomy was blocked on the client's lists, and that was wrong.** Brainstorm #12
 found REQ-035 names the four sectors verbatim — Servicios, Comercio, Industria, Agro — and that #11
@@ -1650,11 +1690,11 @@ Tranche 1 landed via PR [#23](https://github.com/Programa-Semilla/mynet-ps/pull/
 after all eleven CI jobs passed and `verify:clean` ran 13 of 13 green against a database that had
 never existed. It carries constitution **v5.2.0**, migration `0011`, and `deviations.md` **D22**.
 
-**What "open" now means, precisely, because the branch is gone.** The feature is not complete:
-tranche 2 — event types, optional sessions with capacity and enrolment, the profile taxonomy — has no
-code and no tasks. `specs/014-conference-content-authoring/` stays in place and carries that scope.
-**Tranche 2 starts from a fresh branch off `develop`**, against the same spec directory, and it is
-the change that closes 014.
+**Tranche 2 is now implemented on `spec/014-conference-content-authoring-tranche-2`**, a fresh
+branch off `develop` against the same spec directory, and it is the change that closes 014 —
+delivered as specified: event types, optional sessions with capacity and enrolment, the profile
+taxonomy, migration `0012`. What remains of 014 once its PR merges is the by-hand validation
+(T206/T207) that every feature since 007 has carried forward.
 
 **Merging rather than holding removed a standing obligation, and that is why it was the better
 choice.** Held, this branch would have had to re-merge `develop` on every merge to `develop` —

@@ -89,13 +89,15 @@ describe('no migration was added (FR-890)', () => {
 
     expect(
       applied.at(-1),
-      'An unrecorded migration was added. 011 added none (FR-890); 013 reserves `0009` and 014 ' +
-        'reserves `0011` — **`0010` is 012’s, from a parallel branch, and is deliberately not ' +
-        'here yet**. Anything past that has to be recorded here and in the roadmap first. A ' +
-        'migration also means the Drizzle snapshot was regenerated, which the migration README ' +
-        'warns against: `drizzle-kit generate` JSON-parses every file in meta/, so move that ' +
-        'README aside first.',
-    ).toBe('0011_conference_authoring.sql')
+      'An unrecorded migration was added. 011 added none (FR-890); 013 holds `0009`, 014 holds ' +
+        '`0011` (tranche 1) and `0012` (tranche 2, claimed at generation under v5.3.0 O4) — ' +
+        '**`0010` stays permanently EMPTY**: `0012` redefines the CHECK constraint `0011` drops ' +
+        'and re-adds, so filling the gap would order a dependent migration before its ' +
+        'dependency (meta/README.md §4). Anything past `0012` has to be recorded here and in ' +
+        'the roadmap first. A migration also means the Drizzle snapshot was regenerated, which ' +
+        'the migration README warns against: `drizzle-kit generate` JSON-parses every file in ' +
+        'meta/, so move that README aside first.',
+    ).toBe('0012_conference_authoring_tranche_2.sql')
   })
 
   it('leaves the journal alone', () => {

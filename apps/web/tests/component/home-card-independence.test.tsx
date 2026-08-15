@@ -42,7 +42,7 @@ describe('Home when one card fails', () => {
   it('renders EVERY OTHER CARD when the saved-session read fails (SC-212)', async () => {
     renderHome({
       catalog: { listSessions: async () => PROGRAMME, listTracks: async () => [] },
-      savedSessions: {
+      commitments: {
         // Only 005's card reads this. Its failure must be contained to it.
         listSaved: async () => {
           throw new Error('server fault')
@@ -51,11 +51,15 @@ describe('Home when one card fails', () => {
         unsave: async () => {},
 
         markViewed: async () => {},
+        // 014 tranche 2 — enrolment no-ops; `places` rejects so the figure is omitted (FR-1070b).
+        enrol: async () => {},
+        release: async () => {},
+        places: async () => Promise.reject(new Error('places not configured in this test')),
       },
     })
 
     // The failing card says so, in its own region.
-    const failing = await screen.findByRole('region', { name: 'Next saved session' })
+    const failing = await screen.findByRole('region', { name: 'Next on your programme' })
     expect(failing).toHaveTextContent(/could not be loaded/i)
 
     // And every other card renders. Home is not blank.
@@ -81,15 +85,19 @@ describe('Home when one card fails', () => {
         },
         listTracks: async () => [],
       },
-      savedSessions: {
+      commitments: {
         listSaved: async () => [],
         save: async () => {},
         unsave: async () => {},
         markViewed: async () => {},
+        // 014 tranche 2 — enrolment no-ops; `places` rejects so the figure is omitted (FR-1070b).
+        enrol: async () => {},
+        release: async () => {},
+        places: async () => Promise.reject(new Error('places not configured in this test')),
       },
     })
 
-    for (const name of ['Up next', 'Rest of your day', 'Next saved session']) {
+    for (const name of ['Up next', 'Rest of your day', 'Next on your programme']) {
       const region = await screen.findByRole('region', { name })
       expect(region, `${name} must render its own failure state`).toHaveTextContent(/connection/i)
     }
@@ -113,7 +121,7 @@ describe('Home when one card fails', () => {
           throw new Error('server fault')
         },
       },
-      savedSessions: {
+      commitments: {
         listSaved: async () => {
           throw new Error('server fault')
         },
@@ -121,6 +129,10 @@ describe('Home when one card fails', () => {
         unsave: async () => {},
 
         markViewed: async () => {},
+        // 014 tranche 2 — enrolment no-ops; `places` rejects so the figure is omitted (FR-1070b).
+        enrol: async () => {},
+        release: async () => {},
+        places: async () => Promise.reject(new Error('places not configured in this test')),
       },
       // ───────────────────────────────────────────────────────────────────────────────────────
       // 007 — **every read means every read.** The unread indicator renders nothing at zero
@@ -191,7 +203,9 @@ describe('Home when one card fails', () => {
       /everything else on Home still works/i,
     )
     // 005's card is unaffected by a sibling throwing.
-    expect(await screen.findByRole('region', { name: 'Next saved session' })).toBeInTheDocument()
+    expect(
+      await screen.findByRole('region', { name: 'Next on your programme' }),
+    ).toBeInTheDocument()
 
     consoleError.mockRestore()
   })

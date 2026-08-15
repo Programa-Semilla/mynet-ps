@@ -140,6 +140,137 @@ export type ErrorCode =
   | 'conference_ends_before_start'
   /** 014 — a start or end that is not a readable instant. Previously reported as a 404. */
   | 'malformed_time'
+  /**
+   * FR-1059b (014 tranche 2) — a conference creation carrying no modality. Its own code
+   * because FR-1048 forbids a default and a generic `validation_failed` cannot say which
+   * omission it means — this feature's recorded lesson about codes that share a sentence.
+   */
+  | 'modality_missing'
+  /**
+   * FR-1069/FR-1069a (014 tranche 2) — the four enrolment refusals, each its own code and each
+   * a different fact about the reader's own action: full, closed, already held, not an
+   * enrolment session. Mutually different by assertion, not by intention — this feature has
+   * already shipped six refusals rendered as two sentences once (D10).
+   */
+  | 'session_full'
+  | 'enrolment_closed'
+  | 'already_enrolled'
+  | 'not_optional'
+  /**
+   * FR-1064/FR-1064a (014 tranche 2) — saving an optional session. Refused with an explanation
+   * rather than the uniform 404, because what is refused is the ACT: enrolment replaces saving
+   * there, and there is no way to bookmark an optional session without committing to a place.
+   */
+  | 'not_saveable'
+  /**
+   * 014 tranche 2 — the organizer-side optional-session refusals (FR-1061, FR-1061a, FR-1062,
+   * FR-1062a, FR-1065, FR-1077b), each its own code on the D10 rule. `capacity_below_held` and
+   * `places_changed` carry the held COUNT in `details.placesHeld` — a count only, never
+   * identity (FR-1075a); the names travel on the roster route alone, under O1's bounds.
+   */
+  | 'capacity_invalid'
+  | 'closing_offset_invalid'
+  | 'mandatory_carries_no_places'
+  | 'capacity_below_held'
+  | 'kind_committed'
+  | 'places_changed'
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════════════════════
+   * **014 TRANCHE 2 (US8) — THE MODALITY AND ACCESS-LINK REFUSALS, EACH WITH ITS OWN CODE**
+   * (FR-1050, FR-1050a, FR-1050b, FR-1053, FR-1058a, FR-1059a).
+   *
+   * FR-1050b requires the modality row's refusals to be **mutually different**, asserted as
+   * difference from each other — this feature's twice-learned lesson that classifying on the
+   * code is worth nothing unless the code says which refusal it is. The forbidding half is
+   * split by direction because the messages genuinely differ: a link on an in-person
+   * conference and a room on a virtual one are different mistakes with different fixes.
+   * ═══════════════════════════════════════════════════════════════════════════════════════════
+   */
+  /**
+   * FR-1050 (014 T2) — a session carrying neither a room nor an access link, whatever its
+   * conference's modality. The one refusal in this row that does not depend on modality: a
+   * session with neither is a session nobody can attend.
+   */
+  | 'session_needs_room_or_link'
+  /**
+   * FR-1050a (014 T2) — an access link on a session of an **in-person** conference. The
+   * modality forbids as well as requires; a modality that only ever required would drift out
+   * of agreement with the programme silently.
+   */
+  | 'modality_forbids_link'
+  /**
+   * FR-1050a (014 T2) — a room on a session of a **virtual** conference. A room displayed on
+   * a session nobody attends in person is a place shown to people who cannot go there — the
+   * stranding FR-1022a exists to prevent.
+   */
+  | 'modality_forbids_room'
+  /**
+   * FR-1053 (014 T2) — a malformed access link, or one whose scheme is not `https:`.
+   * Well-formedness and scheme only; the permitted scheme set is `https:` alone, named in the
+   * requirement so a test can be written against it. `javascript:` and `data:` are the two
+   * the check exists for. **The product never fetches the link to find out whether it works**
+   * — that would be a server-side request to a URL a promoted attendee typed.
+   */
+  | 'access_link_invalid'
+  /**
+   * FR-1058a (014 T2) — clearing an access link refused while any attendee holds a place or a
+   * save on the session. Correction is always permitted (a corrected link is correct the
+   * moment they open the session); **removal** strands somebody who planned around it, and
+   * notifying instead would be a fourth material change requiring another amendment.
+   */
+  | 'access_link_committed'
+  /**
+   * FR-1059a (014 T2) — a modality change that would leave existing sessions violating
+   * FR-1050a, refused **naming the sessions** in `details.sessions` (FR-1014's shape, for
+   * FR-1014's reason: moving them first is the organizer's act, not the system's). Hybrid is
+   * the transitional modality by construction — the only value satisfied by both room-only
+   * and link-only sessions — so every move between in-person and virtual routes through it.
+   */
+  | 'modality_conflicts_sessions'
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════════════════════
+   * **014 TRANCHE 2 — THE VOCABULARY AND TAXONOMY REFUSALS, EACH WITH ITS OWN CODE.**
+   *
+   * The rule these follow is this feature's own recorded lesson, learned twice: *classifying on
+   * the code is worth nothing unless the code says which refusal it is.* Two different refusals
+   * must never share a code, because the administrative client renders one sentence per code and
+   * the sentence that mattered is the one that becomes unreachable.
+   *
+   * The first five are platform-tier authoring refusals; every one describes the caller's own
+   * act on reference data and none discloses anything about an attendee — the two "held" codes
+   * state THAT attendees hold a value, never who and never how many, because a number would be
+   * the per-value census FR-1099b forbids.
+   * ═══════════════════════════════════════════════════════════════════════════════════════════
+   */
+  /** FR-1085 (014 T2) — a vocabulary value with this label already exists in this list. */
+  | 'vocabulary_label_taken'
+  /**
+   * FR-1094c (014 T2) — renaming refused while any attendee holds the value. A rename changes
+   * what every holder's profile asserts about them without writing to any attendee record —
+   * FR-1093's forbidden outcome by a route that looks like editing content. Retire-plus-create
+   * is the offered alternative.
+   */
+  | 'vocabulary_rename_held'
+  /**
+   * FR-1094 (014 T2) — outright deletion refused while any attendee holds the value, with
+   * retirement offered instead — the delete-versus-cancel shape FR-1017 and FR-1019 establish.
+   */
+  | 'vocabulary_delete_held'
+  /** FR-1087 (014 T2) — a new subsector under a retired sector: not on offer, so not refinable. */
+  | 'sector_retired'
+  /** FR-1087 (014 T2) — a sector still refined by subsectors cannot be deleted; move them first. */
+  | 'sector_has_subsectors'
+  /**
+   * The three profile-write refusals (FR-1095b, FR-1087, FR-1088): a value that is neither held
+   * by the writing attendee nor currently choosable. Distinct per field, because the next step
+   * differs — choose a listed sector, choose a subsector OF your sector, choose an interest from
+   * the vocabulary — and a shared code would render them as one sentence.
+   */
+  | 'sector_not_choosable'
+  | 'subsector_not_choosable'
+  /** FR-1087 (014 T2) — a real subsector, of a different sector than the one submitted. */
+  | 'subsector_outside_sector'
+  | 'interest_not_choosable'
 
 export class AppError extends Error {
   readonly statusCode: number

@@ -278,3 +278,21 @@ An entry is removed once a brainstorm document has been written from it.
 - **Summary**: A creating organizer's self-assignment sets `assigned_by` to the first non-deactivated operator, who took no part in the grant — so `organizer_assignments` records a grant that never happened, and the compensating record is the audit trail FR-999 forbids reading. Separately, `requireOperator` admits anyone holding *any* live assignment.
 
 > Two consequences worth deciding rather than inheriting. The column's own schema comment says it means "the platform operator who granted this (FR-933)", and it now means two different things depending on which write produced the row, with nothing distinguishing them. And because creating mints a fresh live assignment while revocation is per-conference and manual, an organizer being wound down can keep administrative access alive by creating conferences — v5.2.0's N3 accepted "bounded by trust" for how many, but does not appear to have weighed demotion resistance.
+
+### roster-read-unaudited
+
+- **Source**: deep-review
+- **Date**: 2026-08-15
+- **Reference**: spec/014-conference-content-authoring-tranche-2
+- **Summary**: Reading the enrolment roster — the first administrative read of attendee personal data, the fourth Principle VIII exception — writes no audit entry, and the `admin_audit_entries_action_valid` CHECK carries no roster-read action, so the trail could not record it even if a later change wanted to.
+
+> 013 set the precedent this diverges from: reading the report *queue* (no content) is unaudited, but reading one report — the disclosure moment — writes `disclose_report_content` in the same transaction. The roster read is the analogous disclosure moment for the fourth exception, and as shipped an authorized principal can enumerate every roster repeatedly with no record. The spec is silent on it, so this may be the design — the attendee consented before enrolling (FR-1074) — but the asymmetry with 013's precedent is undocumented, and it should be either an audit action or a recorded reason, decided rather than inherited.
+
+### held-retired-sector-chooser-dead-end
+
+- **Source**: deep-review
+- **Date**: 2026-08-15
+- **Reference**: spec/014-conference-content-authoring-tranche-2
+- **Summary**: An attendee holding a retired sector cannot add a live subsector of it in `ProfileEdit` — `selectedSectorId` resolves only from choosable sectors, so the chooser filters to empty — although the server explicitly permits the write and `readChoosableVocabulary` keeps those subsectors on the wire specifically for this flow.
+
+> Two server comments describe a client flow the client cannot reach: the subsectors are delivered and can never be shown, and the empty-state text ("No subsectors of X are defined yet") is misleading when X is retired-but-held. The fix needs the choosable payload to carry the held sector's id↔label mapping (or subsector rows to carry their parent's label), which is a wire-shape change — worth a small decision rather than a quiet patch.

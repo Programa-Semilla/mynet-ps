@@ -159,9 +159,12 @@ export const adminAuditEntries = pgTable(
     occurredAt: timestamp('occurred_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
+    // Derived from ADMIN_AUDIT_ACTIONS rather than restated: tranche 2 found this constraint
+    // carrying its own hand-copy of the list, which is how an action gets declared, used, and
+    // refused by the database that was never told about it. One source, two readers.
     check(
       'admin_audit_entries_action_valid',
-      sql`${table.action} in ('promote', 'demote', 'resolve_report', 'remove_question', 'deactivate_operator', 'disclose_report_content', 'create_conference', 'update_conference', 'write_catalog', 'delete_catalog', 'write_session', 'cancel_session', 'reinstate_session', 'delete_session')`,
+      sql`${table.action} in (${sql.raw(ADMIN_AUDIT_ACTIONS.map((a) => `'${a}'`).join(', '))})`,
     ),
 
     // The retention sweep's predicate, and the only ordering anybody would read this table by.
@@ -245,6 +248,23 @@ export const ADMIN_AUDIT_ACTIONS = [
   'cancel_session',
   'reinstate_session',
   'delete_session',
+
+  // ───────────────────────────────────────────────────────────────────────────────────────────
+  // 014 tranche 2 — **vocabulary authoring, platform tier only** (FR-1089, FR-1089a). Three
+  // rather than one, on the same reasoning as the catalog's split above: retiring a value and
+  // deleting one are the acts the trail exists to tell apart — retirement is reversible and
+  // writes to no attendee record, deletion is permitted only while nobody holds the value — so
+  // an entry that could not distinguish them would be unable to answer the only question
+  // anybody would ask of it. `retire_vocabulary_value` covers un-retiring too: same subject,
+  // same reversibility, direction recorded in the entry's detail.
+  //
+  // Adding these REDEFINES `admin_audit_entries_action_valid` — the same named CHECK `0011`
+  // drops and re-adds — which is why tranche 2's migration is `0012` and depends on `0011`
+  // (R19), and why `0010` stays permanently empty.
+  // ───────────────────────────────────────────────────────────────────────────────────────────
+  'write_vocabulary',
+  'retire_vocabulary_value',
+  'delete_vocabulary_value',
 ] as const
 
 export type AdminAuditAction = (typeof ADMIN_AUDIT_ACTIONS)[number]

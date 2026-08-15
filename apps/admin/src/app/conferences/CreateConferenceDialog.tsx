@@ -1,8 +1,10 @@
+import type { ConferenceFormat, ConferenceModality } from '@mynet/data'
 import { useId, useState } from 'react'
 
 import { classify, describe, detailOf } from '../errors.js'
 import { useAdminSession } from '../session.js'
 import { AdminDialog } from '../shell/AdminDialog.js'
+import { FORMAT_LABELS, FORMATS, MODALITIES, MODALITY_LABELS } from './event-type-options.js'
 
 /**
  * T086, T087 (014) — creating a conference (FR-1007, FR-1008, FR-1009, FR-1010).
@@ -56,6 +58,8 @@ export const CreateConferenceDialog = ({
     startsOn: useId(),
     endsOn: useId(),
     timezone: useId(),
+    modality: useId(),
+    format: useId(),
   }
 
   const [name, setName] = useState('')
@@ -63,6 +67,11 @@ export const CreateConferenceDialog = ({
   const [startsOn, setStartsOn] = useState('')
   const [endsOn, setEndsOn] = useState('')
   const [timezone, setTimezone] = useState('UTC')
+  // T191 (FR-1059b, FR-1048) — NO default, deliberately: the empty value is "nobody chose",
+  // and the form will not submit until somebody does. Defaulting to in-person here would be
+  // FR-1048's silent default reintroduced one layer up from the column that dropped it.
+  const [modality, setModality] = useState<ConferenceModality | ''>('')
+  const [format, setFormat] = useState<ConferenceFormat | ''>('')
   const [busy, setBusy] = useState(false)
   const [failure, setFailure] = useState<string | null>(null)
   const [joinCode, setJoinCode] = useState<string | null>(null)
@@ -73,7 +82,8 @@ export const CreateConferenceDialog = ({
     startsOn === '' ||
     endsOn === '' ||
     endsOn < startsOn ||
-    timezone.trim().length === 0
+    timezone.trim().length === 0 ||
+    modality === ''
 
   /**
    * ═══════════════════════════════════════════════════════════════════════════════════════════
@@ -103,12 +113,15 @@ export const CreateConferenceDialog = ({
     setStartsOn('')
     setEndsOn('')
     setTimezone('UTC')
+    setModality('')
+    setFormat('')
     setFailure(null)
     setJoinCode(null)
     onClose()
   }
 
   const create = async () => {
+    if (modality === '') return
     setBusy(true)
     setFailure(null)
     try {
@@ -118,6 +131,8 @@ export const CreateConferenceDialog = ({
         startsOn,
         endsOn,
         timezone: timezone.trim(),
+        modality,
+        format: format === '' ? null : format,
       })
       setJoinCode(created.joinCode)
       onCreated()
@@ -238,6 +253,55 @@ export const CreateConferenceDialog = ({
               An IANA name, e.g. Europe/Madrid. It can only be changed while the conference has no
               sessions.
             </p>
+          </div>
+
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <div>
+              <label htmlFor={ids.modality} className="text-sm font-medium text-text-primary">
+                Modality
+              </label>
+              {/*
+                T191 (FR-1059b, FR-1046, FR-1048) — an explicit choice from the closed set,
+                with NO preselected value: the placeholder is not submittable, so "nobody
+                chose" cannot reach the server as a value. What it governs is what each
+                session must carry — a room in person, a joining link virtually, either
+                hybrid — which is why there is no safe default to offer.
+              */}
+              <select
+                id={ids.modality}
+                value={modality}
+                onChange={(event) => setModality(event.target.value as ConferenceModality | '')}
+                className={field}
+              >
+                <option value="" disabled>
+                  Choose one…
+                </option>
+                {MODALITIES.map((value) => (
+                  <option key={value} value={value}>
+                    {MODALITY_LABELS[value]}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label htmlFor={ids.format} className="text-sm font-medium text-text-primary">
+                Format
+              </label>
+              {/* Optional and purely descriptive (FR-1047): nothing anywhere branches on it. */}
+              <select
+                id={ids.format}
+                value={format}
+                onChange={(event) => setFormat(event.target.value as ConferenceFormat | '')}
+                className={field}
+              >
+                <option value="">No format</option>
+                {FORMATS.map((value) => (
+                  <option key={value} value={value}>
+                    {FORMAT_LABELS[value]}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
           {/* A disabled control while the form is incomplete, never an error afterwards. */}

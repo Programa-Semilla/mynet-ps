@@ -155,3 +155,11 @@ export * from './report-resolutions.js'
 // The accountability record. `subject_attendee_id` carries no foreign key, deliberately, so
 // erasure can clear it by written rule rather than by constraint (FR-997a, research R6).
 export * from './admin-audit.js'
+
+// 014 tranche 2 — the product-wide controlled vocabulary: sectors, subsectors and
+// networking-interest options. **Reference data, not attendee data** (FR-1085a), cross-event
+// because a profile describes the person rather than their presence at one conference. A new
+// file rather than an addition to `profiles.js`, and the file states why (R17). An attendee's
+// *chosen* values stay on `attendee_profiles` / `attendee_interests`, which are unchanged in
+// shape.
+export * from './vocabulary.js'

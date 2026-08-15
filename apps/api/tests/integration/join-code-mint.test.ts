@@ -77,6 +77,8 @@ describe('the minted join code (T081, FR-1009, SC-1011)', () => {
         startsOn: '2028-06-01',
         endsOn: '2028-06-02',
         timezone: 'UTC',
+        // T191 (014 tranche 2, FR-1059b): creation collects an explicit modality.
+        modality: 'in-person',
       },
     })
     expect(response.statusCode).toBe(201)

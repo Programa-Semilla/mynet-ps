@@ -47,6 +47,14 @@ export interface DirectoryRow {
   readonly company: string | null
   readonly role: string | null
   readonly headline: string | null
+  /**
+   * T180 (014 tranche 2) — the productive-activity description (FR-1099d, REQ-030): what this
+   * person actually makes or does, shown on the card and searched by the free-text predicate.
+   * Sector and subsector are deliberately NOT here — their route into Discover is the filter
+   * question FR-1099 leaves open (T214), and neither the card nor the search may answer it by
+   * accident.
+   */
+  readonly productiveActivity: string | null
   readonly networkingIntent: NetworkingIntent | null
   readonly availability: Availability | null
   readonly interests: readonly string[]
@@ -190,7 +198,8 @@ export const listDirectory = async (
         a.display_name || ' ' ||
         coalesce(p.company, '') || ' ' ||
         coalesce(p.role, '') || ' ' ||
-        coalesce(p.headline, '')
+        coalesce(p.headline, '') || ' ' ||
+        coalesce(p.productive_activity, '')
       )) LIKE '%' || unaccent(lower(${escapeLike(search)})) || '%' ESCAPE '\\'
     `)
   }
@@ -240,6 +249,7 @@ export const listDirectory = async (
     company: string | null
     role: string | null
     headline: string | null
+    productive_activity: string | null
     networking_intent: NetworkingIntent | null
     availability: Availability | null
     interests: string[] | null
@@ -253,6 +263,7 @@ export const listDirectory = async (
       p.company                             AS company,
       p.role                                AS role,
       p.headline                            AS headline,
+      p.productive_activity                 AS productive_activity,
       p.networking_intent                   AS networking_intent,
       p.availability                        AS availability,
       coalesce(listed.interests, ARRAY[]::text[]) AS interests,
@@ -307,6 +318,7 @@ export const listDirectory = async (
       company: row.company,
       role: row.role,
       headline: row.headline,
+      productiveActivity: row.productive_activity,
       networkingIntent: row.networking_intent,
       availability: row.availability,
       interests: row.interests ?? [],

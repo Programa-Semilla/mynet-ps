@@ -7,9 +7,11 @@ import {
 } from '../../admin/require-conference-authority.js'
 import { assertVerifiedOperator, type OperatorScope } from '../../admin/scope.js'
 import { getDb } from '../client.js'
-import { savedSessions, sessionNotes } from '../schema/agenda.js'
+import { savedSessions, sessionEnrolments, sessionNotes } from '../schema/agenda.js'
 import { rooms, sessions, sessionSpeakers, speakers, tracks } from '../schema/catalog.js'
+import type { SessionKind } from '../schema/catalog.js'
 import { events } from '../schema/events.js'
+import type { ConferenceFormat, ConferenceModality } from '../schema/events.js'
 import { organizerAssignments } from '../schema/organizer-assignments.js'
 import { questionVotes, sessionQuestions } from '../schema/questions.js'
 import { appendAuditEntry } from './admin-audit.js'
@@ -164,8 +166,16 @@ export interface SessionRow {
   readonly startsAt: Date
   readonly endsAt: Date
   readonly trackId: string
-  readonly roomId: string
+  // Nullable since 014 tranche 2 (FR-1049): a virtual session carries an access link instead.
+  readonly roomId: string | null
   readonly cancelledAt: Date | null
+  // 014 tranche 2 — the kind and, for an optional session, its bounds (FR-1060–FR-1062) and
+  // where it is attended (FR-1052). The editor needs all four to present the session it is
+  // editing; the pairing rules live in `validateKindFields` and the CHECK, not in this type.
+  readonly kind: SessionKind
+  readonly capacity: number | null
+  readonly enrolmentClosingOffsetHours: number | null
+  readonly accessLink: string | null
 }
 
 export interface CatalogEntryInput {
@@ -201,8 +211,31 @@ export interface SessionInput {
   readonly startsAt: string
   readonly endsAt: string
   readonly trackId: string
-  readonly roomId: string
+  /**
+   * T188 (014 tranche 2) — nullable since FR-1049: a virtual session carries an access link
+   * instead of a room. **Which of the two a session must carry is decided by the conference's
+   * modality at the write path** (`validateModalityFields`), because a CHECK constraint cannot
+   * reference `events.modality`; the `sessions_room_or_link` CHECK is the last line of defence
+   * for the one half that does not depend on modality (FR-1050).
+   */
+  readonly roomId: string | null
+  /**
+   * T189 (014 tranche 2) — the dedicated, validated field FR-1052 requires: `https:` only,
+   * well-formedness and scheme checked and **never fetched** (FR-1053). Lives here rather
+   * than in the summary so nothing has to parse free text to find it.
+   */
+  readonly accessLink: string | null
   readonly speakerIds: readonly string[]
+  /**
+   * T141's server half (014 tranche 2) — the session's kind and, for an optional one, its
+   * bounds (FR-1060, FR-1061, FR-1062). Absent a stated kind the route supplies `mandatory`;
+   * the pairing rules — optional carries both fields, mandatory carries neither — are enforced
+   * by `validateKindFields` with distinct codes, and by the `sessions_kind_fields` CHECK as
+   * the last line of defence (009's two-layer rule).
+   */
+  readonly kind: SessionKind
+  readonly capacity: number | null
+  readonly enrolmentClosingOffsetHours: number | null
 }
 
 /**
@@ -251,6 +284,53 @@ export type WriteRefusal =
   | 'conference-ends-before-start'
   /** A start or end that is not a parseable instant. */
   | 'malformed-time'
+  /**
+   * T191 (014 tranche 2) — a conference creation carrying no modality (FR-1059b).
+   *
+   * Its own code rather than a generic validation failure, because FR-1048's no-default rule
+   * has no write path that honours it otherwise: the route schema deliberately does NOT list
+   * `modality` as required, so the refusal comes from here with a name the client can render.
+   */
+  | 'modality-missing'
+  /**
+   * T137, T142, T143 (014 tranche 2) — the optional-session shape rules, each its own code
+   * (FR-1061, FR-1061a, FR-1062, FR-1062a, FR-1065). Distinct because they are different facts
+   * about the caller's own edit that lead to different next steps — this feature's D10 lesson.
+   */
+  /** An optional session without a capacity of at least one, including zero (FR-1061). */
+  | 'capacity-invalid'
+  /** An optional session without a non-negative closing offset in hours (FR-1062). */
+  | 'closing-offset-invalid'
+  /** A mandatory session carrying a capacity or an offset — a field somebody will fill in (FR-1062a). */
+  | 'mandatory-carries-no-places'
+  /** Capacity lowered below the places held; carries the count, evicts nobody (FR-1061a). */
+  | 'capacity-below-held'
+  /** A kind change while any save or place exists (FR-1065). */
+  | 'kind-committed'
+  /** More places were taken since the organizer was shown the figure (FR-1077b). */
+  | 'places-changed'
+  /**
+   * T188, T189 (014 tranche 2) — the modality and access-link refusals (FR-1050, FR-1050a,
+   * FR-1050b, FR-1053, FR-1058a, FR-1059a), each its own member because each is a different
+   * fact about the caller's own edit. FR-1050b requires them mutually different, and the
+   * forbidding half is split by direction because the fixes genuinely differ.
+   */
+  /** A session carrying neither a room nor an access link — nobody could attend it (FR-1050). */
+  | 'room-or-link-missing'
+  /** An access link on a session of an in-person conference (FR-1050a). */
+  | 'modality-forbids-link'
+  /** A room on a session of a virtual conference (FR-1050a). */
+  | 'modality-forbids-room'
+  /** A malformed access link, or one whose scheme is not `https:` (FR-1053). */
+  | 'access-link-invalid'
+  /** Clearing an access link while any attendee holds a place or a save (FR-1058a). */
+  | 'access-link-committed'
+  /**
+   * A modality change that would leave existing sessions violating FR-1050a, naming them in
+   * `sessions` (FR-1059a). Hybrid is the transitional modality by construction, so every move
+   * between in-person and virtual routes through it.
+   */
+  | 'modality-conflicts-sessions'
 
 export type WriteResult<T> =
   | { readonly ok: true; readonly value: T }
@@ -261,6 +341,22 @@ export type WriteResult<T> =
       readonly sessions?: readonly { readonly id: string; readonly title: string }[]
       /** The engagement behind a refused deletion (FR-1019, FR-1025). Counts only. */
       readonly engagement?: EngagementCounts
+      /**
+       * T148 (014 tranche 2) — the held-places figure behind `capacity-below-held` and
+       * `places-changed` (FR-1061a, FR-1077b). **A separate field beside the four engagement
+       * counts, never a fifth member of them**: the delete boolean is derived by summing
+       * `EngagementCounts`, so a fifth count would silently make places-held sessions
+       * undeletable — the opposite of v5.3.0 O2, and nothing would catch it (research R15).
+       * A count only, never identity (FR-1075a: FR-1025 survives for the four; enrolment's
+       * names travel on the roster route alone, under O1's bounds).
+       */
+      readonly placesHeld?: number
+      /**
+       * T185 (014 tranche 2) — the saved-session count behind `access-link-committed`
+       * (FR-1058a), which names BOTH kinds of commitment because either one refuses the
+       * clearing. A count only, never identity — FR-1025 survives unnarrowed for saves.
+       */
+      readonly saved?: number
     }
 
 const refused = <T>(
@@ -429,6 +525,18 @@ export const deleteTrack = async (
 ): Promise<WriteResult<null>> => {
   const scope = assertVerifiedConferenceAuthority(unverified)
 
+  // The track row is taken `FOR UPDATE` before the reference check, for `deleteSession`'s
+  // reason: decided from an unlocked read, a session write that references this track and
+  // commits between check and delete surfaces as a raw 23503 — a 500 for a refusal every
+  // other outcome delivers tidily. The exclusive parent-row lock conflicts with the
+  // `FOR KEY SHARE` a referencing insert takes, so the check and the delete see one world.
+  const held = await tx.execute<{ id: string }>(sql`
+    SELECT id FROM ${tracks}
+    WHERE id = ${id}::uuid AND event_id = ${scope.eventId}::uuid
+    FOR UPDATE
+  `)
+  if (held.length === 0) return refused('not-found')
+
   const referencing = await tx
     .select({ id: sessions.id })
     .from(sessions)
@@ -454,6 +562,14 @@ export const deleteRoom = async (
 ): Promise<WriteResult<null>> => {
   const scope = assertVerifiedConferenceAuthority(unverified)
 
+  // `FOR UPDATE` before the reference check — `deleteTrack`'s reasoning, same mechanism.
+  const held = await tx.execute<{ id: string }>(sql`
+    SELECT id FROM ${rooms}
+    WHERE id = ${id}::uuid AND event_id = ${scope.eventId}::uuid
+    FOR UPDATE
+  `)
+  if (held.length === 0) return refused('not-found')
+
   const referencing = await tx
     .select({ id: sessions.id })
     .from(sessions)
@@ -478,8 +594,10 @@ export const deleteRoom = async (
  * **No reference check, and that asymmetry with tracks and rooms is correct rather than an
  * omission.** `session_speakers` cascades from `speakers.id`, and a session's speakers are
  * optional by design (FR-138) — removing one leaves a session with one fewer speaker, which is a
- * legitimate programme. A session with no *track* or no *room* cannot exist at all: both columns
- * are `NOT NULL`, which is why those two refuse.
+ * legitimate programme. A session with no *track* cannot exist at all (`track_id` is `NOT NULL`),
+ * and a *room*, nullable since FR-1049, still cannot be taken away by a side effect: silently
+ * clearing it from a session would leave an in-person session violating FR-1050a with nobody
+ * having edited the session — which is why rooms refuse while referenced rather than detach.
  */
 export const deleteSpeaker = async (
   unverified: ConferenceAuthorityScope,
@@ -537,6 +655,21 @@ export const createSession = async (
   const times = validateTimes(input)
   if (times) return refused(times)
 
+  const kindShape = validateKindFields(input)
+  if (kindShape) return refused(kindShape)
+
+  // FR-1053 — well-formedness and scheme, before anything touches the database. The link is
+  // NEVER fetched: that would be a server-side request to a URL a promoted attendee typed.
+  const link = validateAccessLink(input)
+  if (link) return refused(link)
+
+  // T188 (014 tranche 2) — FR-1050a is a WRITE-PATH rule and can only be one: a CHECK cannot
+  // reference `events.modality`, so the `sessions_room_or_link` CHECK covers only FR-1050's
+  // modality-independent half and this call is the whole of the rest. Tested as such, with the
+  // route bypassed, in `tests/integration/session-modality.test.ts` (009's two-layer rule).
+  const shape = validateModalityFields(await conferenceModality(scope, tx), input)
+  if (shape) return refused(shape)
+
   if (!(await belongsToConference(scope, input, tx))) return refused('not-found')
   if (!(await withinConferenceDays(scope, input, tx))) return refused('outside-conference-days')
 
@@ -550,6 +683,10 @@ export const createSession = async (
       endsAt: new Date(input.endsAt),
       trackId: input.trackId,
       roomId: input.roomId,
+      accessLink: input.accessLink,
+      kind: input.kind,
+      capacity: input.capacity,
+      enrolmentClosingOffsetHours: input.enrolmentClosingOffsetHours,
     })
     .returning()
 
@@ -593,11 +730,67 @@ export const updateSession = async (
   const times = validateTimes(input)
   if (times) return refused(times)
 
-  const before = await readSession(scope, id, tx)
+  const kindShape = validateKindFields(input)
+  if (kindShape) return refused(kindShape)
+
+  // FR-1053 and FR-1050a, exactly as on the create path — see `createSession` for why the
+  // modality rule can only live at the write path.
+  const link = validateAccessLink(input)
+  if (link) return refused(link)
+
+  const shape = validateModalityFields(await conferenceModality(scope, tx), input)
+  if (shape) return refused(shape)
+
+  // ─────────────────────────────────────────────────────────────────────────────────────────
+  // **The before-read takes the session-row lock** (014 tranche 2; the lock and its ordering
+  // rule are documented once, in `queries/enrolments.ts`'s header, for all four callers).
+  // Tranche 1 read the before-row unlocked, which was sound while nothing this function
+  // decided depended on concurrent attendee writes. FR-1061a and FR-1065 change that: the
+  // capacity floor and the kind-change refusal below are decided against the held count, and
+  // an enrolment landing between an unlocked read and the update would slip past both — a
+  // place taken over the new cap with nobody having enrolled over a limit, or exactly the
+  // saved-optional state FR-1064 says has no route.
+  // ─────────────────────────────────────────────────────────────────────────────────────────
+  const before = await readSessionLocked(scope, id, tx)
   if (!before) return refused('not-found')
 
   if (!(await belongsToConference(scope, input, tx))) return refused('not-found')
   if (!(await withinConferenceDays(scope, input, tx))) return refused('outside-conference-days')
+
+  // FR-1065 — a kind change while anybody holds a save or a place. Refused with its own
+  // explanation, because there is no honest answer to forty saves becoming twenty places, and
+  // inventing one would make the product choose which twenty.
+  if (input.kind !== before.kind) {
+    const committed = await commitmentCountsFor(id, tx)
+    if (committed.saves + committed.places > 0) return refused('kind-committed')
+  }
+
+  // FR-1061a — capacity must not drop below the places held. Read HERE, inside the updating
+  // transaction with the row locked, and never before it (the one property no layer above a
+  // real database can test). Raising is always permitted; it takes nothing from anybody.
+  if (input.kind === 'optional' && input.capacity !== null) {
+    const held = await heldPlacesCount(id, tx)
+    if (input.capacity < held) return refused('capacity-below-held', { placesHeld: held })
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────────────────
+  // T185 (014 tranche 2) — **CORRECTING an access link is always permitted; REMOVING one is
+  // refused while any attendee holds a place or a save** (FR-1058a). The two acts differ in
+  // what they do to somebody committed to the session: a corrected link is correct the moment
+  // they open the session (FR-1058's argument), while a link that disappears strands them —
+  // and notifying instead would be a fourth material change requiring another amendment.
+  // Checked under the same session-row lock as the two rules above, so a place taken while the
+  // organizer edits blocks rather than slipping past the count.
+  // ─────────────────────────────────────────────────────────────────────────────────────────
+  if (before.accessLink !== null && input.accessLink === null) {
+    const committed = await commitmentCountsFor(id, tx)
+    if (committed.saves + committed.places > 0) {
+      return refused('access-link-committed', {
+        placesHeld: committed.places,
+        saved: committed.saves,
+      })
+    }
+  }
 
   const [after] = await tx
     .update(sessions)
@@ -608,6 +801,10 @@ export const updateSession = async (
       endsAt: new Date(input.endsAt),
       trackId: input.trackId,
       roomId: input.roomId,
+      accessLink: input.accessLink,
+      kind: input.kind,
+      capacity: input.capacity,
+      enrolmentClosingOffsetHours: input.enrolmentClosingOffsetHours,
     })
     .where(and(eq(sessions.id, id), eq(sessions.eventId, scope.eventId)))
     .returning()
@@ -654,6 +851,14 @@ export const deleteSession = async (
   unverified: ConferenceAuthorityScope,
   id: string,
   tx: Tx,
+  /**
+   * T150 (014 tranche 2, FR-1077b) — the held-places figure the organizer WAS SHOWN when they
+   * confirmed. Re-read below under the same lock; if it has RISEN since, the delete refuses
+   * and re-presents rather than destroying a place taken while the dialog was open. Defaults
+   * to zero, which is the honest floor: a caller that never showed a figure is refused into
+   * showing one the moment any place exists.
+   */
+  placesSeen = 0,
 ): Promise<WriteResult<null>> => {
   const scope = assertVerifiedConferenceAuthority(unverified)
 
@@ -678,14 +883,37 @@ export const deleteSession = async (
   // session worth deleting: a popular session normally has engagement, so the expensive branch
   // held the lock longest.
   //
-  // The counts answer the boolean, so the boolean is derived rather than asked for.
-  // `hasEngagement` remains the predicate of record in `session-changes.ts` — it is what
-  // `engagement-coverage.test.ts` derives its table set from, and what a caller with no need for
-  // counts should still use.
+  // The counts answer the boolean, so the boolean is derived rather than asked for. **The
+  // boolean is derived from EXACTLY these four** — tranche 2 deliberately keeps the held-places
+  // figure below OUT of this sum: an enrolment is not engagement (v5.3.0 O2, FR-1077), and a
+  // fifth count here would silently make places-held sessions undeletable (research R15).
+  //
+  // (A sentence here used to call `hasEngagement` "the predicate of record". It had no caller
+  // and no importer anywhere in the repository — a header asserting a call relationship that
+  // did not exist, 013's defect class — and tranche 2 deleted the function. The guard's table
+  // set comes from `ENGAGEMENT_TABLES`, which survives in `session-changes.ts` on its own.)
   // ─────────────────────────────────────────────────────────────────────────────────────────
   const engagement = await countEngagement(id, tx)
   if (engagement.saved + engagement.notes + engagement.questions + engagement.votes > 0) {
     return refused('has-engagement', { engagement })
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────────────────
+  // T150 (014 tranche 2) — **deletion with places held is PERMITTED, and this re-read is the
+  // only protection anybody gets** (v5.3.0 O2, FR-1077, FR-1077b).
+  //
+  // Enrolling replaces saving, so the attendees about to lose their places hold no saved row:
+  // no marker can reach them, no notification is dispatched (register entry 31 is open on
+  // that), and nothing survives to explain the session's absence. The organizer's confirmation
+  // is therefore the whole of the warning — which is why the figure they were shown is re-read
+  // HERE, under the same lock FR-1019a takes, and the delete refuses and re-presents when it
+  // has risen. An enrolment landing mid-confirmation blocks on the `FOR UPDATE` above and then
+  // fails against a session that is gone, or lands first and raises the count this refusal
+  // reports.
+  // ─────────────────────────────────────────────────────────────────────────────────────────
+  const held = await heldPlacesCount(id, tx)
+  if (held > placesSeen) {
+    return refused('places-changed', { placesHeld: held })
   }
 
   await tx.delete(sessions).where(eq(sessions.id, id))
@@ -715,10 +943,22 @@ export const cancelSession = async (
   const before = await readSession(scope, id, tx)
   if (!before || before.cancelledAt !== null) return refused('not-found')
 
+  // `cancelledAt IS NULL` in the predicate itself, mirroring `reinstateSession`'s inverse six
+  // lines down — the unlocked pre-read above cannot carry idempotence alone. Two concurrent
+  // cancels both pass it; without this condition the second UPDATE blocks on the first's row
+  // lock, re-qualifies on a WHERE that still matches, overwrites the instant, writes a second
+  // audit act and dispatches a second notification for one cancellation. With it, the loser
+  // matches nothing and returns the same `not-found` the pre-read gives a settled cancellation.
   const [after] = await tx
     .update(sessions)
     .set({ cancelledAt: new Date() })
-    .where(and(eq(sessions.id, id), eq(sessions.eventId, scope.eventId)))
+    .where(
+      and(
+        eq(sessions.id, id),
+        eq(sessions.eventId, scope.eventId),
+        sql`${sessions.cancelledAt} is null`,
+      ),
+    )
     .returning()
 
   if (!after) return refused('not-found')
@@ -812,7 +1052,10 @@ export const reinstateSession = async (
  * delete is a control that exists only to produce a 409.
  *
  * Composed rather than copied, so the table set has one home in this file.
- * `engagement-coverage.test.ts` now checks this expression as well as `hasEngagement`.
+ * `engagement-coverage.test.ts` checks this expression; the boolean probe it was written for
+ * (`hasEngagement`) is deleted, so this aggregate and `ENGAGEMENT_TABLES` in
+ * `session-changes.ts` are the two expressions of the set that remain, and the test holds them
+ * to the schema and to each other.
  * ═════════════════════════════════════════════════════════════════════════════════════════════
  */
 const engagementCountsFor = (session: SQL) => sql`
@@ -919,6 +1162,19 @@ const stampMaterialChange = async (
       .update(savedSessions)
       .set({ viewedAt: sql`now()` })
       .where(and(eq(savedSessions.sessionId, id), eq(savedSessions.attendeeId, scope.attendeeId)))
+    // T164 (014 tranche 2, FR-1080) — the same acknowledgement for the OTHER commitment. An
+    // organizer may hold a place in the optional session they are changing; the fan-out now
+    // unions enrolments (FR-1079), so without this second stamp the marker and the
+    // notification would disagree for exactly the population tranche 2 added.
+    await tx
+      .update(sessionEnrolments)
+      .set({ viewedAt: sql`now()` })
+      .where(
+        and(
+          eq(sessionEnrolments.sessionId, id),
+          eq(sessionEnrolments.attendeeId, scope.attendeeId),
+        ),
+      )
   }
 }
 
@@ -932,6 +1188,18 @@ export interface ConferencePatch {
   readonly startsOn?: string
   readonly endsOn?: string
   readonly timezone?: string
+  /**
+   * T190 (014 tranche 2) — correctable after creation (FR-1059): no value set at creation is
+   * permanently uncorrectable. A change is refused while it would leave any existing session
+   * violating FR-1050a, naming them (FR-1059a); hybrid is the transitional value.
+   */
+  readonly modality?: ConferenceModality
+  /**
+   * A format change is ALWAYS permitted, because nothing branches on it (FR-1047) — a label
+   * that quietly acquired a validation rule here would be a second modality nobody declared.
+   * `null` clears it; the field is optional on a conference.
+   */
+  readonly format?: ConferenceFormat | null
 }
 
 /**
@@ -962,7 +1230,35 @@ export const patchConference = async (
 ): Promise<WriteResult<{ id: string }>> => {
   const scope = assertVerifiedConferenceAuthority(unverified)
 
-  const [current] = await tx.select().from(events).where(eq(events.id, scope.eventId)).limit(1)
+  // ─────────────────────────────────────────────────────────────────────────────────────────
+  // **The conference row is taken `FOR UPDATE` before any of the checks below, because every
+  // one of them is a programme-wide invariant no CHECK constraint can hold.** The orphan scan,
+  // the timezone freeze and the modality-violation scan all read `sessions` with plain
+  // SELECTs and then write `events`; a concurrent session write validates against `events`
+  // via `conferenceModality`/`withinConferenceDays`. Unlocked, the two transactions touch no
+  // common row and both commit — a link-only session validated against `hybrid` lands beside
+  // a conference concurrently patched to `in-person`, which is exactly the state FR-1050a
+  // declares unrepresentable and nothing downstream can repair. This exclusive lock conflicts
+  // with the `FOR SHARE` those two readers take, so a session write and a conference patch
+  // serialise against each other while session writes stay concurrent among themselves. The
+  // acquisition order is events → sessions in every path, so no cycle with the session-row
+  // lock's four callers is constructible.
+  // ─────────────────────────────────────────────────────────────────────────────────────────
+  const lockedConference = await tx.execute<{
+    name: string
+    location: string
+    startsOn: string
+    endsOn: string
+    timezone: string
+    modality: ConferenceModality
+    format: ConferenceFormat | null
+  }>(sql`
+    SELECT name, location, starts_on AS "startsOn", ends_on AS "endsOn", timezone, modality, format
+    FROM ${events}
+    WHERE id = ${scope.eventId}::uuid
+    FOR UPDATE
+  `)
+  const current = lockedConference[0]
 
   if (!current) return refused('not-found')
 
@@ -1036,6 +1332,33 @@ export const patchConference = async (
     }
   }
 
+  const modality = patch.modality ?? current.modality
+
+  if (modality !== current.modality) {
+    // ─────────────────────────────────────────────────────────────────────────────────────
+    // T190 (014 tranche 2) — **FR-1059a is FR-1014's shape for the modality**: the change is
+    // refused while any existing session would be left violating FR-1050a under the NEW
+    // value, naming them, because moving or cancelling them first is the organizer's act.
+    //
+    // **A direct in-person→virtual change is unreachable by construction, not merely
+    // refused**: every session of an in-person conference carries a room and no link — the
+    // write path enforces exactly that — so with any session at all, this query names every
+    // one of them. And the sessions cannot be prepared first, because FR-1050a forbids adding
+    // a link and forbids clearing the room while the conference is still in-person. **Hybrid
+    // is the transitional modality by construction**: it is the only value satisfied by both
+    // room-only and link-only sessions, so every move between in-person and virtual routes
+    // through it — in-person → hybrid (free), give each session a link and drop its room,
+    // then hybrid → virtual.
+    //
+    // A FORMAT change deliberately has no counterpart to this block: nothing depends on a
+    // format (FR-1047), so nothing can be left invalid by changing one.
+    // ─────────────────────────────────────────────────────────────────────────────────────
+    const violating = await sessionsViolatingModality(scope, modality, tx)
+    if (violating.length > 0) {
+      return refused('modality-conflicts-sessions', { sessions: violating })
+    }
+  }
+
   const [row] = await tx
     .update(events)
     .set({
@@ -1044,6 +1367,10 @@ export const patchConference = async (
       startsOn,
       endsOn,
       timezone,
+      modality,
+      // `undefined` means "not in the patch"; `null` means "clear it" — a format is optional
+      // on a conference, so clearing is an ordinary edit rather than a special act.
+      format: patch.format === undefined ? current.format : patch.format,
     })
     .where(eq(events.id, scope.eventId))
     .returning({ id: events.id })
@@ -1059,6 +1386,10 @@ export interface ConferenceInput {
   readonly startsOn: string
   readonly endsOn: string
   readonly timezone: string
+  // T191 (014 tranche 2, FR-1059b) — creation MUST collect an explicit modality: FR-1048's
+  // no-default rule has no write path that honours it otherwise. Format stays optional.
+  readonly modality: ConferenceModality
+  readonly format: ConferenceFormat | null
 }
 
 /**
@@ -1120,6 +1451,10 @@ export const createConference = async (
   // ═══════════════════════════════════════════════════════════════════════════════════════════
   const operator = assertVerifiedOperator(unverified)
 
+  // FR-1059b: an explicit modality is what makes FR-1048's no-default rule real at the only
+  // write path that creates a conference. Refused with its own named code, not a generic 400.
+  if (!input.modality) return refused('modality-missing')
+
   if (input.endsOn < input.startsOn) return refused('conference-ends-before-start')
 
   if (!(await timezoneKnown(input.timezone, tx))) return refused('unknown-timezone')
@@ -1174,6 +1509,14 @@ export const createConference = async (
 export interface ProgrammeSession extends SessionRow {
   readonly speakerIds: readonly string[]
   readonly engagement: EngagementCounts
+  /**
+   * T148 (014 tranche 2) — the held-places figure, **a separate field beside the four
+   * engagement counts and never a fifth member of them** (v5.3.0 O2, FR-1077b, research R15).
+   * The delete refusal derives its boolean by summing `engagement`; this is the number the
+   * confirmation must present — and must present as places that will be destroyed silently,
+   * never as a fifth reason deletion is blocked.
+   */
+  readonly placesHeld: number
 }
 
 export interface Programme {
@@ -1186,6 +1529,8 @@ export interface Programme {
     readonly timezone: string
     readonly joinCode: string
     readonly timezoneEditable: boolean
+    readonly modality: ConferenceModality
+    readonly format: ConferenceFormat | null
   }
   readonly tracks: readonly { id: string; name: string; colorToken: string }[]
   readonly rooms: readonly { id: string; name: string }[]
@@ -1261,14 +1606,24 @@ export const readProgramme = async (
 
   // One aggregate read for the whole conference rather than one per session: an organizer opening
   // a forty-session programme must not issue forty count queries.
+  //
+  // T148 (014 tranche 2) — `places_held` rides beside the four counts and is DELIBERATELY not a
+  // member of `engagementCountsFor`'s fragment: the delete refusal derives its boolean by
+  // summing that fragment, so a fifth count in it would silently make places-held sessions
+  // undeletable — the opposite of v5.3.0 O2, and no guard would catch it (research R15). A
+  // separate expression here, a separate field on the wire, and the confirmation dialog reads
+  // it as the FR-1077b/c figure rather than as engagement.
   const counts = await db.execute<{
     session_id: string
     saved: number
     notes: number
     questions: number
     votes: number
+    places_held: number
   }>(sql`
-    SELECT s.id AS session_id, ${engagementCountsFor(sql`s.id`)}
+    SELECT s.id AS session_id, ${engagementCountsFor(sql`s.id`)},
+           (SELECT count(*)::int FROM session_enrolments e WHERE e.session_id = s.id)
+             AS places_held
     FROM ${sessions} s
     WHERE s.event_id = ${scope.eventId}::uuid
   `)
@@ -1278,6 +1633,10 @@ export const readProgramme = async (
       row.session_id,
       { saved: row.saved, notes: row.notes, questions: row.questions, votes: row.votes },
     ]),
+  )
+
+  const placesBySession = new Map<string, number>(
+    counts.map((row) => [row.session_id, row.places_held]),
   )
 
   const zero: EngagementCounts = { saved: 0, notes: 0, questions: 0, votes: 0 }
@@ -1294,6 +1653,11 @@ export const readProgramme = async (
       // Surfaced rather than left for the client to infer from the session list, so the control
       // is disabled for the same reason the server would refuse (FR-1015).
       timezoneEditable: sessionRows.length === 0,
+      // T190 (014 tranche 2) — the editor needs both to present them, and the session form
+      // needs the modality to know which of room and access link to offer (FR-1050a). The
+      // format travels as data and nothing in either client may branch on it (FR-1047).
+      modality: conference.modality,
+      format: conference.format,
     },
     tracks: trackRows,
     rooms: roomRows,
@@ -1322,8 +1686,13 @@ export const readProgramme = async (
       trackId: row.trackId,
       roomId: row.roomId,
       cancelledAt: row.cancelledAt,
+      kind: row.kind,
+      capacity: row.capacity,
+      enrolmentClosingOffsetHours: row.enrolmentClosingOffsetHours,
+      accessLink: row.accessLink,
       speakerIds: bySession.get(row.id) ?? [],
       engagement: engagementBySession.get(row.id) ?? zero,
+      placesHeld: placesBySession.get(row.id) ?? 0,
     })),
   }
 }
@@ -1341,9 +1710,14 @@ export const readProgramme = async (
  */
 export const overlappingInRoom = async (
   unverified: ConferenceAuthorityScope,
-  input: { roomId: string; startsAt: string; endsAt: string; excludeSessionId?: string },
+  input: { roomId: string | null; startsAt: string; endsAt: string; excludeSessionId?: string },
 ): Promise<{ id: string; title: string }[]> => {
   const scope = assertVerifiedConferenceAuthority(unverified)
+
+  // T188 (014 tranche 2) — a roomless session cannot clash with anything, and that is now a
+  // DECLARED property rather than an accident of SQL three-valued logic: research R19 noted
+  // `eq(roomId, null)` matches nothing, which was the right answer for the wrong reason.
+  if (input.roomId === null) return []
 
   const rows = await getDb()
     .select({ id: sessions.id, title: sessions.title })
@@ -1436,6 +1810,16 @@ const belongsToConference = async (
   input: SessionInput,
   tx: Tx,
 ): Promise<boolean> => {
+  // A roomless session (FR-1049) has no room to check; the track probe still runs. `true` is
+  // the SQL literal rather than a skipped probe so the statement keeps one shape.
+  const roomProbe =
+    input.roomId === null
+      ? sql`true`
+      : sql`EXISTS (
+        SELECT 1 FROM ${rooms}
+        WHERE ${rooms.id} = ${input.roomId}::uuid AND ${rooms.eventId} = ${scope.eventId}::uuid
+      )`
+
   const rows = await tx.execute<{ valid: boolean }>(sql`
     SELECT (
       EXISTS (
@@ -1443,10 +1827,7 @@ const belongsToConference = async (
         WHERE ${tracks.id} = ${input.trackId}::uuid
           AND ${tracks.eventId} = ${scope.eventId}::uuid
       )
-      AND EXISTS (
-        SELECT 1 FROM ${rooms}
-        WHERE ${rooms.id} = ${input.roomId}::uuid AND ${rooms.eventId} = ${scope.eventId}::uuid
-      )
+      AND ${roomProbe}
     ) AS valid
   `)
 
@@ -1502,6 +1883,10 @@ const withinConferenceDays = async (
   // The same class of mistake as 010's `sql<Date>\`now()\``, which was an assertion to the type
   // checker rather than a conversion and arrived as a string.
   // ─────────────────────────────────────────────────────────────────────────────────────────
+  // `FOR SHARE` for `conferenceModality`'s reason: judged against a snapshot, a session legal
+  // under the old day range could commit beside a concurrently shrunk one — the state FR-1012
+  // forbids, reachable with every layer green. The share lock serialises this read against
+  // `patchConference`'s exclusive lock and against nothing else.
   const rows = await tx.execute<{ inside: boolean }>(sql`
     SELECT (
       (${input.startsAt}::timestamptz AT TIME ZONE e.timezone)::date
@@ -1511,6 +1896,7 @@ const withinConferenceDays = async (
     ) AS inside
     FROM ${events} e
     WHERE e.id = ${scope.eventId}::uuid
+    FOR SHARE
   `)
 
   return rows[0]?.inside === true
@@ -1565,6 +1951,221 @@ const readSession = async (
     .limit(1)
 
   return row ?? null
+}
+
+/**
+ * T142, T143 (014 tranche 2) — `readSession` with the session-row lock, for the two organizer
+ * edits whose refusals are decided against concurrent attendee writes (FR-1061a, FR-1065).
+ * `FOR UPDATE`, the identical mode `deleteSession` and `takePlace` use — one lock, one mode,
+ * four callers; the ordering rule lives in `queries/enrolments.ts`'s header.
+ */
+const readSessionLocked = async (
+  scope: ConferenceAuthorityScope,
+  id: string,
+  tx: Tx,
+): Promise<SessionRow | null> => {
+  const rows = await tx.execute<{
+    id: string
+    event_id: string
+    title: string
+    summary: string | null
+    starts_at: Date
+    ends_at: Date
+    track_id: string
+    room_id: string | null
+    cancelled_at: Date | null
+    kind: SessionKind
+    capacity: number | null
+    enrolment_closing_offset_hours: number | null
+    access_link: string | null
+  }>(sql`
+    SELECT id, event_id, title, summary, starts_at, ends_at, track_id, room_id, cancelled_at,
+           kind, capacity, enrolment_closing_offset_hours, access_link
+    FROM ${sessions}
+    WHERE id = ${id}::uuid AND event_id = ${scope.eventId}::uuid
+    FOR UPDATE
+  `)
+
+  const row = rows[0]
+  if (!row) return null
+
+  return {
+    id: row.id,
+    eventId: row.event_id,
+    title: row.title,
+    summary: row.summary,
+    startsAt: new Date(row.starts_at),
+    endsAt: new Date(row.ends_at),
+    trackId: row.track_id,
+    roomId: row.room_id,
+    cancelledAt: row.cancelled_at === null ? null : new Date(row.cancelled_at),
+    kind: row.kind,
+    capacity: row.capacity,
+    enrolmentClosingOffsetHours: row.enrolment_closing_offset_hours,
+    accessLink: row.access_link,
+  }
+}
+
+/**
+ * FR-1060–FR-1062a — the kind/fields pairing rules, each refusal its own code. Pure, so both
+ * write paths share one statement of the rules and the CHECK constraint stays the last line of
+ * defence rather than the first.
+ */
+const validateKindFields = (input: SessionInput): WriteRefusal | null => {
+  if (input.kind === 'optional') {
+    // Zero is refused with the rest: a session nobody may take a place in is a cancelled
+    // session, and cancellation already exists and preserves everything.
+    if (input.capacity === null || !Number.isInteger(input.capacity) || input.capacity < 1) {
+      return 'capacity-invalid'
+    }
+    if (
+      input.enrolmentClosingOffsetHours === null ||
+      !Number.isInteger(input.enrolmentClosingOffsetHours) ||
+      input.enrolmentClosingOffsetHours < 0
+    ) {
+      return 'closing-offset-invalid'
+    }
+    return null
+  }
+
+  if (input.capacity !== null || input.enrolmentClosingOffsetHours !== null) {
+    return 'mandatory-carries-no-places'
+  }
+  return null
+}
+
+/**
+ * T189 (014 tranche 2) — **well-formedness and scheme, and NOTHING ELSE** (FR-1053).
+ *
+ * ═════════════════════════════════════════════════════════════════════════════════════════════
+ * The permitted scheme set is `https:` alone — named in the requirement precisely so a test can
+ * be written against it. `javascript:` and `data:` are the two the check exists for: either one
+ * rendered as a session's joining link is script or content execution authored by a promoted
+ * attendee, on every registered attendee's device.
+ *
+ * **The product MUST NOT fetch the link to check it.** A reachability probe would be a
+ * server-side request to a URL a promoted attendee typed — an SSRF primitive wearing a
+ * validation's name — and `tranche2-absences.test.ts` asserts this module can make no request.
+ * `new URL` parses; it does not resolve, look up or connect.
+ *
+ * The `sessions_access_link_https` CHECK (`access_link LIKE 'https://%'`) is the last line of
+ * defence for the same rule, driven once with the route bypassed — 009's two-layer discipline,
+ * because the two layers disagreeing is how `"\n\t \n"` got past `trim()`.
+ * ═════════════════════════════════════════════════════════════════════════════════════════════
+ */
+const validateAccessLink = (input: SessionInput): WriteRefusal | null => {
+  if (input.accessLink === null) return null
+  try {
+    return new URL(input.accessLink).protocol === 'https:' ? null : 'access-link-invalid'
+  } catch {
+    return 'access-link-invalid'
+  }
+}
+
+/**
+ * T188 (014 tranche 2) — **modality decides which of the two a session carries, and it FORBIDS
+ * as well as REQUIRES** (FR-1050, FR-1050a). Pure, so both write paths share one statement of
+ * the rules — and write-path only of necessity: a CHECK cannot reference `events.modality`.
+ *
+ * Every modality/field combination is decided here, unambiguously (asserted combination by
+ * combination in `session-modality.test.ts`):
+ *
+ *   - **neither field, any modality** → `room-or-link-missing`. The one refusal that does not
+ *     depend on modality: a session with neither is a session nobody can attend (FR-1050).
+ *   - **in-person** — a link is forbidden, whether or not a room accompanies it: an in-person
+ *     conference's sessions carry a room and only a room.
+ *   - **virtual** — a room is forbidden: a room displayed on a session nobody attends in person
+ *     is a place shown to people who cannot go there (FR-1022a's stranding).
+ *   - **hybrid** — at least one, either one, or both. **Hybrid never requires both**: hybrid
+ *     means the conference mixes, not that every session is delivered twice.
+ */
+const validateModalityFields = (
+  modality: ConferenceModality,
+  input: SessionInput,
+): WriteRefusal | null => {
+  if (input.roomId === null && input.accessLink === null) return 'room-or-link-missing'
+  if (modality === 'in-person' && input.accessLink !== null) return 'modality-forbids-link'
+  if (modality === 'virtual' && input.roomId !== null) return 'modality-forbids-room'
+  return null
+}
+
+/**
+ * The conference's modality, read inside the writing transaction **with the conference row held
+ * `FOR SHARE`**, so the rule is judged against a settled value rather than a snapshot. A plain
+ * SELECT here never blocks on an in-flight modality change — READ COMMITTED reads the old row
+ * version — so a session validated against `hybrid` could land beside a conference concurrently
+ * patched to `in-person`, with no layer left to refuse it (the cross-table rule cannot be a
+ * CHECK). `FOR SHARE` conflicts with the `FOR UPDATE` `patchConference` takes on this row and
+ * with nothing a sibling session write takes, which serialises exactly the pair that can
+ * disagree. Acquisition order stays events → sessions in every path.
+ */
+const conferenceModality = async (
+  scope: ConferenceAuthorityScope,
+  tx: Tx,
+): Promise<ConferenceModality> => {
+  const rows = await tx.execute<{ modality: ConferenceModality }>(sql`
+    SELECT modality FROM ${events}
+    WHERE id = ${scope.eventId}::uuid
+    FOR SHARE
+  `)
+
+  // The scope proves the conference exists (it was minted against this eventId), so an absent
+  // row is a deleted conference mid-request; `in-person` is the strictest reading and the write
+  // will fail on its foreign key regardless.
+  return rows[0]?.modality ?? 'in-person'
+}
+
+/**
+ * T190 (014 tranche 2) — the sessions a modality change would leave violating FR-1050a
+ * (FR-1059a). Named, ordered by start, because an organizer told only "no" would have to find
+ * them by eye — FR-1014's reasoning, applied to the modality.
+ */
+const sessionsViolatingModality = async (
+  scope: ConferenceAuthorityScope,
+  modality: ConferenceModality,
+  tx: Tx,
+): Promise<{ id: string; title: string }[]> => {
+  // Hybrid accepts room-only, link-only and both, and FR-1050's CHECK guarantees no session
+  // carries neither — so no existing session can violate it and the query is not run.
+  if (modality === 'hybrid') return []
+
+  const violates =
+    modality === 'in-person'
+      ? sql`(${sessions.accessLink} IS NOT NULL OR ${sessions.roomId} IS NULL)`
+      : sql`(${sessions.roomId} IS NOT NULL OR ${sessions.accessLink} IS NULL)`
+
+  const rows = await tx.execute<{ id: string; title: string }>(sql`
+    SELECT ${sessions.id} AS id, ${sessions.title} AS title
+    FROM ${sessions}
+    WHERE ${sessions.eventId} = ${scope.eventId}::uuid AND ${violates}
+    ORDER BY ${sessions.startsAt}
+  `)
+
+  return rows.map((row) => ({ id: row.id, title: row.title }))
+}
+
+/** The held-places figure, read ONLY under the session-row lock (FR-1061a, FR-1077b). */
+const heldPlacesCount = async (sessionId: string, tx: Tx): Promise<number> => {
+  const rows = await tx.execute<{ held: number }>(sql`
+    SELECT count(*)::int AS held FROM session_enrolments WHERE session_id = ${sessionId}::uuid
+  `)
+  return rows[0]?.held ?? 0
+}
+
+/**
+ * FR-1065's predicate: both commitments, counted under the caller's lock. Saves and places are
+ * counted separately only because the message an organizer needs differs by direction; the
+ * refusal fires on either.
+ */
+const commitmentCountsFor = async (
+  sessionId: string,
+  tx: Tx,
+): Promise<{ saves: number; places: number }> => {
+  const rows = await tx.execute<{ saves: number; places: number }>(sql`
+    SELECT (SELECT count(*)::int FROM saved_sessions WHERE session_id = ${sessionId}::uuid) AS saves,
+           (SELECT count(*)::int FROM session_enrolments WHERE session_id = ${sessionId}::uuid) AS places
+  `)
+  return rows[0] ?? { saves: 0, places: 0 }
 }
 
 /**
@@ -1629,9 +2230,10 @@ const insertWithMintedCode = async (
   for (let attempt = 0; attempt < 5; attempt += 1) {
     const joinCode = mintJoinCode()
     const rows = await tx.execute<{ id: string }>(sql`
-      INSERT INTO ${events} (name, location, starts_on, ends_on, timezone, join_code)
+      INSERT INTO ${events} (name, location, starts_on, ends_on, timezone, join_code,
+                             modality, format)
       VALUES (${input.name}, ${input.location}, ${input.startsOn}::date, ${input.endsOn}::date,
-              ${input.timezone}, ${joinCode})
+              ${input.timezone}, ${joinCode}, ${input.modality}, ${input.format ?? null})
       ON CONFLICT (join_code) DO NOTHING
       RETURNING id
     `)

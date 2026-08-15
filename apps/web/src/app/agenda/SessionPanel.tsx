@@ -4,10 +4,12 @@ import { useCallback, useEffect, useRef, type ReactNode } from 'react'
 import { useNavigate, useOutletContext, useParams } from 'react-router'
 
 import { Loading } from '../AsyncState.js'
+import { PanelCommitment } from './PanelCommitment.js'
 import { PanelNotes } from './PanelNotes.js'
 import { PanelOverview } from './PanelOverview.js'
 import { PanelQuestions } from './PanelQuestions.js'
 import { PanelSpeakers } from './PanelSpeakers.js'
+import type { Commitments } from './useCommitments.js'
 
 /**
  * T036–T038, T041, T042 (005) — the session detail panel
@@ -75,6 +77,13 @@ export interface AgendaOutletContext {
    * things that can disagree about it.
    */
   readonly markViewed: (sessionId: string) => void
+  /**
+   * T208 (014 tranche 2) — the attendee's commitment set, handed down whole rather than
+   * re-read here, for `markViewed`'s own reason: the set lives in `useCommitments` at the
+   * programme, and a second instance in the panel would be a second reader that can disagree
+   * with the rows behind the dialog about whether a session is committed.
+   */
+  readonly commitments: Commitments
 }
 
 export const SessionPanel = () => {
@@ -296,6 +305,18 @@ const PanelBody = ({
   return (
     <>
       <PanelOverview session={session} timezone={context.timezone} />
+      {/*
+        T208, T209 (014 tranche 2) — the fifth section, announced by T120's rewritten comment
+        below: the ONE commitment control (FR-1063), and on an optional session the live
+        remaining-places figure beside it (FR-1070). Keyed on the session id like its siblings,
+        so switching sessions cannot carry one session's places figure into another's.
+      */}
+      <PanelCommitment
+        key={`commitment-${session.id}`}
+        session={session}
+        eventId={context.eventId}
+        commitments={context.commitments}
+      />
       <PanelSpeakers speakers={session.speakers} />
       {/*
         The third section. `key` on the session id so switching sessions gives the editor a
@@ -318,8 +339,14 @@ const PanelBody = ({
         questions under the new session's title.
 
         The panel is deliberately **not** converted to a registry to accommodate this (research
-        R3): that would be a larger edit to this file than the line itself, for a fifth section
-        the roadmap says will never arrive.
+        R3): that would be a larger edit to this file than the line itself.
+
+        T120 (014 tranche 2) — the sentence above used to end "…for a fifth section the roadmap
+        says will never arrive". The fifth section arrived: the commitment control (save on a
+        mandatory session, a place on an optional one — FR-1063) renders in this panel, and the
+        rewritten sentence is the record that the registry decision was re-weighed rather than
+        silently outgrown. Still not a registry: five known siblings in one file remain cheaper
+        than an abstraction with five callers.
       */}
       <PanelQuestions
         // Prefixed, because `PanelNotes` above is keyed on the bare session id and the two are

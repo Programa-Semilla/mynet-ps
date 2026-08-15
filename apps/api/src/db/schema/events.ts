@@ -5,6 +5,27 @@ import { sql } from 'drizzle-orm'
 import { attendees } from './attendees.js'
 
 /**
+ * T110 (014 tranche 2) — the two axes of "event type" (FR-1045), stated as constants so the
+ * route schema, the CHECK constraints below and the client option lists cannot disagree.
+ *
+ * **Two independent attributes, never one.** Modality says how the conference is delivered;
+ * format says what kind of thing it is. REQ-010 names both kinds in one breath, and collapsed
+ * into one list "virtual hackathon" would be unsayable.
+ */
+export const CONFERENCE_MODALITIES = ['in-person', 'virtual', 'hybrid'] as const
+export type ConferenceModality = (typeof CONFERENCE_MODALITIES)[number]
+
+export const CONFERENCE_FORMATS = [
+  'seminar',
+  'hackathon',
+  'workshop',
+  'congress',
+  'networking-breakfast',
+  'corporate-event',
+] as const
+export type ConferenceFormat = (typeof CONFERENCE_FORMATS)[number]
+
+/**
  * T022 — a conference.
  *
  * **No stored day counter.** The prototype shows "day N of M"; that is derived from
@@ -95,6 +116,47 @@ export const events = pgTable(
      */
     joinCode: text('join_code').notNull().unique(),
 
+    /**
+     * T110 (014 tranche 2) — **how this conference is delivered** (FR-1045, FR-1046).
+     *
+     * ═════════════════════════════════════════════════════════════════════════════════════
+     * **CONFERENCE CONTENT**, not attendee data: it describes the conference, names nobody,
+     * cascades from no attendee and appears in no personal-data export — declared with that
+     * reason rather than allow-listed silently.
+     *
+     * **Controlled, exactly three values, and it governs behaviour**: what each of this
+     * conference's sessions must carry (FR-1050a) — a room, an access link, or (hybrid) at
+     * least one. It governs nothing else: no read path in either product may gate an
+     * attendee's visibility of a conference or a session on it, because a visibility gate is
+     * the lifecycle v5.2.0 N4 forbids wearing a different name.
+     *
+     * **No default, deliberately** (FR-1048) — the same treatment `timezone` and `join_code`
+     * above received, and for the same recorded reason: a column that keeps a silent default
+     * is how a wrong value ships unnoticed. The migration back-fills existing rows with
+     * `'in-person'` — named in the spec rather than derived, because hybrid would also
+     * satisfy every existing programme while being false about all of them — and **drops the
+     * default in the same migration**, so the next conference created without an explicit
+     * value fails rather than inheriting one.
+     * ═════════════════════════════════════════════════════════════════════════════════════
+     */
+    modality: text('modality').$type<ConferenceModality>().notNull(),
+
+    /**
+     * T110 (014 tranche 2) — **what kind of event this is** (FR-1045, FR-1047).
+     *
+     * ─────────────────────────────────────────────────────────────────────────────────────
+     * **A descriptive label with NO behavioural consequence, and that is asserted as an
+     * absence** (`authoring-absences`): nothing in either product may branch on it — no
+     * filter, no ordering, no validation rule, no notification, no visibility condition. A
+     * label that quietly acquires behaviour is a second modality nobody declared.
+     *
+     * Optional and chosen from the product's enumerated set. Conference content, same
+     * declaration as `modality` above. A separate attribute from modality on FR-1045's own
+     * ground: modelled as one field, "virtual hackathon" is unsayable.
+     * ─────────────────────────────────────────────────────────────────────────────────────
+     */
+    format: text('format').$type<ConferenceFormat>(),
+
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
@@ -102,6 +164,18 @@ export const events = pgTable(
     // a conference that ends before it begins cannot exist regardless of which code path
     // inserts it.
     check('events_ends_on_after_starts_on', sql`${table.endsOn} >= ${table.startsOn}`),
+    // FR-1046 at the last line of defence, independent of the route schema that also enforces
+    // it — 009 found the two layers disagreeing, so each is asserted separately.
+    check(
+      'events_modality_valid',
+      sql.raw(`("modality" IN (${CONFERENCE_MODALITIES.map((m) => `'${m}'`).join(', ')}))`),
+    ),
+    check(
+      'events_format_valid',
+      sql.raw(
+        `("format" IS NULL OR "format" IN (${CONFERENCE_FORMATS.map((f) => `'${f}'`).join(', ')}))`,
+      ),
+    ),
   ],
 )
 

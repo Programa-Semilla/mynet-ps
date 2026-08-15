@@ -65,6 +65,7 @@ const SUGGESTION = {
   company: 'Overlap Maximal',
   role: 'Principal Engineer',
   headline: null,
+  productiveActivity: null,
   networkingIntent: null,
   availability: null,
   interests: ['Design systems'],
@@ -97,12 +98,19 @@ const SCENARIOS = {
     },
     // 005 — driven too, or a card reading it would sit in whatever state the default double
     // produces and the matrix would record that as its answer for every scenario.
-    savedSessions: {
-      listSaved: () => new Promise<{ sessionId: string; changedSinceViewed: boolean }[]>(() => {}),
+    commitments: {
+      listSaved: () =>
+        new Promise<
+          { sessionId: string; changedSinceViewed: boolean; commitment: 'saved' | 'place' }[]
+        >(() => {}),
       save: async () => {},
       unsave: async () => {},
 
       markViewed: async () => {},
+      // 014 tranche 2 — enrolment no-ops; `places` rejects so the figure is omitted (FR-1070b).
+      enrol: async () => {},
+      release: async () => {},
+      places: async () => Promise.reject(new Error('places not configured in this test')),
     },
     // 006 — driven for the same reason 005's is, and this file's own header predicted it: "a
     // card added in feature 006 will inherit the mechanism automatically and can still forget to
@@ -145,15 +153,19 @@ const SCENARIOS = {
     },
     // Both fixture sessions are saved, so a card about the attendee's own agenda has something
     // to name rather than falling into its empty state and recording that as "populated".
-    savedSessions: {
+    commitments: {
       listSaved: async () => [
-        { sessionId: 's1', changedSinceViewed: false },
-        { sessionId: 's2', changedSinceViewed: false },
+        { sessionId: 's1', changedSinceViewed: false, commitment: 'saved' as const },
+        { sessionId: 's2', changedSinceViewed: false, commitment: 'saved' as const },
       ],
       save: async () => {},
       unsave: async () => {},
 
       markViewed: async () => {},
+      // 014 tranche 2 — enrolment no-ops; `places` rejects so the figure is omitted (FR-1070b).
+      enrol: async () => {},
+      release: async () => {},
+      places: async () => Promise.reject(new Error('places not configured in this test')),
     },
     // A reader with interests and somebody to meet, so 006's card renders its populated body
     // rather than either of its two empty ones.
@@ -173,11 +185,15 @@ const SCENARIOS = {
   empty: () => ({
     events: { listRegistered: async () => [] },
     catalog: { listSessions: async () => [], listTracks: async () => [] },
-    savedSessions: {
+    commitments: {
       listSaved: async () => [],
       save: async () => {},
       unsave: async () => {},
       markViewed: async () => {},
+      // 014 tranche 2 — enrolment no-ops; `places` rejects so the figure is omitted (FR-1070b).
+      enrol: async () => {},
+      release: async () => {},
+      places: async () => Promise.reject(new Error('places not configured in this test')),
     },
     // Nobody to suggest — and the reader still has interests, so this is the *directory* empty
     // state rather than the no-interests one. Both are 006's, and they are different facts.
@@ -203,7 +219,7 @@ const SCENARIOS = {
         throw new Error('server fault')
       },
     },
-    savedSessions: {
+    commitments: {
       listSaved: async () => {
         throw new Error('server fault')
       },
@@ -211,6 +227,10 @@ const SCENARIOS = {
       unsave: async () => {},
 
       markViewed: async () => {},
+      // 014 tranche 2 — enrolment no-ops; `places` rejects so the figure is omitted (FR-1070b).
+      enrol: async () => {},
+      release: async () => {},
+      places: async () => Promise.reject(new Error('places not configured in this test')),
     },
     directory: {
       list: async () => {

@@ -5,10 +5,11 @@ import { attendees } from './attendees.js'
 import { sessions } from './catalog.js'
 
 /**
- * T004 (005) — the attendee's own agenda: saved sessions and personal notes (FR-184–FR-214).
+ * T004 (005) — the attendee's own agenda: saved sessions, held places and personal notes
+ * (FR-184–FR-214; enrolment added by 014 tranche 2, FR-1060–FR-1084).
  *
  * ═════════════════════════════════════════════════════════════════════════════════════════
- * **SCOPING: PER-EVENT, FOR BOTH TABLES IN THIS FILE.**
+ * **SCOPING: PER-EVENT, FOR EVERY TABLE IN THIS FILE.**
  *
  * The constitution makes neither per-event nor cross-event a default that may be assumed, so
  * each table states its own reasoning below rather than inheriting one from this header.
@@ -35,7 +36,15 @@ import { sessions } from './catalog.js'
  */
 
 /**
- * The fact that one attendee intends to attend one session.
+ * One of the two commitments an attendee can hold on a session — the bookmark.
+ *
+ * **T119 (014 tranche 2)** — this header used to open "The fact that one attendee intends to
+ * attend one session", and that sentence stopped being the whole story when enrolment arrived:
+ * saving is now one of **two** commitments, and it covers **mandatory sessions alone**
+ * (FR-1063, FR-1066a). An optional session is committed to by taking a place in
+ * `session_enrolments` below — enrolment *replaces* saving there, so "saved an optional
+ * session while holding no place" is a state with no route (FR-1064). The sentence is
+ * rewritten rather than deleted because the comment is the record.
  *
  * **Scoping: per-event.** A saved session references a `session`, and sessions exist only
  * within one conference, so the set must swap when the attendee switches (FR-185, US1 scenario
@@ -138,6 +147,77 @@ export const savedSessions = pgTable(
 )
 
 /**
+ * T113 (014 tranche 2) — the other commitment: **a held place in an optional session**
+ * (FR-1063, v5.3.0 O1/O2).
+ *
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ * **ATTENDEE DATA, PER-EVENT.** A session belongs to exactly one conference, so a place in it
+ * cannot mean anything at another (standing decision 7) — deliberately the opposite of a held
+ * card, which is cross-event because it describes a relationship rather than a presence. It
+ * cascades from the attendee and from the session, appears in the personal-data export, and
+ * is **additionally released by withdrawal from the conference by hand** (FR-1081), because
+ * nothing cascades from a registration and that gap is invisible in the schema.
+ *
+ * **DELIBERATELY NOT ENGAGEMENT** (v5.3.0 O2, FR-1077). This table references both `sessions`
+ * and `attendees`, so it fails `engagement-coverage.test.ts` by existing until classified —
+ * and it is classified into `NOT_ENGAGEMENT`, never into the four. A session with places held
+ * stays deletable; the cost (held places destroyed with no notification, no marker, no trace)
+ * is ratified, recorded at the classification site, and register entry 31 is open against it.
+ *
+ * **`viewed_at` is the marker's other half for a held place** (FR-1080), exactly as
+ * `saved_sessions.viewed_at` is for a save: an enrolled attendee holds **no saved row**
+ * (FR-1064), so without its own viewed state a holder would be notified of a room change and
+ * then see no marker and have nothing to clear. `NOT NULL DEFAULT now()` for the same
+ * recorded reason as above — the initial value is the enrolment instant, so a change that
+ * predates the attendee's interest never marks.
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ *
+ * **Absent by design**: no waitlist (FR-1082 — a queue that must notify somebody when it
+ * moves is a third trigger), no released-place history (O1 licenses the roster, not its
+ * past), no attendance or check-in record (FR-1084), and no stored open/closed or remaining
+ * count — all derived at read time from capacity, the offset and the database clock.
+ */
+export const sessionEnrolments = pgTable(
+  'session_enrolments',
+  {
+    attendeeId: uuid('attendee_id')
+      .notNull()
+      .references(() => attendees.id, { onDelete: 'cascade' }),
+
+    sessionId: uuid('session_id')
+      .notNull()
+      .references(() => sessions.id, { onDelete: 'cascade' }),
+
+    takenAt: timestamp('taken_at', { withTimezone: true }).notNull().defaultNow(),
+
+    /** See the header: FR-1080's marker clock for a held place. */
+    viewedAt: timestamp('viewed_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    /**
+     * The composite primary key IS the idempotency of taking a place: `ON CONFLICT … DO
+     * NOTHING` infers it (column order in the conflict target is immaterial), so a double-tap
+     * is the same request twice and no code path can hold two places for one attendee.
+     *
+     * Leads with `attendee_id`, mirroring `saved_sessions` exactly: it serves the commitment
+     * read ("this attendee's places", unioned into `listSaved`) and the deletion cascade from
+     * `attendees` — the two reads that would otherwise scan, which is 004's token-table
+     * defect shape.
+     */
+    primaryKey({ columns: [table.attendeeId, table.sessionId] }),
+
+    /**
+     * The reverse access path: **the `count(*)` that runs inside the enrolment transaction's
+     * exclusive session-row lock** (R12), and the organizer's roster read. PostgreSQL creates
+     * no index for a foreign key, and an unindexed count inside that lock is a sequential
+     * scan paid for by everyone queued behind it — `saved_sessions_session_id_idx`'s own
+     * argument, one table over.
+     */
+    index('session_enrolments_session_id_idx').on(table.sessionId),
+  ],
+)
+
+/**
  * One attendee's private free text against one session.
  *
  * **This is the product's first attendee-authored personal content**, which is why US5 exists
@@ -184,8 +264,9 @@ export const sessionNotes = pgTable(
      * T-review (014) — **the non-leading `session_id` needs its own index.**
      *
      * The composite primary key leads with `attendee_id`, and PostgreSQL 17 has no btree skip
-     * scan, so a predicate on `session_id` alone cannot use it. 014 added three such predicates —
-     * `hasEngagement`, the delete refusal's counts, and the programme read's per-session counts —
+     * scan, so a predicate on `session_id` alone cannot use it. 014 added such predicates —
+     * the delete refusal's counts and the programme read's per-session counts, both expressions
+     * of `engagementCountsFor` in `queries/admin-catalog.ts` —
      * and this table is **not event-scoped**: it holds every attendee's notes for every conference,
      * so each probe was a full scan of all of it.
      *
@@ -222,4 +303,5 @@ export const sessionNotes = pgTable(
 )
 
 export type SavedSession = typeof savedSessions.$inferSelect
+export type SessionEnrolment = typeof sessionEnrolments.$inferSelect
 export type SessionNote = typeof sessionNotes.$inferSelect

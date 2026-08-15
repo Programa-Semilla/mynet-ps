@@ -80,6 +80,11 @@ export const EMPTY_PROFILE = {
   company: null,
   role: null,
   headline: null,
+  // 014 tranche 2 — the taxonomy fields, empty like everything else here (FR-1091): an empty
+  // profile is the ordinary state of a new account, and these are part of it now.
+  sector: null,
+  subsector: null,
+  productiveActivity: null,
   networkingIntent: null,
   availability: null,
   interests: [],
@@ -106,15 +111,25 @@ export const testServices = (
     events: { listRegistered: async () => [SUMMIT] },
     activeEvent: { getActive: async () => SUMMIT, setActive: async () => SUMMIT },
     catalog: { listSessions: async () => [], listTracks: async () => [] },
-    // 005 — an attendee who has saved nothing and written nothing, which is what both seeded
-    // demo attendees actually start as. A test that wants otherwise says so explicitly.
-    savedSessions: {
+    // 005 — an attendee who has committed to nothing and written nothing, which is what both
+    // seeded demo attendees actually start as. A test that wants otherwise says so explicitly.
+    // T196 (014 tranche 2) — the key follows the repository rename: the set carries held
+    // places as well as saves.
+    commitments: {
       listSaved: async () => [],
       save: async () => {},
       unsave: async () => {},
       // 014 — a no-op double. Clearing a marker resolves and records nothing: a test asserting
       // that the panel clears it substitutes its own.
       markViewed: async () => {},
+      // 014 tranche 2 — enrolment no-ops, same reasoning. `places` REJECTS by default, which
+      // renders as the figure being omitted (FR-1070b) — the honest default for a double that
+      // was never told a number; a test about the figure substitutes its own.
+      enrol: async () => {},
+      release: async () => {},
+      places: async () => {
+        throw new Error('no places availability configured in this test')
+      },
     },
     sessionNotes: {
       listNotes: async () => [],
@@ -261,6 +276,22 @@ export const testServices = (
         throw new Error('no vote withdrawn')
       },
     },
+    // 014 tranche 2 — the vocabulary as the product ships it (FR-1086): the four seeded
+    // sectors, and NOTHING else — the subsector and interest lists are empty until the client's
+    // lists arrive, so this default is also the state a reviewer meets first, and the empty
+    // states it forces are the ones most likely to be skipped.
+    vocabulary: {
+      choosable: async () => ({
+        sectors: [
+          { id: 'sector-servicios', label: 'Servicios' },
+          { id: 'sector-comercio', label: 'Comercio' },
+          { id: 'sector-industria', label: 'Industria' },
+          { id: 'sector-agro', label: 'Agro' },
+        ],
+        subsectors: [],
+        interests: [],
+      }),
+    },
     ...overrides,
   },
   // 005 — content is live in a component test unless a test says otherwise, so no staleness
@@ -304,6 +335,11 @@ export const aSession = (overrides: Partial<TestSession> = {}): TestSession => (
   // `cancelled: true` explicitly, which is what keeps the cancelled cases visible in the tests
   // that are about them rather than incidental to every fixture.
   cancelled: false,
+  // 014 tranche 2 — the default is a mandatory, in-person session: exactly what every session
+  // was before the tranche, so every existing test renders the row it always did. A test about
+  // optional sessions or virtual delivery says `kind: 'optional'` / `accessLink: …` explicitly.
+  kind: 'mandatory',
+  accessLink: null,
   ...overrides,
 })
 
@@ -314,7 +350,10 @@ export interface TestSession {
   startsAt: string
   endsAt: string
   track: { id: string; name: string; colorToken: string }
-  room: { id: string; name: string }
+  /** Nullable since 014 tranche 2: a virtual session has no room (SC-1022). */
+  room: { id: string; name: string } | null
   speakers: Array<{ id: string; name: string; title: string | null; company: string | null }>
   cancelled: boolean
+  kind: 'mandatory' | 'optional'
+  accessLink: string | null
 }

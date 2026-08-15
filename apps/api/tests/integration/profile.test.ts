@@ -5,6 +5,7 @@ import {
   ADA,
   clearThrottle,
   cookieHeader,
+  ensureInterestOptions,
   resetDatabase,
   SEED_PASSWORD,
   sessionCookieFrom,
@@ -14,6 +15,12 @@ import {
 
 /**
  * T067 (004) — the attendee's own profile (FR-334, FR-336, FR-340, FR-341).
+ *
+ * **T174 (014 tranche 2)** — a NEW interest is chosen from the vocabulary rather than typed
+ * (FR-1088), so the values this file writes through `PUT /profile` are made choosable in
+ * `beforeAll`. The behaviours under test — persistence, whole-profile semantics, deduplication —
+ * are unchanged; only the fixture moved, because free text stopped being an input the route
+ * accepts for values the attendee does not already hold (FR-1095b).
  */
 describe("an attendee's own profile", () => {
   let app: FastifyInstance
@@ -22,6 +29,20 @@ describe("an attendee's own profile", () => {
   beforeAll(async () => {
     app = await setupTestApp()
     await resetDatabase()
+    await ensureInterestOptions([
+      'Numerical methods',
+      'Poetry',
+      'Concurrency',
+      'Gone soon',
+      'One',
+      'Two',
+      'Three',
+      'Rust',
+      // Lowercase too: matching is exact, never case-folded (FR-1095a), and the deduplication
+      // test below deliberately submits both spellings.
+      'rust',
+      'Go',
+    ])
   })
 
   afterAll(async () => {
@@ -188,6 +209,49 @@ describe("an attendee's own profile", () => {
     expect(
       (await app.inject({ method: 'PUT', url: '/profile', payload: { company: 'X' } })).statusCode,
     ).toBe(401)
+  })
+
+  /**
+   * T165 (014 tranche 2) — **a profile with EVERY taxonomy field empty saves, and every
+   * destination stays usable** (SC-1019, FR-1091, FR-1097).
+   *
+   * FR-1091 is shipped FR-336 holding unchanged under the new fields: sector, subsector,
+   * productive activity and vocabulary interests are all optional, an incomplete profile is
+   * valid, and no capability is gated on completeness. The destination sweep below is what
+   * makes "no capability" an observation rather than a sentence — each answers 200 for an
+   * attendee whose taxonomy is entirely unset.
+   */
+  it('saves with every taxonomy field empty, and every destination stays usable (SC-1019)', async () => {
+    const written = await write({ company: 'Analytical Engines' })
+    expect(written.statusCode).toBe(200)
+    expect(written.json()).toMatchObject({
+      company: 'Analytical Engines',
+      sector: null,
+      subsector: null,
+      productiveActivity: null,
+      interests: [],
+    })
+
+    const eventsResponse = await app.inject({ method: 'GET', url: '/events', headers: as() })
+    expect(eventsResponse.statusCode).toBe(200)
+    const [event] = eventsResponse.json() as { id: string }[]
+    expect(event, 'the seeded attendee is registered for no conference').toBeDefined()
+
+    // One request per destination: Agenda's programme, Discover's directory, Messages'
+    // conversation list, Network's held cards. Home composes from the same reads.
+    for (const url of [
+      `/events/${event!.id}/sessions`,
+      `/events/${event!.id}/attendees`,
+      '/conversations',
+      '/cards/held',
+    ]) {
+      const response = await app.inject({ method: 'GET', url, headers: as() })
+      expect(
+        response.statusCode,
+        `${url} did not answer 200 for an attendee with an empty taxonomy — a capability is ` +
+          'gated on profile completeness (FR-1091)',
+      ).toBe(200)
+    }
   })
 
   it('never returns credential material (FR-376, FR-391)', async () => {

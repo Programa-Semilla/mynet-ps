@@ -70,7 +70,22 @@ const codeOnly = (path: string): string =>
     .replace(/\/\*[\s\S]*?\*\//g, ' ')
     .replace(/^\s*\/\/.*$/gm, ' ')
 
-/** The tables that hold a person rather than conference content. */
+/**
+ * The tables that hold a person rather than conference content.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────────────────────
+ * **T126 (014 tranche 2, R17) — this list is HAND-MAINTAINED, not schema-derived, and so is the
+ * raw-SQL alternation two assertions down. That is the opposite of what `deletion-coverage` and
+ * `export-coverage` do, and the consequence is recorded here because nothing enforces it: a NEW
+ * attendee-side table would pass this guard green until somebody remembered to edit BOTH lists.**
+ *
+ * Tranche 2 honoured that constraint by adding no personal table at all: the taxonomy fields are
+ * columns on `attendee_profiles`, and interest selections stay on `attendee_interests` — both
+ * already listed, so FR-1093's guard extends to the new fields with no edit (R18). A future
+ * feature that genuinely needs a new personal table must add it here AND to the raw-SQL
+ * alternation in the same change, and should consider deriving both from the schema instead.
+ * ─────────────────────────────────────────────────────────────────────────────────────────────
+ */
 const PERSONAL_TABLES = ['attendees', 'attendeeProfiles', 'attendeeInterests']
 
 /** Everything administrative on the API side: the routes, the guards and the query modules. */

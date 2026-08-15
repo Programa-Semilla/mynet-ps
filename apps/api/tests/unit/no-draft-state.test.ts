@@ -36,6 +36,16 @@ import { buildApp } from '../../src/app.js'
  *
  * Comments are stripped before matching, as 009's guards do — the words below all appear in the
  * prose explaining the absence.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────────────────────
+ * **T125 (014 tranche 2) — the population is larger than conference content now.** FR-1094b
+ * extends the no-lifecycle rule to the vocabulary (reference data, `schema/vocabulary.ts`),
+ * where the tempting column is not `published` but a lifecycle-shaped flag on a value — and
+ * where exactly one withdrawal mechanism, `retired_at`, is REQUIRED to exist. The vocabulary
+ * assertions below are a sibling population with their own message, not a widening of
+ * `contentSchemas`, and one of them is positive: a guard that only banned lifecycle columns
+ * would be "fixed" by deleting retirement.
+ * ─────────────────────────────────────────────────────────────────────────────────────────────
  * ═════════════════════════════════════════════════════════════════════════════════════════════
  */
 
@@ -120,6 +130,60 @@ describe('014 — no draft or publish lifecycle (FR-1040, decision 48)', () => {
     ).toEqual([])
   })
 
+  /**
+   * **T125 (014 tranche 2, R17) — the vocabulary is a SIBLING population, not a widening of
+   * `contentSchemas` above.** `vocabulary.ts` is a new schema file and was outside every
+   * file-listed assertion in this guard, so a `status` column there would have passed green.
+   * It gets its own population and its own message rather than joining `contentSchemas`,
+   * because putting reference data into a constant named "content" behind a message that says
+   * "Conference content gained a status column" is the naming lie `appendAuditEntry` already
+   * taught this project about (FR-1094b).
+   */
+  it('declares no lifecycle-shaped column on the vocabulary (FR-1094b)', () => {
+    const referenceSchemas = schemaFiles.filter((path) => /vocabulary\.ts$/.test(path))
+    expect(referenceSchemas.length, 'the vocabulary schema could not be located').toBe(1)
+
+    const declaring = referenceSchemas
+      .filter((path) =>
+        /\b(status|state|stage|phase|draft|published|approved|visible)\s*:/i.test(codeOnly(path)),
+      )
+      .map(label)
+
+    expect(
+      declaring,
+      'The vocabulary gained a lifecycle-shaped column. A value is choosable from the moment ' +
+        'it exists and there is no unpublished vocabulary value (FR-1094b); retirement — below — ' +
+        'is the ONE permitted withdrawal mechanism, and it is an attribute, not a lifecycle.',
+    ).toEqual([])
+  })
+
+  /**
+   * **The positive counterpart** (T125's second half): retirement IS the mechanism FR-1094
+   * requires — a vocabulary value must be withdrawable without writing to any attendee record —
+   * so a guard that only banned lifecycle-shaped columns would be "fixed" by deleting
+   * `retired_at`, and this assertion is what stops that repair.
+   */
+  it('keeps retirement as the one vocabulary withdrawal mechanism (FR-1094)', () => {
+    const vocabulary = codeOnly(join(apiSrc, 'db', 'schema', 'vocabulary.ts'))
+    expect(vocabulary).toMatch(/retiredAt/)
+
+    // And no attendee-side read filters held values out: the profile and card reads must keep
+    // presenting a retired value its holder still has (FR-1094a). The write-path membership
+    // check in `queries/profiles.ts` is a write check, which is the one place `retired` may
+    // legitimately appear outside the vocabulary's own modules.
+    const filtering = sourceFiles(join(apiSrc, 'db', 'queries'))
+      .filter((path) => !/admin-vocabulary\.ts$|vocabulary\.ts$|profiles\.ts$/.test(path))
+      .filter((path) => /\bretired/i.test(codeOnly(path)))
+      .map(label)
+
+    expect(
+      filtering,
+      'A read outside the vocabulary and the profile write path consults retirement. Retiring ' +
+        'withdraws a value from FUTURE choice and does nothing else: holders keep it, it keeps ' +
+        'displaying, it keeps ranking (FR-1094a).',
+    ).toEqual([])
+  })
+
   it('registers no publish or unpublish route (FR-1040)', () => {
     const publishing = routes
       .filter((route) => /\b(publish|unpublish|draft|preview)\b/i.test(route.url))
@@ -143,7 +207,9 @@ describe('014 — no draft or publish lifecycle (FR-1040, decision 48)', () => {
     expect(filtering).toEqual([])
   })
 
-  it('adds no lifecycle column in migration 0011 (FR-1040)', () => {
+  // Retitled by T125: it always read EVERY migration on disk, but its title said "0011" and
+  // went stale the moment tranche 2 generated 0012 (O4: numbers are claimed at generation).
+  it('adds no lifecycle column in any migration (FR-1040)', () => {
     // Read from the migration rather than only from the Drizzle schema: the schema is what the
     // application believes, and the migration is what the database has. 013's regeneration
     // lesson is that those two are worth checking separately.

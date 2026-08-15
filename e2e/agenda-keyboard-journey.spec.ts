@@ -171,7 +171,7 @@ test('the whole agenda journey is completable with the keyboard alone (SC-206)',
   // Arrow movement within the radio group comes from the platform, which is why the filter is
   // radios rather than a pair of toggle buttons.
   await page.keyboard.press('ArrowRight')
-  await expect(page.getByRole('radio', { name: 'Saved' })).toBeChecked()
+  await expect(page.getByRole('radio', { name: 'My agenda' })).toBeChecked()
 
   // ── The journey is complete: exactly the session just saved is on screen ───────────────
   await expect(page.getByRole('heading', { level: 3 })).toHaveCount(1)
@@ -181,7 +181,7 @@ test('the whole agenda journey is completable with the keyboard alone (SC-206)',
   const remove = await tabTo(page, new RegExp(`Remove ${title}`), 10)
   expect(remove.visibleRing).toBe(true)
   await page.keyboard.press('Enter')
-  await expect(page.getByText(/nothing saved yet/i)).toBeVisible()
+  await expect(page.getByText(/nothing on your agenda yet/i)).toBeVisible()
 
   // And the note, so the suite leaves nothing behind.
   await page.goto('/agenda')
