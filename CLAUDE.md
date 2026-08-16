@@ -5,7 +5,7 @@ Guidance for Claude Code (claude.ai/code) working in this repository.
 This file is the **working brief**: what the product is, what has been decided, and how work is
 done here. It is deliberately short. Depth lives elsewhere, and these are authoritative over it:
 
-1. **`.specify/memory/constitution.md` (v5.2.0)** — governance and the authoritative decision
+1. **`.specify/memory/constitution.md` (v5.4.0)** — governance and the authoritative decision
    register. Supersedes tool defaults, habit, and any conflicting statement in this file.
 2. **`docs/superpowers/specs/2026-08-06-mynet-delivery-roadmap-design.md`** — the decomposition of
    the remaining product into features, with dependency order, reserved migration numbers, and gate
@@ -26,7 +26,7 @@ GroundZero/       # Initialization brief, requirements.md, approved prototype (r
 apps/api/         # Fastify + Drizzle over PostgreSQL; versioned migrations
 apps/web/         # React + TypeScript PWA; shell, sign-in, five destinations
 apps/admin/       # 013 — the SEPARATE administrative website (admin.<host>). No PWA, no
-                  #   service worker, no @mynet/platform: it needs none of the seven device
+                  #   service worker, no @mynet/platform: it needs none of the eight device
                   #   capabilities, and its absences are structural rather than configured.
 packages/data/    # Repository interfaces + HTTP implementations + generated contract types
 packages/platform/# Device-capability + storage interfaces, web implementations, repository registry
@@ -133,7 +133,7 @@ tablet layouts have had.
 **Nothing has been deployed yet, and that is not a gap in the code.** `deploy/vm/` is complete —
 two Azure VMs, Caddy with automatic TLS, a loopback-only PostgreSQL container, backups and a
 runbook — and the two owner decisions that gated the first deploy are **now taken and ratified in
-v3.4.0**: UAT is `mynet-dev.programasemilla.com` and the subscription is
+v3.5.0**: UAT is `mynet-dev.programasemilla.com` and the subscription is
 `d428f98f-a3c4-49c3-ae24-06ec3de08477` (LinaSys-DevEnv, `centralus`). `deploy/vm/envs/uat.env`
 still carries `SUBSCRIPTION=` and `APP_DOMAIN=` blank — **filling them is phase 010's work**, and
 until then `deploy-uat` and `deploy-prod` keep printing what they are blocked on and exiting 0
@@ -207,15 +207,21 @@ every mobile width the top bar's product-name label is truncated — it needs 60
 and has 43–58px **without the mark at all**, so it was already rendering as "M…" before this
 feature. The mark takes a further ~9px at 390px. FR-825 is satisfied (the label yields, no control
 moves) and 010 did not cause it, so it was recorded rather than fixed: redesigning the mobile top
-bar is register entry 4's territory and the owner's call.
+bar was filed as register entry 4's territory and the owner's call. **Entry 4 is closed by v5.4.0
+(R3)**, whose subject is the desktop and tablet layouts and which names no mobile surface, so this
+is still the owner's call and no entry now carries it.
 
-**A second layout question is open for the same reason.** The spec justified putting the mark in
+**A second layout question was open for the same reason.** The spec justified putting the mark in
 the tablet top bar with "the rail is desktop-only", and that is **false** — `TabletRail` is live
 768–1279px on the inverse surface, carrying navigation and no brand. `DesktopRail` is the
 desktop-only one. The shipped arrangement satisfies FR-823 and FR-824 either way, but the
 alternative — the mark at the head of `TabletRail` in coral, mirroring `DesktopRail` — was never
 weighed, because the spec recorded that surface as not existing. Corrected in the spec; the
-arrangement is an owner decision under register entry 4.
+arrangement was recorded as an owner decision under register entry 4. **Entry 4 is closed by v5.4.0
+(R3), which ratifies the shipped desktop and tablet layouts as intended.** The two items R3 names as
+ratified as-is are the 768–1279px rail divergence *between the two products* and Home's two-column
+cards on an upright tablet; the mark's placement is not among them, so the shipped arrangement
+stands and nothing tracks the alternative.
 
 **016 (App fixes, mutual card exchange, and the install icon) is shipped**, squash-merged to
 `develop` in [#21](https://github.com/Programa-Semilla/mynet-ps/pull/21) — six items the
@@ -255,14 +261,16 @@ v3.3.0 in one PR, because the amendment gated the code, as 008's did. **With it 
 roadmap is complete**: every feature 001–009 is delivered and every destination `requirements.md`
 names answers its question. What remains adds no schema and no feature.
 
-**The roadmap's 010 is split, by brainstorm #08 and constitution v3.4.0, because its two halves have
+**The roadmap's 010 is split, by brainstorm #08 and constitution v3.5.0, because its two halves have
 different blockers.** **011 — UAT Deployment and Pre-Public Hardening** is shipped: six
 security-and-abuse findings that all get worse once a URL is public, then provision, DNS, TLS, a
 Mailgun adapter behind `MailService`, VAPID, seed, and an **exercised restore on the real host**.
 **012 — Launch Readiness and Production** carries the validation pass, the physical iPhone test, the
-three-width review, register entry 22 and production, and stays blocked on register entries 2 (brand
-mark) and 4 (client validation of desktop and tablet). Keeping them together would have held a
-working UAT hostage to a brand mark. 010's spec must state that it departs from the roadmap.
+three-width review and production. It was blocked on register entries **22 and 4** — the sentence
+here previously named entry **2**, which was resolved in v3.4.0, and it is corrected rather than
+deleted — and **both are closed by v5.4.0, so 012 is startable.** Keeping the halves together would
+have held a working UAT hostage to a brand mark. 010's spec must state that it departs from the
+roadmap.
 
 **Planned as two PRs and delivered as one.** The split existed so a reviewer could read the safety
 half as a unit; both halves were complete and green, and holding the first open would have shipped
@@ -277,10 +285,13 @@ The client's model replaces it: a question is **moderated before it is public** 
 publish → vote), carries **resolved/pending** state that survives the event, may be **grouped
 manually** with its duplicates, and is **projectable** in vote order. The premise that forbade this
 expired rather than being overturned — 009 recorded against itself that a public Q&A surface *"needs
-a moderator, and a moderator is an organizer"*, and v4.0.0 created that actor. **Attribution is NOT
-part of the reversal**: full name still stands as shipped, and whether it becomes first-name-only is
-**register entry 27**, open, blocking 017. Until 009 is rebuilt, everything below describes what is
-running.
+a moderator, and a moderator is an organizer"*, and v4.0.0 created that actor. **Attribution was NOT
+part of the reversal, and it is now settled separately**: full name stands as shipped, and
+**v5.4.0 (R2) closed register entry 27 — a published question is attributed as first name plus
+surname initial, "Ana R.", wherever it is displayed, including the moderation queue and the
+projected screen. 017 is unblocked.** It must close the unthrottled block lookup in the same
+feature, or the abbreviation relocates disclosure rather than reducing it. Until 009 is rebuilt,
+everything below describes what is running.
 
 That visibility is the
 **second recorded exception** to Principle VIII's "private content stays private" — constitution
@@ -1140,12 +1151,14 @@ code**:
     has** — Messages, Discover, cards and profile all refuse without purging, and have since they
     shipped. The underlying gap is real, product-wide and older than 009: **a cached conference
     can outlive a withdrawn registration by up to 24 hours.** It is **register entry 22**, against
-    010 — **now 011**, since v3.4.0 split the phase — rather than 009's to fix alone.
+    010 — **refiled against 012 in v5.4.0's hygiene pass**, having never been updated when v3.5.0
+    split the phase into 011 and 012 — rather than 009's to fix alone. *Closed 2026-08-15 by
+    decision 54.*
 
-**2026-08-10** (ratified in constitution v3.4.0) — **the first amendment that gates a deployment
+**2026-08-10** (ratified in constitution v3.5.0) — **the first amendment that gates a deployment
 rather than a feature.** Nothing here changes what the product does; it changes where it runs, who
 may reach it, and who holds the keys. Taken in brainstorm #08. With these, **no register entry
-blocks phase 010**:
+blocks phase 011** — the UAT half of the split this same amendment made:
 
 30. **UAT is `mynet-dev.programasemilla.com`, openly reachable, carrying seeded data only.** No
     credential, no allowlist, no network boundary — **FR-067 is satisfied by the data rather than
@@ -1214,9 +1227,11 @@ above, and it numbered its decision 27, which the Q&A block already used. The br
     accessible name; and **a declared icon with no file fails the build**, because a manifest can
     name a missing file while all ten gates pass and the failure appears only on a real device.
     **Deliberately not decided**: whether `navy-800` and `coral-500` adopt the brand values — that
-    is new register entry 22, and the resulting seam between the icon plate and the token-derived
+    is new register entry **23** (this brief numbered it 22 until v5.4.0's hygiene pass; 22 is the
+    cache gap), and the resulting seam between the icon plate and the token-derived
     `theme_color` is knowingly accepted. **Deliberately not closed**: register entry 4, the
     unvalidated desktop and tablet layouts, which this work *escalates* by putting a mark in both.
+    *Entry 4 closed 2026-08-15 by decision 56, without the client acceptance act it asked for.*
 
 **2026-08-11** (ratified in constitution **v4.0.0**) — **the amendment that reverses the oldest
 prohibition in this document, and the first to introduce a second actor**:
@@ -1338,7 +1353,8 @@ delivered guarantees, one of them **48 hours after it was ratified**. Sources: b
     post-publication reporting cover different moments and both ship. **A moderator reading an
     unpublished question is not a fourth privacy exception** (content submitted for publication was
     never private), but **a refused question is stored personal data** and needs cascade, export and
-    retention like anything else. **Attribution is explicitly NOT ratified** — register entry 27.
+    retention like anything else. **Attribution is explicitly NOT ratified** — register entry 27,
+    *closed 2026-08-15 by decision 55 as first name plus surname initial, which unblocked 017*.
     Delivered by **017**.
 42. **Every feature declares its administrative counterpart**, including where it is explicitly
     none. A Principle IX obligation and a Feature Declarations row. **"None, because…" is valid and
@@ -1511,6 +1527,135 @@ grant it by inference. **It shares a boundary with entry 29** — both are about
 to tell somebody about their own commitments — and they are deliberately not merged: a suppression
 preference and a missing trigger are different mechanisms with different costs.
 
+**2026-08-15** (ratified in constitution **v5.4.0**) — **the first amendment whose entire subject is
+closing questions rather than licensing work.** It gates no feature's first line of code. It closes
+**three** register entries — 22, 27 and 4 — opens **none**, and unblocks **both** remaining blocked
+features: 017 (on 27) and 012 (on 22 and 4). MINOR, judged explicitly against a real MAJOR argument,
+on the practised test that **withdrawing** a delivered requirement is MAJOR while **narrowing** one
+is MINOR: decision 55 narrows FR-702's rendered form and withdraws nothing, and decision 56 is MINOR
+because of how it is worded — it does **not** claim that passing tests validated a layout, which
+would have retracted a governance rule and made this MAJOR. Entries 19, 21, 23, 28, 29, 30 and 31
+are untouched, and 19 and 21 remain the oldest live entries. Decision prefix `R`; taken on
+`brainstorm/13-blocked-entries-decision-packets.md`, which records no decision and stays as written
+so the reasoning outlives the conclusions.
+
+54. **The cached conference that outlives a withdrawn registration is ACCEPTED, not fixed: a device
+    may keep showing a conference the person has left for up to 24 hours from retrieval.** *Closes
+    register entry 22.* **The ground the register gave for tolerating it is struck as false, and
+    five features carried the entry as low-severity on the strength of it.** It said the data was
+    *"the conference programme, not another attendee's personal data"*; the cached `appointments`
+    payload has carried the other party's display name and the agreed meeting topic since **008** —
+    *before* that sentence was written in 009 — and the cached programme embeds every speaker's
+    name, title and company, which is register entry 30's subject. **It is accepted on a different
+    and true ground**: no third party can end a registration today, and the only way one ends is an
+    act the attendee performs on their own device, which purges that device in the same action.
+    **That ground is protected by a naming convention, which is the most fragile thing this
+    amendment ratifies.** `apps/api/tests/unit/no-attendee-restriction.test.ts` selects routes by
+    the URL regex `/suspend|ban\b|mute|restrict|disable|block|silence/i`, and a route named
+    `DELETE /admin/conferences/:eventId/registrations/:id` matches none of those words and **passes
+    green** — 015 is called "registration and attendee management". **The guard MUST be widened to
+    the concept before 015 is specified, and if 015 adds such a route this entry reopens** rather
+    than being reasoned around. **Two mechanisms are licensed and neither needs a further
+    amendment**: delete an entry at the moment it stops being readable — nothing evicts today, so
+    "24 hours" has always bounded *serving* and never *retention*, and this is the only change that
+    reduces what a disconnected device holds — and erase any conference absent from a successful
+    read of the conferences the attendee is registered for, which lives in the composition root
+    rather than in the caching decorator and so sidesteps the exact objection that withdrew 009's
+    FR-756a. **Three are rejected on evidence rather than on cost, and are named so they are not
+    re-proposed**: reinstating FR-756a fires on a refusal that frequently never arrives; a
+    server-sent "forget this" message **cannot be built**, because subscriptions are registered
+    `userVisibleOnly: true` and a new dispatcher would be a third notification trigger and therefore
+    another amendment; and keying the stored copy to the registration is ineffective, because a
+    disconnected device cannot learn the registration ended and matches its own stale label.
+    **Whether 24 hours is the right span is DEFERRED, not decided**: since 014 an organizer can
+    cancel a session, move a room or change a start time, so a day-old programme can be *wrong*
+    rather than merely old — which argues for shortening on **usefulness**, not privacy — and the
+    cost cannot be priced from this repository, which is what 005 said when it set the value. It
+    returns as a product judgement once a real conference has been run, and it is **not** a register
+    entry. **Two shipped defects are fixed regardless, because neither is a choice.** Account
+    deletion computes its purge prefix from a no-argument call, yielding `attendee:<id>|event:|` — a
+    range that cannot match `attendee:<id>|event:<uuid>|…`, since every UUID first character sorts
+    below `|` — so **a second device keeps everything, including private session notes, permanently,
+    while the deletion screen promises in bold that no copy is kept.** And the reconnection purge
+    does not fire on a cold start at all, because `GET /workspace/active-event` answers a
+    de-registered attendee with **204, a success**. The comment claiming *"online, an authorization
+    refusal purges the conference's entries immediately"* is true of the mechanism and silent on
+    whether the refusal arrives: **the documented false-header class, in the file the entry is
+    about.**
+55. **A published question is attributed as first name plus surname initial — "Ana R.".** *Closes
+    register entry 27, and unblocks 017.* It applies wherever a question is displayed: the
+    attendee's phone, the moderation queue, and the projected screen v5.0.0 ratified. **Decided on
+    the client's behalf, and recorded rather than glossed.** It reads REQ-062 and REQ-063 as being
+    about **register and tone** — a full legal name makes a casual question feel like a filing —
+    rather than about the surname as such, and **it is in tension with her literal words**,
+    *"únicamente el primer nombre, sin apellidos"*, because an initial is a fragment of an apellido.
+    **She must be told, not left to discover it at an event**; if her concern proves to be
+    findability rather than tone, the decision was wrong on its own reasoning and should be
+    revisited, which is cheap because this option moves in either direction more easily than the
+    five it was chosen against. **The framing the entry was carried under was incomplete, and that
+    is the transferable part**: the register offered three options and six existed, and two of the
+    missing ones — this one, and a collision-aware form showing an initial only where first names
+    collide — cost exactly what the cheapest listed option costs and **dissolve the deciding case**,
+    which is two attendees named Ana at one conference whose questions appear together on a hall
+    wall. **A register entry that enumerates its options is asserting that the enumeration is
+    complete**, and this one was not. **What it narrows is FR-702's rendered form only**: FR-734
+    survives verbatim, attribution stays unconditional, a non-discoverable attendee is still named,
+    and SC-707 stays true — Principle VIII's second recorded exception gets **smaller**. **One thing
+    MUST ship with it or the change buys nothing.** `POST /blocks` carries no throttle and
+    `GET /blocks` returns the target's live display name **and card-rendition avatar bytes**, so
+    under any abbreviated attribution blocking becomes a one-request, unrate-limited way to convert
+    "Ana R." into a full name with a photograph — an abbreviated name without that closure
+    **relocates disclosure rather than reducing it**. `blocks.ts` asserts that the caller *"already
+    knows exactly who these people are, having blocked them by hand"*, a claim this decision
+    falsifies in a file it does not otherwise touch. **Not resolved, and made more urgent**: whether
+    a question's payload should carry `authorId`, and whether `listBlocks` should be narrowed — both
+    raised at 009's deep-review gate, both untouched here, and **017 MUST NOT treat either as
+    settled by this.** **Left to 017 deliberately**: what "Ana R." renders as for a mononym, and
+    whether a multi-token given name yields "María R." or "María José R.". `display_name` is one
+    free-text field, so the surname half is a derivation and its edge cases are implementation
+    rather than governance; `initialsOf` already performs that split with `Intl.Segmenter` rather
+    than `slice`, and is the precedent to follow.
+56. **The shipped desktop and tablet layouts are ratified as intended, by the owner, without a
+    client acceptance act.** *Closes register entry 4 — the oldest live question about the product's
+    appearance — and unblocks 012.* **It is NOT a claim that the layouts were validated, and
+    specifically not a claim that green gates validated them**: v5.0.0's rule that no feature may be
+    read as having validated a layout because its tests pass **stands unamended and is deliberately
+    unused here**, and anybody citing this as evidence the layouts were reviewed has misread it. The
+    owner ratifies in the acknowledged absence of validation. **The cost is ratified with it rather
+    than softened**: desktop use is the client's own stated requirement (REQ-108, REQ-110), she has
+    never seen the product at a desk, and closing the entry removes the thing that kept each new
+    feature's unreviewed desktop design visible — so **the debt resumes compounding silently**, paid
+    by whoever meets the first defect in production. The two defects this entry produced were each
+    found within minutes by the first person to look at a screen, which is the honest measure of
+    what is being given up. **Two judgement questions are ratified as-is and must not be reopened as
+    defects**: the 768–1279px rail divergence between the two products, where MyNet shows an
+    icon-only rail and the administrative site a labelled one; and Home's two-column card
+    arrangement on an upright tablet. Both were unrecorded choices rather than constraints — the
+    administrative app imports MyNet's tokens and then uses none of its breakpoints — and both are
+    now choices. **One item is CARVED OUT as a defect and MUST be fixed**: `AdminShell` presents
+    **two** layouts where Principle IV requires three — below 768px the administrative site's only
+    navigation is a horizontally scrolling strip, and at 768–1023px the rail is labelled rather than
+    reduced. **Fiat may close a judgement; it cannot make a non-compliance compliant.** It is
+    checkable today with no client and no UAT, and the end-to-end sweep **cannot see it by
+    construction** — it measures document-level overflow, which an inner `overflow-x-auto` container
+    is designed to keep at zero — so the fix must carry an assertion that does not depend on that
+    measurement. **One gap closes at no cost and is not a layout question at all**: Playwright
+    declares a single Chromium project, so **Safari layout is unverified at every width**, not only
+    on desktop, and the physical-iPhone test 012 already carries is otherwise the only WebKit
+    evidence this project will ever produce. Adding WebKit and Firefox projects needs no client, no
+    UAT and no decision.
+
+**Three obligations are carried out of v5.4.0, and two of them belong to the next two features to
+start.** None is optional and none is tracked by a register entry, because no entry was opened.
+**015 must
+widen `apps/api/tests/unit/no-attendee-restriction.test.ts` from a URL-keyword regex to the concept
+before it is specified** — decision 54's whole ground is that no third party can end a registration,
+and a route named `DELETE /admin/conferences/:eventId/registrations/:id` passes that guard green; if
+015 adds such a route, **entry 22 reopens.** And **017 must close the unthrottled block lookup in the
+same feature as the attribution change** — an abbreviated name beside a one-request, unrate-limited
+`POST /blocks` whose `GET` returns a live display name and avatar bytes relocates disclosure rather
+than reducing it. **A third obligation belongs to no feature yet**: the `AdminShell` carve-out in
+decision 56 must be fixed, and the amendment names nobody to fix it.
 
 ## How work is done here
 
@@ -1633,11 +1778,18 @@ is a working summary. Each names what it blocks, because *when* to ask matters a
 
 ### Require a client decision
 
-**One open question now blocks a feature again — entry 27 blocks 017.** That is new as of
-2026-08-12 and reverses the position this section has held since v3.2.0. Everything else below blocks
-**release**, not code.
+**No open question blocks a feature.** v5.4.0 closed entries 22, 27 and 4 on 2026-08-15, unblocking
+017 and 012 together — which restores the position this section held from v3.2.0 until v5.0.0 opened
+entry 27 on 2026-08-12. Everything below blocks **release**, not code. *The paragraph this replaces
+said "one open question now blocks a feature again — entry 27 blocks 017", and it was true for three
+days.*
 
-- **Register entry 27 — Q&A attribution: full name, first name alone, or attendee-chosen.** Opened
+- ~~**Register entry 27 — Q&A attribution: full name, first name alone, or attendee-chosen.**~~
+  **RESOLVED 2026-08-15 in v5.4.0 (R2)** as standing decision 55: **first name plus surname initial,
+  "Ana R."**, wherever a question is displayed, including the moderation queue and the projected
+  screen. **017 is unblocked**, and it carries two obligations — close the unthrottled block lookup
+  in the same feature, and do not read `authorId` or `listBlocks` as settled by this. *Original
+  entry:* Opened
   by **v5.0.0 (C2)**. **Blocks 017.** v3.3.0 bound the full real name and argued it at length; the
   client asks for the first name alone (REQ-062, REQ-063); **her own extraction records the thread as
   unresolved** (OPEN-002) and the transcript carries both positions in one conversation. REQ-061 adds
@@ -1645,7 +1797,10 @@ is a working summary. Each names what it blocks, because *when* to ask matters a
   which is compatible with all three answers. **Opened rather than settled deliberately**: the
   client's stated preference was available and taking it would have closed by inference a thread she
   herself recorded as open. The case that decides it is mundane and should be put to her directly:
-  two attendees named Ana at one event.
+  two attendees named Ana at one event. **The three options it enumerates are the reason it looked
+  like a hard trade: six existed, and the one chosen was not among the three.** It was decided on
+  the client's behalf and **she must be told**, because the chosen form is in tension with her
+  literal words.
 - **Register entry 28 — two brand marks now coexist, and which one is MyNet's is undecided.** Opened
   by **v5.0.0 (C4)**. **Blocks nothing**; the product behaves as directed. Recorded because a
   knowingly accepted divergence and an unnoticed one look identical six months later, and because
@@ -1678,10 +1833,12 @@ Historically: v3.2.0 closed the connection model, card-exchange semantics
 and Q&A attribution; **v3.3.0** closed public Q&A visibility and withdrew FR-756a; **v3.4.0** closed
 the oldest entry of all, the brand mark; **v3.5.0** closed four more — the UAT address, the mail
 provider, VAPID custody and the operator address; and **v4.0.0/v4.1.0** opened entries 24, 25 and 26
-and closed all three in the same session. **009, 010, 011, 013 and 016 are shipped, and the attendee
-delivery roadmap is complete.** Two of those closures — card-exchange semantics and Q&A visibility —
-were **reversed on 2026-08-12 by v5.0.0**, which is the first time this project has reopened settled
-ground on client feedback rather than on a design finding.
+and closed all three in the same session. **v5.4.0 closed three more on 2026-08-15 — 22, 27 and 4 —
+and opened none**, which is the largest number closed at once since v4.1.0 and the first amendment
+whose whole subject is closing questions rather than licensing work. **009, 010, 011, 013 and 016
+are shipped, and the attendee delivery roadmap is complete.** Two of those closures — card-exchange
+semantics and Q&A visibility — were **reversed on 2026-08-12 by v5.0.0**, which is the first time
+this project has reopened settled ground on client feedback rather than on a design finding.
 
 **Two programmes are now in flight and their numbering interleaves, which is worth stating once
 rather than re-deriving.** The attendee roadmap ends at **012 — Launch Readiness & Production**,
@@ -1690,7 +1847,7 @@ parallel branch; 013 took the next free number rather than the next number in it
 because parallel branches cannot see each other's reservations. The constitution records the same
 lesson about version numbers three times over. **A third strand now runs beside both** — the client
 feedback programme that v5.0.0 opened, of which **016 is delivered and 017 (the Q&A rebuild) is
-not startable**.
+startable as of 2026-08-15**, register entry 27 having closed.
 
 **014 is CLOSED: both tranches are merged to `develop`.** That sentence replaces one saying tranche
 1 was merged and 014 remained open, which itself replaced one written a day earlier saying nothing
@@ -1716,12 +1873,19 @@ session number, and nearly the migration number. Integrated, that debt is paid a
 from a current base. This is the collision itself, recorded where it happened: 016 was authored on
 `develop` while 014 was authored on a branch taken before it, and each artifact honestly described a
 project in which the other did not exist. 014 merged `develop` into itself on 2026-08-14, taking
-the renumbering described under standing decision 45, and closed in #24 the next day. **With 014
-done, the administrative programme has one feature left — 015 — and it is the only startable work.**
-**017 is blocked** — register entry 27 (Q&A attribution) is the first open question to block a
-feature since v3.2.0, and it is the client's to answer; the case that decides it is two attendees
-named Ana at one event. **012 is blocked** on register entries 22 and 4. Choosing among them is an
-owner decision, not a planning inference.
+the renumbering described under standing decision 45, and closed in #24 the next day.
+
+**Three features are startable, and that is the single biggest change v5.4.0 makes to this brief.**
+With 014 done the administrative programme has one feature left — **015** — and until 2026-08-15 it
+was the *only* startable work. v5.4.0 closed the three entries that held the other two: **017** (the
+Q&A rebuild) was blocked on entry 27 and is now unblocked by decision 55, and **012** (Launch
+Readiness and Production) was blocked on entries 22 and 4 and is now unblocked by decisions 54
+and 56. **Two of the three carry an obligation out of the amendment**, neither tracked by a register
+entry because none was opened: **015** must widen the attendee-restriction guard before it is
+specified, and **017** must close the unthrottled block lookup in the same feature as the
+attribution change. **A third obligation belongs to nobody yet** — `AdminShell`'s missing third
+layout is carved out of decision 56 as a defect and must be fixed, and the amendment assigns it to
+no feature. Choosing among the three is an owner decision, not a planning inference.
 
 The closing sequence for 24, 25 and 26 is worth keeping, because it is the argument for opening
 entries you cannot yet answer: those three produced a **third privacy exception**, a
@@ -1757,14 +1921,6 @@ not been opened deliberately.
   gave when it predicted the third privacy exception and refused to grant it by inference. **Blocks
   nothing**; the product behaves as decision 51 ratifies.
 
-- **Register entries 19 and 21 are ADDRESSED but NOT closed — by v4.0.0, v4.1.0, or 013 shipping.**
-  013 built the first actor capable of moderating an avatar and of reading a report queue, and
-  v4.1.0 decided what that operator may *see* — but **a capability is not a policy**. Who moderates,
-  against what standard, on whose complaint, with what appeal, and whether a removed avatar is
-  replaced or blanked are all undecided (19); and somebody still has to *be* that operator, which
-  v3.5.0's address does not appoint (21). **These two are the oldest live entries in the register**,
-  and they are the reason the administration exclusion was reversed at all.
-
 - **Whether the audit trail's retention clock should start at pseudonymisation, as two comments
   already claim it does.** Opened by 013 (`deviations.md` D11) and found only by writing the sweep's
   first behavioural test. `maintenance.ts` declares *"365 days after pseudonymisation"* and
@@ -1776,17 +1932,19 @@ not been opened deliberately.
   `retention-sweep.test.ts` pins the shipped behaviour and says in its own message that it encodes
   current rather than desired behaviour. **Blocks nothing.**
 
-- **Register entry 22 — a cached conference can outlive a withdrawn registration by up to 24
-  hours.** Conceded by 009 when FR-756a was withdrawn, and **product-wide rather than 009's**: no
-  undecorated repository — Messages, Discover, cards, profile or Q&A — purges on refusal. Filed
-  against the phase that became 011, which did not answer it: 011 adds no repository and no cached
-  read, so the single answer that covers all of them is still owed. **013 did not answer it
-  either** — the administrative client caches nothing at all. **Blocks 012.**
-- **Desktop and tablet layouts are unvalidated.** The approved prototype is mobile-only — a fixed
+- ~~**Desktop and tablet layouts are unvalidated** — register entry 4.~~ **RESOLVED 2026-08-15 in
+  v5.4.0 (R3)** as standing decision 56: **closed by owner ratification, without the client
+  acceptance act it asked for**, and **012 is unblocked**. It is **not** a claim that the layouts
+  were validated, and not a claim that green gates validated them — v5.0.0's rule on that stands
+  unamended and deliberately unused. Ratified as-is: the 768–1279px rail divergence between the two
+  products, and Home's two-column cards on an upright tablet. **Carved out as a defect and still to
+  be fixed**: `AdminShell` presents two layouts where Principle IV requires three. *Original entry,
+  with its filing corrected:* The approved prototype is mobile-only — a fixed
   390×844 frame. Every desktop layout built before this is answered is unreviewed design, so the
   cost compounds with each feature. **008 turned this from a risk into an observed defect**: the
   first dialog a human looked at was rendering in the top-left corner, having passed every gate.
-  **Blocks 011, not 010** — and it has never been *answerable*, because reviewing a layout needs a
+  **Blocked 012, not 011** — this brief said 011, which shipped — and it had never been
+  *answerable*, because reviewing a layout needs a
   running product at a real screen width. 010's UAT is what makes it a question somebody can be
   asked, which is a reason to sequence 010 first rather than to keep waiting.
 - **Whether a question's payload should carry `authorId`** — raised at 009's deep-review gate.
@@ -1808,26 +1966,16 @@ not been opened deliberately.
   carried it into the product. Every icon on disk is derived from that board; the amber-banded
   placeholder and the script that drew it are deleted. What remains is a person looking at it on a
   phone.
-- **Whether `navy-800` and `coral-500` adopt the brand's values** (`#0d1942`, `#fe6551`) — register
-  entry **23**, opened by v3.4.0. Measured from the board, brand and tokens disagree on both; cream
-  agrees. Adopting them makes the board the single source of truth for colour and removes the
-  visible seam between the icon plate and the token-derived `theme_color` on the splash screen — but
-  `navy-800` is the primary surface and `coral-500` is both the accent and the focus ring, so it
-  repaints the whole product and every contrast ratio must be re-verified. **Blocks nothing**, and
-  011 was explicitly forbidden from resolving it.
-- ~~**VAPID key custody**~~ — **CLOSED in v3.5.0** (standing decision 34), along with the "push
-  provider" half of register entry 20, which was **withdrawn as never having existed**: Web Push
-  signs with the project's own key pair and posts to whatever endpoint the browser issued, so there
-  was never an account, an SDK or a third party to choose.
-- ~~**The operator address abuse reports are sent to**~~ — **CLOSED in v3.5.0** (decision 35):
-  `apps@programasemilla.com`. The obligation behind it is not closed and cannot be by naming an
-  address — somebody has to read that inbox for the dialog's promise to stay true.
 - **Whether `requirements.md` is amended** or its divergence from the constitution simply recorded.
 - **What "PS" denotes** in `mynet-ps`.
 
 ### Require an owner or planning decision
 
-- ~~**No domain is registered and no Azure subscription is named**~~ — **CLOSED in v3.4.0**
+*Entries 19, 20, 21, 22 and 23 were filed above, under a client decision, until 2026-08-15. The
+constitution files all five here and is authoritative; they were moved in v5.4.0's hygiene pass,
+which also removed a second copy of entry 19 that had been carried in both sections.*
+
+- ~~**No domain is registered and no Azure subscription is named**~~ — **CLOSED in v3.5.0**
   (decisions 30–32). UAT is `mynet-dev.programasemilla.com`; production is `mynetcr.com`
   provisionally and **stays out of `prod.env` until registered**, because a blank value is what
   keeps the deploy jobs' refusal honest. Subscription `d428f98f-a3c4-49c3-ae24-06ec3de08477`
@@ -1835,21 +1983,56 @@ not been opened deliberately.
   blank — **filling them is phase 010's work**, and this amendment is what licenses it.
   `deploy/vm/OPERATIONS-LOG.md` records the restore exercised locally against a throwaway
   container; 010 does it on the real host.
-- ~~**UAT access control**~~ — **CLOSED in v3.4.0** (decision 30): openly reachable, **seeded data
+- ~~**UAT access control**~~ — **CLOSED in v3.5.0** (decision 30): openly reachable, **seeded data
   only**. FR-067 is satisfied by the data rather than by the door. The data-separation half was
   already binding and is unchanged — the tooling must *refuse* to point UAT at production data, not
   merely be configured not to.
 - **Authentication ownership** — self-implemented versus a delegated provider. Worth noting what
   "open" means here: it *is* self-implemented and has shipped since 004; the question is whether
   that is settled or an unratified default. Blocks nothing.
-- ~~**The transactional email provider**~~ — **CLOSED in v3.4.0** (decision 33): Mailgun.
-- **Nobody moderates uploaded avatar images.** Public self sign-up plus image upload, in a product
-  with no administrative actor by construction — and the organizer exclusion forecloses the usual
-  answer. **v3.4.0 escalated it without resolving it**: decision 30 makes an openly reachable
-  environment with public sign-up a present fact, so this is no longer hypothetical. Decision 35
-  narrows it — the operator mailbox that 007's report path always needed now exists, so the nearest
-  available answer is available; whether avatars use it is undecided. Bounded meanwhile by UAT
-  carrying **seeded data only** and by the URL being unpublished.
+- ~~**The transactional email provider**~~ — **CLOSED in v3.5.0** (decision 33): Mailgun.
+- **Register entries 19 and 21 are ADDRESSED but NOT closed — by v4.0.0, v4.1.0, or 013 shipping.**
+  **19 is that nobody moderates uploaded avatar images**: public self sign-up plus image upload, and
+  the organizer exclusion foreclosed the usual answer for the whole of this entry's life. **v3.5.0
+  escalated it without resolving it** — decision 30 makes an openly reachable environment with
+  public sign-up a present fact, so it is no longer hypothetical — and decision 35 narrowed it by
+  supplying the operator mailbox 007's report path always needed. 013 then built the first actor
+  capable of moderating an avatar and of reading a report queue, and v4.1.0 decided what that
+  operator may *see* — but **a capability is not a policy**. Who moderates, against what standard,
+  on whose complaint, with what appeal, and whether a removed avatar is replaced or blanked are all
+  undecided (19); and somebody still has to *be* that operator, which v3.5.0's address does not
+  appoint (21). Bounded meanwhile by UAT carrying **seeded data only** and by the URL being
+  unpublished. **These two are the oldest live entries in the register**, and they are the reason
+  the administration exclusion was reversed at all.
+- ~~**Register entry 20 — the push provider, and VAPID key custody**~~ — **CLOSED in v3.5.0**
+  (standing decision 34). The "push provider" half was **withdrawn as never having existed**: Web
+  Push signs with the project's own key pair and posts to whatever endpoint the browser issued, so
+  there was never an account, an SDK or a third party to choose.
+- ~~**Register entry 21 — the operator address abuse reports are sent to**~~ — **CLOSED in v3.5.0**
+  (decision 35): `apps@programasemilla.com`. The obligation behind it is not closed and cannot be by
+  naming an address — somebody has to read that inbox for the dialog's promise to stay true, which
+  is why the entry also survives above as ADDRESSED-not-closed.
+- ~~**Register entry 22 — a cached conference can outlive a withdrawn registration by up to 24
+  hours.**~~ **RESOLVED 2026-08-15 in v5.4.0 (R1)** as standing decision 54: **ACCEPTED, not
+  fixed**, and **012 is unblocked**. The 24-hour readable window is ratified; **the ground it was
+  tolerated on is struck as false**, since cached appointments have carried the counterpart's
+  display name and meeting topic since 008; it is accepted instead on the ground that no third party
+  can end a registration today — **which 015 can falsify, so the attendee-restriction guard must be
+  widened before 015 is specified.** Two mechanisms licensed, three rejected on evidence, the
+  lifetime figure deferred, and two shipped defects fixed regardless. *Original entry:* Conceded by
+  009 when FR-756a was withdrawn, and **product-wide rather than 009's**: no
+  undecorated repository — Messages, Discover, cards, profile or Q&A — purges on refusal. Filed
+  against the phase that became 011, which did not answer it: 011 adds no repository and no cached
+  read, so the single answer that covers all of them is still owed. **013 did not answer it
+  either** — the administrative client caches nothing at all. **Blocks 012.**
+- **Whether `navy-800` and `coral-500` adopt the brand's values** (`#0d1942`, `#fe6551`) — register
+  entry **23**, opened by v3.4.0. Measured from the board, brand and tokens disagree on both; cream
+  agrees. Adopting them makes the board the single source of truth for colour and removes the
+  visible seam between the icon plate and the token-derived `theme_color` on the splash screen — but
+  `navy-800` is the primary surface and `coral-500` is both the accent and the focus ring, so it
+  repaints the whole product and every contrast ratio must be re-verified. **Blocks nothing**, and
+  011 was explicitly forbidden from resolving it. *This brief numbered it 22 in one place until
+  v5.4.0's hygiene pass; 22 is the cache gap, now closed.*
 - **Server-side branch protection is unconfigured** — a configuration task, not a limitation. The
   protection endpoints return **404 (no rule set)**, and protection is free on public repositories.
   Enforcement is meanwhile client-side and bypassable, which is material now that real attendee
