@@ -5,7 +5,7 @@
 
 | Field | Value |
 |---|---|
-| Deployed base commit | *(record before step A1 — FR-1120a)* |
+| Deployed base commit | `659fa94` (develop, PR #31), hand-deployed 2026-08-17 per D-012-4 |
 | Seed patch (FR-1127) | *(name the patch; "none" is not a valid value for the assessed walk)* |
 | Walker | |
 | Defect planter (T059) | *(must not be the walker; if none exists, record the T060 fallback)* |

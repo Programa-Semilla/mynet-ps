@@ -544,3 +544,15 @@ owner's own address and doubles as the walk's real-inbox account.
    Walk scenarios 006/3d and 011/8 no longer fail at step 1.
 
 **Recorded by**: the 012 implementation session, 2026-08-16.
+
+## 2026-08-17 — 012 T058: develop hand-deployed to UAT (decision D-012-4's first exercise)
+
+`deploy/vm/deploy.sh uat --migrate` run from the dev machine against **commit `659fa94`** — the
+squash-merge of PR #31, 012's machine phase. All six steps green: maintenance raised and lifted,
+client and admin bundles built locally and rsynced, API image rebuilt, migrations applied (none
+pending — 012 adds no schema), `/ready` 200, the SC-411 header smoke check passed, and both hosts
+answer over TLS. This is the first deploy performed under D-012-4 (UAT is hand-deployed by
+decision; CI's deploy job is inert on purpose) and the build the FR-1120 walk runs against —
+`walk-record.md`'s header now names it.
+
+**Recorded by**: the 012 implementation session.
