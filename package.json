@@ -32,6 +32,7 @@
     "db:seed": "pnpm --filter @mynet/api db:seed",
     "db:generate": "pnpm --filter @mynet/api db:generate",
     "admin:bootstrap": "pnpm --filter @mynet/api admin:bootstrap",
+    "admin:seed-operators": "pnpm --filter @mynet/api admin:seed-operators",
     "budget": "node scripts/asset-budget.mjs",
     "brand:audit": "node scripts/brand-audit.mjs",
     "brand:generate": "pnpm brand:generate:board && pnpm brand:generate:install",

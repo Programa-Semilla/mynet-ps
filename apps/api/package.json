@@ -13,6 +13,7 @@
     "db:migrate": "tsx src/db/migrate.ts",
     "db:seed": "tsx src/db/seed/index.ts",
     "admin:bootstrap": "tsx src/admin/bootstrap.ts",
+    "admin:seed-operators": "tsx src/db/seed/operator-identities.ts",
     "contract:generate": "tsx src/contract/generate.ts",
     "contract:check": "tsx src/contract/check.ts"
   },

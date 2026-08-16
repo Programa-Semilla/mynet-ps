@@ -23,10 +23,10 @@ outputs.
 *T007 destroys UAT data while the host's backups have never worked. T001 is insurance, not ceremony.*
 
 - [ ] T001 Take a verified `pg_dump` of UAT before anything destructive, or verify the existing `deploy/vm/backups/pre-014-manual-20260816T012211Z.dump` (a path on the **UAT host**, not in this repository) restores into a throwaway container; record the path in `deploy/vm/OPERATIONS-LOG.md`
-- [ ] T002 Extract the operator insert into an exported `ensureOperatorIdentities(db)` in `apps/api/src/db/seed/operators.ts`, using `.onConflictDoNothing({ target: operators.email })` and keeping the FR-918 cross-table address check
-- [ ] T003 Narrow the end-of-run self-check in `apps/api/src/db/seed/operators.ts` from a **table-wide** `count(*) WHERE password_hash IS NOT NULL` to the rows this call inserted — un-narrowed it throws on every database this command exists to serve (research R2)
-- [ ] T004 Add `apps/api/src/db/seed/operator-identities.ts` with a CLI wrapper; register `admin:seed-operators` in `apps/api/package.json` and the root `package.json`; do **not** call `assertSeedableTarget` — an additive command has nothing to guard (FR-1102)
-- [ ] T005 Add an integration test in `apps/api/tests/integration/operator-identities.test.ts` issuing a credential against a database **holding attendee rows** and asserting the attendee row count is unchanged. **Not a source-shape test** — SC-1210's subject is behavioural, and a source grep is the assertion class this project keeps finding blind (SC-1210)
+- [X] T002 Extract the operator insert into an exported `ensureOperatorIdentities(db)` in `apps/api/src/db/seed/operators.ts`, using `.onConflictDoNothing({ target: operators.email })` and keeping the FR-918 cross-table address check
+- [X] T003 Narrow the end-of-run self-check in `apps/api/src/db/seed/operators.ts` from a **table-wide** `count(*) WHERE password_hash IS NOT NULL` to the rows this call inserted — un-narrowed it throws on every database this command exists to serve (research R2)
+- [X] T004 Add `apps/api/src/db/seed/operator-identities.ts` with a CLI wrapper; register `admin:seed-operators` in `apps/api/package.json` and the root `package.json`; do **not** call `assertSeedableTarget` — an additive command has nothing to guard (FR-1102)
+- [X] T005 Add an integration test in `apps/api/tests/integration/operator-identities.test.ts` issuing a credential against a database **holding attendee rows** and asserting the attendee row count is unchanged. **Not a source-shape test** — SC-1210's subject is behavioural, and a source grep is the assertion class this project keeps finding blind (SC-1210)
 - [ ] T006 [P] Send one verification email and one password-reset email from UAT to a real inbox; confirm both links resolve; record in `OPERATIONS-LOG.md`. **Mail has authenticated but never delivered a message from that host** — and verification gates discoverability, so if this fails Discover is empty for the entire walk
 - [ ] T007 Get T002–T004's command onto the host **first** — the deployed image predates it and UAT's PostgreSQL is loopback-only: either deploy this branch's build via `deploy/vm/deploy.sh`, or run `admin:seed-operators` from a local checkout over the runbook's SSH tunnel; record which in `OPERATIONS-LOG.md`. Then re-seed UAT (7 attendee rows, of which 4 are genuine and disposable), run `admin:seed-operators`, issue a credential, confirm sign-in at `admin.mynet-dev.programasemilla.com` (FR-1100, FR-1101, SC-1209)
 - [ ] T008 Record the re-seed in `OPERATIONS-LOG.md` — what was destroyed, the date, and that decision 30 compliance is restored at a moment rather than guaranteed over time (FR-1103)
@@ -36,12 +36,12 @@ outputs.
 *The claim is in four files. Repairing one and leaving three is the 016/FR-1052 failure this
 requirement invokes.*
 
-- [ ] T009 [P] Rewrite the false claim in `apps/api/src/admin/bootstrap.ts`; correct its **FR-902 → FR-901** mis-citation; point the `no-such-operator` message at `admin:seed-operators`
-- [ ] T010 Rewrite the same false claim in `apps/api/src/db/seed/operators.ts` *(same file as T002/T003 — not parallel)*
-- [ ] T011 [P] Rewrite the same false claim in `deploy/vm/README.md`
-- [ ] T012 [P] Rewrite the same false claim in `specs/013-administrative-foundation/quickstart.md`
-- [ ] T013 [P] Correct the FR-902 citation in `apps/api/tests/integration/admin-bootstrap.test.ts` (lines ~112, ~118, ~129). **`apps/api/tests/unit/admin-forbidden-surfaces.test.ts`'s five FR-902 references are CORRECT and must not be touched**
-- [ ] T014 [P] Document the two undocumented re-seed consequences in `deploy/vm/README.md`: a re-seed **does** reset a chosen operator credential (FR-993 holds only for the bootstrap command), and it **destroys the administrative audit trail** and every organizer assignment (FR-1102b)
+- [X] T009 [P] Rewrite the false claim in `apps/api/src/admin/bootstrap.ts`; correct its **FR-902 → FR-901** mis-citation; point the `no-such-operator` message at `admin:seed-operators`
+- [X] T010 Rewrite the same false claim in `apps/api/src/db/seed/operators.ts` *(same file as T002/T003 — not parallel)*
+- [X] T011 [P] Rewrite the same false claim in `deploy/vm/README.md`
+- [X] T012 [P] Rewrite the same false claim in `specs/013-administrative-foundation/quickstart.md`
+- [X] T013 [P] Correct the FR-902 citation in `apps/api/tests/integration/admin-bootstrap.test.ts` (lines ~112, ~118, ~129). **`apps/api/tests/unit/admin-forbidden-surfaces.test.ts`'s five FR-902 references are CORRECT and must not be touched**
+- [X] T014 [P] Document the two undocumented re-seed consequences in `deploy/vm/README.md`: a re-seed **does** reset a chosen operator credential (FR-993 holds only for the bootstrap command), and it **destroys the administrative audit trail** and every organizer assignment (FR-1102b)
 
 ---
 

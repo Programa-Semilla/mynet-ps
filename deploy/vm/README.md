@@ -167,6 +167,14 @@ look local and `NODE_ENV` is a statement about a process rather than about what 
 > card refuses `DELETE FROM events` and breaks the re-seed with an error naming neither table.
 >
 > **Seed once, at provisioning. Treat a second run as a decision, not a refresh.**
+>
+> Two further consequences are easy to miss (012, FR-1102b): a re-seed **resets a committed
+> operator's chosen credential** — the operator rows are cleared and re-inserted with
+> `password_hash = null`, so FR-993's never-reset guarantee holds for the *bootstrap command*
+> only, not for the seed; and it **destroys the administrative audit trail and every organizer
+> assignment** — `operatorSeed.clear` empties `admin_audit_entries`, `report_resolutions` and
+> `organizer_assignments` before anything else, so the accountability record does not survive a
+> refresh.
 
 > ### The seeded credentials are committed and world-readable, on purpose
 >
@@ -212,8 +220,14 @@ than `exec` so it works whether or not the API container is currently up.
 
 Three things about it are load-bearing and are asserted by `admin-bootstrap.test.ts`:
 
-- **It is separate from `pnpm db:seed` on purpose.** Seeding deletes every attendee and re-inserts
-  the committed fixtures; getting a credential must not require doing that.
+- **It is separate from `pnpm db:seed` on purpose — and since 012 the separation is real.**
+  Seeding deletes every attendee and re-inserts the committed fixtures; getting a credential must
+  not require doing that, and no longer does:
+  `docker compose run --rm api node dist/db/seed/operator-identities.js` (locally
+  `pnpm admin:seed-operators`) inserts the identities **additively** — nothing cleared, no
+  credential created — so the bootstrap has something to hand a credential to on a database full
+  of attendee data. **Until 012 this bullet was a claim rather than a fact** (FR-1102a): the
+  identity's only route into a database was the destructive seed.
 - **The credential it sets is _initial_.** It reaches exactly one route — the forced replacement —
   and no administrative surface until it has been replaced (FR-992).
 - **It never resets a credential the operator chose** (FR-993). Idempotent upsert is the natural
@@ -234,19 +248,20 @@ last", which is a governance question nobody has decided, and the alternative �
 undeletable operator — is a worse property for a product whose whole administrative tier is
 supposed to be revocable.
 
-**Recovery is by re-seed of the identities plus a fresh bootstrap:**
+**Recovery is the additive identity command plus a fresh bootstrap** (012, FR-1102):
 
 ```bash
-docker compose run --rm api node dist/db/seed/index.js   # ⚠️ deletes every attendee — see below
+docker compose run --rm api node dist/db/seed/operator-identities.js
 docker compose run --rm api node dist/admin/bootstrap.js
 ```
 
-**In production this is not an acceptable recovery**, because `db:seed` deletes attendee data. On
-a production host the repair is to insert an operator row by hand against the database and then
-bootstrap it — which requires shell access to the VM, and that is the actual control protecting
-this path. Record any such intervention in `OPERATIONS-LOG.md`; an operator created outside the
-seed is an administrative act with no audit entry, because `admin_audit_entries` records acts
-performed _through_ the product (FR-939 records the same reasoning for the re-seed).
+Neither command touches an attendee row, so this recovery is acceptable in **every** environment,
+production included. *(Before 012 this section prescribed a full re-seed — which deletes every
+attendee — and production's repair was an operator row inserted by hand. The by-hand insert
+remains the fallback only when the committed identities are not the ones wanted.)* Record any
+such intervention in `OPERATIONS-LOG.md`; an operator created outside the seed is an
+administrative act with no audit entry, because `admin_audit_entries` records acts performed
+_through_ the product (FR-939 records the same reasoning for the re-seed).
 
 ---
 

@@ -56,6 +56,11 @@ The two commands this replaces still work and are what a deployed environment us
 `pnpm admin:bootstrap`. Establishing the credential is **a separate command by design** (research
 R10), because `pnpm db:seed` deletes every attendee and re-inserts committed passwords, and
 administrative credentials must not sit behind the least-guarded entry point in the project.
+**Since 012 the separation is complete rather than claimed** (FR-1102a): on a database already
+holding attendee data, `pnpm admin:seed-operators` inserts the operator identities additively —
+nothing cleared, no credential created — so the deployed sequence is `admin:seed-operators` then
+`admin:bootstrap` and no attendee row is touched. Until 012, the identity's only route into a
+database was the destructive seed, and this paragraph's claim was ahead of the code.
 
 MyNet at `http://localhost:5173`, admin at `http://localhost:5174`. **Two ports locally stand in for
 two hosts in deployment** — same-site is not reproducible on `localhost`, so the *cookie

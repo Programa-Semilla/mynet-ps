@@ -21,10 +21,13 @@ import { operators } from '../db/schema/operators.js'
  * that reads the abuse-report queue. Sign-in for a seeded operator is therefore *impossible*
  * rather than *defaulted* — there is no well-known password to find.
  *
- * Separating the two commands is the point rather than a convenience. `pnpm db:seed` **deletes
- * every attendee and re-inserts committed fixtures**; needing a credential must not require doing
- * that, and a deployed environment where somebody has to bootstrap an operator is exactly the
- * environment where re-seeding would be catastrophic.
+ * Separating the two commands is the point rather than a convenience — and **until 012 the
+ * separation did not deliver what it claimed** (FR-1102a). This command only hands a credential
+ * to an identity that already exists, and the identity's only route into the database was
+ * `pnpm db:seed`, which **deletes every attendee** before inserting. The additive half now
+ * exists: `pnpm admin:seed-operators` inserts the committed identities if absent, clears
+ * nothing, and creates no credential — so on a deployed environment the sequence is
+ * `admin:seed-operators` then this, and no attendee data is touched (FR-1102).
  *
  * The two values are read from `config.admin`, which reads them from the environment — **no route
  * can reach them**, so there is no request that could set a credential and no path by which the
@@ -79,7 +82,8 @@ export const bootstrapOperatorCredential = async (): Promise<BootstrapOutcome> =
 
   const operator = existing[0]
   // ─────────────────────────────────────────────────────────────────────────────────────────
-  // **This does not CREATE an operator, and that is FR-902.**
+  // **This does not CREATE an operator, and that is FR-901.**
+  // (This comment cited FR-902 — the organizer rule — until 012; the test file inherited it.)
   //
   // Neither tier is reachable by self sign-up (decision 32), and a bootstrap that creates an
   // identity from an environment variable is self sign-up with extra steps: anybody who can set
@@ -132,8 +136,9 @@ const main = async (): Promise<void> => {
         console.error(
           `No seeded operator has the address ${outcome.email}. This command gives a credential ` +
             'to an identity a reviewed change already created; it does not create one, because ' +
-            'neither administrative tier is reachable by self sign-up (FR-902). Run `pnpm ' +
-            'db:seed` on a development database, or add the operator to `db/seed/operators.ts`.',
+            'neither administrative tier is reachable by self sign-up (FR-901). Run `pnpm ' +
+            'admin:seed-operators` — it inserts the committed identities and destroys nothing — ' +
+            'or add the operator to `db/seed/operators.ts`.',
         )
         process.exitCode = 1
         return

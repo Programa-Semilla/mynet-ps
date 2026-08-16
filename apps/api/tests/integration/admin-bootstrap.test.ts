@@ -109,13 +109,13 @@ describe('the administrative bootstrap', () => {
 
   /**
    * **It gives a credential to an identity a reviewed change already created — it does not
-   * create one** (FR-902).
+   * create one** (FR-901; this file cited FR-902, the organizer rule, until 012 — FR-1102a).
    *
    * A bootstrap that created an identity from an environment variable is self sign-up with extra
    * steps: anybody who can set an environment variable on the host could mint themselves a
    * platform operator. Decision 32 forbids that in both tiers.
    */
-  it('refuses to create an operator that the seed did not (FR-902)', async () => {
+  it('refuses to create an operator that the seed did not (FR-901)', async () => {
     configure('someone-who-does-not-exist@mynet.invalid', BOOTSTRAP_PASSWORD)
 
     const outcome = await bootstrapOperatorCredential()
@@ -126,7 +126,7 @@ describe('the administrative bootstrap', () => {
       all.map((operator) => operator.email),
       'the bootstrap created an administrative identity. A platform operator is SEEDED as ' +
         'committed reviewed data; a bootstrap that creates one is self sign-up with extra steps ' +
-        '(decision 32, FR-902).',
+        '(decision 32, FR-901).',
     ).toEqual([SEEDED])
   })
 
