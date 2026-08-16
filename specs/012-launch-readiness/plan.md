@@ -38,13 +38,15 @@ gates on can be run locally.
 
 | Principle | Status |
 |---|---|
+| **I — requirements define the product** | Pass. This feature retires 122 scenarios derived from `requirements.md`'s validation checklist and decides what happens to Q&A at launch. Neither changes what the product is required to do; both change what has been *verified*. |
+| **II — the prototype is reference, not architecture** | Pass, and worth stating: the prototype is a fixed 390×844 mobile frame, so **every non-mobile layout this feature walks is unreviewed design rather than an implementation of an approved one.** That is why US4 exists. |
 | **III — attendee experience first** | Pass. No actor gains a capability. The walk covers all three actors; repairs are defect fixes. |
 | **IV — accessibility and responsiveness** | Pass, and this feature is where it is finally *verified*. FR-1124 screen-reader pass; FR-1121 three widths on real viewports; v5.4.0 R3 ratified layouts nobody had seen. |
 | **V — abstraction before platform** | Pass. No feature code gains a browser API call. `getCurrent`'s reclassification is a composition-root change. |
 | **VI — web-first** | Pass. No Capacitor trigger fires. |
 | **VII — verified on Linux CI** | **Strengthened.** FR-1147 brings nine orphaned tests in; FR-1144 adds two engines; FR-1146 fixes two assertions that could never fail. |
 | **VIII — attendee data is personal data** | **Strengthened.** FR-1140 closes an offline disclosure; FR-1149 closes a cross-prefix write. |
-| **IX — every feature declares its completeness** | Pass. Feature Declarations complete; the Offline row was **wrong twice and is now corrected** — see below. |
+| **IX — every feature declares its completeness** | **Pass, with a stated qualification.** Feature Declarations are complete and the Offline row was wrong twice before being corrected. The qualification: the principle permits a consolidated pass *"only as verification of work already done"*, and **two items here are not verification — they are other features' undischarged obligations being paid off.** FR-1148's backup install is **011's own T081**, and FR-1147's accessibility gating for `apps/admin` was never built by 013. Both are recorded as debt against those features under FR-1132; **012 paying them does not retroactively discharge them**, and T098 annotates rather than silently ticks. |
 
 ### Post-Phase-0 re-evaluation
 
