@@ -195,10 +195,18 @@ notifications; retype the composer test with a real keyboard.
 - **FR-1102**: Obtaining an operator credential MUST NOT require destroying attendee data. The
   present coupling — `pnpm db:seed` is the only route to an operator row, and `attendeeSeed.clear`
   is unconditional with no module argument — MUST be removed.
-- **FR-1102a**: `apps/api/src/admin/bootstrap.ts`'s header **already claims** that separating the
-  two commands means obtaining a credential does not require re-seeding. That claim is false today.
-  It MUST be made true or corrected in the same change — it is the header a reader consults before
-  reaching for `db:seed`, and this project's false-header class is why 016 needed FR-1055.
+- **FR-1102a**: The claim that separating the two commands means obtaining a credential does not
+  require re-seeding is **false today, and it appears in FOUR places**: `apps/api/src/admin/
+  bootstrap.ts`, `apps/api/src/db/seed/operators.ts`, `deploy/vm/README.md`, and
+  `specs/013-administrative-foundation/quickstart.md`. **All four MUST be made true or corrected.**
+  An earlier draft named only the first — repairing one and leaving three is precisely the 016
+  FR-1052 failure this requirement invokes, committed by the requirement itself.
+  `bootstrap.ts` additionally **cites the wrong requirement** — FR-902 is the organizer rule; the
+  operator rule is FR-901 — and its test file inherited the error.
+- **FR-1102b**: Two consequences of re-seeding are undocumented and MUST be recorded where an
+  operator will read them: a re-seed **does** reset a committed operator's chosen credential (FR-993
+  holds only for the *bootstrap command*), and a re-seed **destroys the administrative audit trail**
+  and every organizer assignment.
 - **FR-1103**: The re-seed and the credential issuance MUST be recorded in
   `deploy/vm/OPERATIONS-LOG.md`, including what was destroyed.
 
@@ -275,8 +283,36 @@ notifications; retype the composer test with a real keyboard.
   the gate are not.
 - **FR-1144**: Playwright MUST declare **WebKit and Firefox** projects alongside Chromium, and the
   responsive sweep MUST run in all three. Constitution v5.4.0 R3 names this work, assigns it to 012
-  by name, and states it needs no client, no UAT and no decision. Without it the physical-iPhone
-  pass is the only WebKit evidence this project will ever produce.
+  by name, and states it needs no client, no UAT and no decision.
+- **FR-1145**: **Messages MUST load in WebKit.** Phase 0 measured it: `GET /conversations` is issued
+  and never answered, so the destination sits at `Loading…` indefinitely with the shell rendered
+  around it — **Safari users cannot open Messages**, and no gate has ever been able to see it.
+  It cannot self-recover because `Messages.tsx` has **no first-load effect**; the initial read *is*
+  the poll's first tick, so a stalled request has no error path. **This is a defect found by 012's
+  own research and fixed under FR-1130** (owner decision, 2026-08-16). FR-1144 budgeted
+  configuration and did not budget this.
+- **FR-1146**: The two latent false-greens Phase 0 found MUST be fixed: both offline helpers wait on
+  `navigator.serviceWorker?.controller !== null`, and on an engine without `serviceWorker`
+  `undefined !== null` is **true**, so the wait resolves instantly; and the IndexedDB helpers
+  resolve silently on error, so their assertions pass vacuously. **Both are wrong on Chromium too.**
+- **FR-1147**: **Nine end-to-end tests have never run in CI** and MUST be brought in. The workflow
+  derives its spec list with `ls e2e/*.spec.ts | grep -v 'accessibility\.spec\.ts$'`; the `$` anchor
+  also excludes `admin-accessibility.spec.ts`, and the glob does not recurse, so
+  `e2e/accessibility/identity.spec.ts` is matched by neither job. **The job count MUST stay at 10** —
+  `verify` and `verify-push` hard-assert it and say in their own error text that it must not move
+  without an amendment.
+- **FR-1148**: **Backups on UAT MUST work, and a restore MUST be exercised on the real host.**
+  `OPERATIONS-LOG.md` records that no backup has ever been taken there and `backup.sh` cannot run —
+  `BACKUP_DIR` empty, no cron, `status` dying because an unquoted RFC 5322 `MAIL_FROM` has its
+  `<`/`>` parsed as shell redirection, and `backups/` root-owned while the script runs as
+  `azureuser`. **Standing decision 17 makes daily automated backups a governance obligation**, so
+  this is a breach rather than a gap, and two walk scenarios (006/3d, 011/8) fail at step 1 without
+  it.
+- **FR-1149**: A session that **expires** MUST clear the resolved identity. Today `forget()` is
+  called only on sign-out and account deletion, so an expired session leaves the scope resolved to
+  the previous attendee — and a second person signing in in that same document has their identity
+  written under the **first person's** cache prefix, where the first person's sign-out purge will
+  never run.
 
 ### Record-keeping
 
@@ -290,10 +326,14 @@ notifications; retype the composer test with a real keyboard.
 
 - **SC-1201**: A person can complete the entire attendee journey — sign-up to scheduled meeting — on
   a phone they own, without consulting the source code, working only from the script.
-- **SC-1202**: **Every** by-hand scenario in **every** `specs/*/quickstart.md` whose feature task is
-  not marked complete is either walked or explicitly named as retired with its coverage relocated.
-  **The inventory is produced by enumerating the task files, not by transcribing a list into this
-  specification.** No scenario is left unaccounted for.
+- **SC-1202**: **Every** by-hand scenario in **every** `specs/*/quickstart.md` is either walked or
+  explicitly named as retired with its coverage relocated. **The inventory is produced by
+  enumerating the specs, not by transcribing a list into this specification.** No scenario is left
+  unaccounted for. **This criterion no longer says "whose feature task is not marked complete",
+  because 002 and 004 have NO walk task at all** — 18 scenarios with nothing that could ever be
+  marked, outstanding under the earlier wording's plain reading and invisible under its intended
+  one. Phase 0 measured the corrected figures: **122 scenarios across 13 features, 74 outstanding
+  walk units, 90 unaccounted.**
 - **SC-1203**: Somebody who was not present can read the walk record and tell which steps passed,
   which failed, what was observed at each, and what was done about each failure.
 - **SC-1204**: No content and no primary action requires horizontal scrolling at any tested width in
@@ -327,7 +367,7 @@ notifications; retype the composer test with a real keyboard.
 | Obligation | Declaration |
 |---|---|
 | **Actor and tier** | All three, deliberately. US1 is the **attendee** in MyNet; US2 the **conference organizer** and US3 the **platform operator**, both in `apps/admin`; US4 and US5 cover both products. This feature adds no capability to any actor — it validates the ones that exist and repairs what the validation finds. |
-| **Offline behaviour** | **Unchanged, and validating it is part of the work.** No repository member is added, removed or reclassified. FR-1140 and FR-1141 alter *when stored data is discarded*, never what any surface reads or displays. **No new cached read, no new `passThrough` member, no new device capability.** US1 scenario 4 exercises it; SC-1207 tests the offline no-credential case specifically. |
+| **Offline behaviour** | **CHANGED, deliberately, and this row was wrong in the first two drafts.** They declared it unchanged with "no new `passThrough` member" — which any fix closing SC-1207 falsifies, making the declaration an FR-1140a artifact in the specification that requirement lives in. What actually changes: **`getCurrent` stops being a cached read and becomes a declared `passThrough` member**, so an offline cold start can no longer resolve an identity from disk. **The cost is the offline cold start itself** — an installed PWA launch is a fresh document every time, so *"arrive at the venue with no signal, open MyNet, read the programme"* stops working. That degraded state is already built and already worded (`active-event.tsx`). No device capability is added. FR-1141 alters only *when* stored data is discarded. |
 | **Desktop layout** | Unchanged by this feature and **reviewed by it for the first time**. v5.4.0 R3 ratified it without a client acceptance act; US4 is where a person finally looks. |
 | **Tablet layout** | As above. The 768–1279 band is where the two products **deliberately diverge**, ratified as-is by R3. US4 scenario 4 pins that divergence as correct, so the walk cannot mistake it for a defect. |
 | **Mobile layout** | As above, plus FR-1122/FR-1123's physical passes. `apps/admin`'s mobile layout was built days ago and no person has seen it. |
