@@ -59,21 +59,21 @@ repository.
 
 ### Three browser engines (FR-1144)
 
-- [ ] T019 Add `firefox` and `webkit` projects to `playwright.config.ts`, restricted to `responsive.spec.ts`, `first-viewport.spec.ts` and T018's `messages-terminal.spec.ts`. **Guard the `capturingScreenshots` ternary** — a project-level `testMatch` overrides the top-level one, silently defeating the `CAPTURE_SCREENSHOTS` switch
-- [ ] T020 In `playwright.config.ts` use `devices['Desktop Firefox']` and `devices['Desktop Safari']` — never a mobile descriptor, since `isMobile` is unsupported in Firefox and throws — and pin `deviceScaleFactor: 1` on WebKit against the sweep's ±1px assertions
-- [ ] T021 Change the **`test-e2e`** job's browser install line in `.github/workflows/verify.yml` (~line 656) to `chromium webkit firefox`; `test-accessibility`'s line (~553) stays chromium-only — its suites run one engine. **Add no job** — `verify` and `verify-push` hard-assert a count of 10
+- [X] T019 Add `firefox` and `webkit` projects to `playwright.config.ts`, restricted to `responsive.spec.ts`, `first-viewport.spec.ts` and T018's `messages-terminal.spec.ts`. **Guard the `capturingScreenshots` ternary** — a project-level `testMatch` overrides the top-level one, silently defeating the `CAPTURE_SCREENSHOTS` switch
+- [X] T020 In `playwright.config.ts` use `devices['Desktop Firefox']` and `devices['Desktop Safari']` — never a mobile descriptor, since `isMobile` is unsupported in Firefox and throws — and pin `deviceScaleFactor: 1` on WebKit against the sweep's ±1px assertions
+- [X] T021 Change the **`test-e2e`** job's browser install line in `.github/workflows/verify.yml` (~line 656) to `chromium webkit firefox`; `test-accessibility`'s line (~553) stays chromium-only — its suites run one engine. **Add no job** — `verify` and `verify-push` hard-assert a count of 10
 
 ### Gate holes (FR-1146, FR-1147)
 
 - [ ] T022 Fix the `navigator.serviceWorker?.controller !== null` waits in `e2e/offline.spec.ts` and `e2e/agenda-offline.spec.ts` — `undefined !== null` is **true**, so the wait resolves instantly. Wrong on Chromium too
 - [ ] T023 Fix the IndexedDB helpers in `e2e/agenda-offline.spec.ts` that resolve silently on error *(same file as T022 — not parallel)*
-- [ ] T024 Add `e2e/admin-accessibility.spec.ts` to the **`test-accessibility`** job in `.github/workflows/verify.yml`, matching the existing `test:a11y` script. It must not move into `test-e2e` — that would take an accessibility gate out of the accessibility check
-- [ ] T025 Change `test-e2e`'s spec derivation in `.github/workflows/verify.yml` to recurse (`find e2e -name '*.spec.ts'`) with the accessibility exclusion re-anchored to **path** — excluding the whole `e2e/accessibility/` directory as well as the two root a11y specs. Route `e2e/accessibility/identity.spec.ts` into **`test-accessibility`** beside T024's addition, adding it to `test:a11y` in the root `package.json` — it is a pure axe suite (004's T128), and landing it in `test-e2e` would repeat exactly the mistake T024 names. Keep the emptiness guard
+- [X] T024 Add `e2e/admin-accessibility.spec.ts` to the **`test-accessibility`** job in `.github/workflows/verify.yml`, matching the existing `test:a11y` script. It must not move into `test-e2e` — that would take an accessibility gate out of the accessibility check
+- [X] T025 Change `test-e2e`'s spec derivation in `.github/workflows/verify.yml` to recurse (`find e2e -name '*.spec.ts'`) with the accessibility exclusion re-anchored to **path** — excluding the whole `e2e/accessibility/` directory as well as the two root a11y specs. Route `e2e/accessibility/identity.spec.ts` into **`test-accessibility`** beside T024's addition, adding it to `test:a11y` in the root `package.json` — it is a pure axe suite (004's T128), and landing it in `test-e2e` would repeat exactly the mistake T024 names. Keep the emptiness guard
 - [ ] T026 Run the nine recovered tests and fix what they surface — they have never executed in CI
 
 ### Backups (FR-1148) — a governance breach, not a gap
 
-- [ ] T027 [P] Quote `MAIL_FROM` in `deploy/vm/backup.sh` — an RFC 5322 address has its `<`/`>` parsed as shell redirection, which is why `status` dies
+- [X] T027 [P] Quote `MAIL_FROM` in `deploy/vm/backup.sh` — an RFC 5322 address has its `<`/`>` parsed as shell redirection, which is why `status` dies
 - [ ] T028 Fix `backups/` ownership on the UAT host (root-owned, script runs as `azureuser`) and set `BACKUP_DIR`
 - [ ] T029 Ship T027's repaired `backup.sh` to the host first — T027 edits the repository copy and nothing else carries it there — then install the backup cron on UAT and confirm a scheduled backup actually fires
 - [ ] T030 **Exercise a restore on the real host, into a scratch database or throwaway container — never the live database**, which would undo T007's re-seed. Record it in `OPERATIONS-LOG.md`. This is 011's undischarged T081, paid off here — walk scenarios 006/3d and 011/8 fail at step 1 without it
@@ -94,11 +94,11 @@ repository.
 
 ### `listRegistered` completeness (FR-1141)
 
-- [ ] T040 **Name the accidental guard first** — `packages/data/src/contract.ts:69`'s `Satisfies<EventsResponse[number], Event>` already fails the build on a pagination envelope, and nothing records that it does. A refactor would remove the erasure's only protection with every test green
-- [ ] T041 [P] Add the `_EventsTakesNoQuery` compile-time binding in `packages/data/src/contract.ts`
-- [ ] T042 [P] Add `apps/api/tests/unit/registered-events-complete.test.ts` asserting `/events` declares no `querystring` and no pagination-shaped property. **The failure message is the deliverable** — it must name `erasingWithdrawnConferences` and say the client changes first
-- [ ] T043 [P] Add an integration case proving a conference that has **ended** is still listed, using the existing `moveEvent` helper — the break mode no regex can catch
-- [ ] T044 [P] Add comments at `apps/api/src/db/queries/events.ts` and `packages/data/src/interfaces/events.ts`, each **pointing at the test that enforces it** rather than standing alone
+- [X] T040 **Name the accidental guard first** — `packages/data/src/contract.ts:69`'s `Satisfies<EventsResponse[number], Event>` already fails the build on a pagination envelope, and nothing records that it does. A refactor would remove the erasure's only protection with every test green
+- [X] T041 [P] Add the `_EventsTakesNoQuery` compile-time binding in `packages/data/src/contract.ts`
+- [X] T042 [P] Add `apps/api/tests/unit/registered-events-complete.test.ts` asserting `/events` declares no `querystring` and no pagination-shaped property. **The failure message is the deliverable** — it must name `erasingWithdrawnConferences` and say the client changes first
+- [X] T043 [P] Add an integration case proving a conference that has **ended** is still listed, using the existing `moveEvent` helper — the break mode no regex can catch
+- [X] T044 [P] Add comments at `apps/api/src/db/queries/events.ts` and `packages/data/src/interfaces/events.ts`, each **pointing at the test that enforces it** rather than standing alone
 
 ---
 
