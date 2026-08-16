@@ -479,7 +479,7 @@ back today's database. A fresh dump was taken and verified the same way:
 counts spot-checked: attendees 3, events 4, operators 2, audit entries 5).
 
 **T007 — executed WITHOUT the re-seed, and the reasoning is the record.** FR-1100's authorization
-to destroy rested on the owner's statement that *the 4 genuine accounts* are disposable. Those
+to destroy rested on the owner's statement that _the 4 genuine accounts_ are disposable. Those
 accounts no longer exist; what a re-seed would destroy **today** is the owner's chosen operator
 credential (FR-993 does not survive a re-seed — see README), the authored "test" conference, and
 the 5-entry audit trail — none of which was declared disposable. FR-1100's substance (seeded
@@ -502,7 +502,7 @@ on a stale premise. What was performed, non-destructively:
 
 **Decision 30 compliance is therefore a present fact restored by somebody else's unlogged
 re-seed, held non-destructively by this session** — and, as FR-1103 asks this log to say: it is
-restored *at a moment* rather than guaranteed over time, because public sign-up stays open by
+restored _at a moment_ rather than guaranteed over time, because public sign-up stays open by
 design.
 
 **Recorded by**: the 012 implementation session, 2026-08-16.
@@ -528,9 +528,9 @@ owner's own address and doubles as the walk's real-inbox account.
    centralus, Standard_LRS, subscription pinned per decision 32), container `backups`, and a
    **write-only SAS** (`sp=cw`, HTTPS-only, expires 2027-08-16) written into the VM `.env` — the
    runbook's own design: a compromised VM can add backups and can neither read nor destroy the
-   history. *One trap recorded for the next operator: writing the SAS with `sed` corrupts it —
+   history. _One trap recorded for the next operator: writing the SAS with `sed` corrupts it —
    `&` in a replacement means "the whole match" — which produced an HTTP 409 until rewritten
-   literally. The literal `.env` parser in `backup.sh` handles the 5-`&` SAS correctly.*
+   literally. The literal `.env` parser in `backup.sh` handles the 5-`&` SAS correctly._
 3. **A full run is green end to end**: dump → verified readable → off-host copy confirmed by the
    service (Content-MD5, HTTP 201) → prune. `exit=0 success`, where every previous run on this
    host had failed at step 0.

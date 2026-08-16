@@ -72,7 +72,9 @@ for (const step of recorded) {
 const VERDICTS = new Set(['pending', 'pass', 'fail', 'blocked', 'n/a'])
 for (const row of rows) {
   if (!VERDICTS.has(row.verdict)) {
-    failures.push(`row ${row.step}: verdict "${row.verdict}" is not one of ${[...VERDICTS].join(', ')}`)
+    failures.push(
+      `row ${row.step}: verdict "${row.verdict}" is not one of ${[...VERDICTS].join(', ')}`,
+    )
     continue
   }
   // A verdict without an observation is exactly what FR-1125 forbids: "a step recorded only as
@@ -88,11 +90,15 @@ for (const row of rows) {
   if (row.step.startsWith('D') && row.verdict === 'pass') {
     const name = row.capture.replace(/\(required\)/, '').trim()
     if (!name) {
-      failures.push(`row ${row.step} passed with no capture named — FR-1126: layout is the one thing no verdict can convey`)
+      failures.push(
+        `row ${row.step} passed with no capture named — FR-1126: layout is the one thing no verdict can convey`,
+      )
     } else {
       for (const file of name.split(/[,\s]+/).filter(Boolean)) {
         if (!existsSync(join(DIR, 'captures', file))) {
-          failures.push(`row ${row.step} names capture "${file}", which does not exist in captures/`)
+          failures.push(
+            `row ${row.step} names capture "${file}", which does not exist in captures/`,
+          )
         }
       }
     }
@@ -106,7 +112,9 @@ if (complete) {
     failures.push(`the record declares itself complete while ${row.step} is still pending`)
   }
   if (/\*\(record before step A1/.test(record)) {
-    failures.push('the record declares itself complete without naming the deployed base commit (FR-1120a)')
+    failures.push(
+      'the record declares itself complete without naming the deployed base commit (FR-1120a)',
+    )
   }
   if (/\*\(name the patch/.test(record)) {
     failures.push('the record declares itself complete without naming the FR-1127 seed patch')

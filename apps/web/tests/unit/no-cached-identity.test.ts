@@ -49,7 +49,7 @@ describe('the identity read stays out of the cache (FR-1140)', () => {
     // passThrough form is `'getCurrent'` inside an array and never matches this shape.
     expect(
       /getCurrent\s*:\s*['"]/.test(source),
-      "getCurrent appears as a reads-map entry in services.ts. Caching the identity read is " +
+      'getCurrent appears as a reads-map entry in services.ts. Caching the identity read is ' +
         'SC-1207 re-opened: an offline cold start with no credential would again resolve the ' +
         'previous attendee from disk and serve their notes. Decision D-012-1 (owner, ' +
         '2026-08-16) closed this deliberately — passThrough, never cached. If you are here to ' +

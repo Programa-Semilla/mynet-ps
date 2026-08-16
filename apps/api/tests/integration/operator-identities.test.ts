@@ -54,7 +54,9 @@ describe('the additive operator-identity command', () => {
 
     const rows = await db.select({ email: operators.email }).from(operators)
     expect(rows.map((r) => r.email).sort()).toEqual(
-      SEED_OPERATORS.map((o) => o.email).slice().sort(),
+      SEED_OPERATORS.map((o) => o.email)
+        .slice()
+        .sort(),
     )
   })
 
@@ -62,7 +64,9 @@ describe('the additive operator-identity command', () => {
     const db = getDb()
 
     // The state the old table-wide self-check threw on: one operator holds a real credential.
-    await db.update(operators).set({ passwordHash: 'a-hash-somebody-chose', credentialIsInitial: false })
+    await db
+      .update(operators)
+      .set({ passwordHash: 'a-hash-somebody-chose', credentialIsInitial: false })
 
     const [attendeesBefore] = await db.select({ value: count() }).from(attendees)
 

@@ -170,7 +170,7 @@ look local and `NODE_ENV` is a statement about a process rather than about what 
 >
 > Two further consequences are easy to miss (012, FR-1102b): a re-seed **resets a committed
 > operator's chosen credential** — the operator rows are cleared and re-inserted with
-> `password_hash = null`, so FR-993's never-reset guarantee holds for the *bootstrap command*
+> `password_hash = null`, so FR-993's never-reset guarantee holds for the _bootstrap command_
 > only, not for the seed; and it **destroys the administrative audit trail and every organizer
 > assignment** — `operatorSeed.clear` empties `admin_audit_entries`, `report_resolutions` and
 > `organizer_assignments` before anything else, so the accountability record does not survive a
@@ -256,9 +256,9 @@ docker compose run --rm api node dist/admin/bootstrap.js
 ```
 
 Neither command touches an attendee row, so this recovery is acceptable in **every** environment,
-production included. *(Before 012 this section prescribed a full re-seed — which deletes every
+production included. _(Before 012 this section prescribed a full re-seed — which deletes every
 attendee — and production's repair was an operator row inserted by hand. The by-hand insert
-remains the fallback only when the committed identities are not the ones wanted.)* Record any
+remains the fallback only when the committed identities are not the ones wanted.)_ Record any
 such intervention in `OPERATIONS-LOG.md`; an operator created outside the seed is an
 administrative act with no audit entry, because `admin_audit_entries` records acts performed
 _through_ the product (FR-939 records the same reasoning for the re-seed).

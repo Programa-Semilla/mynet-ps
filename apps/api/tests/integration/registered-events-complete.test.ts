@@ -94,7 +94,7 @@ describe('GET /events lists every registration, however old (FR-1141)', () => {
       'GET /events stopped listing a conference whose dates have ended. ' +
         '`erasingWithdrawnConferences` (apps/web/src/app/services.ts) erases every cached ' +
         'conference absent from this answer — so an "upcoming only" predicate erases the ' +
-        "device copy of every conference the moment it ends: programme, saved sessions, the " +
+        'device copy of every conference the moment it ends: programme, saved sessions, the ' +
         "attendee's private notes, appointments. The client changes FIRST: rework the erasure " +
         'at the composition root, then filter this read. Do not fix this by tuning the test dates.',
     ).toContain('Product & Design Summit')
