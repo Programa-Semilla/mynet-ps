@@ -33,6 +33,185 @@ const awaitServiceWorker = async (page: Page): Promise<void> => {
   })
 }
 
+/**
+ * ═════════════════════════════════════════════════════════════════════════════════════════════
+ * **READING THE STORE ITSELF, BECAUSE FIX-2 AND FIX-3 CHANGE WHAT IS STORED AND NOTHING THAT IS
+ * SHOWN.**
+ *
+ * Everything above this point asserts a surface. The two members `LocalCache` gained cannot be
+ * asserted that way: through the decorator, "deleted" and "present but stale" are the same
+ * observation (FIX-204), and a conference erased on a cold start was already invisible. So these
+ * three helpers open `mynet-cache` directly — the same database `WebLocalCache` writes, opened at
+ * the same version so no upgrade is triggered — and read its keys back out.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────────────────────
+ * **THEY ARE THE OBSERVATION, NEVER THE SUBJECT.** Nothing here reimplements `keys` or `remove`;
+ * a second copy of a cursor loop would prove the copy works. The subject is always the product
+ * calling the real member — the composition root's erasure for `keys`, the caching decorator's
+ * expiry for `remove` — and these read the bytes afterwards.
+ *
+ * That distinction is the whole point of the two tests at the foot of this file. Before them the
+ * real bodies of `keys` and `remove` ran in **no test at all**: the unit suite exercises the
+ * no-IndexedDB degradation path, where `remove` resolves `undefined` and `keys` resolves `[]`
+ * without touching a store, and substitutes an in-memory double everywhere else. Had `keys`
+ * resolved `[]` against a *working* store — a cursor that never completes, a bound built the
+ * wrong way round, `primaryKey` read where `key` was meant — **no conference would ever have been
+ * erased and every suite would have stayed green.** That is 008's `#private`-field Proxy and
+ * 010's precache guard arriving a third time.
+ * ─────────────────────────────────────────────────────────────────────────────────────────────
+ *
+ * Each resolves rather than rejecting when the store is not there, because a helper that throws
+ * turns a missing precondition into a stack trace instead of a legible assertion failure.
+ * ═════════════════════════════════════════════════════════════════════════════════════════════
+ */
+const CACHE_DATABASE = 'mynet-cache'
+const CACHE_STORE = 'entries'
+
+/** Every key the device holds, exactly as the store reports them. */
+const storedKeys = (page: Page): Promise<string[]> =>
+  page.evaluate(
+    ([database, store]) =>
+      new Promise<string[]>((resolve) => {
+        const open = indexedDB.open(database)
+        open.onerror = () => resolve([])
+        open.onblocked = () => resolve([])
+        open.onsuccess = () => {
+          const db = open.result
+          if (!db.objectStoreNames.contains(store)) {
+            db.close()
+            resolve([])
+            return
+          }
+          const request = db.transaction(store, 'readonly').objectStore(store).getAllKeys()
+          request.onsuccess = () => {
+            resolve(request.result.filter((key): key is string => typeof key === 'string'))
+            db.close()
+          }
+          request.onerror = () => {
+            db.close()
+            resolve([])
+          }
+        }
+      }),
+    [CACHE_DATABASE, CACHE_STORE] as const,
+  )
+
+/** Puts an entry under an exact key, with the shape `WebLocalCache.write` gives it. */
+const storeEntry = (page: Page, key: string, retrievedAt: string, payload: unknown) =>
+  page.evaluate(
+    ({ database, store, entryKey, stamp, body }) =>
+      new Promise<void>((resolve) => {
+        const open = indexedDB.open(database)
+        open.onerror = () => resolve()
+        open.onblocked = () => resolve()
+        open.onsuccess = () => {
+          const db = open.result
+          const transaction = db.transaction(store, 'readwrite')
+          transaction.objectStore(store).put({ payload: body, retrievedAt: stamp }, entryKey)
+          transaction.oncomplete = () => {
+            db.close()
+            resolve()
+          }
+          transaction.onerror = () => {
+            db.close()
+            resolve()
+          }
+        }
+      }),
+    {
+      database: CACHE_DATABASE,
+      store: CACHE_STORE,
+      entryKey: key,
+      stamp: retrievedAt,
+      body: payload,
+    },
+  )
+
+/**
+ * Rewrites one entry's `retrievedAt` to `hoursAgo` hours before **the device's own clock**,
+ * keeping its payload, and answers the stamp it wrote (or `null` if there was no such entry).
+ *
+ * ─────────────────────────────────────────────────────────────────────────────────────────────
+ * **THE STAMP IS COMPUTED IN THE PAGE, AND IT MUST BE OLD ENOUGH TO EXPIRE AND YOUNG ENOUGH TO
+ * BE BELIEVED.**
+ *
+ * `ageOf` in `cached.ts` reads the stamp against the device clock and sorts it into three states,
+ * not two: inside the lifetime is `fresh`, past it by a credible margin is `expired` **and gets
+ * deleted**, and past `CLOCK_TRUST_CEILING_MS` is `withheld` — served no more than an expired one
+ * and **deliberately not deleted**, because an age only a moved clock explains says more about the
+ * date than about the entry.
+ *
+ * So an epoch stamp is exactly the wrong choice here: it is neither served nor removed, and a
+ * test using one would report FIX-2 broken while FIX-2 worked. That is what this helper is for —
+ * naming the band rather than reaching for the oldest date available. Computing `Date.now()` in
+ * the page rather than in the runner is the same care one level down: the comparison is made
+ * against the browser's clock, so the stamp has to be relative to the browser's clock.
+ * ─────────────────────────────────────────────────────────────────────────────────────────────
+ *
+ * **The payload is preserved deliberately**: the entry must be indistinguishable from a real one
+ * that has simply aged, or this would exercise the corrupt-entry path rather than the expiry path.
+ */
+const ageOut = (page: Page, key: string, hoursAgo: number): Promise<string | null> =>
+  page.evaluate(
+    ({ database, store, entryKey, hours }) =>
+      new Promise<string | null>((resolve) => {
+        const open = indexedDB.open(database)
+        open.onerror = () => resolve(null)
+        open.onblocked = () => resolve(null)
+        open.onsuccess = () => {
+          const db = open.result
+          const transaction = db.transaction(store, 'readwrite')
+          const objectStore = transaction.objectStore(store)
+          const read = objectStore.get(entryKey)
+          const stamp = new Date(Date.now() - hours * 60 * 60 * 1000).toISOString()
+
+          read.onsuccess = () => {
+            const entry = read.result as { payload: unknown } | undefined
+            if (!entry) {
+              db.close()
+              resolve(null)
+              return
+            }
+            objectStore.put({ ...entry, retrievedAt: stamp }, entryKey)
+            transaction.oncomplete = () => {
+              db.close()
+              resolve(stamp)
+            }
+          }
+          transaction.onerror = () => {
+            db.close()
+            resolve(null)
+          }
+        }
+      }),
+    { database: CACHE_DATABASE, store: CACHE_STORE, entryKey: key, hours: hoursAgo },
+  )
+
+/** One entry's stamp, so a test can prove its own precondition took rather than assume it. */
+const storedStamp = (page: Page, key: string): Promise<string | null> =>
+  page.evaluate(
+    ([database, store, entryKey]) =>
+      new Promise<string | null>((resolve) => {
+        const open = indexedDB.open(database)
+        open.onerror = () => resolve(null)
+        open.onblocked = () => resolve(null)
+        open.onsuccess = () => {
+          const db = open.result
+          const request = db.transaction(store, 'readonly').objectStore(store).get(entryKey)
+          request.onsuccess = () => {
+            const entry = request.result as { retrievedAt?: string } | undefined
+            db.close()
+            resolve(entry?.retrievedAt ?? null)
+          }
+          request.onerror = () => {
+            db.close()
+            resolve(null)
+          }
+        }
+      }),
+    [CACHE_DATABASE, CACHE_STORE, key] as const,
+  )
+
 test.describe('Agenda offline', () => {
   test('the programme and saved set stay READABLE, with a retrieval stamp', async ({
     page,
@@ -218,6 +397,206 @@ test.describe('Agenda offline', () => {
       await expect(page.getByText(/no published programme/i)).toHaveCount(0)
     } finally {
       await context.setOffline(false)
+    }
+  })
+
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════════════════════
+   * **FIX-3 — `keys()` AGAINST A REAL STORE, WHICH IS THE ONE THING NO OTHER LAYER CAN DO.**
+   *
+   * `erasingWithdrawnConferences` at the composition root asks the store which conferences this
+   * device holds and purges the ones the server no longer lists. **The whole mechanism rests on
+   * `keys()` returning real key strings**, and until this test its real body — the
+   * `openKeyCursor` loop, the `typeof cursor.key === 'string'` filter, the `oncomplete`
+   * resolution — executed in no test at all. The unit suite drives the no-IndexedDB path, where
+   * it resolves `[]` without opening anything, and doubles it everywhere else.
+   *
+   * A `keys()` that resolved `[]` against a working store would therefore be **completely
+   * silent**: no conference would ever be erased, the erasure would be a no-op forever, and every
+   * suite in this repository would stay green. That is exactly the shape of 008's `#private`-field
+   * Proxy and of 010's precache guard that could never run.
+   *
+   * So a conference this attendee is *not* registered for is planted in the store by hand, and
+   * the product is made to perform an online `listRegistered()`. The plant is what makes the
+   * assertion sharp: it can only disappear if `keys()` genuinely reported it back.
+   * ═══════════════════════════════════════════════════════════════════════════════════════════
+   */
+  test('a stored conference the server no longer lists is ERASED, keys and all (FIX-301)', async ({
+    page,
+  }) => {
+    await page.goto('/')
+    await signIn(page, ADA)
+    await goToAgenda(page)
+    await awaitServiceWorker(page)
+
+    // ───────────────────────────────────────────────────────────────────────────────────────
+    // Back to Home by a link rather than a reload, because what has to be true when the erasure
+    // runs is that **identity has resolved**: it skips outright while the scope still reads
+    // `anonymous`, and only a resolved session can be reached by a control the attendee pressed.
+    //
+    // **And the conference list is waited for, not just the greeting** — it is what says the
+    // `listRegistered()` this page load issued has *finished*. Planting while one is in flight
+    // is a race the plant loses: the erasure took its snapshot of the device's conferences
+    // before the plant existed, so it survives that pass and the precondition below fails on a
+    // mechanism that is working. It failed exactly that way once.
+    // ───────────────────────────────────────────────────────────────────────────────────────
+    const settled = async () => {
+      await expect(page.getByRole('heading', { name: `Hello, ${ADA.displayName}` })).toBeVisible()
+      await expect(
+        page
+          .getByRole('region', { name: 'Your conferences' })
+          .getByRole('heading', { level: 3 })
+          .first(),
+      ).toBeVisible()
+    }
+
+    await page.getByRole('link', { name: 'Home', exact: true }).first().click()
+    await settled()
+
+    const before = await storedKeys(page)
+
+    // A key naming a conference, from which the attendee's own prefix is read back. Derived from
+    // what the store actually holds rather than from an attendee id fetched some other way —
+    // this test is about the store's answer, so the store is where the question comes from.
+    const conferenceKey = before.find((key) => /^attendee:[^|]+\|event:[^|]+\|/.test(key))
+    expect(
+      conferenceKey,
+      `no conference-scoped entry was written after visiting Agenda. Keys: ${JSON.stringify(before)}`,
+    ).toBeDefined()
+
+    const attendeePrefix = conferenceKey!.slice(0, conferenceKey!.indexOf('|') + 1)
+    const phantom = `${attendeePrefix}event:00000000-0000-4000-8000-0000000000ff|programme`
+    await storeEntry(page, phantom, new Date().toISOString(), [])
+
+    expect(
+      await storedKeys(page),
+      'the planted conference was not stored, so the assertion below would pass vacuously',
+    ).toContain(phantom)
+
+    // A round trip that remounts Home's `Your conferences` card, which is what issues a fresh
+    // `listRegistered()` with identity already resolved.
+    await goToAgenda(page)
+    await page.getByRole('link', { name: 'Home', exact: true }).first().click()
+    await settled()
+
+    await expect
+      .poll(async () => await storedKeys(page), {
+        timeout: 15_000,
+        message:
+          `the planted conference ${phantom} survived a successful listRegistered(). Either the ` +
+          'erasure did not run, or `keys()` did not report the key back — the second is silent ' +
+          'everywhere else, because an unreported key is simply never purged.',
+      })
+      .not.toContain(phantom)
+
+    // ─────────────────────────────────────────────────────────────────────────────────────────
+    // **And nothing else went with it** (FIX-302's sibling property). The erasure purges a whole
+    // conference prefix, so a bound that reached one key too far would take the conference the
+    // attendee is still registered for — and that loss is offline-only and silent.
+    // ─────────────────────────────────────────────────────────────────────────────────────────
+    const after = await storedKeys(page)
+    for (const key of before) {
+      expect(
+        after,
+        `${key} was erased alongside the withdrawn conference. Only entries under the conference ` +
+          'absent from listRegistered() may go.',
+      ).toContain(key)
+    }
+  })
+
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════════════════════
+   * **FIX-2 — `remove()` AGAINST A REAL STORE, AND IT MUST TAKE ONE KEY AND NO NEIGHBOUR.**
+   *
+   * The other half of the same gap. `remove`'s real body is one line — `store.delete(key)` — and
+   * one line is exactly the sort of thing nobody writes a browser test for; the unit suite proves
+   * it resolves `undefined` when there is no IndexedDB, which is the path where it deletes
+   * nothing by construction.
+   *
+   * **`remove`, never `purge`, is the property under test** (FIX-203). `purge` is a prefix match,
+   * and this conference's other resources are still fresh and still readable — so the expiry of
+   * one entry must not cost the attendee the rest of their offline copy. Routed through
+   * `prefixBounds`, `remove` would take `programme` and leave `tracks` and `saved` gone too, and
+   * **nothing on any screen would say so**: through the decorator, "deleted" and "present but
+   * stale" are the same observation (FIX-204). Only the store can tell them apart, which is why
+   * this reads the store.
+   *
+   * The entry is aged rather than corrupted, and the read is made offline, because that is the
+   * only situation in which the decorator reaches the deletion at all: online it never consults
+   * the cache, and a refusal purges the conference instead.
+   * ═══════════════════════════════════════════════════════════════════════════════════════════
+   */
+  test('an entry past its lifetime is DELETED, and its fresh neighbours are not (FIX-203)', async ({
+    page,
+    context,
+  }) => {
+    await page.goto('/')
+    await signIn(page, ADA)
+    await goToAgenda(page)
+    await awaitServiceWorker(page)
+
+    const before = await storedKeys(page)
+    const programme = before.find((key) => key.endsWith('|programme'))
+    expect(
+      programme,
+      `the programme was not cached after visiting Agenda. Keys: ${JSON.stringify(before)}`,
+    ).toBeDefined()
+
+    // Its neighbours under the same conference prefix — the entries `purge` would take and
+    // `remove` must not. There is at least one: Agenda reads tracks and the commitment set too.
+    const conferencePrefix = programme!.slice(0, programme!.lastIndexOf('|') + 1)
+    const neighbours = before.filter((key) => key.startsWith(conferencePrefix) && key !== programme)
+    expect(
+      neighbours.length,
+      `no other entry is cached under ${conferencePrefix}, so "one key and no neighbour" would ` +
+        'be asserted against an empty set',
+    ).toBeGreaterThan(0)
+
+    // ───────────────────────────────────────────────────────────────────────────────────────
+    // **Offline FIRST, then the entry is aged.** The other way round leaves a window in which a
+    // read still in flight rewrites the stamp with a live one, and the test then measures a
+    // fresh entry while reporting on an expired one — it failed exactly that way once, and a
+    // precondition that can be undone by a race is not a precondition.
+    // ───────────────────────────────────────────────────────────────────────────────────────
+    await context.setOffline(true)
+    try {
+      // 48 hours: twice the lifetime, and nowhere near the clock-trust ceiling. See `ageOut`.
+      const stamp = await ageOut(page, programme!, 48)
+      expect(stamp, `${programme} could not be aged out`).not.toBeNull()
+      expect(
+        await storedStamp(page, programme!),
+        `${programme} did not keep the stamp it was given, so its expiry is not established`,
+      ).toBe(stamp)
+
+      await page.reload()
+
+      // The surface is unchanged by the deletion (FIX-202): a connection is needed and nothing
+      // is cached, which is what an expired entry has always meant. Waited for here so the
+      // deletion has demonstrably happened before the store is read.
+      const failure = page.getByRole('alert').first()
+      await expect(failure).toBeVisible()
+      await expect(failure).toContainText(/needs a connection/i)
+
+      await expect
+        .poll(async () => await storedKeys(page), {
+          timeout: 15_000,
+          message:
+            `${programme} was still stored after it expired and was read. The 24-hour lifetime ` +
+            'bounded what may be SERVED and, before FIX-2, bounded retention not at all — the ' +
+            'bytes survived on the device against a deletion screen that says none are kept.',
+        })
+        .not.toContain(programme)
+    } finally {
+      await context.setOffline(false)
+    }
+
+    const after = await storedKeys(page)
+    for (const key of neighbours) {
+      expect(
+        after,
+        `${key} went with the expired programme entry. That is \`purge\`'s prefix match rather ` +
+          'than `remove`, and it silently costs the attendee an offline copy that was still fresh.',
+      ).toContain(key)
     }
   })
 })

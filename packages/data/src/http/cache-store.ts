@@ -32,4 +32,26 @@ export interface LocalCache {
   write<T>(key: string, payload: T): Promise<void>
   /** Removes every entry whose key begins with this prefix. */
   purge(keyPrefix: string): Promise<void>
+  /**
+   * Removes the entry under **exactly** this key (FIX-2, constitution v5.4.0 R1).
+   *
+   * Not `purge(key)`: that is a prefix match, so it would also take a resource whose name
+   * extends this one. The decorator's expiry branch has established that *one* entry aged out
+   * and its neighbours may still be fresh (FIX-203).
+   */
+  remove(key: string): Promise<void>
+  /**
+   * Every key held under this prefix, in no defined order (FIX-3, constitution v5.4.0 R1).
+   *
+   * The read-side mirror of `purge`. Two callers, neither of them a repository: the composition
+   * root's erasure of a conference the attendee has left (FIX-303), and `sweepExpired` in
+   * `cached.ts`, which enumerates the whole store because the entries it must delete belong to
+   * an attendee the device can no longer identify (review finding I1).
+   *
+   * It is declared here because this file is the structural counterpart of
+   * `packages/platform/src/interfaces/local-cache.ts` and the two shapes must stay identical;
+   * **the header at the top of THIS file explains why there are two**, and the platform-side
+   * declaration carries the long argument for these members.
+   */
+  keys(keyPrefix: string): Promise<readonly string[]>
 }

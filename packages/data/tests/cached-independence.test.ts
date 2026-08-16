@@ -28,6 +28,10 @@ const nullStore = (): LocalCache => ({
   read: async () => null as CachedEntry<never> | null,
   write: async () => {},
   purge: async () => {},
+  // FIX-2 / FIX-3 — nothing is ever stored here, so there is nothing to remove and nothing to
+  // enumerate. This file is about promise identity, not about storage.
+  remove: async () => {},
+  keys: async () => [],
 })
 
 /** A repository whose single read is held open until the test settles it. */
