@@ -458,3 +458,60 @@ decision, not a deploy step.
 
 **Recorded by**: the session that promoted `develop` to `main` and shipped
 `fix/post-merge-verification`.
+
+## 2026-08-16 — 012 T001/T007: backups verified, operator credential issued, and NO re-seed — the environment had moved
+
+**State found** (all queried live): 40 tables, migrations current; `attendees = 3` — **exactly the
+three seeded fixtures; the 4 genuine accounts the previous entry records are already gone**;
+`operators = 2`, of which `operator@mynet.invalid` holds a **chosen** credential
+(`credential_is_initial = false`) and `second.operator@mynet.invalid` held none; `events = 4` (the
+three seeded plus an operator-authored conference named "test"); `admin_audit_entries = 5`.
+Somebody re-seeded and bootstrapped this environment after the previous entry was written and did
+not log it — inferred from the data, not witnessed.
+
+**T001 — the existing dump is not a safety net, so a fresh one was taken and verified.**
+`backups/pre-014-manual-20260816T012211Z.dump` restores cleanly (`pg_restore` exit 0 into a
+throwaway `postgres:17` container) but contains **31 of the live 40 tables** — the whole
+administrative domain (`operators`, `admin_audit_entries`, `organizer_assignments`,
+`report_resolutions`) and 014's tables are absent, so it captures a pre-013 schema and cannot
+back today's database. A fresh dump was taken and verified the same way:
+`backups/pre-012-reseed-20260816T174158Z.dump` (139K, custom format, restore exit 0, 40 tables,
+counts spot-checked: attendees 3, events 4, operators 2, audit entries 5).
+
+**T007 — executed WITHOUT the re-seed, and the reasoning is the record.** FR-1100's authorization
+to destroy rested on the owner's statement that *the 4 genuine accounts* are disposable. Those
+accounts no longer exist; what a re-seed would destroy **today** is the owner's chosen operator
+credential (FR-993 does not survive a re-seed — see README), the authored "test" conference, and
+the 5-entry audit trail — none of which was declared disposable. FR-1100's substance (seeded
+attendee data only) is **already true**, so the destructive half was skipped rather than performed
+on a stale premise. What was performed, non-destructively:
+
+1. `pnpm admin:seed-operators` (012's additive command) from a local checkout of
+   `spec/012-launch-readiness` over the runbook's SSH tunnel — the deployed image predates the
+   command, and this is the transport T007 asks to be recorded. Outcome: **clean no-op** over an
+   operator holding a chosen credential — live proof of research R2's trap case (the pre-012
+   table-wide self-check would have thrown here) — with `attendees` unchanged at 3 (SC-1210, on
+   the real host).
+2. `docker compose run --rm api node dist/admin/bootstrap.js` on the VM with the bootstrap pair
+   set for `second.operator@mynet.invalid` → `credential-set` (FR-1101). The values were passed
+   per-invocation and are **not** in `.env`.
+3. `POST https://admin.mynet-dev.programasemilla.com/api/admin/session` with that credential →
+   **204 with the session cookie**, over real TLS at the real admin host (SC-1209). FR-992 will
+   force replacement at first sign-in; the initial credential is with the walk coordinator, not
+   in this file.
+
+**Decision 30 compliance is therefore a present fact restored by somebody else's unlogged
+re-seed, held non-destructively by this session** — and, as FR-1103 asks this log to say: it is
+restored *at a moment* rather than guaranteed over time, because public sign-up stays open by
+design.
+
+**Recorded by**: the 012 implementation session, 2026-08-16.
+
+**T006 addendum, same session — mail sent from this host for the first time.** Sign-up
+(`POST /auth/sign-up`, 204) and reset-request (`POST /auth/reset-request`, 202, 627ms — a real
+outbound call) were issued against the live host for `danny.perez.u@gmail.com`; the API logged
+**no** `transactional mail could not be delivered` warning for either, so both messages were
+accepted by Mailgun. **Outstanding human half**: open the inbox, confirm both links resolve — the
+verification link and the reset link — then this line can be marked confirmed. This deliberately
+creates one genuine account on UAT (the walk's edge case 5: recorded, walk continues); it is the
+owner's own address and doubles as the walk's real-inbox account.

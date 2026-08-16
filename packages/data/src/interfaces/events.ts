@@ -50,6 +50,17 @@ export interface EventsRepository {
    *
    * An attendee registered for none receives an **empty array**, not an error (FR-040). The
    * caller renders an explicit empty state; an empty result is a valid answer, not a failure.
+   *
+   * **The array is a COMPLETE enumeration, and that completeness is load-bearing** (012,
+   * FR-1141): `erasingWithdrawnConferences` at the composition root erases every cached
+   * conference absent from it, so an answer that could ever be a page, a bound, or a filtered
+   * view would turn that erasure against conferences the attendee still holds. This sentence
+   * enforces nothing on its own (013's false-header class) — the guards are
+   * `apps/api/tests/unit/registered-events-complete.test.ts` (the route declares no
+   * querystring and no pagination shape), the ended-conference case in
+   * `apps/api/tests/integration/registered-events-complete.test.ts` (no date predicate), and
+   * the compile-time bindings `_EventsMatchContract` / `_EventsTakesNoQuery` in
+   * `../contract.ts`.
    */
   listRegistered(): Promise<Event[]>
 }

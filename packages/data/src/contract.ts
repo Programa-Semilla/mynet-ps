@@ -66,7 +66,52 @@ export type TracksResponse =
 // no longer guarantees. Fix the domain type or the route schema — never this file, and never
 // contracts/openapi.json, which is generated output.
 export type _AttendeeMatchesContract = Satisfies<MeResponse, Attendee>
+
+/**
+ * T040 (012) — **this line is also the erasure's only protection against `GET /events`
+ * growing a pagination envelope, and `[number]` is the load-bearing part** (FR-1141,
+ * research R4 break mode A).
+ *
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ * `erasingWithdrawnConferences` (apps/web/src/app/services.ts) erases every cached conference
+ * absent from this response — programme, saved sessions, private notes, appointments — which
+ * is only safe while the response is a COMPLETE enumeration of the attendee's registrations.
+ * Wrapped in an envelope (`{ events, nextCursor }`), one page's answer would mark every
+ * conference on the next page as withdrawn, and the erasure would destroy working offline
+ * copies of conferences the attendee is still registered for.
+ *
+ * Indexing with `number` only typechecks while `EventsResponse` is an array (verified against
+ * this repository's own TypeScript: error TS2537), so that change stops the build right here —
+ * accidentally until 012 wrote this down, deliberately since. A refactor "tidying" this line
+ * to bind the whole response, or to index a named property, keeps every test green and removes
+ * the protection; if it goes, either the erasure over-deletes or the build stops proving the
+ * completeness it depends on. The other break modes are guarded separately:
+ * `_EventsTakesNoQuery` below (a limit/offset query, mode B),
+ * `apps/api/tests/unit/registered-events-complete.test.ts` (the route schema, modes B and C),
+ * and `apps/api/tests/integration/registered-events-complete.test.ts` (an "upcoming only"
+ * date predicate, mode D — the one no static check can reach).
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ */
 export type _EventsMatchContract = Satisfies<EventsResponse[number], Event>
+
+/**
+ * T041 (012) — **the events contract declares no query parameters, asserted at compile time**
+ * (FR-1141, research R4 break mode B).
+ *
+ * A `limit`/`offset` pair with a server-side default is the pagination that arrives *without*
+ * an envelope: the response stays a bare array, so `_EventsMatchContract` above keeps compiling
+ * while the array quietly stops being the whole answer — and the erasure it protects starts
+ * deleting conferences that were merely on the next page. The generated contract writes
+ * `query?: never` for a route with no `querystring` schema, so this binding holds exactly until
+ * somebody gives the route one; the generated type then carries a real object here and stops
+ * being assignable to `undefined`. The failure lands in this file on purpose, one comment away
+ * from the explanation of why the client must change before the route may paginate.
+ */
+export type _EventsTakesNoQuery = Satisfies<
+  paths['/events']['get']['parameters']['query'],
+  undefined
+>
+
 export type _HealthIsShaped = Satisfies<HealthResponse, { status: 'ok' }>
 
 // 002 — the active conference is the same `Event` the client already knows, including the

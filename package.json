@@ -25,7 +25,7 @@
     "test:component": "vitest run --project component",
     "test:integration": "vitest run --project integration",
     "test:e2e": "playwright test",
-    "test:a11y": "playwright test e2e/accessibility.spec.ts e2e/admin-accessibility.spec.ts",
+    "test:a11y": "playwright test e2e/accessibility.spec.ts e2e/admin-accessibility.spec.ts e2e/accessibility/identity.spec.ts",
     "contract:generate": "pnpm --filter @mynet/api contract:generate && pnpm --filter @mynet/data types:generate",
     "contract:check": "pnpm --filter @mynet/api contract:check && pnpm --filter @mynet/data types:check",
     "db:migrate": "pnpm --filter @mynet/api db:migrate",

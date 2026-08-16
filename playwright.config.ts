@@ -95,11 +95,72 @@ export default defineConfig({
     screenshot: 'only-on-failure',
   },
 
+  /**
+   * T019/T020 (012, FR-1144) — **the layout sweep runs in three engines; everything else in one.**
+   *
+   * Constitution v5.4.0 (R3) names this work: Playwright declared a single Chromium project, so
+   * Safari layout was unverified at every width — not only on desktop — and the physical-iPhone
+   * test was otherwise the only WebKit evidence this project would ever produce. Firefox and
+   * WebKit need no client, no UAT and no decision, so they are declared here.
+   *
+   * **Restricted to the layout sweep, not the whole suite, because the cost is shared state
+   * rather than engines** (research R5, measured): `globalSetup` seeds once per invocation, so a
+   * project multiplies every matched spec against one database, and four suites break on a
+   * second pass (duplicate conference names, non-timestamped message bodies, a `question_ask`
+   * throttle that never settles). The three files below are repeat-safe, verified by running
+   * them twice. `messages-terminal.spec.ts` is 012's WebKit terminal-state suite (FR-1145) and
+   * may not exist yet on this branch — a `testMatch` entry with no file matches nothing, which
+   * is fine; the moment the file lands it runs in all three engines with no config change.
+   */
   projects: [
     {
       name: 'chromium',
+      // No project-level `testMatch`: chromium inherits the top-level switch above, so it runs
+      // the full suite on an ordinary run and ONLY the capture tool on a capture run.
       use: { ...devices['Desktop Chrome'] },
     },
+    /**
+     * **The extra engines vanish entirely on a capture run, and that is the guard R5 demands.**
+     *
+     * A project-level `testMatch` OVERRIDES the top-level one — it does not intersect with it.
+     * Declared unconditionally, these two projects would ignore the `CAPTURE_SCREENSHOTS`
+     * ternary and run the responsive sweep anyway, so a capture run — which is supposed to
+     * substitute the suite, not add to it — would silently execute the sweep twice over while
+     * also writing screenshots. Guarding the *match* per project would repeat the ternary in
+     * three places; omitting the projects keeps the capture switch in exactly one, and makes
+     * capture what it has always been: a chromium-only tool run.
+     *
+     * **Desktop descriptors only — never a mobile one.** `isMobile` is unsupported in Firefox
+     * and throws at context creation; the sweep sets its own viewports per test anyway.
+     */
+    ...(capturingScreenshots
+      ? []
+      : [
+          {
+            name: 'firefox',
+            use: { ...devices['Desktop Firefox'] },
+            testMatch: [
+              '**/responsive.spec.ts',
+              '**/first-viewport.spec.ts',
+              '**/messages-terminal.spec.ts',
+            ],
+          },
+          {
+            name: 'webkit',
+            use: {
+              ...devices['Desktop Safari'],
+              // The Desktop Safari descriptor ships `deviceScaleFactor: 2`, and the responsive
+              // sweep asserts geometry to ±1px. Pinned to 1 so the three engines measure the
+              // same raster and a half-device-pixel rounding difference cannot fail the gate.
+              deviceScaleFactor: 1,
+            },
+            testMatch: [
+              '**/responsive.spec.ts',
+              '**/first-viewport.spec.ts',
+              '**/messages-terminal.spec.ts',
+            ],
+          },
+        ]),
   ],
 
   /**
