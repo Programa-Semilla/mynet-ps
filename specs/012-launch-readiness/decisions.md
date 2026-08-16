@@ -46,18 +46,71 @@ re-take it.
 
 ---
 
-## D-012-2 — Q&A at launch (FR-1143, SC-1212)
+## D-012-2 — Q&A at launch: it stays LIVE as shipped (FR-1143, SC-1212)
 
-**Staged for the owner; NOT yet taken.** T095 records the decision here when it is taken.
-Today's Q&A is unmoderated, attributed "Ana R." per v5.4.0 R2 pending 017, published instantly,
-and has no feature flag. Hiding or gating it retracts delivered 009 requirements and requires a
-constitution amendment; leaving it live until 017 lands does not. The recording of this decision
-is in 012's scope; drafting any amendment is not.
+**Decided by the owner, 2026-08-16, interactively in session (T095).** Production may launch with
+today's Q&A exactly as 009 shipped it — unmoderated, attributed by full real name, published
+instantly, no feature flag — with **reporting (FR-781) as the safety mechanism** until 017's
+moderated model replaces the surface. No constitution amendment is required, because nothing
+delivered is hidden, gated or retracted.
+
+**The cost is recorded rather than softened**: the client's own feedback drove v5.0.0 C2's
+retraction of this model, and this decision accepts that her concern — instant public
+attribution with no moderator — stays live in production for whatever gap exists between launch
+and 017 landing. The alternatives weighed: *launch waits for 017* (rejected — the owner chose
+not to couple the launch date to 017's delivery) and *hide Q&A at launch* (rejected — it
+retracts delivered 009 requirements and needs an amendment plus a gating feature). **This
+decision does not reorder anything**: 017 remains startable and remains the replacement; the
+sooner it lands, the shorter the accepted gap.
 
 ---
 
-## D-012-3 — The client diagnostic channel (FR-1142, SC-1212)
+## D-012-3 — The client diagnostic channel: a third-party crash-reporting SDK, DECIDED but not
+licensed to land without its own feature (FR-1142, SC-1212)
 
-**Staged for the owner; NOT yet taken.** T096 records the decision here when it is taken.
-`apps/web/src` has exactly two `console.*` calls, both for unrecoverable faults, and the client
-holds personal data — so "add a telemetry SDK" is a privacy decision, not a tooling one.
+**Decided by the owner, 2026-08-16, interactively in session (T096).** The client is to gain a
+**Sentry-class third-party crash-reporting SDK**. The alternatives — no channel at all, and a
+minimal first-party error beacon — were presented with their costs and not chosen.
+
+**What this decision records, and deliberately does NOT skip over.** 012's scope is to record the
+decision; building it is a feature of its own, and four consequences travel with it, each the
+kind this project refuses to discover mid-implementation:
+
+1. **It is a Principle VIII event.** A new vendor processing data from a client that holds
+   messages, notes and identity is a disclosure-surface decision — at minimum a recorded
+   register-entry-class decision on what the SDK may capture (an unhandled error's stack can
+   embed personal data in ways no scrub list fully closes), retention at the vendor, and the
+   data-processing relationship.
+2. **It touches a recorded invariant by name.** Decision 19's ground for one origin is that it
+   makes `connect-src 'self'` *literally true*; an SDK endpoint widens `connect-src`, so the
+   building feature must either proxy the reports through MyNet's own origin (keeping the
+   invariant literal) or record the exception explicitly — it must not quietly widen the CSP.
+3. **The vendor gets a lint boundary**, exactly as storage, mail and push have: the SDK confined
+   to one directory, chosen by configuration, absent in every environment where its keys are
+   absent.
+4. **It needs its own Feature Declarations row-set** — deletion/export coverage does not reach a
+   vendor's servers, and the feature must say what that means for decision 12's erasure promise.
+
+**Until that feature is specified and shipped, the shipped state — two `console.*` calls, nothing
+leaving the device — remains the product's diagnostic channel.**
+
+---
+
+## D-012-4 — UAT is deployed BY HAND, and CI's deploy job is inert by decision (T057)
+
+**Decided by the owner, 2026-08-16, interactively in session.** UAT receives builds via
+`deploy/vm/deploy.sh` run by an operator; the `deploy-uat` job stays deliberately inert, and
+**FR-1120a is amended in this change** to name the hand deploy as the mechanism (the decision's
+own required act, per T057).
+
+**Context that forced the choice**: the designed `AZURE_CREDENTIALS` service principal cannot be
+minted by the signed-in account — a guest in the tenant, without app-registration rights — and
+the two available acquisition routes (a tenant-admin device-code login, or an OIDC managed
+identity requiring a rewrite of the deploy job's auth) were both offered and declined in favour
+of the decision T057 itself names as the second branch.
+
+**Consequences, recorded**: 011 scenario 9 steps 1–4 (merge → CI deploys with nobody running a
+script) are **retired by decision**, not blocked — the mechanism they describe is one the owner
+decided against; steps 5–7 (the door closes behind a deploy) remain walkable at any hand deploy.
+The `deploy-uat` job's inert message now states the decision rather than a pending credential,
+so reactivating it reads as what it is: a reversal to record, not a configuration task.

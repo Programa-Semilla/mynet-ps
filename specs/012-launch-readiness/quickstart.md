@@ -320,9 +320,10 @@ owns, working only from this script. It ends at a scheduled meeting (C8).*
 - **006/3d and 011/8 (backup and restore on the real host): DISCHARGED 2026-08-16** by 012's
   implementation — see `deploy/vm/OPERATIONS-LOG.md`: off-host copy confirmed, cron proven to
   fire, restore exercised on the host.
-- **011/9 steps 1–4 (CI deploys on merge): BLOCKED on T057's decision** — `AZURE_CREDENTIALS`
-  does not exist and CI has never deployed. Steps 5–7 (the door closes behind a deploy) are
-  walkable whenever a hand deploy is performed. Recorded per SC-1202 as blocked-by-decision.
+- **011/9 steps 1–4 (CI deploys on merge): RETIRED BY DECISION D-012-4** (owner, 2026-08-16) —
+  UAT is deployed by hand via `deploy/vm/deploy.sh`; the mechanism those steps describe is one
+  the owner decided against, and FR-1120a was amended to say so. Steps 5–7 (the door closes
+  behind a deploy) remain walkable at any hand deploy. Recorded per SC-1202.
 - **006/3a–3c, 3e**: 3a's two owner decisions landed (v3.5.0); 3b was performed by 011 (the
   environment exists); 3c's checks are one command (`deploy/vm/README.md` §4) — run them once
   during Part A and record; 3e (rollback) is deliberately not walked against the shared walk
@@ -444,7 +445,7 @@ derivation time.
 | `011/6` | The environment says it is not production | outstanding | walked → D5 (the UAT marker) |
 | `011/7` | Notifications and reports leave the box | outstanding | walked → C7, C9, D9 |
 | `011/8` | A backup that outlives its host, and a restore that has been done | outstanding | discharged 2026-08-16 by 012 implementation — OPERATIONS-LOG (off-host copy + cron proven + restore) |
-| `011/9` | Delivery is automatic, and the door closes behind it | outstanding | BLOCKED (steps 1–4) on T057's decision — AZURE_CREDENTIALS does not exist; steps 5–7 walkable at the next hand deploy (recorded per SC-1202) |
+| `011/9` | Delivery is automatic, and the door closes behind it | outstanding | retired-by-decision (steps 1–4): D-012-4 — UAT is hand-deployed, FR-1120a amended; steps 5–7 walkable at the next hand deploy (SC-1202) |
 | `013/1` | Sign in, and the second actor exists | outstanding | walked → A1 |
 | `013/SC-900 — sign-in to queue, measured (T153)` | SC-900 sign-in-to-queue timing, measured | complete | retired → measured once at 013 (SC-900) |
 | `013/2` | Refusals are indistinguishable | outstanding | walked → A7 |

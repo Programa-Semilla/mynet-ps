@@ -1037,14 +1037,16 @@ jobs:
         run: |
           set -euo pipefail
           if [ -z "${AZURE_CREDENTIALS:-}" ]; then
-            echo "::notice::UAT deployment credentials are not configured, so there is nothing to do."
-            echo "The environment itself IS provisioned and serving — see OPERATIONS-LOG.md."
-            echo "What is missing is the automation's own credentials. To enable this job, add to"
-            echo "the 'uat' environment:"
-            echo "  * AZURE_CREDENTIALS  -- a service principal scoped to rg-mynet-uat, with"
-            echo "                          network-write on vm-mynet-uatNSG for the rule above;"
-            echo "  * DEPLOY_SSH_KEY     -- az login grants control-plane access, not shell;"
-            echo "  * SSH_KNOWN_HOSTS    -- verified out-of-band, NOT accepted on first connection."
+            echo "::notice::UAT is deployed BY HAND, by owner decision — this job is inert on purpose."
+            echo "012 decision D-012-4 (2026-08-16, T057): UAT receives builds via"
+            echo "deploy/vm/deploy.sh run by an operator, not via this job. The credential was"
+            echo "never configured — the signed-in owner is a guest in the tenant and cannot mint"
+            echo "the service principal — and rather than acquire one, the owner decided the"
+            echo "hand-deploy IS the mechanism (FR-1120a was amended to say so; 011 scenario 9"
+            echo "steps 1-4 are retired by the same decision)."
+            echo "Reactivating this job is a REVERSAL of that decision, not a configuration task:"
+            echo "record the reversal, then add AZURE_CREDENTIALS, DEPLOY_SSH_KEY and"
+            echo "SSH_KNOWN_HOSTS to the 'uat' environment as the step comments above describe."
             exit 0
           fi
           ./deploy/vm/deploy.sh uat --migrate
