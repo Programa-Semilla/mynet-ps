@@ -375,3 +375,86 @@ real administrative rows, because none exists. The shapes are verified; the data
 
 **Recorded by**: the 011 implementation.
 ---
+
+## 2026-08-15 — the administrative site is published. **First deploy since 2026-08-11, and the first time `apps/admin` has ever been served anywhere.**
+
+**Act**: an `A` record for `admin.mynet-dev.programasemilla.com` was created at GoDaddy by the
+owner, then `deploy/vm/deploy.sh uat --migrate` was run by hand from a developer machine.
+
+**Result**: `https://admin.mynet-dev.programasemilla.com` serves the administrative product over
+its own Let's Encrypt certificate, obtained automatically once the name resolved. The attendee
+host is unchanged and healthy. Migrations `0009`, `0011` and `0012` applied — the database went
+from 9 applied migrations to 12.
+
+### The VM had been four features behind, and nothing said so
+
+The running stack was the 2026-08-11 deploy. Everything from 013 onward existed only in the
+repository:
+
+| Checked before deploying                                 | State found                                             |
+| -------------------------------------------------------- | ------------------------------------------------------- |
+| Applied migrations                                       | 9 (through `0008`) — `0009`, `0011`, `0012` all pending |
+| `operators`, `session_enrolments`, `vocabulary_*` tables | absent                                                  |
+| Admin site block in live Caddyfile                       | absent                                                  |
+| `/srv/admin` content                                     | absent                                                  |
+
+**CI has never deployed anything.** `deploy-uat` reports _"UAT deployment credentials are not
+configured, so there is nothing to do"_ — `AZURE_CREDENTIALS` is the one secret 2026-08-11 left
+unset, pending a service principal. Every deploy to date has been by hand. Until 2026-08-15 the
+push run carrying that job was also being cancelled at birth (see `fix/post-merge-verification`),
+so the notice had never been read by anybody.
+
+### Verified after the deploy
+
+| Check                                              | Result                                        |
+| -------------------------------------------------- | --------------------------------------------- |
+| `https://mynet-dev…` document                      | 200, `<title>MyNet</title>`                   |
+| `https://admin.mynet-dev…` document                | 200, `<title>MyNet Administration</title>`    |
+| Admin certificate                                  | `CN=admin.mynet-dev…`, Let's Encrypt, 90 days |
+| `POST /api/admin/session` on the **attendee** host | **404** — the Caddyfile's boundary holds      |
+| `POST /api/admin/session` on the **admin** host    | 401 — the route exists and refuses            |
+
+That 404/401 pair is the property `Caddyfile` argues for at length: the administrative API is
+reachable on `admin.<host>` and **nowhere else**, so no administrative session cookie can be
+planted on the attendee origin.
+
+### Three findings, and the backup one is the serious one
+
+1. **No backup has ever been taken on this host, and `backup.sh` cannot run.** `BACKUP_DIR` is
+   empty, there is no cron entry and no systemd timer, and `./backup.sh status` fails with
+   `syntax error near unexpected token 'newline'`. The cause is that the script `source`s `.env`
+   with bash while `MAIL_FROM` holds an **unquoted RFC 5322 display-name address** — the `<` and
+   `>` are redirection operators to a shell. Docker Compose parses the same file correctly, which
+   is why the API has always booted and nothing surfaced it. **`backups/` is also owned by `root`
+   while the script runs as `azureuser`**, so a second failure was waiting behind the first.
+   Standing decision 17 makes backups a governance obligation — "at least daily, automated" — and
+   they have never run. UAT carries no data worth restoring, so this costs nothing **here** and
+   would cost everything in production.
+2. **A pre-migration dump was therefore taken by hand** —
+   `backups/pre-014-manual-20260816T012211Z.dump`, 112K, custom format, written with `sudo`
+   because of the ownership above.
+3. **There are real sign-ups on UAT.** Of 7 attendees, 3 are `@example.com` fixtures and **4 are
+   genuine accounts** on `gmail.com` and `programasemilla.com`, created 2026-08-11 and 08-12
+   (one is a typo'd address). Decision 30 describes this environment as carrying _seeded data
+   only_, with FR-067 _"satisfied by the data rather than by the door"_. That is now drift rather
+   than fact. It also has an immediate operational consequence — see below.
+
+### Administrative sign-in is impossible, and that is the documented safe state
+
+`operators = 0`. The seed creates the two operator identities and it has not been run since 013
+merged, so there is no identity for `pnpm admin:bootstrap` to give a credential to; it would
+report `no-such-operator`. `ADMIN_BOOTSTRAP_EMAIL` / `ADMIN_BOOTSTRAP_PASSWORD` are correspondingly
+unset on the host, which `.env.example` calls _"the correct state for any environment where no
+human has yet been made responsible for it (register entry 21 is still open)"_.
+
+**`ADMIN_ORIGIN` is deliberately still unset** and must stay so: Caddy proxies `/api/*` beneath
+the admin host, so administrative calls are same-origin and never reach CORS. Setting it here
+would widen the API's allow-list to an origin nobody named.
+
+The only documented route to a credential is `pnpm db:seed`, and **that deletes every attendee** —
+`attendeeSeed.clear` is unconditional, and the seed runner takes no module argument. With four
+real accounts present, re-seeding is destructive and was **not** run. Resolving this is an owner
+decision, not a deploy step.
+
+**Recorded by**: the session that promoted `develop` to `main` and shipped
+`fix/post-merge-verification`.
