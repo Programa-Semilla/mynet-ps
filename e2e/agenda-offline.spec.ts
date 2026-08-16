@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test'
 
 import { ADA, signIn } from './support/attendees.js'
+import { awaitServiceWorker } from './support/service-worker.js'
 
 /**
  * T068 (005) — the agenda with no signal (FR-215–FR-221, SC-203, SC-204).
@@ -24,21 +25,6 @@ import { ADA, signIn } from './support/attendees.js'
 const goToAgenda = async (page: Page): Promise<void> => {
   await page.getByRole('link', { name: 'Agenda' }).first().click()
   await expect(page.getByRole('heading', { level: 1, name: 'Agenda' })).toBeVisible()
-}
-
-/**
- * Waits for the service worker, which is what makes the shell available offline at all.
- *
- * A truthiness check, never `!== null` (T022 — 012, FR-1146): on an engine with no
- * `serviceWorker`, `navigator.serviceWorker?.controller` is `undefined`, and
- * `undefined !== null` is TRUE — the old comparison resolved instantly precisely where there
- * was nothing to wait for. Wrong on Chromium too: `undefined` is also what an aborted
- * registration yields.
- */
-const awaitServiceWorker = async (page: Page): Promise<void> => {
-  await page.waitForFunction(() => Boolean(navigator.serviceWorker?.controller), null, {
-    timeout: 20_000,
-  })
 }
 
 /**
@@ -719,6 +705,17 @@ test.describe('Agenda offline', () => {
       // The page is real — the worker served the shell. Without this, a blank error page
       // satisfies every absence below.
       await expect(page.getByRole('navigation')).toBeVisible()
+
+      // ───────────────────────────────────────────────────────────────────────────────────
+      // **The expected terminal state is awaited BEFORE any absence is asserted** (deep-review
+      // correction). Absence assertions pass instantly on a page that has not settled: on a
+      // regressed build the disclosure renders only after async IndexedDB reads, and the whole
+      // `toHaveCount(0)` block could complete inside that window — a pass for the wrong
+      // reason, the same trap the FIX-203 test avoids by waiting for its failure alert. The
+      // identity-offline failure is the positive marker of the correct build; a regressed
+      // build renders content instead and this wait fails deterministically.
+      // ───────────────────────────────────────────────────────────────────────────────────
+      await expect(page.getByRole('alert').first()).toContainText(/needs a connection/i)
 
       // No name, no greeting: identity must not resolve from disk (FR-1140).
       await expect(page.getByText(ADA.displayName)).toHaveCount(0)

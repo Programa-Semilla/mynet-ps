@@ -148,8 +148,9 @@ const main = async (): Promise<void> => {
           `${outcome.email} has already replaced their initial credential, so nothing was ` +
             'changed (FR-993). This command never resets a password an operator chose — a ' +
             'bootstrap that did would be a credential reset triggered by an environment ' +
-            'variable that stays on the host forever. Recovery from a lost administrative ' +
-            'password is a re-seed; see deploy/vm/README.md.',
+            'variable that stays on the host forever. Recovery from a lost chosen password is ' +
+            'a by-hand `credential_is_initial = true` on that row, then this command again; ' +
+            'see deploy/vm/README.md ("The last operator").',
         )
         return
 

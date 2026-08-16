@@ -77,21 +77,27 @@ for (const row of rows) {
     )
     continue
   }
-  // A verdict without an observation is exactly what FR-1125 forbids: "a step recorded only as
-  // 'pass' is not recorded".
-  if ((row.verdict === 'pass' || row.verdict === 'fail') && row.observation.length < 10) {
+  // ANY recorded verdict without an observation is what FR-1125 forbids: "a step recorded only
+  // as 'pass' is not recorded" — and a `blocked` or `n/a` with no stated reason is the same
+  // shape (the template's own instruction: "n/a (with reason in the observation)"). Only
+  // `pending` asserts nothing. The first version armed this for pass/fail alone, which let an
+  // unexplained n/a discharge a step silently — the deep review caught the gap.
+  if (row.verdict !== 'pending' && row.observation.length < 10) {
     failures.push(
       `row ${row.step} carries the verdict "${row.verdict}" with no real observation — FR-1125: ` +
-        'what was actually on the screen, never a verdict alone',
+        'what was actually on the screen (or why it was blocked/inapplicable), never a verdict alone',
     )
   }
-  // FR-1126 — every layout/install row that PASSED names a capture that exists. `(required)` is
-  // the template's placeholder, not a file.
-  if (row.step.startsWith('D') && row.verdict === 'pass') {
+  // FR-1126 — every layout/install step that was WALKED names a capture that exists. That is
+  // pass AND fail: a failed layout is precisely the one the fix round needs a picture of.
+  // `(required)` is the template's placeholder, not a file. `blocked`/`n/a` rows carry their
+  // reason in the observation instead — an unwalked step has nothing to photograph.
+  if (row.step.startsWith('D') && (row.verdict === 'pass' || row.verdict === 'fail')) {
     const name = row.capture.replace(/\(required\)/, '').trim()
     if (!name) {
       failures.push(
-        `row ${row.step} passed with no capture named — FR-1126: layout is the one thing no verdict can convey`,
+        `row ${row.step} was walked ("${row.verdict}") with no capture named — FR-1126: layout ` +
+          'is the one thing no verdict can convey',
       )
     } else {
       for (const file of name.split(/[,\s]+/).filter(Boolean)) {
@@ -105,8 +111,18 @@ for (const row of rows) {
   }
 }
 
-// The completion obligations arm when the record says it is complete.
-const complete = /^\*\*Status\*\*: `complete`/m.test(record)
+// The completion obligations arm when the record says it is complete — and the Status line's
+// EXISTENCE is guarded like the step parser guards its own pattern: a reworded header would
+// otherwise disarm completion enforcement forever, silently, which is this script's own
+// "fix the parser, never the threshold" failure mode arriving through the other door.
+const statusLine = record.match(/^\*\*Status\*\*: `(\w[\w-]*)`/m)
+if (!statusLine) {
+  failures.push(
+    'walk-record.md has no parseable "**Status**: `…`" line — the completion obligations ' +
+      'cannot arm. Restore the header line; do not remove this guard.',
+  )
+}
+const complete = statusLine?.[1] === 'complete'
 if (complete) {
   for (const row of rows.filter((r) => r.verdict === 'pending')) {
     failures.push(`the record declares itself complete while ${row.step} is still pending`)

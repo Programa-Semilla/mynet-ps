@@ -75,9 +75,11 @@ const deviceHolding = async () => {
     await store.write(cacheKey('ada', 'horizons', resource), [resource])
   }
 
-  // The two event-less keys every session writes: identity, and the active conference. Their
-  // event segment is empty, and reading either as a conference id would have the erasure
-  // deleting the attendee's own cached identity on the first successful read.
+  // The event-less keys: the active conference, which every session still writes, and the
+  // legacy `self` identity entry — since 012's T032 `getCurrent` is `passThrough` and writes
+  // nothing, but devices that last ran a pre-012 build still carry the key, so the erasure must
+  // keep skipping it. Reading either as a conference id would have the erasure deleting the
+  // attendee's own event-less entries on the first successful read.
   await store.write(cacheKey('ada', '', 'self'), { id: 'ada' })
   await store.write(cacheKey('ada', '', 'active-event'), conference('summit'))
 
@@ -154,10 +156,11 @@ describe('erasing a conference absent from a live registered list', () => {
 
     expect(
       entries.has(cacheKey('ada', '', 'self')),
-      'The cached identity was erased. `getCurrent` and `getActive` take no event argument, so ' +
-        'the decorator keys them with an empty event segment — read as a conference id, that is ' +
-        'a "conference" absent from every registered list, and the attendee is signed out of ' +
-        'their own offline shell.',
+      'The legacy identity entry was erased. `getActive` takes no event argument (and pre-012 ' +
+        'builds keyed `getCurrent` the same way — devices still carry that `self` key), so the ' +
+        'decorator keys the event segment empty — read as a conference id, that is a ' +
+        '"conference" absent from every registered list, and the erasure destroys the ' +
+        "attendee's own event-less entries.",
     ).toBe(true)
     expect(entries.has(cacheKey('ada', '', 'active-event'))).toBe(true)
   })

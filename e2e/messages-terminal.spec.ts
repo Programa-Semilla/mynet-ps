@@ -13,14 +13,16 @@ import { ADA, signIn } from './support/attendees.js'
  * `NotificationPrompt`'s reconcile called `pushManager.getSubscription()` on a WebKit build with
  * no push service behind it, which wedged the page's main thread, and the in-flight
  * `GET /conversations` response became undeliverable. Two things fixed it and this spec holds
- * both: the push read is now gated on granted permission (`packages/platform`), and a stalled
- * first load now falls to a failure state with a retry control instead of standing forever
- * (`FIRST_LOAD_DEADLINE_MS` in `Messages.tsx`).
+ * both: the push read is now gated on granted permission (`packages/platform`), and every poll
+ * tick is raced against `READ_DEADLINE_MS` in `Messages.tsx`, so a stalled read settles into
+ * the ordinary failure path instead of standing forever.
  *
- * So the assertion is deliberately disjunctive: **content OR a declared failure state — never an
- * indefinite spinner.** A spec that demanded content would re-fail on any environment where the
- * list legitimately cannot load, and would miss the point: FR-1145's obligation is that the
- * attendee is never left with nothing to act on.
+ * **The accepted terminal states are the two `ready` renders and nothing else** — conversations,
+ * or "No conversations yet". The component's `offline` and `failed` states are terminal too, but
+ * this suite always runs against the live webServer its config starts, where reaching either
+ * could only mean the engine failed to talk to a demonstrably-up server — the exact defect class
+ * FR-1145 exists to catch. (An earlier draft accepted them disjunctively, which would have let a
+ * regressed engine pass by rendering its failure banner; the deep review narrowed it.)
  * ═════════════════════════════════════════════════════════════════════════════════════════
  *
  * **Repeat-safe by construction.** This spec signs in, reads, and writes nothing — no
@@ -43,25 +45,22 @@ test.describe('Messages: the list reaches a terminal state (FR-1145)', () => {
     await expect(page.getByRole('heading', { name: 'Messages' })).toBeVisible()
 
     /*
-     * Every state the list pane can end in, from `MessagesEmptyStates.tsx` and the list itself:
-     *
-     *   - ready with conversations — the list of links into threads
-     *   - ready with none         — "No conversations yet"
-     *   - offline                 — "You are offline…" with a retry control
-     *   - failed                  — "…could not be loaded…" with a retry control
-     *
-     * Any one of them satisfies FR-1145. What none of them is, is `Loading…`.
+     * The states this suite accepts are NARROWER than the list pane's full set, deliberately
+     * (deep-review tightening). Against the live webServer this config always starts, the only
+     * legitimate outcomes are the two `ready` renders — conversations, or "No conversations
+     * yet". `offline` and `failed` are terminal states of the COMPONENT, but here they could
+     * only mean the engine failed to reach a server that is demonstrably up, which is exactly
+     * the defect class FR-1145 exists to catch; accepting them would let a regressed engine
+     * pass by rendering its failure banner instead of its content.
      */
     const terminal = page
       .getByRole('link', { name: /./ })
       .and(page.locator('[href^="/messages/"]'))
       .or(page.getByText('No conversations yet'))
-      .or(page.getByText(/You are offline/))
-      .or(page.getByText(/could not be loaded/))
 
     /*
      * The bound is derived, not chosen: the transport aborts a stalled request at 20 seconds and
-     * `FIRST_LOAD_DEADLINE_MS` declares failure at 25, so 40 covers the slowest honest path to a
+     * `READ_DEADLINE_MS` bounds the tick at 25, so 40 covers the slowest honest path to a
      * terminal state with margin for a loaded CI host. Before the fix, WebKit failed here by
      * timeout — the page's main thread was wedged and nothing would ever have appeared.
      */

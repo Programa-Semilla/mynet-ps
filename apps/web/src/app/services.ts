@@ -457,7 +457,10 @@ export const createServices = (): PlatformServices => {
  * must not de-scope an attendee whose tab merely lost signal.
  * ═════════════════════════════════════════════════════════════════════════════════════════
  */
-const attendeeIdentity = () => {
+export const attendeeIdentity = () => {
+  // Exported (like `erasingWithdrawnConferences`, and for its reason) only so FR-1149's
+  // scope-reset can be a real test: the un-resolve on an auth refusal is invisible to any
+  // online behavioural test, and `identity-scope-guards.test.ts` is nothing else's import.
   let attendeeId = 'anonymous'
 
   return {
@@ -527,7 +530,9 @@ const attendeeIdentity = () => {
  * copy of their data must not be what survives that.
  * ─────────────────────────────────────────────────────────────────────────────────────────
  */
-const purgingOnSignOut = (
+export const purgingOnSignOut = (
+  // Exported for the same one reason as `attendeeIdentity` above: T034's sign-in purge of the
+  // legacy `anonymous` prefix has no online-observable surface, and its test is the sole importer.
   auth: PlatformServices['auth'],
   store: LocalCache,
   identity: { current: () => string; forget: () => void },

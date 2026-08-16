@@ -1,7 +1,9 @@
-import { count, isNotNull } from 'drizzle-orm'
+import { count } from 'drizzle-orm'
 import type { FastifyInstance } from 'fastify'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
+import { bootstrapOperatorCredential } from '../../src/admin/bootstrap.js'
+import { resetConfigForTests } from '../../src/config.js'
 import { getDb } from '../../src/db/client.js'
 import { attendees } from '../../src/db/schema/attendees.js'
 import { operators } from '../../src/db/schema/operators.js'
@@ -73,15 +75,51 @@ describe('the additive operator-identity command', () => {
     // The narrowed check must not see the existing credential (T003) …
     await expect(ensureOperatorIdentities(db)).resolves.toBeUndefined()
 
-    // … and must not have reset it, created a duplicate, or touched an attendee.
-    const [withCredential] = await db
-      .select({ value: count() })
+    // … and must not have reset it, created a duplicate, or touched an attendee. **The hash
+    // and the flag are compared by VALUE, not counted** (deep-review tightening): a count of
+    // non-null hashes would pass an upsert that kept the hash and flipped
+    // `credential_is_initial` back to true — which re-arms the bootstrap's
+    // `WHERE credential_is_initial = true` and makes its next run overwrite the operator's
+    // chosen password: FR-993's exact catastrophe, arriving through this command instead.
+    const rows = await db
+      .select({ passwordHash: operators.passwordHash, initial: operators.credentialIsInitial })
       .from(operators)
-      .where(isNotNull(operators.passwordHash))
-    expect(withCredential?.value).toBe(SEED_OPERATORS.length)
+    expect(rows).toHaveLength(SEED_OPERATORS.length)
+    for (const row of rows) {
+      expect(row.passwordHash).toBe('a-hash-somebody-chose')
+      expect(row.initial).toBe(false)
+    }
 
     const [operatorCount] = await db.select({ value: count() }).from(operators)
     expect(operatorCount?.value).toBe(SEED_OPERATORS.length)
+
+    const [attendeesAfter] = await db.select({ value: count() }).from(attendees)
+    expect(attendeesAfter?.value).toBe(attendeesBefore?.value)
+  })
+
+  it('issues a CREDENTIAL against a database holding attendee rows, count unchanged — the whole of SC-1210', async () => {
+    // The first test proves the identity half; SC-1210's sentence is about ISSUANCE, and
+    // `admin-bootstrap.test.ts` never references an attendee row — so without this, the
+    // criterion's own verb had no attendee-invariance assertion anywhere (deep review).
+    const db = getDb()
+
+    await db.delete(operators)
+    await ensureOperatorIdentities(db)
+
+    const [attendeesBefore] = await db.select({ value: count() }).from(attendees)
+    expect(attendeesBefore?.value ?? 0).toBeGreaterThan(0)
+
+    process.env['ADMIN_BOOTSTRAP_EMAIL'] = SEED_OPERATORS[0].email
+    process.env['ADMIN_BOOTSTRAP_PASSWORD'] = 'sc-1210-issued-credential'
+    resetConfigForTests()
+    try {
+      const outcome = await bootstrapOperatorCredential()
+      expect(outcome.status).toBe('credential-set')
+    } finally {
+      delete process.env['ADMIN_BOOTSTRAP_EMAIL']
+      delete process.env['ADMIN_BOOTSTRAP_PASSWORD']
+      resetConfigForTests()
+    }
 
     const [attendeesAfter] = await db.select({ value: count() }).from(attendees)
     expect(attendeesAfter?.value).toBe(attendeesBefore?.value)

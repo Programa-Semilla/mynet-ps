@@ -48,7 +48,14 @@ load_config() {
   # so the values are assigned literally, fixing the CLASS: no `.env` value is ever evaluated.
   # ───────────────────────────────────────────────────────────────────────────────────────────
   local key value
-  while IFS='=' read -r key value; do
+  # `|| [[ -n "$key" ]]`: `read` exits non-zero at EOF even after populating the variables, so a
+  # final line with no trailing newline would otherwise be silently dropped — and the optional
+  # keys fail towards defaults, so a last-line BACKUP_KEEP_LOCAL=30 would silently prune 23
+  # artifacts the operator meant to keep. The key is also trimmed: `KEY = value` spacing would
+  # otherwise match no case arm and be silently ignored.
+  while IFS='=' read -r key value || [[ -n "$key" ]]; do
+    key="${key%"${key##*[![:space:]]}"}" key="${key#"${key%%[![:space:]]*}"}"
+    value="${value#"${value%%[![:space:]]*}"}"
     case "$key" in
       POSTGRES_USER | DATABASE_NAME | BACKUP_DIR | BACKUP_KEEP_LOCAL | BACKUP_MIN_FREE_MB | \
         BACKUP_LOG | BACKUP_REMOTE_CONTAINER | BACKUP_REMOTE_CREDENTIAL)

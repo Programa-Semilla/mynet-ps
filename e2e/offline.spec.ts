@@ -1,7 +1,8 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test } from '@playwright/test'
 
 import { ADA, signIn } from './support/attendees.js'
 import { DESTINATIONS } from './support/destinations.js'
+import { awaitServiceWorker } from './support/service-worker.js'
 
 /**
  * T094, T102 — offline behaviour, bounded and honest
@@ -14,21 +15,6 @@ import { DESTINATIONS } from './support/destinations.js'
  * responses are never cached at all (research.md D14).
  * ─────────────────────────────────────────────────────────────────────────────────────────
  */
-
-/**
- * Waits for the service worker to control the page, which is what makes the shell available.
- *
- * A truthiness check, never `!== null` (T022 — 012, FR-1146): on an engine with no
- * `serviceWorker` at all, `navigator.serviceWorker?.controller` is `undefined`, and
- * `undefined !== null` is TRUE — so the old comparison resolved instantly exactly where there
- * was nothing to wait for, and every offline assertion downstream ran against a page no worker
- * would serve. Wrong on Chromium too: `undefined` is also what an aborted registration yields.
- */
-const awaitServiceWorker = async (page: Page): Promise<void> => {
-  await page.waitForFunction(() => Boolean(navigator.serviceWorker?.controller), null, {
-    timeout: 20_000,
-  })
-}
 
 test.describe('offline', () => {
   test('the shell renders offline, with the offline state shown', async ({ page, context }) => {
@@ -223,17 +209,20 @@ test.describe('offline', () => {
     await expect(page.getByRole('heading', { level: 1, name: 'Agenda' })).toBeVisible()
     await expect(page.getByRole('heading', { level: 3 }).first()).toBeVisible()
 
+    // Rejects on store failure (T023's correction, applied here by the deep review — FR-1146's
+    // class was fixed in agenda-offline.spec.ts and this file still swallowed every error).
     const cachedBefore = await page.evaluate(async () => {
-      const open = await new Promise<IDBDatabase | null>((resolve) => {
+      const open = await new Promise<IDBDatabase>((resolve, reject) => {
         const request = indexedDB.open('mynet-cache')
         request.onsuccess = () => resolve(request.result)
-        request.onerror = () => resolve(null)
+        request.onerror = () =>
+          reject(new Error(`could not open mynet-cache: ${request.error?.message}`))
       })
-      if (!open || !open.objectStoreNames.contains('entries')) return 0
-      return new Promise<number>((resolve) => {
+      if (!open.objectStoreNames.contains('entries')) return 0
+      return new Promise<number>((resolve, reject) => {
         const count = open.transaction('entries', 'readonly').objectStore('entries').count()
         count.onsuccess = () => resolve(count.result)
-        count.onerror = () => resolve(0)
+        count.onerror = () => reject(new Error(`count failed: ${count.error?.message}`))
       })
     })
     expect(
@@ -269,17 +258,24 @@ test.describe('offline', () => {
 
         // 005 — the offline cache. Every entry is read and searched, so a purge that missed a
         // resource, or a key prefix that did not reach it, is caught by name.
-        const db = await new Promise<IDBDatabase | null>((resolve) => {
+        //
+        // **Rejects on a store failure rather than resolving empty** (FR-1146's class, closed
+        // here by the deep review): the final assertion is a deletion proof — `residue` equals
+        // `[]` — so an error-induced empty answer is exactly the direction that passes. A
+        // broken open or a failing getAll would have reported "no residue" forever while
+        // private content sat on the device.
+        const db = await new Promise<IDBDatabase>((resolve, reject) => {
           const request = indexedDB.open('mynet-cache')
           request.onsuccess = () => resolve(request.result)
-          request.onerror = () => resolve(null)
+          request.onerror = () =>
+            reject(new Error(`could not open mynet-cache: ${request.error?.message}`))
         })
 
-        if (db?.objectStoreNames.contains('entries')) {
-          const entries = await new Promise<unknown[]>((resolve) => {
+        if (db.objectStoreNames.contains('entries')) {
+          const entries = await new Promise<unknown[]>((resolve, reject) => {
             const all = db.transaction('entries', 'readonly').objectStore('entries').getAll()
             all.onsuccess = () => resolve(all.result as unknown[])
-            all.onerror = () => resolve([])
+            all.onerror = () => reject(new Error(`getAll failed: ${all.error?.message}`))
           })
 
           for (const entry of entries) {

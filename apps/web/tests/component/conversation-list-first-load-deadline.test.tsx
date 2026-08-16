@@ -18,13 +18,15 @@ import { aConversation, renderMessages } from '../support/messages.js'
  * where a promise can honestly be left pending forever.
  *
  * The deadline sits at 25 seconds, deliberately past the transport's own 20-second abort — see
- * `FIRST_LOAD_DEADLINE_MS` in `Messages.tsx` — so these tests advance fake time rather than
+ * `READ_DEADLINE_MS` in `Messages.tsx` — so these tests advance fake time rather than
  * shortening the constant: a configurable deadline would let the test pass at a value the
- * product never uses.
+ * product never uses. **The mechanism is a race inside the tick, not a screen-watching
+ * effect**: the tick itself settles at the deadline, so `usePoll`'s chain keeps scheduling and
+ * a recovery after failure arrives through the poll's own next tick.
  * ═════════════════════════════════════════════════════════════════════════════════════════
  */
 
-/** Past `FIRST_LOAD_DEADLINE_MS` in `Messages.tsx`, with margin for jittered scheduling. */
+/** Past `READ_DEADLINE_MS` in `Messages.tsx`, with margin for jittered scheduling. */
 const PAST_DEADLINE_MS = 26_000
 
 /** A repository whose `list` hangs forever until `release()` resolves it. */

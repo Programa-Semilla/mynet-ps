@@ -248,20 +248,33 @@ last", which is a governance question nobody has decided, and the alternative �
 undeletable operator — is a worse property for a product whose whole administrative tier is
 supposed to be revocable.
 
-**Recovery is the additive identity command plus a fresh bootstrap** (012, FR-1102):
+**Recovery depends on what state the rows are in — and two of this section's three scenarios
+still need a hand on the database** (012, FR-1102; deep-review correction):
 
-```bash
-docker compose run --rm api node dist/db/seed/operator-identities.js
-docker compose run --rm api node dist/admin/bootstrap.js
-```
+- **The rows are absent** (a fresh database, or somebody deleted them): the additive identity
+  command plus a fresh bootstrap recovers everything, and neither touches an attendee row —
+  acceptable in every environment, production included:
 
-Neither command touches an attendee row, so this recovery is acceptable in **every** environment,
-production included. _(Before 012 this section prescribed a full re-seed — which deletes every
-attendee — and production's repair was an operator row inserted by hand. The by-hand insert
-remains the fallback only when the committed identities are not the ones wanted.)_ Record any
-such intervention in `OPERATIONS-LOG.md`; an operator created outside the seed is an
-administrative act with no audit entry, because `admin_audit_entries` records acts performed
-_through_ the product (FR-939 records the same reasoning for the re-seed).
+  ```bash
+  docker compose run --rm api node dist/db/seed/operator-identities.js
+  docker compose run --rm api node dist/admin/bootstrap.js
+  ```
+
+- **Every operator is deactivated**: the rows still exist, so `onConflictDoNothing` skips them
+  and sign-in still refuses on `deactivated_at`. The repair is a by-hand
+  `UPDATE operators SET deactivated_at = NULL WHERE …` for the operator being restored — the
+  additive command cannot do it, deliberately: un-deactivating is an administrative judgement,
+  not a provisioning step.
+- **The last operator lost a credential they had CHOSEN**: the row exists with
+  `credential_is_initial = false`, so the bootstrap refuses (FR-993 — it never resets a chosen
+  password). The repair is a by-hand `UPDATE operators SET credential_is_initial = true
+WHERE email = …`, then the bootstrap.
+
+_(Before 012 this section prescribed a full re-seed — which deletes every attendee — and its
+first 012 rewrite claimed the additive pair covered all three scenarios; it covers the first.)_
+Record any by-hand intervention in `OPERATIONS-LOG.md`; an operator repaired outside the product
+is an administrative act with no audit entry, because `admin_audit_entries` records acts
+performed _through_ the product (FR-939 records the same reasoning for the re-seed).
 
 ---
 

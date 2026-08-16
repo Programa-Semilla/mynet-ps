@@ -159,30 +159,39 @@ export const ensureOperatorIdentities = async (db: Database): Promise<void> => {
     // that looks seeded and has no platform tier, and the failure would surface much later as
     // "nobody can sign in to the administrative site". FR-915's single-lookup sign-in depends
     // on the rule holding, so breaking it is not a warning.
+    //
+    // **Check and insert share one transaction**, which is `addressTakenByOtherPrincipal`'s
+    // own stated precondition ("called INSIDE the caller's transaction… that is the entirety
+    // of what makes it work") — on the bare pool the pair is a read-then-write race against a
+    // concurrent attendee sign-up for the same address (deep-review finding). The window is
+    // operator-seed-vs-sign-up, so it is narrow; honouring the helper's contract costs one
+    // wrapper.
     // ═══════════════════════════════════════════════════════════════════════════════════════
-    if (await addressTakenByOtherPrincipal(operator.email, 'operator', db)) {
-      throw new Error(
-        `The operator seed address ${operator.email} is already registered to an attendee ` +
-          '(FR-918). One address identifies at most one principal product-wide — FR-915 ' +
-          'resolves administrative sign-in with a single lookup and no branch, which stops ' +
-          'being possible the moment an address names both. Change the seed address, or ' +
-          'remove the attendee account that holds it.',
-      )
-    }
+    const inserted = await db.transaction(async (tx) => {
+      if (await addressTakenByOtherPrincipal(operator.email, 'operator', tx)) {
+        throw new Error(
+          `The operator seed address ${operator.email} is already registered to an attendee ` +
+            '(FR-918). One address identifies at most one principal product-wide — FR-915 ' +
+            'resolves administrative sign-in with a single lookup and no branch, which stops ' +
+            'being possible the moment an address names both. Change the seed address, or ' +
+            'remove the attendee account that holds it.',
+        )
+      }
 
-    const inserted = await db
-      .insert(operators)
-      .values({
-        email: operator.email,
-        displayName: operator.displayName,
-        // Explicit rather than omitted, so a reader sees the decision rather than a default.
-        passwordHash: null,
-        // Vacuously true — there is no credential yet. `admin:bootstrap` sets one and leaves
-        // this true until the operator replaces it themselves (FR-992).
-        credentialIsInitial: true,
-      })
-      .onConflictDoNothing({ target: operators.email })
-      .returning({ id: operators.id, passwordHash: operators.passwordHash })
+      return tx
+        .insert(operators)
+        .values({
+          email: operator.email,
+          displayName: operator.displayName,
+          // Explicit rather than omitted, so a reader sees the decision rather than a default.
+          passwordHash: null,
+          // Vacuously true — there is no credential yet. `admin:bootstrap` sets one and leaves
+          // this true until the operator replaces it themselves (FR-992).
+          credentialIsInitial: true,
+        })
+        .onConflictDoNothing({ target: operators.email })
+        .returning({ id: operators.id, passwordHash: operators.passwordHash })
+    })
 
     // A guard against the one way this seed could quietly become wrong: somebody adding a
     // committed password above. **Narrowed to the rows THIS call inserted** (T003, research R2):

@@ -108,9 +108,9 @@ export default defineConfig({
    * project multiplies every matched spec against one database, and four suites break on a
    * second pass (duplicate conference names, non-timestamped message bodies, a `question_ask`
    * throttle that never settles). The three files below are repeat-safe, verified by running
-   * them twice. `messages-terminal.spec.ts` is 012's WebKit terminal-state suite (FR-1145) and
-   * may not exist yet on this branch — a `testMatch` entry with no file matches nothing, which
-   * is fine; the moment the file lands it runs in all three engines with no config change.
+   * them twice. `messages-terminal.spec.ts` is 012's terminal-state suite (FR-1145): its whole
+   * reason for existing is WebKit — the engine Messages broke in — so it is read-only against
+   * the seed precisely to be admissible here, and it runs in all three engines.
    */
   projects: [
     {

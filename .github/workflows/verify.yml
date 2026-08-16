@@ -562,18 +562,16 @@ jobs:
       # Its own container, so it applies its own migrations. The `migrations` job proves the
       # committed migrations apply cleanly; this makes this suite's database usable.
       - run: pnpm db:migrate
-      # T024/T025 (012, FR-1147) — **this line MUST mirror the root `test:a11y` script.** It
-      # named one file while the script named two: `admin-accessibility.spec.ts` (4 tests, the
-      # administrative site's only axe evidence) was excluded from `test-e2e` by the derivation's
-      # `$`-anchored grep and never named here — so it ran in no CI job at all. The same pass
-      # routes `e2e/accessibility/identity.spec.ts` (5 pure-AxeBuilder tests, 004's T128, in a
-      # subdirectory the old `ls` glob could not see) into this job rather than `test-e2e`,
-      # because an axe sweep is an accessibility check and reports as this required check. The
-      # two lists drifting apart is exactly how the nine tests vanished, so a change to one line
-      # is a change to both.
-      - run: >-
-          pnpm exec playwright test e2e/accessibility.spec.ts e2e/admin-accessibility.spec.ts
-          e2e/accessibility/identity.spec.ts
+      # T024/T025 (012, FR-1147) — **the accessibility spec list has exactly ONE home: the root
+      # `test:a11y` script, and this job runs it by name.** The first fix wrote the list here a
+      # second time with a comment demanding manual mirroring — which is the arrangement that
+      # lost the nine tests in the first place: this job named one file while the script named
+      # two, and `admin-accessibility.spec.ts` (the administrative site's only axe evidence) ran
+      # in no CI job at all, alongside `e2e/accessibility/identity.spec.ts` (5 pure-AxeBuilder
+      # tests, 004's T128, in a subdirectory the old `ls` glob could not see). A mandate to keep
+      # two lists in step is a hope; deriving one from the other is a mechanism (the deep review
+      # rewrote this from the former to the latter).
+      - run: pnpm test:a11y
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
