@@ -35,10 +35,11 @@
     "admin:seed-operators": "pnpm --filter @mynet/api admin:seed-operators",
     "budget": "node scripts/asset-budget.mjs",
     "brand:audit": "node scripts/brand-audit.mjs",
+    "walk:audit": "node scripts/walk-record-audit.mjs",
     "brand:generate": "pnpm brand:generate:board && pnpm brand:generate:install",
     "brand:generate:board": "node scripts/generate-brand-assets.mjs",
     "brand:generate:install": "node scripts/generate-install-icons.mjs",
-    "verify": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm test:unit && pnpm test:component && pnpm contract:check && pnpm test:integration && pnpm build && pnpm budget && pnpm brand:audit && pnpm test:e2e",
+    "verify": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm test:unit && pnpm test:component && pnpm contract:check && pnpm test:integration && pnpm build && pnpm budget && pnpm brand:audit && pnpm walk:audit && pnpm test:e2e",
     "verify:clean": "node scripts/verify-clean.mjs"
   },
   "devDependencies": {

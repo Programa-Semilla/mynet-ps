@@ -425,6 +425,14 @@ jobs:
       - name: brand audit
         run: node scripts/brand-audit.mjs
       # ─────────────────────────────────────────────────────────────────────────────────────
+      # T097 (012) — the walk-record audit: the machine-visible edge of the human gate. Green
+      # while the record is in progress (pending rows assert nothing); arms row by row as
+      # verdicts are recorded, and completely when walk-record.md declares itself complete. A
+      # STEP in this job, never an eleventh job — `verify`/`verify-push` hard-assert the count.
+      # ─────────────────────────────────────────────────────────────────────────────────────
+      - name: walk-record audit
+        run: node scripts/walk-record-audit.mjs
+      # ─────────────────────────────────────────────────────────────────────────────────────
       # **This artifact has no consumer today, and saying so is the honest thing.**
       #
       # A comment here previously claimed it was "the one `deploy.sh` ships". It is not:

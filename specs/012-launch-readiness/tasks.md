@@ -69,7 +69,7 @@ repository.
 - [X] T023 Fix the IndexedDB helpers in `e2e/agenda-offline.spec.ts` that resolve silently on error *(same file as T022 — not parallel)*
 - [X] T024 Add `e2e/admin-accessibility.spec.ts` to the **`test-accessibility`** job in `.github/workflows/verify.yml`, matching the existing `test:a11y` script. It must not move into `test-e2e` — that would take an accessibility gate out of the accessibility check
 - [X] T025 Change `test-e2e`'s spec derivation in `.github/workflows/verify.yml` to recurse (`find e2e -name '*.spec.ts'`) with the accessibility exclusion re-anchored to **path** — excluding the whole `e2e/accessibility/` directory as well as the two root a11y specs. Route `e2e/accessibility/identity.spec.ts` into **`test-accessibility`** beside T024's addition, adding it to `test:a11y` in the root `package.json` — it is a pure axe suite (004's T128), and landing it in `test-e2e` would repeat exactly the mistake T024 names. Keep the emptiness guard
-- [ ] T026 Run the nine recovered tests and fix what they surface — they have never executed in CI
+- [X] T026 Run the nine recovered tests and fix what they surface — they have never executed in CI
 
 ### Backups (FR-1148) — a governance breach, not a gap
 
@@ -106,21 +106,21 @@ repository.
 
 **Runs concurrently with Phase 2.** Depends only on the repository. Output: `quickstart.md`.
 
-- [ ] T045 Enumerate every by-hand scenario across all 13 `specs/*/quickstart.md`, cross-checked against each feature's `tasks.md` for outstanding status — FR-1111's "enumerating the task files" and SC-1202's "enumerating the specs" are the two halves of this one enumeration, not two sources. **Do not key on heading shape** — that is what hid 006. Phase 0 measured 122 scenarios, 74 outstanding walk units, 90 unaccounted
-- [ ] T046 Give 002's 8 and 004's 10 scenarios an explicit disposition — they have **no walk task at all**, so "not marked complete" cannot be evaluated against them — and give 011 scenario 9 one too: steps 5–7 are walkable, steps 1–4 depend on T057's outcome and are recorded as walked or blocked-by-decision accordingly (SC-1202)
-- [ ] T047 Retire the ~9 machine-covered scenarios, naming each and where its coverage now lives (014/5, 016/9, 010/1–4, 006 Parts 1 & 4, 002/8 as spent)
-- [ ] T048 **Rewrite the three scenarios carrying false expectations** — 001/5 step 2, 008/1 step 3, 010/5 step 2 — or the walker reports defects that are not defects
-- [ ] T049 Pick **one** width triple, record why, **and update `spec.md` US4 scenario 1 (which names 390/768/1280) to match** — SC-1204 names no widths and needs no edit. Thirteen places assert six inconsistent triples; the sweep uses a seventh; the spec named an eighth
-- [ ] T050 Write the seam steps from Phase 0's 16 candidates (SC-1211). **S2 is highest value**: delete one attendee who is simultaneously an organizer, a contact, a conversation participant, a question author, a place-holder and a report subject
-- [ ] T051 Fold the six repeated setup prerequisites into one place — chiefly "two browser profiles, not two tabs", where 007's version alone carries the push/incognito trap
-- [ ] T052 Add a step telling the walker how to distinguish a **throttle** from a defect (seam S15)
-- [ ] T053 Mark every Q&A step as describing a surface v5.0.0 retracted and 017 will rebuild — still walkable, still a defect if broken
-- [ ] T054 **Write `specs/012-launch-readiness/quickstart.md`** — the consolidated script itself, organised by journey, covering both products, stating per step what a pass looks like and requiring an **observation, not a verdict** (FR-1110, FR-1113, FR-1114, FR-1125)
+- [X] T045 Enumerate every by-hand scenario across all 13 `specs/*/quickstart.md`, cross-checked against each feature's `tasks.md` for outstanding status — FR-1111's "enumerating the task files" and SC-1202's "enumerating the specs" are the two halves of this one enumeration, not two sources. **Do not key on heading shape** — that is what hid 006. Phase 0 measured 122 scenarios, 74 outstanding walk units, 90 unaccounted
+- [X] T046 Give 002's 8 and 004's 10 scenarios an explicit disposition — they have **no walk task at all**, so "not marked complete" cannot be evaluated against them — and give 011 scenario 9 one too: steps 5–7 are walkable, steps 1–4 depend on T057's outcome and are recorded as walked or blocked-by-decision accordingly (SC-1202)
+- [X] T047 Retire the ~9 machine-covered scenarios, naming each and where its coverage now lives (014/5, 016/9, 010/1–4, 006 Parts 1 & 4, 002/8 as spent)
+- [X] T048 **Rewrite the three scenarios carrying false expectations** — 001/5 step 2, 008/1 step 3, 010/5 step 2 — or the walker reports defects that are not defects
+- [X] T049 Pick **one** width triple, record why, **and update `spec.md` US4 scenario 1 (which names 390/768/1280) to match** — SC-1204 names no widths and needs no edit. Thirteen places assert six inconsistent triples; the sweep uses a seventh; the spec named an eighth
+- [X] T050 Write the seam steps from Phase 0's 16 candidates (SC-1211). **S2 is highest value**: delete one attendee who is simultaneously an organizer, a contact, a conversation participant, a question author, a place-holder and a report subject
+- [X] T051 Fold the six repeated setup prerequisites into one place — chiefly "two browser profiles, not two tabs", where 007's version alone carries the push/incognito trap
+- [X] T052 Add a step telling the walker how to distinguish a **throttle** from a defect (seam S15)
+- [X] T053 Mark every Q&A step as describing a surface v5.0.0 retracted and 017 will rebuild — still walkable, still a defect if broken
+- [X] T054 **Write `specs/012-launch-readiness/quickstart.md`** — the consolidated script itself, organised by journey, covering both products, stating per step what a pass looks like and requiring an **observation, not a verdict** (FR-1110, FR-1113, FR-1114, FR-1125)
 
 ### The walk record — the feature's evidentiary output
 
-- [ ] T055 Create `specs/012-launch-readiness/walk-record.md` with a per-step row schema — step id, features joined, observation, pass/fail, capture path — and `specs/012-launch-readiness/captures/`. **Four requirements and two success criteria constrain an artifact nothing produced** (FR-1125, FR-1126, SC-1203, SC-1208)
-- [ ] T056 Create `specs/012-launch-readiness/defect-register.md` — the count SC-1208 requires, one row per defect with the step that found it
+- [X] T055 Create `specs/012-launch-readiness/walk-record.md` with a per-step row schema — step id, features joined, observation, pass/fail, capture path — and `specs/012-launch-readiness/captures/`. **Four requirements and two success criteria constrain an artifact nothing produced** (FR-1125, FR-1126, SC-1203, SC-1208)
+- [X] T056 Create `specs/012-launch-readiness/defect-register.md` — the count SC-1208 requires, one row per defect with the step that found it
 
 ---
 
@@ -207,7 +207,7 @@ walk continues and the occurrence is recorded (edge case 5).
 
 - [ ] T095 Record the **Q&A at launch** decision in `specs/012-launch-readiness/decisions.md`. Hiding or gating it retracts delivered 009 requirements and needs an amendment; leaving it live does not (FR-1143, SC-1212)
 - [ ] T096 Record the **client diagnostic channel** decision in the same file. `apps/web/src` has exactly two `console.*` calls, both for unrecoverable faults, and the client holds personal data (FR-1142, SC-1212)
-- [ ] T097 Add `scripts/walk-record-audit.mjs` — `brand-audit.mjs`'s precedent — run from `pnpm verify` as a step inside an existing job (FR-1147 forbids an eleventh), parsing T055's row schema and asserting every step in `quickstart.md` has a row in `walk-record.md`, and every layout and install row names a capture file **that exists on disk**. Without it the human gate has no machine-visible output (SC-1203, FR-1126)
+- [X] T097 Add `scripts/walk-record-audit.mjs` — `brand-audit.mjs`'s precedent — run from `pnpm verify` as a step inside an existing job (FR-1147 forbids an eleventh), parsing T055's row schema and asserting every step in `quickstart.md` has a row in `walk-record.md`, and every layout and install row names a capture file **that exists on disk**. Without it the human gate has no machine-visible output (SC-1203, FR-1126)
 - [ ] T098 Mark discharged walk tasks complete in each feature's own `tasks.md`, **feature-prefixed**: `006/T080`, `006/T081`, `006/T102`, `007/T148`, `008/T148`, `008/T149`, `009/T097`, `010/T066`–`010/T070`, `011/T082`, `011/T084`, `013/T158`, `013/T159`, `014/T105`, `014/T206`, `014/T207`, `016/T067`, `016/T068`. Annotate each as **"discharged by 012"** rather than silently ticking it. **`001/T093` stays open** — T089 borrows its principle for the human gate; nothing in 012 breaks each automated gate, so ticking it would mark work complete that nothing here does; annotate it in 001's `tasks.md` as *principle borrowed by 012/FR-1127, gate-breaking pass still open*. **`011/T073` and `011/T074` are conditional on T057's outcome**: tick them only if the service principal was created and the CI deploy walked; under the hand-deploy decision, record them per T046's 011/9 disposition instead
 - [ ] T099 Confirm the roadmap's 012 row annotation is present and correct (FR-1150 — already applied in `6568db4`)
 - [ ] T100 Update `CLAUDE.md`: the validation backlog is discharged and 012's outstanding-walk paragraphs no longer describe the project
