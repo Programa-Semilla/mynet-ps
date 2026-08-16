@@ -23,6 +23,8 @@ import {
   HttpReportRepository,
   HttpSessionNotesRepository,
   HttpVocabularyRepository,
+  heldConferences,
+  sweepExpired,
   type CacheScope,
   type LocalCache,
 } from '@mynet/data/http'
@@ -89,6 +91,30 @@ export const createServices = (): PlatformServices => {
   // callers opt into.
   // ─────────────────────────────────────────────────────────────────────────────────────────
   const store: LocalCache = new WebLocalCache()
+
+  // ─────────────────────────────────────────────────────────────────────────────────────────
+  // **Review finding I1 — the one deletion that does not depend on who is signed in.**
+  //
+  // Every other purge in this file names an attendee: sign-out, account deletion and withdrawal
+  // all take `identity.current()`, and the decorator's expiry branch only ever sees an entry
+  // somebody read. **The device the retention fix was written for is the one where none of those
+  // ever happen again** — the account was deleted elsewhere, or a session ended and was never
+  // re-established, so the client renders signed-out, issues no conference-scoped read and
+  // resolves no identity. Its programme, saved set and **notes** would sit in IndexedDB forever.
+  //
+  // So this fires here, before anything is wired, reading nothing but a stamp and a clock. It is
+  // **not** the mechanism constitution v5.4.0 R1 rejects: R1 refuses to purge on an authorization
+  // refusal, because that means classifying why a session ended, and an idle timeout is
+  // indistinguishable from a deleted account at that call site. This classifies nothing and
+  // deletes only entries FIX-201 has already declared unreadable by any caller.
+  //
+  // **Fire-and-forget, with an explicit catch, so it can never affect rendering.** Every
+  // `LocalCache` member fails towards "nothing there" rather than throwing, so the `catch` should
+  // be unreachable — it is written anyway because a substituted store is not bound by that
+  // contract, and a retention sweep must not be able to blank the application.
+  // ─────────────────────────────────────────────────────────────────────────────────────────
+  void sweepExpired(store).catch(() => undefined)
+
   const identity = attendeeIdentity()
   // Written by the decorators as they serve reads, read by the staleness stamp (FR-216).
   const freshness = createFreshnessRegistry()
@@ -233,7 +259,12 @@ export const createServices = (): PlatformServices => {
       // absent offline, and 005 does not reverse that: FR-215 names the *active* conference's
       // content and nothing else. Caching a cross-event read behind a per-event key is also the
       // one place the scoping rules would have to be bent.
-      events: new HttpEventsRepository(http),
+      //
+      // **Being uncached is exactly what qualifies it for FIX-3** — see
+      // `erasingWithdrawnConferences` below. A decorated read can answer from disk; this one
+      // either reaches the server or throws, so a returned array is a *live* answer and can be
+      // trusted to say which conferences the attendee still holds.
+      events: erasingWithdrawnConferences(new HttpEventsRepository(http), store, identity),
       activeEvent,
       catalog,
       commitments,
@@ -491,9 +522,11 @@ const purgingOnSignOut = (
  * ═════════════════════════════════════════════════════════════════════════════════════════
  * **THE SERVER-SIDE DELETE IS ONLY HALF OF "NO COPY IS KEPT".**
  *
- * `WebLocalCache` has no eviction: `write` puts an entry and only `purge` ever removes one. The
- * 24-hour lifetime stops a stale entry being *served*; it does not delete the bytes. So without
- * this, an attendee who deletes their account leaves their saved sessions, their **notes** —
+ * The 24-hour lifetime does not stand in for this, and **FIX-2 does not change that**. Since
+ * FIX-2 the decorator deletes an entry at the moment it reads one past its lifetime — but only
+ * an entry somebody *reads*, and a device whose account has been deleted renders signed-out and
+ * reads nothing at all. Its bytes are therefore never presented for expiry. So without this, an
+ * attendee who deletes their account leaves their saved sessions, their **notes** —
  * the product's first attendee-authored free text — and, under the `anonymous` prefix, their
  * name and email on the device, indefinitely. The confirmation dialog they read first says in
  * bold that no copy is kept and there is nothing to restore.
@@ -553,6 +586,151 @@ const purgingIdentity = (
       await store.purge(attendeePrefix('anonymous'))
       scope.forget()
     }
+  },
+})
+
+/**
+ * FIX-3 — **a conference the attendee has left is erased on the next successful reading of the
+ * conferences they are registered for** (FIX-301–FIX-305, constitution v5.4.0 R1).
+ *
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ * **THE DECORATOR'S PURGE-ON-REFUSAL IS SOUND AND FREQUENTLY NEVER FIRES.**
+ *
+ * `cached` drops a conference the moment a read scoped to it is refused, and on the device that
+ * performed the withdrawal that is prompt and complete. On **any other device** the refused read
+ * is often never issued at all:
+ *
+ *   - `GET /workspace/active-event` answers an attendee registered for nothing with **204 — a
+ *     success, not a refusal.** Every conference-scoped read is gated behind that resolving to
+ *     `ready`, and no route carries an `:eventId` parameter, so **no destination holds a
+ *     remembered conference id it could fire with.** After a cold start the client never
+ *     addresses the withdrawn conference again: nothing is refused, so nothing is purged, and
+ *     the entries sit there until something reads them — which, on that device, nothing will.
+ *   - A tab already open at `ready` does purge eventually, when the next gated surface mounts or
+ *     retries. Nothing *forces* it: there is no poll, no focus refetch and no reconnect refetch
+ *     of the active event.
+ *
+ * `listRegistered()` is the one call in the client that learns the **authoritative** set, it is
+ * deliberately uncached, and it already runs on every online Home load. A conference missing
+ * from its answer is one the server will refuse.
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ *
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ * **IT IS HERE, AND HERE IS THE POINT RATHER THAN A DETAIL** (FIX-303).
+ *
+ * Putting it in `cached.ts` would give one repository's read the job of invalidating every other
+ * repository's cache — the objection that withdrew 009's FR-756a. Expressing it as a `reads` or
+ * `passThrough` member would be worse: it would make a cross-repository responsibility look like
+ * a per-repository classification, which is the shape 008's `slots` defect took.
+ *
+ * At the composition root it is a wire between two collaborators that already exist, exactly as
+ * `purgingOnSignOut`, `purgingIdentity` and `watchReachability` are. `EventsRepository` learns
+ * nothing; `LocalCache` learns nothing; no component can tell.
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ *
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ * **IT ACTS ONLY ON A SUCCESSFUL ONLINE READ, AND THE ASYMMETRY IS THE SAFETY PROPERTY**
+ * (FIX-302).
+ *
+ * A failed read throws before the erasure is reached, and there is no `catch` here on purpose.
+ * **An empty answer that failed is not an answer that the attendee is registered for nothing** —
+ * treating it as one would erase a working offline copy on every connectivity blip, which is
+ * FR-215 destroyed by the mechanism meant to protect it. Nothing needs to consult connectivity
+ * to establish this: this repository is undecorated, so it has no cache to answer from, and
+ * `HttpClient` refuses outright when connectivity reports offline. **A returned array is a live
+ * array.**
+ *
+ * The erasure runs **after** the answer is in hand and before it is handed on, so a caller
+ * cannot observe a half-erased device.
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ *
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ * **A STORE FAILURE SKIPS THE ERASURE AND THE READ SUCCEEDS ANYWAY** (review finding M3).
+ *
+ * This paragraph used to claim the opposite — *"a store failure fails the read rather than
+ * silently skipping the erasure, which is the direction that gets noticed"* — and **no store
+ * failure could fail the read**. `WebLocalCache.keys()` resolves `[]` on every failure path and
+ * `purge()` resolves on every failure path, so the sentence described behaviour that does not
+ * occur, in a change whose own FIX-304 exists to correct exactly that. It is corrected rather
+ * than deleted, because the claim it made was also the wrong *design*:
+ *
+ *   - `LocalCache`'s declared contract is that a store which cannot be read answers as an empty
+ *     one, on the ground that failing towards "there is nothing to delete" is the direction that
+ *     **cannot destroy a working offline copy**. A caller that turned those answers into a
+ *     rejection would be contradicting the interface one file over.
+ *   - The read this wraps is `listRegistered()`, and `EventSwitcher` renders it **in the shell,
+ *     on every destination**. Letting a storage fault — private browsing, a quota, a corrupt
+ *     database — reject that read would blank the conference switcher for a reason with nothing
+ *     to do with the network, in the one product whose offline behaviour is a stated feature.
+ *
+ * So the erasure is wrapped and its failure swallowed: the answer is never harmed by the store.
+ * What is lost is one opportunity to erase, and the next successful `listRegistered()` takes it
+ * — this read runs on every online Home load.
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ *
+ * **Delegates its one method explicitly rather than spreading**, for the reason stated at length
+ * in `attendeeIdentity().watching`: the wrapped object's methods live on a prototype, so a
+ * spread would drop them at runtime while the type still claimed otherwise.
+ *
+ * **Exported, unlike its three neighbours here, and only so that FIX-305 can be a real test.**
+ * The cold-start case it must cover — a stored conference, an answer omitting it, the bytes gone
+ * — cannot be reached through `createServices()`, which builds a real `HttpClient` and a real
+ * `WebLocalCache` that stores nothing outside a browser. Nothing but the test imports it.
+ */
+export const erasingWithdrawnConferences = (
+  events: PlatformServices['repositories']['events'],
+  store: LocalCache,
+  scope: { current: () => string },
+): PlatformServices['repositories']['events'] => ({
+  listRegistered: async () => {
+    // ─────────────────────────────────────────────────────────────────────────────────────
+    // **IDENTITY IS READ ON BOTH SIDES OF THE AWAIT, AND BOTH READINGS ARE NEEDED** (review
+    // finding M1).
+    //
+    // Reading it only *after* is what shipped, and it is stale by construction: the answer
+    // being erased against was requested by whoever was signed in when the request left. On a
+    // shared device — a phone lent at a conference, a kiosk — somebody can sign out and
+    // somebody else sign in while it is in flight, and **attendee A's registered list would
+    // then decide which of attendee B's conferences are erased.** The `anonymous` guard below
+    // does not cover it: that catches "not resolved yet", not "resolved to somebody else".
+    //
+    // Reading it only *before* would break the case FIX-3 exists for. On a cold start the scope
+    // still says `anonymous` when this read is dispatched and resolves while it is in flight —
+    // which is the normal path, not an edge, because `getCurrent()` and this call race on every
+    // load. Refusing to act on that would leave the cold-start device permanently un-erased.
+    //
+    // So: act when the identity is the same at both ends, and when it only *became* real; skip
+    // when it moved between two real identities, which is the one combination that would erase
+    // the wrong person's conferences.
+    // ─────────────────────────────────────────────────────────────────────────────────────
+    const requestedAs = scope.current()
+    const registered = await events.listRegistered()
+    const attendeeId = scope.current()
+
+    // Identity has not resolved yet, so there is no prefix to scope the erasure to and no
+    // conference-scoped entry could have been written under `anonymous` — every cached read
+    // needs a session, and a session would have answered `getCurrent` first. Erasing under a
+    // guessed identity is the one way this could reach another attendee's content.
+    if (attendeeId === 'anonymous') return registered
+    if (requestedAs !== 'anonymous' && requestedAs !== attendeeId) return registered
+
+    try {
+      const stillRegistered = new Set(registered.map((event) => event.id))
+      const held = heldConferences(attendeeId, await store.keys(attendeePrefix(attendeeId)))
+
+      for (const eventId of held) {
+        // The **whole** conference prefix, unlike FIX-2's single key: this conference is gone
+        // rather than aged, so its programme, tracks, saved set, notes and appointments all go
+        // together — the same thing a refusal does, arriving by the route that actually happens.
+        if (!stillRegistered.has(eventId)) await store.purge(conferencePrefix(attendeeId, eventId))
+      }
+    } catch {
+      // Swallowed deliberately — see the header. The store's own contract is to fail towards
+      // "nothing there"; a store that rejects instead must not be able to convert a successful
+      // network read into a rejection on a surface that renders everywhere.
+    }
+
+    return registered
   },
 })
 

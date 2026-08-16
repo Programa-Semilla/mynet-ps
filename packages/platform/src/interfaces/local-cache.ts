@@ -27,6 +27,55 @@
  * What this *does* own is the `retrievedAt` stamp, because only the writer knows when the
  * write happened.
  * ─────────────────────────────────────────────────────────────────────────────────────────
+ *
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ * **FIX-2 / FIX-3 (constitution v5.4.0 R1) — THE INTERFACE GAINS TWO MEMBERS, AND BOTH ARE
+ * STORAGE PRIMITIVES RATHER THAN POLICY.**
+ *
+ * It stood at three members from 005 to here, and widening it is not free: every
+ * implementation must supply them, and each new verb is a new way for a caller to reach past
+ * the decorator. So the addition is stated rather than made quietly, and both members were
+ * chosen to keep the paragraph above true — **neither knows what a conference is, what an
+ * attendee is, or when an entry stops being readable.**
+ *
+ * They exist because R1's two licensed mechanisms are each **unimplementable with `read`,
+ * `write` and `purge` alone**:
+ *
+ *   - **`remove`** — an entry read past its lifetime must be deleted (FIX-201), and it must be
+ *     *that one entry* (FIX-203). `purge(key)` is a prefix match, so it would also take any
+ *     resource whose name extends this one. No resource does today; the day one does, the loss
+ *     is silent and offline-only, which is the class of defect this whole fix is about.
+ *   - **`keys`** — a conference the attendee has left must be erased even though no read of it
+ *     was ever refused (FIX-301), and *which* conferences are held on this device is a question
+ *     only the store can answer. Nothing else in the product can enumerate them: the composition
+ *     root has no memory across a reload, which is precisely the cold-start case FIX-3 exists
+ *     for.
+ *
+ * **The alternative was a bookkeeping index** — the client writing down which conferences it
+ * had cached, under a key of its own. It was rejected for the reason this codebase rejects
+ * denormalised counters: it is a second source of truth for something the rows already answer,
+ * and the copy that drifted would be the one deciding whether somebody's withdrawn conference
+ * survives on their phone.
+ *
+ * **A THIRD MEMBER WAS CONSIDERED AND REJECTED, AND IT IS THE ONE SOMEBODY WILL PROPOSE NEXT.**
+ * `sweep(olderThanMs)` — delete everything older than an age, in one cursor pass — is cheaper
+ * than the read-then-`remove` loop `cached.ts`'s `sweepExpired` runs, and it was rejected
+ * because it would move the *judgement* into every implementation of this interface: parsing
+ * `retrievedAt`, comparing it, and deciding what an unparseable stamp means. That is precisely
+ * what the paragraph above forbids — the age rule is expressed **once**, in `packages/data`, so
+ * that a native implementation cannot disagree with the web one about when access is revoked
+ * offline. Two implementations of a comparison is two answers to that question.
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ *
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ * **THE SHAPE DECLARED HERE IS MIRRORED, MEMBER FOR MEMBER, IN
+ * `packages/data/src/http/cache-store.ts`** — the caching decorator's structural copy. Neither
+ * package may import the other (both are leaves; the composition root is the only module that
+ * knows about both), so the two files are kept identical by hand and reconciled by
+ * `apps/web/src/app/services.ts`, which stops compiling if they diverge. **A member added here
+ * must be added there in the same change**, with its documentation: that file carries the
+ * shape, this one carries the argument.
+ * ─────────────────────────────────────────────────────────────────────────────────────────
  */
 
 /** A cached payload and the moment it was retrieved from the server. */
@@ -64,4 +113,44 @@ export interface LocalCache {
    * still readable offline by somebody whose access had been withdrawn.
    */
   purge(keyPrefix: string): Promise<void>
+
+  /**
+   * Removes the entry stored under **exactly** this key. A key holding nothing is not an error.
+   *
+   * The narrow counterpart to `purge`, and the narrowness is the requirement (FIX-203): both
+   * callers have established that *one* entry has aged out — the decorator's expiry branch for
+   * an entry somebody read, the retention sweep for one nobody will — and its neighbours under
+   * the same conference may still be fresh and still readable. `purge` cannot express that: it
+   * selects every key the argument is a prefix of.
+   *
+   * **Fails silently, like every other member**, for the reason stated at the top of the web
+   * implementation: this runs on a path whose caller is already about to report that nothing is
+   * cached, and a rejection would turn an ordinary offline answer into an unhandled error.
+   */
+  remove(key: string): Promise<void>
+
+  /**
+   * Every key currently stored whose own key begins with this prefix, in no defined order.
+   *
+   * The read-side mirror of `purge`, selecting on the same boundary. It answers "what does this
+   * device still hold" — the question that has no other source, because the store outlives every
+   * process that wrote to it.
+   *
+   * **The prefix does not have to name an attendee, and one caller deliberately does not name
+   * one.** The retention sweep (review finding I1) enumerates the whole grammar, because the
+   * entries it exists to delete belong to attendees this device can no longer identify — the
+   * account was deleted elsewhere, or a session ended and was never re-established. A member
+   * that could only be asked about a signed-in attendee would be unable to reach exactly the
+   * bytes that outlive everybody.
+   *
+   * **It returns keys, never payloads.** A caller deciding what to discard needs to know what
+   * exists and nothing more, and handing back the entries would put other people's conference
+   * content in the hands of code whose whole job is to delete it.
+   *
+   * A store that cannot be read answers `[]`, for the reason `read` answers `null`: a cache
+   * that cannot be enumerated is indistinguishable from an empty one, and the caller's next act
+   * is to delete things — so failing towards "there is nothing to delete" is the direction that
+   * cannot destroy an attendee's working offline copy.
+   */
+  keys(keyPrefix: string): Promise<readonly string[]>
 }

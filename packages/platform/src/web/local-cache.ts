@@ -149,6 +149,76 @@ export class WebLocalCache implements LocalCache {
     )
   }
 
+  /**
+   * FIX-2 — deletes one key, and only that key.
+   *
+   * ───────────────────────────────────────────────────────────────────────────────────────
+   * `store.delete(key)` rather than a one-key range: IndexedDB's `delete` on an exact key is
+   * the primitive, and routing it through `prefixBounds` would reintroduce the prefix match
+   * this member exists to avoid.
+   *
+   * Silent on failure like every other member here. The caller is the caching decorator on its
+   * way to reporting "a connection is needed and nothing is cached" — a rejection would turn
+   * that ordinary answer into an unhandled error on a path that must always complete.
+   * ───────────────────────────────────────────────────────────────────────────────────────
+   */
+  async remove(key: string): Promise<void> {
+    await transact<void>(
+      'readwrite',
+      (store) => store.delete(key),
+      () => undefined,
+      undefined,
+    )
+  }
+
+  /**
+   * FIX-3 — every key held under this prefix.
+   *
+   * ───────────────────────────────────────────────────────────────────────────────────────
+   * `openKeyCursor` over the same bound `purge` uses, so the two agree by construction about
+   * what "under this prefix" means. **Keys only**: `openCursor` would deserialise every payload
+   * on the device to answer a question about names, and the caller is about to delete some of
+   * them.
+   *
+   * Answers `[]` on any failure, which is the direction that cannot destroy anything — see the
+   * interface. A store that reported keys it could not really see would have the caller purging
+   * conferences on the strength of a failed read.
+   *
+   * **One caller asks for the whole grammar rather than one attendee's slice** — the retention
+   * sweep (review finding I1), which must reach entries belonging to an attendee this device can
+   * no longer identify. The cursor is bounded either way, so a broad prefix costs a longer scan
+   * and nothing else; it is a `readonly` transaction on a fire-and-forget startup path.
+   * ───────────────────────────────────────────────────────────────────────────────────────
+   */
+  async keys(keyPrefix: string): Promise<readonly string[]> {
+    const db = await openDatabase()
+    if (!db) return []
+
+    return new Promise<readonly string[]>((resolve) => {
+      const found: string[] = []
+
+      try {
+        const transaction = db.transaction(STORE, 'readonly')
+        const store = transaction.objectStore(STORE)
+        const { lower, upper } = prefixBounds(keyPrefix)
+        const request = store.openKeyCursor(IDBKeyRange.bound(lower, upper, false, false))
+
+        request.onsuccess = () => {
+          const cursor = request.result
+          if (!cursor) return
+          if (typeof cursor.key === 'string') found.push(cursor.key)
+          cursor.continue()
+        }
+
+        transaction.oncomplete = () => resolve(found)
+        transaction.onerror = () => resolve([])
+        transaction.onabort = () => resolve([])
+      } catch {
+        resolve([])
+      }
+    })
+  }
+
   async purge(keyPrefix: string): Promise<void> {
     const db = await openDatabase()
     if (!db) return
