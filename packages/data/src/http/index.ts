@@ -43,15 +43,22 @@ export { HttpQuestionsRepository } from './questions-repository.js'
 // 005 — the caching decorator. Applied at the composition root, so no component learns that a
 // cache exists (research D1, Principle V).
 export {
+  // The key grammar's root, exported for the one caller that must reach entries belonging to an
+  // attendee this device can no longer identify — see `sweepExpired`.
+  ALL_ATTENDEES_PREFIX,
   attendeePrefix,
   cached,
   cacheKey,
   CACHE_LIFETIME_MS,
+  CLOCK_TRUST_CEILING_MS,
   conferencePrefix,
   createFreshnessRegistry,
   // FIX-3 — the inverse of `cacheKey`, exported so the composition root can read a conference
   // id back out of a stored key without owning a second copy of the key grammar.
   heldConferences,
+  // Review finding I1 — the age-based sweep, wired at the composition root because it must run
+  // when nobody is signed in.
+  sweepExpired,
 } from './cached.js'
 export type { CachedReads, CacheOptions, CacheScope, Clock, FreshnessRegistry } from './cached.js'
 export type { CachedEntry, LocalCache } from './cache-store.js'

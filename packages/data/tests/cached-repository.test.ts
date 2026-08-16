@@ -290,6 +290,73 @@ describe('the caching decorator', () => {
     expect(purges).toEqual([])
   })
 
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════════════════
+   * **THE UNPARSEABLE STAMP — THE THIRD PROPERTY THE FIX-2 BRANCH NAMES, AND THE ONE NOTHING
+   * EXECUTED** (FIX-201, FIX-202).
+   *
+   * `cached.ts` lists three load-bearing properties of that branch and this is the third: *"an
+   * unparseable stamp is deleted too"*. Every other test in this file takes its stamp from the
+   * double's clock, which always produces a valid ISO string — so `isFresh`'s `Number.isNaN`
+   * guard, and the deletion that now follows it, were reachable by no test at all.
+   *
+   * **It is the one route by which an entry can be permanently unreadable AND permanently
+   * retained**, which is the exact retention hole FIX-201 exists to close, and it is reachable
+   * in production from a corrupted or hand-edited IndexedDB record.
+   *
+   * It also guards a plausible simplification. `isFresh` reduced to
+   * `now - retrieved <= CACHE_LIFETIME_MS` is `false` for `NaN` **by accident** — `NaN` compares
+   * false with everything — so the first half of this test would go on passing while the entry
+   * silently became one that is never served and never deleted. That is a tidy-up nobody would
+   * think to argue for, which is why the stamp is seeded rather than written.
+   * ═══════════════════════════════════════════════════════════════════════════════════════
+   */
+  it('DELETES an entry whose stamp cannot be parsed, not merely refuses to serve it (FIX-201)', async () => {
+    const nowMs = Date.parse('2026-09-14T09:00:00.000Z')
+    const { store, entries, purges, removals } = memoryStore(() => nowMs)
+
+    const { repository } = repositoryThat({
+      listSaved: async () => {
+        throw new OfflineError('Loading your saved sessions')
+      },
+    })
+
+    // Seeded **directly into the backing map**, bypassing `store.write` — which is the only way
+    // to produce this entry, because `write` stamps from the clock and the clock cannot lie in
+    // this shape. A device gets here through a corrupted record, not through this decorator.
+    entries.set(cacheKey('ada', 'summit', 'saved'), {
+      payload: ['a session the attendee saved'],
+      retrievedAt: 'not-a-date',
+    })
+
+    const subject = cached(repository, store, { attendeeId: 'ada' }, READS, { now: () => nowMs })
+
+    // FIX-202 — **the caller's outcome is unchanged.** An entry whose age cannot be established
+    // fails towards "nothing cached", which is the direction that cannot leak: the worst outcome
+    // is a request the attendee would have made anyway.
+    await expect(
+      subject.listSaved('summit'),
+      'An entry with an unparseable stamp was SERVED. Its age cannot be established, so nothing ' +
+        'can say it is inside the lifetime — and the lifetime is the only thing that revokes ' +
+        'access offline (FR-221).',
+    ).rejects.toBeInstanceOf(OfflineError)
+
+    expect(
+      entries.has(cacheKey('ada', 'summit', 'saved')),
+      'An entry with an unparseable stamp was left on the device. It can never be served again ' +
+        'and nothing else will ever reach it, so it is the one entry that is both permanently ' +
+        'unreadable and permanently retained — retention with no possible benefit, which is the ' +
+        'hole FIX-201 exists to close.',
+    ).toBe(false)
+
+    expect(removals).toEqual([cacheKey('ada', 'summit', 'saved')])
+    expect(
+      purges,
+      'The unparseable-stamp branch reached for `purge`. That is a prefix match and would take ' +
+        "this conference's other entries, which may still be fresh and still readable (FIX-203).",
+    ).toEqual([])
+  })
+
   it('PURGES a conference when the server REFUSES (FR-221)', async () => {
     const { store, entries } = memoryStore()
     let refuse = false

@@ -43,10 +43,15 @@ export interface LocalCache {
   /**
    * Every key held under this prefix, in no defined order (FIX-3, constitution v5.4.0 R1).
    *
-   * The read-side mirror of `purge`. **The decorator does not call it** — it is the composition
-   * root's, which is where FIX-303 puts the erasure of a conference the attendee has left. It
-   * is declared here because this file is `@mynet/platform`'s structural counterpart and the
-   * two shapes must stay identical; see `cache-store.ts`'s header for why there are two.
+   * The read-side mirror of `purge`. Two callers, neither of them a repository: the composition
+   * root's erasure of a conference the attendee has left (FIX-303), and `sweepExpired` in
+   * `cached.ts`, which enumerates the whole store because the entries it must delete belong to
+   * an attendee the device can no longer identify (review finding I1).
+   *
+   * It is declared here because this file is the structural counterpart of
+   * `packages/platform/src/interfaces/local-cache.ts` and the two shapes must stay identical;
+   * **the header at the top of THIS file explains why there are two**, and the platform-side
+   * declaration carries the long argument for these members.
    */
   keys(keyPrefix: string): Promise<readonly string[]>
 }

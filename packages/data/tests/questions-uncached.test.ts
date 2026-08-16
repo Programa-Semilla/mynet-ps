@@ -112,6 +112,24 @@ describe('the questions repository and the conference cache', () => {
     // ───────────────────────────────────────────────────────────────────────────────────────
     expect(recorder.purges, 'a Q&A write purged the conference cache').toEqual([])
 
+    // ───────────────────────────────────────────────────────────────────────────────────────
+    // **The store gained a second destructive verb, and this file must check both.** FIX-2 added
+    // `remove` — an exact-key delete — and a file whose whole claim is that this repository
+    // reaches the store through **none** of its verbs would be checking one of two if it looked
+    // only at `purges`. Wrapped in `cached`, an expired read would call `store.remove` and the
+    // prefix list would still be empty.
+    //
+    // This repository is undecorated precisely so it can touch the store by neither verb: there
+    // is no Proxy to intercept a call, no `reads` map to classify against, and no store
+    // reference for it to reach at all.
+    // ───────────────────────────────────────────────────────────────────────────────────────
+    expect(
+      recorder.removals,
+      'a Q&A action deleted a cached entry by exact key. This repository is undecorated so that ' +
+        'it can touch the store by neither verb — `purge` nor `remove` — and a removal here ' +
+        'means the decorator has been reintroduced, taking 008’s write-branch purge with it.',
+    ).toEqual([])
+
     expect(recorder.entries.get(cacheKey('ada', 'event-summit', 'programme'))).toEqual([
       'a session',
     ])
@@ -173,6 +191,17 @@ describe('the questions repository and the conference cache', () => {
       'the decorator no longer purges on a write — the risk this feature avoids has changed ' +
         'shape, and the reasoning at the composition root needs revisiting',
     ).toBeGreaterThan(0)
+
+    // The counter-example names the verb as well as the fact, so the pair of empty assertions in
+    // the first test cannot both go quietly vacuous. If the write branch ever reached for
+    // `remove` instead, `purges` above would stop being the thing that catches a decorated
+    // questions repository — and this is where that change announces itself.
+    expect(
+      recorder.removals,
+      'the decorator’s write branch now deletes by exact key rather than purging the conference ' +
+        'prefix. That is a different guarantee from the one the first test asserts the absence ' +
+        'of, and both halves of that assertion need re-reading against it.',
+    ).toEqual([])
     expect(
       recorder.entries.get(cacheKey('ada', 'event-summit', 'programme')),
       'the decorator purged a prefix that did not reach the cached programme — the key shape ' +

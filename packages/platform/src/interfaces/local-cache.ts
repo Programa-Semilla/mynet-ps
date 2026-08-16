@@ -56,7 +56,26 @@
  * denormalised counters: it is a second source of truth for something the rows already answer,
  * and the copy that drifted would be the one deciding whether somebody's withdrawn conference
  * survives on their phone.
+ *
+ * **A THIRD MEMBER WAS CONSIDERED AND REJECTED, AND IT IS THE ONE SOMEBODY WILL PROPOSE NEXT.**
+ * `sweep(olderThanMs)` — delete everything older than an age, in one cursor pass — is cheaper
+ * than the read-then-`remove` loop `cached.ts`'s `sweepExpired` runs, and it was rejected
+ * because it would move the *judgement* into every implementation of this interface: parsing
+ * `retrievedAt`, comparing it, and deciding what an unparseable stamp means. That is precisely
+ * what the paragraph above forbids — the age rule is expressed **once**, in `packages/data`, so
+ * that a native implementation cannot disagree with the web one about when access is revoked
+ * offline. Two implementations of a comparison is two answers to that question.
  * ═════════════════════════════════════════════════════════════════════════════════════════
+ *
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ * **THE SHAPE DECLARED HERE IS MIRRORED, MEMBER FOR MEMBER, IN
+ * `packages/data/src/http/cache-store.ts`** — the caching decorator's structural copy. Neither
+ * package may import the other (both are leaves; the composition root is the only module that
+ * knows about both), so the two files are kept identical by hand and reconciled by
+ * `apps/web/src/app/services.ts`, which stops compiling if they diverge. **A member added here
+ * must be added there in the same change**, with its documentation: that file carries the
+ * shape, this one carries the argument.
+ * ─────────────────────────────────────────────────────────────────────────────────────────
  */
 
 /** A cached payload and the moment it was retrieved from the server. */
@@ -98,9 +117,10 @@ export interface LocalCache {
   /**
    * Removes the entry stored under **exactly** this key. A key holding nothing is not an error.
    *
-   * The narrow counterpart to `purge`, and the narrowness is the requirement (FIX-203): the
-   * caller here has established that *one* entry has aged out, and its neighbours under the
-   * same conference may still be fresh and still readable. `purge` cannot express that — it
+   * The narrow counterpart to `purge`, and the narrowness is the requirement (FIX-203): both
+   * callers have established that *one* entry has aged out — the decorator's expiry branch for
+   * an entry somebody read, the retention sweep for one nobody will — and its neighbours under
+   * the same conference may still be fresh and still readable. `purge` cannot express that: it
    * selects every key the argument is a prefix of.
    *
    * **Fails silently, like every other member**, for the reason stated at the top of the web
@@ -113,8 +133,15 @@ export interface LocalCache {
    * Every key currently stored whose own key begins with this prefix, in no defined order.
    *
    * The read-side mirror of `purge`, selecting on the same boundary. It answers "what does this
-   * device still hold for this attendee" — the question that has no other source, because the
-   * store outlives every process that wrote to it.
+   * device still hold" — the question that has no other source, because the store outlives every
+   * process that wrote to it.
+   *
+   * **The prefix does not have to name an attendee, and one caller deliberately does not name
+   * one.** The retention sweep (review finding I1) enumerates the whole grammar, because the
+   * entries it exists to delete belong to attendees this device can no longer identify — the
+   * account was deleted elsewhere, or a session ended and was never re-established. A member
+   * that could only be asked about a signed-in attendee would be unable to reach exactly the
+   * bytes that outlive everybody.
    *
    * **It returns keys, never payloads.** A caller deciding what to discard needs to know what
    * exists and nothing more, and handing back the entries would put other people's conference

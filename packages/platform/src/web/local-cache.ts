@@ -183,6 +183,11 @@ export class WebLocalCache implements LocalCache {
    * Answers `[]` on any failure, which is the direction that cannot destroy anything — see the
    * interface. A store that reported keys it could not really see would have the caller purging
    * conferences on the strength of a failed read.
+   *
+   * **One caller asks for the whole grammar rather than one attendee's slice** — the retention
+   * sweep (review finding I1), which must reach entries belonging to an attendee this device can
+   * no longer identify. The cursor is bounded either way, so a broad prefix costs a longer scan
+   * and nothing else; it is a `readonly` transaction on a fire-and-forget startup path.
    * ───────────────────────────────────────────────────────────────────────────────────────
    */
   async keys(keyPrefix: string): Promise<readonly string[]> {

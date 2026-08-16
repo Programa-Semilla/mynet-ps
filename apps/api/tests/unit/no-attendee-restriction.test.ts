@@ -1,8 +1,8 @@
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath, URL } from 'node:url'
 
-import type { RouteOptions } from 'fastify'
+import type { HTTPMethods, RouteOptions } from 'fastify'
 import { beforeAll, describe, expect, it } from 'vitest'
 
 import { buildApp } from '../../src/app.js'
@@ -102,6 +102,38 @@ const writeLabelsOf = (route: RouteOptions): string[] =>
   methodsOf(route)
     .filter((method) => !READ_METHODS.has(method))
     .map((method) => `${method} ${route.url}`)
+
+/**
+ * **The population, selected by prefix — and the prefix is a convention, not a mechanism.**
+ *
+ * `apps/api/src/routes/admin/index.ts` registers its nine plugins with **no `{ prefix: '/admin' }`
+ * option**: every URL is a hand-written literal inside each module. So this expression is the same
+ * dependency on a naming convention that FIX-101 removed one level down — an administrative write
+ * registered at a URL not beginning with `/admin` is not *permitted* by the enumeration below, it
+ * is **invisible to it**, and the enumeration is what register entry 22 now rests on.
+ *
+ * It is kept — a prefix is how the product is actually organised, and re-deriving the population
+ * from something else would be inventing a second convention. What is added is a guard: the last
+ * assertion in this file reads the nine modules and fails if any route literal escapes the prefix,
+ * so a route that would disappear from this population fails a test instead.
+ */
+const ADMIN_PREFIX = /^\/admin(\/|$)/
+
+const adminRoutesOf = (routes: readonly RouteOptions[]): RouteOptions[] =>
+  routes.filter((route) => ADMIN_PREFIX.test(route.url))
+
+/**
+ * A route object with the two fields this file reads, for driving the derivation from a **table**
+ * rather than from the routes that happen to exist (FIX-104).
+ *
+ * The tables below hand these to `unlistedWrites`, so the stage that was blind in the old shape —
+ * turning a route tree into a set of labels — is the stage the tables exercise.
+ */
+const synthetic = (method: HTTPMethods, url: string): RouteOptions => ({
+  method,
+  url,
+  handler: async () => undefined,
+})
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════════════════════
@@ -387,43 +419,80 @@ const unlisted = (labels: readonly string[]): string[] =>
   labels.filter((label) => !(label in PERMITTED)).sort()
 
 /**
+ * ═════════════════════════════════════════════════════════════════════════════════════════════
+ * **THE WHOLE DERIVATION, AS ONE NAMED FUNCTION — BECAUSE THE DERIVATION IS THE STAGE THAT WAS
+ * BLIND** (FIX-104).
+ *
+ * The old shape did not fail because `label in PERMITTED` was wrong; it failed because the label
+ * set handed to it had already had the interesting route removed. A table that calls `unlisted`
+ * with pre-formed label strings therefore exercises the half that was never broken, and leaves
+ * `routes → labels` covered by nothing but the routes of the day — which is the exact condition
+ * FIX-104 exists to remove.
+ *
+ * So `filter`, `writeLabelsOf` and `unlisted` are composed here, the live assertion calls this,
+ * and **both tables below drive this with synthetic route objects**. Re-introducing a URL filter
+ * at any stage — `routes.filter((r) => !/registrations/.test(r.url))` is the natural one — now
+ * fails the forbidden table rather than passing green.
+ * ═════════════════════════════════════════════════════════════════════════════════════════════
+ */
+const adminWriteLabels = (routes: readonly RouteOptions[]): string[] =>
+  adminRoutesOf(routes).flatMap(writeLabelsOf).sort()
+
+const unlistedWrites = (routes: readonly RouteOptions[]): string[] =>
+  unlisted(adminWriteLabels(routes))
+
+/**
  * **The pre-filter that made the old shape blind**, kept as a literal so the failure it caused is
  * demonstrable rather than described (FIX-104).
  *
- * Nothing in the assertions uses it. It exists so the test below can show, side by side, that a
- * registration-ending route walks straight past it and is caught by the shape that replaced it.
+ * **No enumeration filters on it — that is what FIX-101 removed, and removing it is the fix.** It
+ * survives as the *subject* of two assertions rather than as a step in any of them: one selects the
+ * permitted writes whose URL happens to name an attendee or an organizer and pins that set at two,
+ * and one asserts that the forbidden routes below do **not** match it, which is what makes the
+ * blindness demonstrable side by side rather than described in prose.
+ *
+ * **The first of those is deliberately weaker than it reads**, and that is the reason it is not the
+ * guard: it can only speak about routes whose URL contains one of these two words, so a permitted
+ * route named `.../registrations/:id` would satisfy it by never being selected. **The enumeration
+ * is what covers routes whose URL names neither word**, and this regular expression must never be
+ * moved back in front of it.
  */
 const NAME_MATCHING_PREFILTER = /attendee|organizers?/i
 
 /**
  * Routes this product must never register, written down **as a table rather than discovered from
- * the route tree** (FIX-104).
+ * the route tree** (FIX-104), and driven through `unlistedWrites` as synthetic routes so the
+ * derivation is what the table exercises.
  *
  * `missedByName` records whether the retired pre-filter would have examined the route at all. The
  * four that it would not are the whole reason this file changed: **every one of them ends
  * somebody's access without the URL ever saying so.**
  */
 const FORBIDDEN: readonly {
-  readonly label: string
+  readonly method: HTTPMethods
+  readonly url: string
   readonly missedByName: boolean
   readonly note: string
 }[] = [
   {
-    label: 'DELETE /admin/conferences/:eventId/registrations/:id',
+    method: 'DELETE',
+    url: '/admin/conferences/:eventId/registrations/:id',
     missedByName: true,
     note:
       'Ends a registration. This is the exact shape R1 names, and the ground register entry ' +
       '22 was closed on is that it does not exist.',
   },
   {
-    label: 'POST /admin/conferences/:eventId/registrations/:id/removal',
+    method: 'POST',
+    url: '/admin/conferences/:eventId/registrations/:id/removal',
     missedByName: true,
     note:
       'The same act spelled as a sub-resource, which is how this codebase already names ' +
       'deactivation and retirement — so it is the likelier of the two, not the exotic one.',
   },
   {
-    label: 'DELETE /admin/conferences/:eventId/enrolments/:id',
+    method: 'DELETE',
+    url: '/admin/conferences/:eventId/enrolments/:id',
     missedByName: true,
     note:
       'Releases somebody’s held place. An enrolment is not engagement (decision 51), but ' +
@@ -431,21 +500,24 @@ const FORBIDDEN: readonly {
       'person’s place away.',
   },
   {
-    label: 'DELETE /admin/conferences/:eventId/participants/:id',
+    method: 'DELETE',
+    url: '/admin/conferences/:eventId/participants/:id',
     missedByName: true,
     note:
       'The same act under a third noun. The vocabulary is unbounded, which is why the ' +
       'assertion enumerates what is permitted instead of guessing what is not.',
   },
   {
-    label: 'DELETE /admin/attendees/:attendeeId',
+    method: 'DELETE',
+    url: '/admin/attendees/:attendeeId',
     missedByName: false,
     note:
       'Removal on somebody’s behalf. Erasure is the attendee’s OWN right (decision 12) and ' +
       'is never conditional (v4.1.0).',
   },
   {
-    label: 'POST /admin/attendees/:attendeeId/suspension',
+    method: 'POST',
+    url: '/admin/attendees/:attendeeId/suspension',
     missedByName: false,
     note:
       'Suspension — a power with its own governance, none of which is decided. Register ' +
@@ -454,13 +526,16 @@ const FORBIDDEN: readonly {
 ]
 
 describe('014 — an operator acts on content, never on a person (FR-1041)', () => {
+  /** Every route the application registers, unfiltered — the input the derivation takes. */
+  let registered: RouteOptions[]
   let admin: RouteOptions[]
 
   beforeAll(async () => {
     const routes: RouteOptions[] = []
     const app = await buildApp({ onRoute: (route) => routes.push(route) })
     await app.close()
-    admin = routes.filter((route) => /^\/admin(\/|$)/.test(route.url))
+    registered = routes
+    admin = adminRoutesOf(routes)
   })
 
   it('found administrative routes to audit', () => {
@@ -508,15 +583,24 @@ describe('014 — an operator acts on content, never on a person (FR-1041)', () 
    *
    * There is no URL filter here now. Method only — and `HEAD` is a read, for the reason given at
    * `READ_METHODS`.
+   *
+   * **It runs the same `unlistedWrites` the tables below drive**, taking the *unfiltered* route
+   * list, so selecting the population is part of what the tables exercise rather than a stage
+   * reachable only by the routes that happen to exist (FIX-104).
    * ═══════════════════════════════════════════════════════════════════════════════════════════
    */
   it('names EVERY administrative write and what it acts on — a new one fails by existing (FR-1041)', () => {
-    const writes = admin.flatMap(writeLabelsOf).sort()
+    const writes = adminWriteLabels(registered)
 
     // A gate that cannot fail is not a gate. If `buildApp` stopped registering the administrative
     // plugins, or the `/admin` prefix moved, the comparison below would pass vacuously against an
     // empty set while checking nothing — the same case `deletion-coverage` and the route audits
     // each guard for.
+    //
+    // It is a floor rather than the tripwire, and deliberately so: a floor cannot catch a filter
+    // that removes SOME routes. Two other assertions do that — every entry in PERMITTED must still
+    // be found in this derived set, and the forbidden table must still come back flagged from it —
+    // so a partial filter fails 39 named comparisons rather than one count.
     expect(
       writes.length,
       'No administrative writes were found at all. Either the routes moved off the `/admin` ' +
@@ -525,7 +609,7 @@ describe('014 — an operator acts on content, never on a person (FR-1041)', () 
     ).toBeGreaterThan(20)
 
     expect(
-      unlisted(writes),
+      unlistedWrites(registered),
       'An administrative write is registered that this file has never been told about.\n\n' +
         'Every non-GET route under /admin must appear in PERMITTED, with what it acts on: ' +
         'CONTENT (a conference, track, room, speaker, session, reported question or vocabulary ' +
@@ -554,22 +638,31 @@ describe('014 — an operator acts on content, never on a person (FR-1041)', () 
   })
 
   /**
-   * **The two writes whose subject is an attendee, stated by name.**
+   * **The two permitted writes whose URL NAMES an attendee or an organizer, stated by name.**
    *
    * The assertion above covers the concept; this one keeps 014's original claim readable. Both
    * act on AUTHORITY — what somebody may *do* — and neither changes what they *are* or whether
    * they may use MyNet at all. A third entry here is a governance change, not a route addition.
+   *
+   * **Its title says "URL names" rather than "subject is" because its selector cannot reach the
+   * stronger claim.** It selects with `NAME_MATCHING_PREFILTER`, so a permitted write acting on a
+   * person under a URL saying neither word — `.../registrations/:id` — would satisfy it by never
+   * being selected. That is the blindness FIX-101 removed from the enumeration, kept here where it
+   * is harmless because the enumeration above already covers the whole population. Do not restate
+   * the title as a claim about subjects: it would be a sentence this test cannot support.
    */
-  it('permits exactly two writes whose subject is an attendee, both acting on AUTHORITY (FR-1041)', () => {
+  it('permits exactly two writes whose URL NAMES an attendee or organizer, both acting on AUTHORITY (FR-1041)', () => {
     const naming = Object.keys(PERMITTED)
       .filter((label) => NAME_MATCHING_PREFILTER.test(urlOf(label)))
       .sort()
 
     expect(
       naming,
-      'An administrative write names an attendee outside promotion and demotion. Those two act ' +
-        'on AUTHORITY, and 013 built nothing that acts on the person; 014 adds authoring, which ' +
-        'acts on content (FR-1041).',
+      'A permitted administrative write names an attendee or an organizer in its URL outside ' +
+        'promotion and demotion. Those two act on AUTHORITY, and 013 built nothing that acts on ' +
+        'the person; 014 adds authoring, which acts on content (FR-1041). Note this selects on ' +
+        'the URL alone — a route acting on a person under a neutral name is caught by the ' +
+        'enumeration above, not here.',
     ).toEqual([
       'DELETE /admin/conferences/:eventId/organizers/:attendeeId',
       'POST /admin/conferences/:eventId/organizers',
@@ -578,7 +671,7 @@ describe('014 — an operator acts on content, never on a person (FR-1041)', () 
     for (const label of naming) {
       expect(
         PERMITTED[label]?.acts,
-        `${label} is a write whose subject is an attendee and it is not classified as acting on ` +
+        `${label} names an attendee or an organizer and it is not classified as acting on ` +
           'AUTHORITY. Promotion and demotion are the only two, and reclassifying one is how a ' +
           'power over the person would enter wearing a familiar label.',
       ).toBe('authority')
@@ -592,15 +685,26 @@ describe('014 — an operator acts on content, never on a person (FR-1041)', () 
    * A guard exercised only by today's routes stops guarding when they change. 009 recorded this
    * about the event audit's conference-content predicate and fixed it the same way: a written
    * table of paths that must still be caught, checked on every run.
+   *
+   * **Every case below is handed to `unlistedWrites` as a synthetic ROUTE, never as a pre-formed
+   * label.** A table calling `unlisted('DELETE /admin/…/registrations/:id')` directly would prove
+   * only that a string absent from an object literal is reported absent — while the stage that was
+   * actually blind, turning routes into labels, went on being covered by the routes of the day.
+   * Driven this way, re-introducing a URL filter anywhere in the derivation fails here.
    * ───────────────────────────────────────────────────────────────────────────────────────────
    */
   it('flags an act on a person’s access whatever the route is called (FIX-104)', () => {
-    for (const { label, note } of FORBIDDEN) {
+    for (const { method, url, note } of FORBIDDEN) {
+      const label = `${method} ${url}`
+
       expect(
-        unlisted([label]),
+        unlistedWrites([synthetic(method, url)]),
         `${label} was not flagged. ${note}\n\nIf this assertion has started passing because the ` +
           'route was added to PERMITTED, that is the failure — the allow-list is for content and ' +
-          'authority, and this is neither.',
+          'authority, and this is neither. If it has started passing because the derivation ' +
+          'stopped producing a label for it — a filter on the URL, or on the `/admin` prefix ' +
+          'this route carries — that is the ORIGINAL failure returning, and the route is now ' +
+          'invisible rather than permitted.',
       ).toEqual([label])
     }
   })
@@ -614,39 +718,83 @@ describe('014 — an operator acts on content, never on a person (FR-1041)', () 
         'no longer demonstrates why the shape changed.',
     ).toBeGreaterThan(2)
 
-    for (const { label, note } of missed) {
+    for (const { method, url, note } of missed) {
+      const label = `${method} ${url}`
+
       expect(
-        NAME_MATCHING_PREFILTER.test(urlOf(label)),
+        NAME_MATCHING_PREFILTER.test(url),
         `${label} matches /attendee|organizers?/i, so it is not an example of the blindness this ` +
           'test records. Move it to the `missedByName: false` half of the table.',
       ).toBe(false)
 
       expect(
-        unlisted([label]),
+        unlistedWrites([synthetic(method, url)]),
         `${label} names no attendee and no organizer, so the retired pre-filter removed it ` +
           `before the enumeration ever saw it — and it passed all four assertions green. ${note}`,
       ).toEqual([label])
     }
   })
 
-  it('does not flag the content and authority writes this product legitimately has (FIX-104)', () => {
-    // Literal strings, deliberately: if one of these routes is renamed this test fails alongside
-    // the enumeration, which forces the rename to be re-justified rather than absorbed.
-    const legitimate = [
-      'POST /admin/conferences',
-      'PATCH /admin/conferences/:eventId',
-      'POST /admin/conferences/:eventId/sessions',
-      'POST /admin/conferences/:eventId/sessions/:id/cancel',
-      'DELETE /admin/conferences/:eventId/sessions/:id',
-      'POST /admin/conferences/:eventId/organizers',
-      'DELETE /admin/conferences/:eventId/organizers/:attendeeId',
-      'DELETE /admin/questions/:questionId',
-      'PATCH /admin/vocabulary/interests/:id',
-      'PUT /admin/session/credential',
-    ]
+  /**
+   * **The method filter is the only filter, and this pins that it is a filter on the METHOD.**
+   *
+   * `READ_METHODS` is what keeps twelve `HEAD` mirrors out of the allow-list, and it is the one
+   * exclusion FIX-101 permits. Stated against the *most* forbidden URL in the file: asked for as a
+   * read it is out of scope for this assertion entirely, asked for as a write it is flagged. If
+   * somebody ever narrows the population by URL again and reaches for `READ_METHODS` as the
+   * precedent, this is the difference.
+   */
+  it('excludes reads by METHOD and not by URL, on the same forbidden path (FIX-101)', () => {
+    const url = '/admin/conferences/:eventId/registrations/:id'
 
     expect(
-      unlisted(legitimate),
+      unlistedWrites([synthetic('GET', url), synthetic('HEAD', url)]),
+      'A GET or HEAD under /admin was reported as an unlisted write. Reads are excluded so the ' +
+        'allow-list stays the list of every way an administrator CHANGES something; if this is ' +
+        'failing, the method filter has moved rather than the URL rule.',
+    ).toEqual([])
+
+    expect(
+      unlistedWrites([synthetic('DELETE', url)]),
+      'The SAME url is not flagged when it arrives as a DELETE, which means something other than ' +
+        'the method excluded it — a URL filter has been re-introduced into the derivation, and ' +
+        'that is precisely what FIX-101 removed.',
+    ).toEqual([`DELETE ${url}`])
+  })
+
+  it('does not flag the content and authority writes this product legitimately has (FIX-104)', () => {
+    // Literal strings, deliberately: if one of these routes is renamed this test fails alongside
+    // the enumeration, which forces the rename to be re-justified rather than absorbed. Handed to
+    // the derivation as routes, like the forbidden table, so "flags nothing" cannot be satisfied
+    // by a derivation that produces nothing.
+    const legitimate: readonly { readonly method: HTTPMethods; readonly url: string }[] = [
+      { method: 'POST', url: '/admin/conferences' },
+      { method: 'PATCH', url: '/admin/conferences/:eventId' },
+      { method: 'POST', url: '/admin/conferences/:eventId/sessions' },
+      { method: 'POST', url: '/admin/conferences/:eventId/sessions/:id/cancel' },
+      { method: 'DELETE', url: '/admin/conferences/:eventId/sessions/:id' },
+      { method: 'POST', url: '/admin/conferences/:eventId/organizers' },
+      { method: 'DELETE', url: '/admin/conferences/:eventId/organizers/:attendeeId' },
+      { method: 'DELETE', url: '/admin/questions/:questionId' },
+      { method: 'PATCH', url: '/admin/vocabulary/interests/:id' },
+      { method: 'PUT', url: '/admin/session/credential' },
+    ]
+
+    const routes = legitimate.map(({ method, url }) => synthetic(method, url))
+
+    // The half that stops this being a tautology: the derivation must have PRODUCED a label for
+    // every one of them. Without this, a filter that removed them all would satisfy the assertion
+    // below by handing it an empty set — an over-flagging guard and a blind one look identical
+    // once the comparison is against `[]`.
+    expect(
+      adminWriteLabels(routes),
+      'The derivation did not produce a label for every legitimate write it was given. It has ' +
+        'started dropping administrative routes before they reach the allow-list, which is how a ' +
+        'route becomes invisible to this file rather than permitted by it.',
+    ).toEqual(legitimate.map(({ method, url }) => `${method} ${url}`).sort())
+
+    expect(
+      unlistedWrites(routes),
       'A guard that flags everything is as useless as one that flags nothing, and it is the ' +
         'shape a widened guard decays into: the next author weakens it until it stops ' +
         'complaining. These are authoring, moderation, promotion, demotion and the operator’s ' +
@@ -676,16 +824,110 @@ describe('014 — an operator acts on content, never on a person (FR-1041)', () 
    * the route audits about paths, for the same reason.
    */
   it('keeps every permitted entry pointing at a route that is still registered (FIX-102)', () => {
-    const registered = new Set(admin.flatMap(writeLabelsOf))
+    // Through the same named derivation, deliberately: this is the assertion that turns a
+    // partially-blind derivation into 39 named failures rather than a count that still clears its
+    // floor. A filter dropping `registrations` alone would leave the floor green and this red.
+    const derived = new Set(adminWriteLabels(registered))
 
     for (const label of Object.keys(PERMITTED)) {
       expect(
-        registered,
+        derived,
         `${label} is permitted here but is no longer registered. Remove the entry in the change ` +
           'that removed the route, so a later route reusing the name does not inherit an ' +
           'exemption nobody granted it.',
       ).toContain(label)
     }
+  })
+
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════════════════════
+   * **THE POPULATION IS SELECTED BY A NAMING CONVENTION, AND THIS IS THE ASSERTION THAT MAKES IT
+   * ONE.**
+   *
+   * Everything above enumerates *the routes beginning `/admin`*. FIX-101 removed a URL filter one
+   * level down and this is the same dependency one level up: `routes/admin/index.ts` registers its
+   * plugins with **no `{ prefix: '/admin' }` option**, so each URL is a hand-written literal inside
+   * each module and nothing makes the prefix true. An administrative write registered at
+   * `/conferences/:eventId/registrations/:id` would not be *permitted* by the enumeration — it
+   * would be **absent from the population the enumeration reads**, and register entry 22's only
+   * evidence would disappear in a green build, which is exactly the failure this branch exists to
+   * correct.
+   *
+   * So the convention is asserted rather than assumed. Three claims, and each one closes a
+   * different way out:
+   *
+   *   - **Every route literal in every module begins `/admin/`** — a route escaping the prefix
+   *     fails here rather than vanishing.
+   *   - **The literals found in source are exactly the URLs the application registered** — which is
+   *     what stops a parsing failure passing as an empty, compliant set, and stops an
+   *     administrative route being registered from a module this scan never reads.
+   *   - **`index.ts` composes siblings of this directory and every sibling is composed** — so a
+   *     tenth module fails by existing, and a plugin pulled in from elsewhere fails by not being
+   *     one.
+   * ═══════════════════════════════════════════════════════════════════════════════════════════
+   */
+  it('registers every administrative route under the /admin prefix it is selected by (FIX-101)', () => {
+    const adminDir = join(apiSrc, 'routes', 'admin')
+    const modules = readdirSync(adminDir)
+      .filter((file) => file.endsWith('.ts') && file !== 'index.ts')
+      .sort()
+
+    const composed = [...codeOnly(join(adminDir, 'index.ts')).matchAll(/from\s+'([^']+)'/g)]
+      .map((match) => match[1] ?? '')
+      .filter((specifier) => specifier.startsWith('.'))
+
+    expect(
+      composed.filter((specifier) => !/^\.\/[a-z-]+\.js$/.test(specifier)).sort(),
+      'The administrative route group composes a plugin from outside its own directory. The scan ' +
+        'below reads this directory, so a plugin registered from anywhere else declares routes ' +
+        'nothing in this file has ever looked at.',
+    ).toEqual([])
+
+    expect(
+      composed.map((specifier) => specifier.replace(/^\.\//, '').replace(/\.js$/, '.ts')).sort(),
+      'The modules in src/routes/admin/ and the modules index.ts composes are not the same set. ' +
+        'A module in this directory that nothing registers is dead code; a module registered ' +
+        'from elsewhere is routes this scan cannot see.',
+    ).toEqual(modules)
+
+    const declared = modules.flatMap((file) =>
+      [
+        ...codeOnly(join(adminDir, file)).matchAll(
+          /\bapp\.(get|post|put|patch|delete)\s*\(\s*'([^']*)'/g,
+        ),
+      ].map((match) => ({ file, url: match[2] ?? '' })),
+    )
+
+    // The parse must have found something, or the two assertions below are vacuous — the same
+    // floor the enumeration carries, for the same reason.
+    expect(
+      declared.length,
+      'No route literals were found in src/routes/admin/ at all. Either the registration shape ' +
+        'changed — `app.route({ … })`, a template literal, a constant — or this scan has stopped ' +
+        'reading the modules, and either way it is now asserting nothing about the prefix.',
+    ).toBeGreaterThanOrEqual(Object.keys(PERMITTED).length)
+
+    expect(
+      declared
+        .filter(({ url }) => !url.startsWith('/admin/'))
+        .map(({ file, url }) => `${file}: ${url}`),
+      'An administrative route is registered at a URL that does not begin with /admin/. Every ' +
+        'assertion in this file selects its population with that prefix, and this route is not ' +
+        'permitted by them — it is INVISIBLE to them. **Register entry 22 was closed as accepted ' +
+        'on the single ground that no third party can end a registration, and this file is the ' +
+        'only thing in the codebase that says so**; a route outside the prefix removes that ' +
+        'evidence while every test stays green. Register it under /admin/, or — if the group is ' +
+        'genuinely moving — change the prefix here and in ADMIN_PREFIX in the same commit, ' +
+        'deliberately.',
+    ).toEqual([])
+
+    expect(
+      [...new Set(declared.map(({ url }) => url))].sort(),
+      'The route URLs written in src/routes/admin/ and the administrative URLs the application ' +
+        'actually registered are not the same set. Either a route is registered in a form this ' +
+        'scan cannot read — so the prefix claim above covers less than it appears to — or an ' +
+        'administrative route is registered from a module outside this directory.',
+    ).toEqual([...new Set(admin.map((route) => route.url))].sort())
   })
 
   it('writes no attendee row from the authoring surface (FR-1041)', () => {

@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+
 import { describe, expect, it } from 'vitest'
 
 import { cacheKey, type CachedEntry, type LocalCache } from '@mynet/data/http'
@@ -189,5 +192,80 @@ describe('erasing a conference absent from a live registered list', () => {
 
     await expect(events.listRegistered()).resolves.toEqual([])
     expect(entries.size).toBe(11)
+  })
+})
+
+/**
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ * **FIX-305'S OTHER HALF: THE HELPER ABOVE IS ONLY A FIX IF IT IS WIRED IN.**
+ *
+ * Every assertion above imports `erasingWithdrawnConferences` directly, and it has to — the
+ * cold-start case cannot be reached through `createServices()`, which builds a real
+ * `HttpClient` and a real `WebLocalCache` that stores nothing outside a browser. The price of
+ * that is exact and has to be paid separately: **delete the wrapper from the composition root,
+ * leave `events: new HttpEventsRepository(http)` bare, and every test in this file still
+ * passes** — FIX-301 and FIX-305 unmet in the shipped product, on a fully green build. The
+ * helper's own header says it is exported *"only so that FIX-305 can be a real test"*, so its
+ * single production call site is precisely the thing those tests cannot see.
+ *
+ * So this reads the composition root as **text**, which is `messages-absences.test.ts`'s idiom
+ * for the inverse claim — that `conversations` and `messages` are constructed **bare**. That
+ * guard has existed since 016; its mirror for `events` was never written.
+ *
+ * **Comments are stripped first.** The paragraphs in `services.ts` that explain this wiring name
+ * the helper repeatedly, and a check its own justification could satisfy is one that goes on
+ * passing after the wiring is deleted and the prose is left behind — 016's finding that a check
+ * whose subject is prose is brightest exactly where it is blindest, read from the other end.
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ */
+const compositionRoot = (): string =>
+  readFileSync(join(import.meta.dirname, '../../src/app/services.ts'), 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/^\s*\/\/.*$/gm, '')
+
+describe('the composition root wires the erasure this feature depends on', () => {
+  it('finds the composition root to read — a gate that cannot fail is not a gate', () => {
+    expect(compositionRoot()).toContain('export const createServices')
+  })
+
+  it('WRAPS the events repository in `erasingWithdrawnConferences` (FIX-301, FIX-305)', () => {
+    // ───────────────────────────────────────────────────────────────────────────────────────
+    // Whitespace-tolerant **across** the call, because prettier is free to break the three
+    // arguments onto their own lines the moment anything about that line grows — and still
+    // specific enough that the bare construction cannot satisfy it, because between `events:`
+    // and `new HttpEventsRepository(` the bare form has nothing at all where this requires the
+    // wrapper's name and its opening parenthesis.
+    // ───────────────────────────────────────────────────────────────────────────────────────
+    expect(
+      /events:\s*erasingWithdrawnConferences\(\s*new HttpEventsRepository\(\s*http\s*\)/.test(
+        compositionRoot(),
+      ),
+      'The events repository is no longer wrapped in `erasingWithdrawnConferences` at the ' +
+        'composition root. Every other assertion in this file imports that helper directly, so ' +
+        'all of them stay green while FIX-301 and FIX-305 are unmet in the shipped product. ' +
+        '**The erasure is the only mechanism that reaches a device which never issues a refused ' +
+        'read**: `GET /workspace/active-event` answers an attendee registered for nothing with ' +
+        '204, every conference-scoped read is gated behind that resolving to `ready`, and no ' +
+        'route carries an `:eventId`, so after a cold start nothing addresses the withdrawn ' +
+        'conference again and the decorator’s purge-on-refusal never fires. An unwrapped ' +
+        '`events` member therefore leaves the withdrawn conference’s programme, saved set and ' +
+        'notes on the device with nothing left to remove them — silently reopening the cache ' +
+        'residue register entry 22 was closed over, in a fully passing build.',
+    ).toBe(true)
+  })
+
+  it('constructs NO bare events repository at the composition root', () => {
+    // The negative half of the pair, exactly as `messages-absences.test.ts` writes it: one
+    // assertion requires the shape that must be there, one refuses the shape that must not.
+    // Removing the wrapper fails both, which is the point of writing them separately.
+    expect(
+      /events:\s*new\s+Http[A-Za-z]*Repository\(/.test(compositionRoot()),
+      'The events repository is constructed bare at the composition root. `listRegistered()` is ' +
+        'the one call in the client that learns the authoritative set of conferences, and it is ' +
+        'the only read a cold-started device makes that names them at all — undecorated, live, ' +
+        'and therefore trustworthy. Constructed bare it erases nothing, and a conference the ' +
+        'attendee has left survives on that device until something reads it, which on that ' +
+        'device nothing will (FIX-301, register entry 22).',
+    ).toBe(false)
   })
 })

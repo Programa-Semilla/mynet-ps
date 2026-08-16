@@ -24,6 +24,7 @@ import {
   HttpSessionNotesRepository,
   HttpVocabularyRepository,
   heldConferences,
+  sweepExpired,
   type CacheScope,
   type LocalCache,
 } from '@mynet/data/http'
@@ -90,6 +91,30 @@ export const createServices = (): PlatformServices => {
   // callers opt into.
   // ─────────────────────────────────────────────────────────────────────────────────────────
   const store: LocalCache = new WebLocalCache()
+
+  // ─────────────────────────────────────────────────────────────────────────────────────────
+  // **Review finding I1 — the one deletion that does not depend on who is signed in.**
+  //
+  // Every other purge in this file names an attendee: sign-out, account deletion and withdrawal
+  // all take `identity.current()`, and the decorator's expiry branch only ever sees an entry
+  // somebody read. **The device the retention fix was written for is the one where none of those
+  // ever happen again** — the account was deleted elsewhere, or a session ended and was never
+  // re-established, so the client renders signed-out, issues no conference-scoped read and
+  // resolves no identity. Its programme, saved set and **notes** would sit in IndexedDB forever.
+  //
+  // So this fires here, before anything is wired, reading nothing but a stamp and a clock. It is
+  // **not** the mechanism constitution v5.4.0 R1 rejects: R1 refuses to purge on an authorization
+  // refusal, because that means classifying why a session ended, and an idle timeout is
+  // indistinguishable from a deleted account at that call site. This classifies nothing and
+  // deletes only entries FIX-201 has already declared unreadable by any caller.
+  //
+  // **Fire-and-forget, with an explicit catch, so it can never affect rendering.** Every
+  // `LocalCache` member fails towards "nothing there" rather than throwing, so the `catch` should
+  // be unreachable — it is written anyway because a substituted store is not bound by that
+  // contract, and a retention sweep must not be able to blank the application.
+  // ─────────────────────────────────────────────────────────────────────────────────────────
+  void sweepExpired(store).catch(() => undefined)
+
   const identity = attendeeIdentity()
   // Written by the decorators as they serve reads, read by the staleness stamp (FR-216).
   const freshness = createFreshnessRegistry()
@@ -616,8 +641,31 @@ const purgingIdentity = (
  * array.**
  *
  * The erasure runs **after** the answer is in hand and before it is handed on, so a caller
- * cannot observe a half-erased device — and a store failure fails the read rather than silently
- * skipping the erasure, which is the direction that gets noticed.
+ * cannot observe a half-erased device.
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ *
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ * **A STORE FAILURE SKIPS THE ERASURE AND THE READ SUCCEEDS ANYWAY** (review finding M3).
+ *
+ * This paragraph used to claim the opposite — *"a store failure fails the read rather than
+ * silently skipping the erasure, which is the direction that gets noticed"* — and **no store
+ * failure could fail the read**. `WebLocalCache.keys()` resolves `[]` on every failure path and
+ * `purge()` resolves on every failure path, so the sentence described behaviour that does not
+ * occur, in a change whose own FIX-304 exists to correct exactly that. It is corrected rather
+ * than deleted, because the claim it made was also the wrong *design*:
+ *
+ *   - `LocalCache`'s declared contract is that a store which cannot be read answers as an empty
+ *     one, on the ground that failing towards "there is nothing to delete" is the direction that
+ *     **cannot destroy a working offline copy**. A caller that turned those answers into a
+ *     rejection would be contradicting the interface one file over.
+ *   - The read this wraps is `listRegistered()`, and `EventSwitcher` renders it **in the shell,
+ *     on every destination**. Letting a storage fault — private browsing, a quota, a corrupt
+ *     database — reject that read would blank the conference switcher for a reason with nothing
+ *     to do with the network, in the one product whose offline behaviour is a stated feature.
+ *
+ * So the erasure is wrapped and its failure swallowed: the answer is never harmed by the store.
+ * What is lost is one opportunity to erase, and the next successful `listRegistered()` takes it
+ * — this read runs on every online Home load.
  * ─────────────────────────────────────────────────────────────────────────────────────────
  *
  * **Delegates its one method explicitly rather than spreading**, for the reason stated at length
@@ -635,6 +683,27 @@ export const erasingWithdrawnConferences = (
   scope: { current: () => string },
 ): PlatformServices['repositories']['events'] => ({
   listRegistered: async () => {
+    // ─────────────────────────────────────────────────────────────────────────────────────
+    // **IDENTITY IS READ ON BOTH SIDES OF THE AWAIT, AND BOTH READINGS ARE NEEDED** (review
+    // finding M1).
+    //
+    // Reading it only *after* is what shipped, and it is stale by construction: the answer
+    // being erased against was requested by whoever was signed in when the request left. On a
+    // shared device — a phone lent at a conference, a kiosk — somebody can sign out and
+    // somebody else sign in while it is in flight, and **attendee A's registered list would
+    // then decide which of attendee B's conferences are erased.** The `anonymous` guard below
+    // does not cover it: that catches "not resolved yet", not "resolved to somebody else".
+    //
+    // Reading it only *before* would break the case FIX-3 exists for. On a cold start the scope
+    // still says `anonymous` when this read is dispatched and resolves while it is in flight —
+    // which is the normal path, not an edge, because `getCurrent()` and this call race on every
+    // load. Refusing to act on that would leave the cold-start device permanently un-erased.
+    //
+    // So: act when the identity is the same at both ends, and when it only *became* real; skip
+    // when it moved between two real identities, which is the one combination that would erase
+    // the wrong person's conferences.
+    // ─────────────────────────────────────────────────────────────────────────────────────
+    const requestedAs = scope.current()
     const registered = await events.listRegistered()
     const attendeeId = scope.current()
 
@@ -643,15 +712,22 @@ export const erasingWithdrawnConferences = (
     // needs a session, and a session would have answered `getCurrent` first. Erasing under a
     // guessed identity is the one way this could reach another attendee's content.
     if (attendeeId === 'anonymous') return registered
+    if (requestedAs !== 'anonymous' && requestedAs !== attendeeId) return registered
 
-    const stillRegistered = new Set(registered.map((event) => event.id))
-    const held = heldConferences(attendeeId, await store.keys(attendeePrefix(attendeeId)))
+    try {
+      const stillRegistered = new Set(registered.map((event) => event.id))
+      const held = heldConferences(attendeeId, await store.keys(attendeePrefix(attendeeId)))
 
-    for (const eventId of held) {
-      // The **whole** conference prefix, unlike FIX-2's single key: this conference is gone
-      // rather than aged, so its programme, tracks, saved set, notes and appointments all go
-      // together — the same thing a refusal does, arriving by the route that actually happens.
-      if (!stillRegistered.has(eventId)) await store.purge(conferencePrefix(attendeeId, eventId))
+      for (const eventId of held) {
+        // The **whole** conference prefix, unlike FIX-2's single key: this conference is gone
+        // rather than aged, so its programme, tracks, saved set, notes and appointments all go
+        // together — the same thing a refusal does, arriving by the route that actually happens.
+        if (!stillRegistered.has(eventId)) await store.purge(conferencePrefix(attendeeId, eventId))
+      }
+    } catch {
+      // Swallowed deliberately — see the header. The store's own contract is to fail towards
+      // "nothing there"; a store that rejects instead must not be able to convert a successful
+      // network read into a rejection on a surface that renders everywhere.
     }
 
     return registered
