@@ -95,6 +95,36 @@ const toBase64Url = (buffer: ArrayBuffer): string => {
  */
 const WORKER_READY_TIMEOUT_MS = 3_000
 
+/**
+ * T016 (012) — whether a push subscription could exist at all on this device (FR-1145).
+ *
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ * **WITHOUT GRANTED PERMISSION THERE IS NO SUBSCRIPTION, AND ASKING THE PUSH SERVICE ANYWAY
+ * DEADLOCKED AN ENTIRE ENGINE.**
+ *
+ * The invariant comes first, because it is what makes the guard a no-op everywhere it does not
+ * matter: a push subscription cannot outlive notification permission. Subscribing requires the
+ * permission (`userVisibleOnly: true`), and revoking it discards the subscription — which is the
+ * fact `NotificationPrompt`'s ENDPOINT_KEY exists to work around. So when permission is not
+ * `'granted'`, `pushManager.getSubscription()` can only ever answer `null`, and consulting
+ * `Notification.permission` instead returns the same answer without touching the push machinery.
+ *
+ * **Touching the push machinery is what this exists to avoid.** On WebKit builds with no push
+ * service behind them — Playwright's WPE build is the measured case — `getSubscription()` wedges
+ * the WebProcess main thread: the promise never settles, and moments later the page stops
+ * executing anything at all. Every in-flight fetch response becomes undeliverable, which is how
+ * this surfaced as *"`GET /conversations` is issued and never answered"* (research R5): the
+ * request was fine, and the page it would have answered was dead. It presented as a Messages
+ * defect only because `NotificationPrompt` lives in Messages and is the sole caller of this API.
+ *
+ * `subscribe()` has always carried this exact gate. The asymmetry — reads unguarded, the write
+ * guarded — was the defect, because the reconcile-on-mount path runs the *read* on every visit
+ * to Messages while the write waits for a button press.
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ */
+const subscriptionPossible = (): boolean =>
+  typeof Notification !== 'undefined' && Notification.permission === 'granted'
+
 /** The service worker this browser has registered, or `null` where there is none. */
 const registration = async (): Promise<ServiceWorkerRegistration | null> => {
   if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return null
@@ -236,6 +266,11 @@ export class WebNotificationService implements NotificationService {
 
   /** Surrender this browser's registration (FR-556). Idempotent. */
   async unsubscribe(): Promise<void> {
+    // No permission means the browser already discarded the subscription — there is nothing left
+    // to surrender, and asking the push service to confirm that is the call `subscriptionPossible`
+    // exists to avoid (FR-1145).
+    if (!subscriptionPossible()) return
+
     const worker = await registration()
     if (!worker) return
 
@@ -250,6 +285,11 @@ export class WebNotificationService implements NotificationService {
 
   /** What this browser holds, or `null`. The browser is authoritative, not the server. */
   async currentSubscription(): Promise<DeviceSubscription | null> {
+    // Answered from `Notification.permission` rather than from the push service: without granted
+    // permission the answer is `null` by invariant, and this is the read that runs on every visit
+    // to Messages — the one that deadlocked WebKit (FR-1145; see `subscriptionPossible`).
+    if (!subscriptionPossible()) return null
+
     const worker = await registration()
     if (!worker) return null
 

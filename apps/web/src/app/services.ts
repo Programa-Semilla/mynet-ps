@@ -28,6 +28,7 @@ import {
   type CacheScope,
   type LocalCache,
 } from '@mynet/data/http'
+import { NotAuthenticatedError, SessionExpiredError } from '@mynet/data'
 import type { ConnectivityService, PlatformServices } from '@mynet/platform'
 import { webDevices, WebLocalCache } from '@mynet/platform/web'
 
@@ -120,33 +121,44 @@ export const createServices = (): PlatformServices => {
   const freshness = createFreshnessRegistry()
 
   // ───────────────────────────────────────────────────────────────────────────────────────
-  // **Identity and the active conference are cached too, and they have to be.**
+  // **The active conference is cached; the identity read deliberately is NOT** (T032 — 012,
+  // FR-1140, SC-1207, decision D-012-1 in `specs/012-launch-readiness/decisions.md`).
   //
-  // FR-215 requires the active conference's programme to be readable with no connection. You
-  // cannot read *the active conference's* programme without knowing which conference is active,
-  // and you cannot key a per-attendee cache without knowing who the attendee is. Caching the
-  // programme alone produced a screen stuck on "Loading your conference…" — the cache was
-  // perfectly warm and unreachable, which an end-to-end run found and no component test could.
+  // This block used to argue the opposite — *"identity and the active conference are cached
+  // too, and they have to be"* — and cached `getCurrent` under the scope's current value,
+  // which is `anonymous` before identity resolves. **That entry was the SC-1207 disclosure**:
+  // an offline cold start presenting no credential resolved the *previous* attendee from it,
+  // adopted their identifier as the cache scope, and went on to serve their programme, saved
+  // sessions and private notes. Offline, the device owner and a stranger holding the device
+  // are indistinguishable to this client (research R3), so the entry that made the owner's
+  // cold start work was the same entry that disclosed to the stranger. It is corrected rather
+  // than deleted, because the old sentence is the one a later change would cite to bring the
+  // cache back (FR-1140a).
   //
-  // `getCurrent` is cached under the scope's *current* value, which is `anonymous` on the first
-  // call of a page load — deliberately, because that is the only value available before
-  // identity resolves, and it is therefore also the value a later offline reload will look
-  // under. Sign-out purges it explicitly alongside the attendee's own prefix.
+  // `getCurrent` is a **declared** `passThrough` — declared, never omitted: an unnamed method
+  // falls into the decorator's write branch and purges the conference prefix, which is 008's
+  // `slots` defect. `no-cached-identity.test.ts` asserts no `reads` map ever names it again.
+  // The cost is the offline cold start itself — an installed PWA launch is a fresh document,
+  // so *"arrive with no signal, read the programme"* now lands on the built signed-out
+  // degraded state (`active-event.tsx`). Owner decision, 2026-08-16. FR-215 survives for every
+  // session whose identity resolved online — which is every session except the one a stranger
+  // could replay.
   // ───────────────────────────────────────────────────────────────────────────────────────
   const attendee = identity.watching(
     cached(
       new HttpAttendeeRepository(http),
       store,
       identity.scope,
-      { getCurrent: 'self' },
-      { freshness },
+      {},
+      { freshness, passThrough: ['getCurrent'] },
     ),
   )
 
-  // Wrapped by `watching` on the *outside*, so identity is recorded whether the answer came
-  // from the server or from the cache. Decorating the other way round would mean a cache hit
-  // never told anybody who the attendee was, and every per-attendee key would fall back to
-  // `anonymous` exactly when it mattered.
+  // Wrapped by `watching` on the *outside*, so identity is recorded whenever the server
+  // answers. *(Until 012 this comment defended the arrangement by saying a cache hit had to
+  // tell somebody who the attendee was — an argument FOR the SC-1207 defect, corrected rather
+  // than deleted: a cache hit that resolves an identity is exactly what an offline stranger
+  // must never get, and since T032 no cache hit can.)*
   const activeEvent = cached(
     new HttpActiveEventRepository(http),
     store,
@@ -428,9 +440,21 @@ export const createServices = (): PlatformServices => {
  * who is signed in, and wrapping it here means the cache learns the identity at precisely the
  * moment it becomes true, with no component involved and nothing to remember.
  *
- * Until it resolves, the scope reads `anonymous` — a key nothing is ever written under while
- * signed out, because every cached read requires a session that would have answered
- * `getCurrent` first.
+ * Until it resolves, the scope reads `anonymous`. *(This paragraph used to add "a key nothing
+ * is ever written under while signed out" — written in the file that cached `getCurrent` under
+ * exactly that key, which is FR-1140a's named instance. Since T032 the identity read is
+ * `passThrough`, so the sentence is now true of identity; conference-scoped reads have always
+ * required a resolved session first.)*
+ *
+ * **And it is UN-observed on the same evidence** (T033 — 012, FR-1149): a `getCurrent` that the
+ * server answers with an authentication refusal resets the scope to `anonymous`. Before this, a
+ * session that merely *expired* left the scope resolved to the previous attendee — sign-out and
+ * deletion were the only paths that called `forget()` — so a second person signing in in the
+ * same document had their content written under the **first person's** cache prefix, where the
+ * first person's sign-out purge would never run. The classification is deliberately narrow:
+ * only `NotAuthenticatedError` and `SessionExpiredError` (the two the transport mints from
+ * `error.code`) un-resolve the scope. A network failure proves nothing about the session and
+ * must not de-scope an attendee whose tab merely lost signal.
  * ═════════════════════════════════════════════════════════════════════════════════════════
  */
 const attendeeIdentity = () => {
@@ -468,12 +492,21 @@ const attendeeIdentity = () => {
       repository: PlatformServices['repositories']['attendee'],
     ): PlatformServices['repositories']['attendee'] => ({
       getCurrent: async () => {
-        // T012 (006) — no cast. `AttendeeRepository.getCurrent` is typed here now, so the
-        // identifier this reads is the one the interface promises rather than one recovered
-        // from `unknown` (FR-496).
-        const attendee = await repository.getCurrent()
-        if (attendee?.id) attendeeId = attendee.id
-        return attendee
+        try {
+          // T012 (006) — no cast. `AttendeeRepository.getCurrent` is typed here now, so the
+          // identifier this reads is the one the interface promises rather than one recovered
+          // from `unknown` (FR-496).
+          const attendee = await repository.getCurrent()
+          if (attendee?.id) attendeeId = attendee.id
+          return attendee
+        } catch (error) {
+          // T033 (012, FR-1149) — see the header. An auth refusal un-resolves the scope; any
+          // other failure leaves it alone.
+          if (error instanceof NotAuthenticatedError || error instanceof SessionExpiredError) {
+            attendeeId = 'anonymous'
+          }
+          throw error
+        }
       },
     }),
   }
@@ -499,14 +532,26 @@ const purgingOnSignOut = (
   store: LocalCache,
   identity: { current: () => string; forget: () => void },
 ): PlatformServices['auth'] => ({
-  signIn: (credentials) => auth.signIn(credentials),
+  signIn: async (credentials) => {
+    // ─────────────────────────────────────────────────────────────────────────────────────
+    // T034 (012, FR-1149) — **this purge is NOT a fix for SC-1207, and research R3 rejected it
+    // as one**: sign-in needs a connection, and SC-1207's scenario has nobody signing in. It
+    // exists only for FR-1149's cross-prefix write: whatever a pre-012 build left under
+    // `anonymous` — the previous attendee's cached identity, name and email — must not still
+    // be on disk when a different person establishes a session in the same document. Fired
+    // before the request, like sign-out's purge: the person has asked to become somebody, and
+    // the stale bytes must not be what survives a failed attempt.
+    // ─────────────────────────────────────────────────────────────────────────────────────
+    await store.purge(attendeePrefix('anonymous'))
+    return auth.signIn(credentials)
+  },
   signOut: async () => {
     const attendeeId = identity.current()
     try {
       await store.purge(attendeePrefix(attendeeId))
-      // Identity itself is cached before the attendee is known, so it lives under the
-      // `anonymous` prefix. Leaving it behind would keep the previous attendee's name and email
-      // on a device they have just signed out of.
+      // The `anonymous` prefix too — since T032 the identity read is `passThrough` and writes
+      // nothing here, but a device that last ran a pre-012 build still holds the previous
+      // attendee's name and email under it, and sign-out is where such bytes must die.
       await store.purge(attendeePrefix('anonymous'))
     } finally {
       identity.forget()
@@ -581,8 +626,8 @@ const purgingIdentity = (
       await identity.deleteAccount()
     } finally {
       await store.purge(attendeePrefix(attendeeId))
-      // Identity is cached before the attendee is known, so it lives under `anonymous` — the
-      // same reason sign-out clears both prefixes.
+      // The `anonymous` prefix too — no longer written by this build (T032 made the identity
+      // read `passThrough`), purged for the same pre-012 leftovers sign-out clears.
       await store.purge(attendeePrefix('anonymous'))
       scope.forget()
     }

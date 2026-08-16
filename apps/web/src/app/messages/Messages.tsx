@@ -1,6 +1,6 @@
 import { OfflineError, type ConversationSummary } from '@mynet/data'
 import { useConversationRepository } from '@mynet/platform'
-import { useCallback, useId, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { Outlet, useMatch } from 'react-router'
 
 import { Loading } from '../AsyncState.js'
@@ -95,6 +95,40 @@ type ListStatus = 'loading' | 'ready' | 'offline' | 'failed'
  * ═════════════════════════════════════════════════════════════════════════════════════════
  */
 const LIST_POLL_INTERVAL_MS = 10_000
+
+/**
+ * T017 (012) — how long `Loading…` may stand before it is declared a failure (FR-1145).
+ *
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ * **THE FIRST LOAD HAS NO EFFECT OF ITS OWN, SO A READ THAT NEVER SETTLES USED TO HAVE NO
+ * ERROR PATH AT ALL.**
+ *
+ * The initial read *is* `usePoll`'s first tick, deliberately (see `usePoll`'s header) — but every
+ * path out of `loading` runs from that tick's settlement. A tick that never settles, or one that
+ * is never scheduled, left this destination at `Loading…` forever with no retry control on
+ * screen. That is not hypothetical: WebKit's push-API deadlock (research R5) held the
+ * `/conversations` response undeliverable, and the first person on Safari met an indefinite
+ * spinner with the shell rendered around it.
+ *
+ * **Honestly bounded**: that WebKit wedge froze the page's timers with everything else, so this
+ * deadline could not have fired there either — the wedge itself is fixed at its root, in
+ * `WebNotificationService`. What this closes is the rest of the class: a request that stalls
+ * while the page lives — a service-worker routing fault, a transport whose abort never fires, a
+ * poll that was never scheduled — none of which previously had any path out of `loading`.
+ *
+ * The transport already bounds the ordinary stall — `HttpClient` aborts at 20 seconds and the
+ * rejection lands here as `offline`. **This deadline is the backstop for the request that never
+ * rejects**, so it sits deliberately *past* that bound: whenever the transport's own timeout
+ * works, it wins and this timer is cleaned up unfired. A shorter deadline would race the
+ * transport and report a slow-but-working first load as failed while its response was still
+ * coming.
+ *
+ * It fires into `failed`, not `offline`, because nothing is known about connectivity — the one
+ * fact in hand is that the product did not answer, and `ConversationsFailed` owns that sentence
+ * and carries the retry control (FR-059's honest next step).
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ */
+const FIRST_LOAD_DEADLINE_MS = 25_000
 
 export const Messages = () => {
   const headingId = useId()
@@ -223,6 +257,29 @@ export const Messages = () => {
     enabled: listOnScreen,
     onTick: read,
   })
+
+  /**
+   * T017 (012) — `loading` is not allowed to be terminal (FR-1145; see FIRST_LOAD_DEADLINE_MS).
+   *
+   * Armed whenever the screen shows `Loading…` — the first load and every retry alike — and
+   * cleaned up the moment any outcome arrives, because every outcome leaves `loading`. The
+   * `settled` re-check inside the timer is not decorative: a success that lands in the same
+   * breath as the deadline must win, and `status` in this closure is stale by exactly that
+   * window — the same trap `read`'s own header records for `useConversation`.
+   *
+   * A response arriving *after* the deadline still applies normally: `read` reports its own
+   * outcome and `failed` yields to `ready`, which is strictly better than holding the failure
+   * out of pride.
+   */
+  useEffect(() => {
+    if (status !== 'loading') return
+
+    const deadline = setTimeout(() => {
+      if (!settled.current) setStatus('failed')
+    }, FIRST_LOAD_DEADLINE_MS)
+
+    return () => clearTimeout(deadline)
+  }, [status])
 
   /**
    * Reads **now**, rather than bumping a counter an effect watches.

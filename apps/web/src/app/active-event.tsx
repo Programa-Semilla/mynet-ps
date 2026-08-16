@@ -192,9 +192,15 @@ export const ActiveEventProvider = ({ children }: { children: ReactNode }) => {
      * from. That is a knowable state and it is reported as one, with the same wording an
      * offline conference read produces and with a retry that works the moment signal returns.
      *
-     * Note this is only reached when identity itself is uncached — once it has been read with
-     * a connection, `getCurrent` resolves from the cache, the attendee is signed in as far as
-     * this provider is concerned, and the agenda renders from the cache as FR-215 requires.
+     * Since 012 (T032, decision D-012-1) this is the state EVERY offline cold start reaches:
+     * identity is deliberately never cached — the entry that resolved it also resolved the
+     * previous attendee for whoever held the device (SC-1207) — so a fresh document with no
+     * connection always lands here. A session that resolved its identity online keeps FR-215's
+     * offline reading within its own document; the cold-start convenience was the price of
+     * closing the disclosure, and the trade is recorded as an owner decision. *(This paragraph
+     * used to say the opposite — that `getCurrent` resolves from the cache once read with a
+     * connection — which was the disclosure described approvingly; corrected rather than
+     * deleted, FR-1140a.)*
      * ═══════════════════════════════════════════════════════════════════════════════════════
      */
     if (authStatus === 'offline') {

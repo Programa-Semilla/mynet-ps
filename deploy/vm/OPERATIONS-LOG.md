@@ -515,3 +515,32 @@ accepted by Mailgun. **Outstanding human half**: open the inbox, confirm both li
 verification link and the reset link — then this line can be marked confirmed. This deliberately
 creates one genuine account on UAT (the walk's edge case 5: recorded, walk continues); it is the
 owner's own address and doubles as the walk's real-inbox account.
+
+## 2026-08-16 — 012 T028–T030: backups WORK on this host, off-host copy included, restore exercised
+
+**FR-1148's breach is closed, live.** In order:
+
+1. **The repaired `backup.sh` was shipped to the host** (T027's fix — `.env` read as data, never
+   sourced as shell; the RFC 5322 `MAIL_FROM` that killed `status` no longer can, and nor can any
+   future value holding a shell metacharacter). `backups/` ownership corrected
+   (root → `azureuser`); `BACKUP_DIR` was already the mounted default.
+2. **The off-host target now exists**: storage account `stmynetuatbackups` (rg-mynet-uat,
+   centralus, Standard_LRS, subscription pinned per decision 32), container `backups`, and a
+   **write-only SAS** (`sp=cw`, HTTPS-only, expires 2027-08-16) written into the VM `.env` — the
+   runbook's own design: a compromised VM can add backups and can neither read nor destroy the
+   history. *One trap recorded for the next operator: writing the SAS with `sed` corrupts it —
+   `&` in a replacement means "the whole match" — which produced an HTTP 409 until rewritten
+   literally. The literal `.env` parser in `backup.sh` handles the 5-`&` SAS correctly.*
+3. **A full run is green end to end**: dump → verified readable → off-host copy confirmed by the
+   service (Content-MD5, HTTP 201) → prune. `exit=0 success`, where every previous run on this
+   host had failed at step 0.
+4. **The schedule is installed and PROVEN to fire**: `./backup.sh install` wrote the daily 02:30
+   entry; a temporary one-minute `# mynet-backup-proof` entry was added, a scheduled run fired at
+   18:03:02Z and succeeded (artifacts 3 → 4), and the proof entry was removed. The daily entry
+   remains.
+5. **T030 — the restore, on the real host** (011's undischarged T081, paid off): the newest
+   scheduled artifact restored into a throwaway `postgres:17` container — exit 0, 40 tables,
+   counts spot-checked (attendees 4, operators 2, events 4) — then the container destroyed.
+   Walk scenarios 006/3d and 011/8 no longer fail at step 1.
+
+**Recorded by**: the 012 implementation session, 2026-08-16.

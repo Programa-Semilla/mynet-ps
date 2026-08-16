@@ -15,9 +15,17 @@ import { DESTINATIONS } from './support/destinations.js'
  * ─────────────────────────────────────────────────────────────────────────────────────────
  */
 
-/** Waits for the service worker to control the page, which is what makes the shell available. */
+/**
+ * Waits for the service worker to control the page, which is what makes the shell available.
+ *
+ * A truthiness check, never `!== null` (T022 — 012, FR-1146): on an engine with no
+ * `serviceWorker` at all, `navigator.serviceWorker?.controller` is `undefined`, and
+ * `undefined !== null` is TRUE — so the old comparison resolved instantly exactly where there
+ * was nothing to wait for, and every offline assertion downstream ran against a page no worker
+ * would serve. Wrong on Chromium too: `undefined` is also what an aborted registration yields.
+ */
 const awaitServiceWorker = async (page: Page): Promise<void> => {
-  await page.waitForFunction(() => navigator.serviceWorker?.controller !== null, null, {
+  await page.waitForFunction(() => Boolean(navigator.serviceWorker?.controller), null, {
     timeout: 20_000,
   })
 }

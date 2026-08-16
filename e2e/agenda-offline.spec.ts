@@ -26,9 +26,17 @@ const goToAgenda = async (page: Page): Promise<void> => {
   await expect(page.getByRole('heading', { level: 1, name: 'Agenda' })).toBeVisible()
 }
 
-/** Waits for the service worker, which is what makes the shell available offline at all. */
+/**
+ * Waits for the service worker, which is what makes the shell available offline at all.
+ *
+ * A truthiness check, never `!== null` (T022 — 012, FR-1146): on an engine with no
+ * `serviceWorker`, `navigator.serviceWorker?.controller` is `undefined`, and
+ * `undefined !== null` is TRUE — the old comparison resolved instantly precisely where there
+ * was nothing to wait for. Wrong on Chromium too: `undefined` is also what an aborted
+ * registration yields.
+ */
 const awaitServiceWorker = async (page: Page): Promise<void> => {
-  await page.waitForFunction(() => navigator.serviceWorker?.controller !== null, null, {
+  await page.waitForFunction(() => Boolean(navigator.serviceWorker?.controller), null, {
     timeout: 20_000,
   })
 }
@@ -60,8 +68,16 @@ const awaitServiceWorker = async (page: Page): Promise<void> => {
  * 010's precache guard arriving a third time.
  * ─────────────────────────────────────────────────────────────────────────────────────────────
  *
- * Each resolves rather than rejecting when the store is not there, because a helper that throws
- * turns a missing precondition into a stack trace instead of a legible assertion failure.
+ * ─────────────────────────────────────────────────────────────────────────────────────────────
+ * **THEY REJECT ON A STORE FAILURE, AND THAT IS A 012 CORRECTION** (T023, FR-1146). Each used to
+ * resolve an empty answer on every error path, argued as "a helper that throws turns a missing
+ * precondition into a stack trace instead of a legible assertion failure" — and the argument
+ * missed which direction the assertions point. The deletion proofs are `.not.toContain(...)`,
+ * and an error-induced `[]` satisfies them: a broken `indexedDB.open` would have reported FIX-2
+ * and FIX-3 working forever, on Chromium too. A helper whose failure mode PASSES the test it
+ * serves is the `it.skipIf` precache guard arriving again. So: a missing ENTRY is still a
+ * legible `null`/empty answer (that is a real state under test), but a store that cannot be
+ * OPENED or a transaction that ERRORS rejects with its reason.
  * ═════════════════════════════════════════════════════════════════════════════════════════════
  */
 const CACHE_DATABASE = 'mynet-cache'
@@ -71,15 +87,15 @@ const CACHE_STORE = 'entries'
 const storedKeys = (page: Page): Promise<string[]> =>
   page.evaluate(
     ([database, store]) =>
-      new Promise<string[]>((resolve) => {
+      new Promise<string[]>((resolve, reject) => {
         const open = indexedDB.open(database)
-        open.onerror = () => resolve([])
-        open.onblocked = () => resolve([])
+        open.onerror = () => reject(new Error(`could not open ${database}: ${open.error?.message}`))
+        open.onblocked = () => reject(new Error(`open of ${database} blocked`))
         open.onsuccess = () => {
           const db = open.result
           if (!db.objectStoreNames.contains(store)) {
             db.close()
-            resolve([])
+            reject(new Error(`${database} has no object store ${store}`))
             return
           }
           const request = db.transaction(store, 'readonly').objectStore(store).getAllKeys()
@@ -89,7 +105,7 @@ const storedKeys = (page: Page): Promise<string[]> =>
           }
           request.onerror = () => {
             db.close()
-            resolve([])
+            reject(new Error(`getAllKeys failed: ${request.error?.message}`))
           }
         }
       }),
@@ -100,12 +116,17 @@ const storedKeys = (page: Page): Promise<string[]> =>
 const storeEntry = (page: Page, key: string, retrievedAt: string, payload: unknown) =>
   page.evaluate(
     ({ database, store, entryKey, stamp, body }) =>
-      new Promise<void>((resolve) => {
+      new Promise<void>((resolve, reject) => {
         const open = indexedDB.open(database)
-        open.onerror = () => resolve()
-        open.onblocked = () => resolve()
+        open.onerror = () => reject(new Error(`could not open ${database}: ${open.error?.message}`))
+        open.onblocked = () => reject(new Error(`open of ${database} blocked`))
         open.onsuccess = () => {
           const db = open.result
+          if (!db.objectStoreNames.contains(store)) {
+            db.close()
+            reject(new Error(`${database} has no object store ${store}`))
+            return
+          }
           const transaction = db.transaction(store, 'readwrite')
           transaction.objectStore(store).put({ payload: body, retrievedAt: stamp }, entryKey)
           transaction.oncomplete = () => {
@@ -114,7 +135,7 @@ const storeEntry = (page: Page, key: string, retrievedAt: string, payload: unkno
           }
           transaction.onerror = () => {
             db.close()
-            resolve()
+            reject(new Error(`write of ${entryKey} failed: ${transaction.error?.message}`))
           }
         }
       }),
@@ -154,12 +175,17 @@ const storeEntry = (page: Page, key: string, retrievedAt: string, payload: unkno
 const ageOut = (page: Page, key: string, hoursAgo: number): Promise<string | null> =>
   page.evaluate(
     ({ database, store, entryKey, hours }) =>
-      new Promise<string | null>((resolve) => {
+      new Promise<string | null>((resolve, reject) => {
         const open = indexedDB.open(database)
-        open.onerror = () => resolve(null)
-        open.onblocked = () => resolve(null)
+        open.onerror = () => reject(new Error(`could not open ${database}: ${open.error?.message}`))
+        open.onblocked = () => reject(new Error(`open of ${database} blocked`))
         open.onsuccess = () => {
           const db = open.result
+          if (!db.objectStoreNames.contains(store)) {
+            db.close()
+            reject(new Error(`${database} has no object store ${store}`))
+            return
+          }
           const transaction = db.transaction(store, 'readwrite')
           const objectStore = transaction.objectStore(store)
           const read = objectStore.get(entryKey)
@@ -167,6 +193,7 @@ const ageOut = (page: Page, key: string, hoursAgo: number): Promise<string | nul
 
           read.onsuccess = () => {
             const entry = read.result as { payload: unknown } | undefined
+            // A missing ENTRY is a legible answer, not a store failure — the caller asserts on it.
             if (!entry) {
               db.close()
               resolve(null)
@@ -180,7 +207,7 @@ const ageOut = (page: Page, key: string, hoursAgo: number): Promise<string | nul
           }
           transaction.onerror = () => {
             db.close()
-            resolve(null)
+            reject(new Error(`ageing ${entryKey} failed: ${transaction.error?.message}`))
           }
         }
       }),
@@ -191,21 +218,27 @@ const ageOut = (page: Page, key: string, hoursAgo: number): Promise<string | nul
 const storedStamp = (page: Page, key: string): Promise<string | null> =>
   page.evaluate(
     ([database, store, entryKey]) =>
-      new Promise<string | null>((resolve) => {
+      new Promise<string | null>((resolve, reject) => {
         const open = indexedDB.open(database)
-        open.onerror = () => resolve(null)
-        open.onblocked = () => resolve(null)
+        open.onerror = () => reject(new Error(`could not open ${database}: ${open.error?.message}`))
+        open.onblocked = () => reject(new Error(`open of ${database} blocked`))
         open.onsuccess = () => {
           const db = open.result
+          if (!db.objectStoreNames.contains(store)) {
+            db.close()
+            reject(new Error(`${database} has no object store ${store}`))
+            return
+          }
           const request = db.transaction(store, 'readonly').objectStore(store).get(entryKey)
           request.onsuccess = () => {
             const entry = request.result as { retrievedAt?: string } | undefined
             db.close()
+            // A missing entry answers `null` — a real state the callers assert on.
             resolve(entry?.retrievedAt ?? null)
           }
           request.onerror = () => {
             db.close()
-            resolve(null)
+            reject(new Error(`reading ${entryKey} failed: ${request.error?.message}`))
           }
         }
       }),
@@ -233,7 +266,21 @@ test.describe('Agenda offline', () => {
     expect(titles.length).toBeGreaterThan(0)
 
     await context.setOffline(true)
-    await page.reload()
+    // ───────────────────────────────────────────────────────────────────────────────────────
+    // **In-app navigation, NOT a reload — restructured by 012's T035, and the boundary is the
+    // point** (FR-1140, decision D-012-1). This test used to reload here, and the reload was
+    // asserting the SC-1207 disclosure as a feature: a fresh document offline could only
+    // resolve its identity from the cached `getCurrent` entry, which is the exact entry that
+    // served the previous attendee's notes to whoever held the device. Since T032 an offline
+    // document cannot resolve an identity at all, so FR-215's surviving scope — and this
+    // test's subject — is the SESSION that resolved its identity online: navigate away and
+    // back without leaving the document, and the cached programme must still be readable.
+    // The document-boundary case now has its own test at the foot of this file, asserting the
+    // opposite outcome by design.
+    // ───────────────────────────────────────────────────────────────────────────────────────
+    await page.getByRole('link', { name: 'Home', exact: true }).first().click()
+    await expect(page.getByRole('heading', { name: `Hello, ${ADA.displayName}` })).toBeVisible()
+    await goToAgenda(page)
 
     try {
       // FR-215 — the programme is readable with no connection.
@@ -383,6 +430,12 @@ test.describe('Agenda offline', () => {
       // the attendee is in — so the message comes from that layer rather than the programme's.
       // Which layer says it is a presentation detail; that the attendee is told both halves is
       // the requirement, and that is what is asserted.
+      //
+      // Since 012's T032, the layer moved once more: an offline `goto` is a fresh document,
+      // identity itself no longer resolves offline, and the failure is the identity-offline
+      // one — which carries the same two halves by design (`active-event.tsx` reuses the
+      // wording). The requirement under test — a device-fact, never rendered as an empty
+      // programme — is unchanged, and the anti-assertion below still pins it.
       // ─────────────────────────────────────────────────────────────────────────────────────
       const failure = page.getByRole('alert').first()
       await expect(failure).toBeVisible()
@@ -568,7 +621,19 @@ test.describe('Agenda offline', () => {
         `${programme} did not keep the stamp it was given, so its expiry is not established`,
       ).toBe(stamp)
 
-      await page.reload()
+      // ─────────────────────────────────────────────────────────────────────────────────────
+      // **In-app navigation, NOT a reload — restructured by 012's T036** (FR-1140). This test
+      // used to reload here, and under T032 that would make it pass FOR THE WRONG REASON while
+      // proving nothing: an offline reload can no longer resolve an identity, so it renders
+      // the identity-offline failure — whose wording also matches the assertion below — and
+      // issues NO conference read at all, so the expired entry is never presented for the
+      // deletion this test exists to prove. Navigating within the document keeps identity
+      // resolved in memory; remounting Agenda is what issues the read that meets the expired
+      // entry, triggers FIX-2's remove, and renders the conference-layer refusal.
+      // ─────────────────────────────────────────────────────────────────────────────────────
+      await page.getByRole('link', { name: 'Home', exact: true }).first().click()
+      await expect(page.getByRole('heading', { name: `Hello, ${ADA.displayName}` })).toBeVisible()
+      await goToAgenda(page)
 
       // The surface is unchanged by the deletion (FIX-202): a connection is needed and nothing
       // is cached, which is what an expired entry has always meant. Waited for here so the
@@ -597,6 +662,79 @@ test.describe('Agenda offline', () => {
         `${key} went with the expired programme entry. That is \`purge\`'s prefix match rather ` +
           'than `remove`, and it silently costs the attendee an offline copy that was still fresh.',
       ).toContain(key)
+    }
+  })
+
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════════════════════
+   * **T038 (012) — SC-1207: AN OFFLINE COLD START PRESENTING NO CREDENTIAL DISCLOSES NOTHING.**
+   *
+   * The scenario is a device somebody else used: the previous attendee signed in, read their
+   * agenda, and walked away without signing out. Whoever holds the device next opens MyNet with
+   * no signal and no session cookie. Before T032 the client resolved the previous attendee from
+   * the cached `getCurrent` entry, adopted their identifier as the cache scope, and served their
+   * programme, saved sessions and private notes — name and all. This is the one test that
+   * crosses the document boundary on purpose, because the boundary is where the disclosure
+   * lived: jsdom has no document boundary and no service worker, which is why this cannot be a
+   * unit or component test (research R3 names the layers and why each cheaper one fails).
+   *
+   * The two traps that would make it pass vacuously, handled by name:
+   *   - **The service worker must control the page BEFORE going offline** — otherwise the
+   *     offline reload serves no application at all, nothing renders, and every "does not
+   *     disclose" assertion is true of a blank page. `awaitServiceWorker` plus the navigation
+   *     assertion below are what make the page a real one.
+   *   - **`clearCookies()` is the difference between this test and FR-215's** — with the cookie
+   *     still present the scenario is "the owner reopened their own app", which is a different
+   *     case with a different requirement. Here the credential is gone; only the bytes remain.
+   * ═══════════════════════════════════════════════════════════════════════════════════════════
+   */
+  test('an offline cold start with NO credential discloses nothing (SC-1207)', async ({
+    page,
+    context,
+  }) => {
+    await page.goto('/')
+    await signIn(page, ADA)
+    await goToAgenda(page)
+    await awaitServiceWorker(page)
+
+    // Seed the cache with real reads, and prove it: a disclosure test against an empty store
+    // asserts nothing.
+    await expect(page.getByRole('heading', { level: 3 }).first()).toBeVisible()
+    const titles = (await page.getByRole('heading', { level: 3 }).allTextContents()).map((t) =>
+      t.trim(),
+    )
+    expect(titles.length).toBeGreaterThan(0)
+    const seeded = await storedKeys(page)
+    expect(
+      seeded.some((key) => /\|programme$/.test(key)),
+      'the programme was never cached, so nothing below could disclose it and this test would pass vacuously',
+    ).toBe(true)
+
+    await context.clearCookies()
+    await context.setOffline(true)
+
+    try {
+      await page.reload()
+
+      // The page is real — the worker served the shell. Without this, a blank error page
+      // satisfies every absence below.
+      await expect(page.getByRole('navigation')).toBeVisible()
+
+      // No name, no greeting: identity must not resolve from disk (FR-1140).
+      await expect(page.getByText(ADA.displayName)).toHaveCount(0)
+      await expect(page.getByText(ADA.email)).toHaveCount(0)
+
+      // No programme: the cached conference content is keyed to an identity this document must
+      // not learn, so not one seeded session title may render.
+      for (const title of titles) {
+        await expect(page.getByRole('heading', { level: 3, name: title })).toHaveCount(0)
+      }
+
+      // No retrieval stamp either — a stamp is an admission that cached content is being served.
+      await expect(page.getByText(/last updated/i)).toHaveCount(0)
+      await expect(page.getByText(/saved on this device/i)).toHaveCount(0)
+    } finally {
+      await context.setOffline(false)
     }
   })
 })

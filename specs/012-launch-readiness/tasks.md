@@ -52,10 +52,10 @@ repository.
 
 ### Safari (FR-1145) — Messages does not load in WebKit
 
-- [ ] T015 Diagnose why `GET /conversations` is issued and never answered in WebKit. Prime suspects: `apps/web/src/sw.ts`'s fetch interception, and the cross-origin credentialed read. Every other call in the same page load returns 200; `curl` answers in 6ms
-- [ ] T016 Fix it in `apps/web/src`. **Safari users cannot open Messages today**
-- [ ] T017 Give `apps/web/src/app/messages/Messages.tsx` a failure path — it has **no first-load effect**, so a stalled request leaves the destination at `Loading…` with no way out
-- [ ] T018 Add a **repeat-safe** spec `e2e/messages-terminal.spec.ts` asserting Messages reaches a terminal state — content **or** error. Repeat-safe means read-only against the seed, no fixture writes — which is what makes it admissible to the restricted engine projects; `messages-journey.spec.ts` is one of R5's four suites that break on a second pass and **cannot** carry this assertion. T019 includes it in all three engines: FR-1145 broke in WebKit, so its assertion must run there
+- [X] T015 Diagnose why `GET /conversations` is issued and never answered in WebKit. Prime suspects: `apps/web/src/sw.ts`'s fetch interception, and the cross-origin credentialed read. Every other call in the same page load returns 200; `curl` answers in 6ms
+- [X] T016 Fix it in `apps/web/src`. **Safari users cannot open Messages today**
+- [X] T017 Give `apps/web/src/app/messages/Messages.tsx` a failure path — it has **no first-load effect**, so a stalled request leaves the destination at `Loading…` with no way out
+- [X] T018 Add a **repeat-safe** spec `e2e/messages-terminal.spec.ts` asserting Messages reaches a terminal state — content **or** error. Repeat-safe means read-only against the seed, no fixture writes — which is what makes it admissible to the restricted engine projects; `messages-journey.spec.ts` is one of R5's four suites that break on a second pass and **cannot** carry this assertion. T019 includes it in all three engines: FR-1145 broke in WebKit, so its assertion must run there
 
 ### Three browser engines (FR-1144)
 
@@ -65,8 +65,8 @@ repository.
 
 ### Gate holes (FR-1146, FR-1147)
 
-- [ ] T022 Fix the `navigator.serviceWorker?.controller !== null` waits in `e2e/offline.spec.ts` and `e2e/agenda-offline.spec.ts` — `undefined !== null` is **true**, so the wait resolves instantly. Wrong on Chromium too
-- [ ] T023 Fix the IndexedDB helpers in `e2e/agenda-offline.spec.ts` that resolve silently on error *(same file as T022 — not parallel)*
+- [X] T022 Fix the `navigator.serviceWorker?.controller !== null` waits in `e2e/offline.spec.ts` and `e2e/agenda-offline.spec.ts` — `undefined !== null` is **true**, so the wait resolves instantly. Wrong on Chromium too
+- [X] T023 Fix the IndexedDB helpers in `e2e/agenda-offline.spec.ts` that resolve silently on error *(same file as T022 — not parallel)*
 - [X] T024 Add `e2e/admin-accessibility.spec.ts` to the **`test-accessibility`** job in `.github/workflows/verify.yml`, matching the existing `test:a11y` script. It must not move into `test-e2e` — that would take an accessibility gate out of the accessibility check
 - [X] T025 Change `test-e2e`'s spec derivation in `.github/workflows/verify.yml` to recurse (`find e2e -name '*.spec.ts'`) with the accessibility exclusion re-anchored to **path** — excluding the whole `e2e/accessibility/` directory as well as the two root a11y specs. Route `e2e/accessibility/identity.spec.ts` into **`test-accessibility`** beside T024's addition, adding it to `test:a11y` in the root `package.json` — it is a pure axe suite (004's T128), and landing it in `test-e2e` would repeat exactly the mistake T024 names. Keep the emptiness guard
 - [ ] T026 Run the nine recovered tests and fix what they surface — they have never executed in CI
@@ -74,23 +74,23 @@ repository.
 ### Backups (FR-1148) — a governance breach, not a gap
 
 - [X] T027 [P] Quote `MAIL_FROM` in `deploy/vm/backup.sh` — an RFC 5322 address has its `<`/`>` parsed as shell redirection, which is why `status` dies
-- [ ] T028 Fix `backups/` ownership on the UAT host (root-owned, script runs as `azureuser`) and set `BACKUP_DIR`
-- [ ] T029 Ship T027's repaired `backup.sh` to the host first — T027 edits the repository copy and nothing else carries it there — then install the backup cron on UAT and confirm a scheduled backup actually fires
-- [ ] T030 **Exercise a restore on the real host, into a scratch database or throwaway container — never the live database**, which would undo T007's re-seed. Record it in `OPERATIONS-LOG.md`. This is 011's undischarged T081, paid off here — walk scenarios 006/3d and 011/8 fail at step 1 without it
+- [X] T028 Fix `backups/` ownership on the UAT host (root-owned, script runs as `azureuser`) and set `BACKUP_DIR`
+- [X] T029 Ship T027's repaired `backup.sh` to the host first — T027 edits the repository copy and nothing else carries it there — then install the backup cron on UAT and confirm a scheduled backup actually fires
+- [X] T030 **Exercise a restore on the real host, into a scratch database or throwaway container — never the live database**, which would undo T007's re-seed. Record it in `OPERATIONS-LOG.md`. This is 011's undischarged T081, paid off here — walk scenarios 006/3d and 011/8 fail at step 1 without it
 
 ### The offline disclosure (FR-1140, FR-1140a, FR-1149)
 
 *T031 comes FIRST. FR-1131 forbids fixing-then-recording.*
 
-- [ ] T031 **Record the decision before making the change**: closing SC-1207 narrows FR-215's field behaviour — an offline PWA cold start no longer resolves an identity. Weigh v3.0.0's and v5.0.0's precedent explicitly and state why this is MINOR rather than a retraction needing an amendment. Owner-signed, in `specs/012-launch-readiness/decisions.md` (FR-1131, FR-1140)
-- [ ] T032 Move `getCurrent` out of the cached `reads` map and into `passThrough` in `apps/web/src/app/services.ts`. **Declare it — never omit it**: an omitted method falls into the write branch, which is 008's `slots` defect
-- [ ] T033 Call `identity.forget()` on the signed-out transition in `apps/web/src/app/services.ts`, so an expired session cannot leave a second person's identity under the first person's prefix (FR-1149)
-- [ ] T034 Purge the `anonymous` prefix at sign-in in `apps/web/src/app/services.ts` — **research R3 rejected this as a fix for SC-1207** (sign-in needs a connection). It is included only for FR-1149's cross-prefix write, and the code comment must say so *(same file as T032/T033 — not parallel)*
-- [ ] T035 Restructure `e2e/agenda-offline.spec.ts:216-254` — it reloads across a document boundary and asserts the opposite of the new behaviour, so it **will fail**
-- [ ] T036 Verify the FIX-2 expiry test in `e2e/agenda-offline.spec.ts` still proves what it was written to prove — its `role=alert` now arrives from the auth-offline path, so it would keep passing for a different reason
-- [ ] T037 Correct the FR-1140a comments. **The one named in the spec is not the worst** — three load-bearing ones carry the false premise in other words, with no "anonymous" and no requirement number. One at `apps/web/src/app/services.ts:146-149` **argues for the defect**
-- [ ] T038 Add the SC-1207 e2e in `e2e/agenda-offline.spec.ts` with its seven traps handled — chiefly: await the service worker, or the offline reload serves no application and the test passes vacuously; and `clearCookies()`, the only thing distinguishing it from the test at `:216`
-- [ ] T039 [P] Add the source tripwire in `apps/web/tests/unit/` asserting `getCurrent` appears in no `reads` map, following the `messages-absences` idiom
+- [X] T031 **Record the decision before making the change**: closing SC-1207 narrows FR-215's field behaviour — an offline PWA cold start no longer resolves an identity. Weigh v3.0.0's and v5.0.0's precedent explicitly and state why this is MINOR rather than a retraction needing an amendment. Owner-signed, in `specs/012-launch-readiness/decisions.md` (FR-1131, FR-1140)
+- [X] T032 Move `getCurrent` out of the cached `reads` map and into `passThrough` in `apps/web/src/app/services.ts`. **Declare it — never omit it**: an omitted method falls into the write branch, which is 008's `slots` defect
+- [X] T033 Call `identity.forget()` on the signed-out transition in `apps/web/src/app/services.ts`, so an expired session cannot leave a second person's identity under the first person's prefix (FR-1149)
+- [X] T034 Purge the `anonymous` prefix at sign-in in `apps/web/src/app/services.ts` — **research R3 rejected this as a fix for SC-1207** (sign-in needs a connection). It is included only for FR-1149's cross-prefix write, and the code comment must say so *(same file as T032/T033 — not parallel)*
+- [X] T035 Restructure `e2e/agenda-offline.spec.ts:216-254` — it reloads across a document boundary and asserts the opposite of the new behaviour, so it **will fail**
+- [X] T036 Verify the FIX-2 expiry test in `e2e/agenda-offline.spec.ts` still proves what it was written to prove — its `role=alert` now arrives from the auth-offline path, so it would keep passing for a different reason
+- [X] T037 Correct the FR-1140a comments. **The one named in the spec is not the worst** — three load-bearing ones carry the false premise in other words, with no "anonymous" and no requirement number. One at `apps/web/src/app/services.ts:146-149` **argues for the defect**
+- [X] T038 Add the SC-1207 e2e in `e2e/agenda-offline.spec.ts` with its seven traps handled — chiefly: await the service worker, or the offline reload serves no application and the test passes vacuously; and `clearCookies()`, the only thing distinguishing it from the test at `:216`
+- [X] T039 [P] Add the source tripwire in `apps/web/tests/unit/` asserting `getCurrent` appears in no `reads` map, following the `messages-absences` idiom
 
 ### `listRegistered` completeness (FR-1141)
 
