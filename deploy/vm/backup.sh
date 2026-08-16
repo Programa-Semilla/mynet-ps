@@ -37,12 +37,35 @@ log() { printf '%s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*"; }
 load_config() {
   local file="${SCRIPT_DIR}/.env"
   [[ -f "$file" ]] || { echo "ERROR: no .env beside this script at ${file}" >&2; exit 2; }
-  set -a
-  # The directive must sit immediately before the `.` itself — on the previous line it attached
-  # to `set -a` instead and the warning stood.
-  # shellcheck source=/dev/null
-  . "$file"
-  set +a
+  # ───────────────────────────────────────────────────────────────────────────────────────────
+  # T027 (012, FR-1148) — **read `.env` as DATA, never as shell.**
+  #
+  # This used to `set -a; . "$file"`, which executes every line: an RFC 5322
+  # `MAIL_FROM=MyNet <noreply@…>` has its `<`/`>` parsed as redirections, which is precisely how
+  # `./backup.sh status` died on the UAT host while the API container read the same file happily
+  # (docker compose parses `.env` as data, not code). Filtering to this script's own keys is not
+  # enough — `BACKUP_REMOTE_CREDENTIAL` is a SAS URL whose `&` backgrounds a sourced command —
+  # so the values are assigned literally, fixing the CLASS: no `.env` value is ever evaluated.
+  # ───────────────────────────────────────────────────────────────────────────────────────────
+  local key value
+  # `|| [[ -n "$key" ]]`: `read` exits non-zero at EOF even after populating the variables, so a
+  # final line with no trailing newline would otherwise be silently dropped — and the optional
+  # keys fail towards defaults, so a last-line BACKUP_KEEP_LOCAL=30 would silently prune 23
+  # artifacts the operator meant to keep. The key is also trimmed: `KEY = value` spacing would
+  # otherwise match no case arm and be silently ignored.
+  while IFS='=' read -r key value || [[ -n "$key" ]]; do
+    key="${key%"${key##*[![:space:]]}"}" key="${key#"${key%%[![:space:]]*}"}"
+    value="${value#"${value%%[![:space:]]*}"}"
+    case "$key" in
+      POSTGRES_USER | DATABASE_NAME | BACKUP_DIR | BACKUP_KEEP_LOCAL | BACKUP_MIN_FREE_MB | \
+        BACKUP_LOG | BACKUP_REMOTE_CONTAINER | BACKUP_REMOTE_CREDENTIAL)
+        # Tolerate the quoting styles a `.env` legitimately carries; the quotes are not data.
+        value="${value%\"}" value="${value#\"}" value="${value%\'}" value="${value#\'}"
+        printf -v "$key" '%s' "$value"
+        export "${key?}"
+        ;;
+    esac
+  done <"$file"
 
   : "${POSTGRES_USER:?POSTGRES_USER must be set in .env}"
   : "${DATABASE_NAME:?DATABASE_NAME must be set in .env}"

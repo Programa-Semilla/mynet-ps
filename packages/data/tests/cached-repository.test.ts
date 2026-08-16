@@ -705,9 +705,11 @@ describe('the conferences a stored key set names', () => {
   })
 
   it('names NO conference for an event-less key', () => {
-    // `getCurrent` and `getActive` take no event argument, so the decorator keys them with an
-    // empty event segment. Read as a conference, the empty id is absent from every registered
-    // list — and the erasure would delete the attendee's own cached identity every time it ran.
+    // `getActive` takes no event argument, so the decorator keys it with an empty event
+    // segment — and pre-012 builds keyed `getCurrent` the same way, so devices still carry the
+    // legacy `self` key (since T032 the identity read is `passThrough` and writes nothing).
+    // Read as a conference, the empty id is absent from every registered list — and the
+    // erasure would delete the attendee's own event-less entries every time it ran.
     expect(heldConferences('ada', [cacheKey('ada', '', 'self')])).toEqual([])
     expect(heldConferences('ada', [cacheKey('ada', '', 'active-event')])).toEqual([])
   })

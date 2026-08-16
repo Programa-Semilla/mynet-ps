@@ -458,3 +458,89 @@ decision, not a deploy step.
 
 **Recorded by**: the session that promoted `develop` to `main` and shipped
 `fix/post-merge-verification`.
+
+## 2026-08-16 — 012 T001/T007: backups verified, operator credential issued, and NO re-seed — the environment had moved
+
+**State found** (all queried live): 40 tables, migrations current; `attendees = 3` — **exactly the
+three seeded fixtures; the 4 genuine accounts the previous entry records are already gone**;
+`operators = 2`, of which `operator@mynet.invalid` holds a **chosen** credential
+(`credential_is_initial = false`) and `second.operator@mynet.invalid` held none; `events = 4` (the
+three seeded plus an operator-authored conference named "test"); `admin_audit_entries = 5`.
+Somebody re-seeded and bootstrapped this environment after the previous entry was written and did
+not log it — inferred from the data, not witnessed.
+
+**T001 — the existing dump is not a safety net, so a fresh one was taken and verified.**
+`backups/pre-014-manual-20260816T012211Z.dump` restores cleanly (`pg_restore` exit 0 into a
+throwaway `postgres:17` container) but contains **31 of the live 40 tables** — the whole
+administrative domain (`operators`, `admin_audit_entries`, `organizer_assignments`,
+`report_resolutions`) and 014's tables are absent, so it captures a pre-013 schema and cannot
+back today's database. A fresh dump was taken and verified the same way:
+`backups/pre-012-reseed-20260816T174158Z.dump` (139K, custom format, restore exit 0, 40 tables,
+counts spot-checked: attendees 3, events 4, operators 2, audit entries 5).
+
+**T007 — executed WITHOUT the re-seed, and the reasoning is the record.** FR-1100's authorization
+to destroy rested on the owner's statement that _the 4 genuine accounts_ are disposable. Those
+accounts no longer exist; what a re-seed would destroy **today** is the owner's chosen operator
+credential (FR-993 does not survive a re-seed — see README), the authored "test" conference, and
+the 5-entry audit trail — none of which was declared disposable. FR-1100's substance (seeded
+attendee data only) is **already true**, so the destructive half was skipped rather than performed
+on a stale premise. What was performed, non-destructively:
+
+1. `pnpm admin:seed-operators` (012's additive command) from a local checkout of
+   `spec/012-launch-readiness` over the runbook's SSH tunnel — the deployed image predates the
+   command, and this is the transport T007 asks to be recorded. Outcome: **clean no-op** over an
+   operator holding a chosen credential — live proof of research R2's trap case (the pre-012
+   table-wide self-check would have thrown here) — with `attendees` unchanged at 3 (SC-1210, on
+   the real host).
+2. `docker compose run --rm api node dist/admin/bootstrap.js` on the VM with the bootstrap pair
+   set for `second.operator@mynet.invalid` → `credential-set` (FR-1101). The values were passed
+   per-invocation and are **not** in `.env`.
+3. `POST https://admin.mynet-dev.programasemilla.com/api/admin/session` with that credential →
+   **204 with the session cookie**, over real TLS at the real admin host (SC-1209). FR-992 will
+   force replacement at first sign-in; the initial credential is with the walk coordinator, not
+   in this file.
+
+**Decision 30 compliance is therefore a present fact restored by somebody else's unlogged
+re-seed, held non-destructively by this session** — and, as FR-1103 asks this log to say: it is
+restored _at a moment_ rather than guaranteed over time, because public sign-up stays open by
+design.
+
+**Recorded by**: the 012 implementation session, 2026-08-16.
+
+**T006 addendum, same session — mail sent from this host for the first time.** Sign-up
+(`POST /auth/sign-up`, 204) and reset-request (`POST /auth/reset-request`, 202, 627ms — a real
+outbound call) were issued against the live host for `danny.perez.u@gmail.com`; the API logged
+**no** `transactional mail could not be delivered` warning for either, so both messages were
+accepted by Mailgun. **Outstanding human half**: open the inbox, confirm both links resolve — the
+verification link and the reset link — then this line can be marked confirmed. This deliberately
+creates one genuine account on UAT (the walk's edge case 5: recorded, walk continues); it is the
+owner's own address and doubles as the walk's real-inbox account.
+
+## 2026-08-16 — 012 T028–T030: backups WORK on this host, off-host copy included, restore exercised
+
+**FR-1148's breach is closed, live.** In order:
+
+1. **The repaired `backup.sh` was shipped to the host** (T027's fix — `.env` read as data, never
+   sourced as shell; the RFC 5322 `MAIL_FROM` that killed `status` no longer can, and nor can any
+   future value holding a shell metacharacter). `backups/` ownership corrected
+   (root → `azureuser`); `BACKUP_DIR` was already the mounted default.
+2. **The off-host target now exists**: storage account `stmynetuatbackups` (rg-mynet-uat,
+   centralus, Standard_LRS, subscription pinned per decision 32), container `backups`, and a
+   **write-only SAS** (`sp=cw`, HTTPS-only, expires 2027-08-16) written into the VM `.env` — the
+   runbook's own design: a compromised VM can add backups and can neither read nor destroy the
+   history. _One trap recorded for the next operator: writing the SAS with `sed` corrupts it —
+   `&` in a replacement means "the whole match" — which produced an HTTP 409 until rewritten
+   literally. The literal `.env` parser in `backup.sh` handles the 5-`&` SAS correctly._
+3. **A full run is green end to end**: dump → verified readable → off-host copy confirmed by the
+   service (Content-MD5, HTTP 201) → prune. `exit=0 success`, where every previous run on this
+   host had failed at step 0.
+4. **The schedule is installed and PROVEN to fire**: `./backup.sh install` wrote the daily 02:30
+   entry; a temporary one-minute `# mynet-backup-proof` entry was added, a scheduled run fired at
+   18:03:02Z and succeeded (artifacts 3 → 4), and the proof entry was removed. The daily entry
+   remains.
+5. **T030 — the restore, on the real host** (011's undischarged T081, paid off): the newest
+   scheduled artifact restored into a throwaway `postgres:17` container — exit 0, 40 tables,
+   counts spot-checked (attendees 4, operators 2, events 4) — then the container destroyed.
+   Walk scenarios 006/3d and 011/8 no longer fail at step 1.
+
+**Recorded by**: the 012 implementation session, 2026-08-16.

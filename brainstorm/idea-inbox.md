@@ -297,24 +297,6 @@ An entry is removed once a brainstorm document has been written from it.
 
 > Two server comments describe a client flow the client cannot reach: the subsectors are delivered and can never be shown, and the empty-state text ("No subsectors of X are defined yet") is misleading when X is retired-but-held. The fix needs the choosable payload to carry the held sector's id↔label mapping (or subsector rows to carry their parent's label), which is a wire-shape change — worth a small decision rather than a quiet patch.
 
-### anonymous-prefix-not-attendee-isolated
-
-- **Source**: deep-review
-- **Date**: 2026-08-15
-- **Reference**: fix/purge-defects-restriction-guard-admin-layout
-- **Summary**: The `anonymous` cache prefix is the one part of the store that is not attendee-isolated, and an offline cold start on a lent phone can resolve the previous attendee from it, adopt their id as the cache scope, and serve their programme, saved sessions and notes with no credential presented.
-
-> Pre-existing, not introduced by the fix branch. `getCurrent` is decorated under the *current* scope, which is `anonymous` on the first call of a page load, and a cache hit **sets** `attendeeId` — so the bootstrap entry is both unscoped and load-bearing for scoping. Only explicit sign-out and account deletion clear that prefix, and neither runs when a session simply lapses. The cache key was designed with the attendee in it precisely for the lent-phone case, and this is the seam that design does not cover. The new age sweep now reaches the entry as a second layer, which bounds it to the 24-hour lifetime but is not a fix. The cheap candidate is purging the bootstrap prefix at sign-in, which is the one moment a different principal unambiguously takes over the device.
-
-### listregistered-completeness-is-load-bearing
-
-- **Source**: deep-review
-- **Date**: 2026-08-15
-- **Reference**: fix/purge-defects-restriction-guard-admin-layout
-- **Summary**: The withdrawn-conference erasure treats the `listRegistered()` payload as a complete and authoritative enumeration and destroys the stored copy of anything absent from it, and nothing anywhere enforces that completeness.
-
-> True today — the query carries no `limit`, no `offset` and no date filter. The day that endpoint gains a page size or an "upcoming only" clause, this silently deletes the offline copy of every conference not on the first page, on every Home load, with no error and no test failure, presenting as "offline mode stopped working for my older conferences" and tracing back to an API change nobody connected to a client-side cache. This codebase's standard defence against exactly this shape is `deletion-coverage`/`export-coverage`'s property — *a new column fails by existing* — and it is not applied here. Worth either an assertion that the response carries no pagination envelope, or an erasure that refuses to act when the answer is implausibly smaller than the held set.
-
 ### cache-key-grammar-wants-its-own-module
 
 - **Source**: deep-review
@@ -324,11 +306,47 @@ An entry is removed once a brainstorm document has been written from it.
 
 > The review's verdict was that `heldConferences` does not cross the line the spec drew: it is a pure function over strings, the decorator never calls it, no classification map gained a member, and the erasure lives entirely in the composition root. But the header has to spend its first paragraph explaining that a function in this file is not the mechanism the file is named after, which is a reliable signal the file is holding two things. Extracting `cacheKey`, `attendeePrefix`, `conferencePrefix` and `heldConferences` into `cache-keys.ts` would put the boundary in the module graph — nothing named `cached` would hold the parser the composition root uses — and shrink the justification to a sentence. The next reader who wants the erasure "closer to the cache" currently has a precedent-shaped foothold inside the very file FIX-303 names.
 
-### client-diagnostic-channel-undecided
+### single-passthrough-undecorated
 
 - **Source**: deep-review
-- **Date**: 2026-08-15
-- **Reference**: fix/purge-defects-restriction-guard-admin-layout
-- **Summary**: Both destructive cache paths are silent — erasing an attendee's entire offline copy of a conference and deleting an expired entry emit no log, counter or marker — so four causes with different remedies share one symptom and none is distinguishable after the fact.
+- **Date**: 2026-08-16
+- **Reference**: spec/012-launch-readiness
+- **Summary**: After T032 the attendee repository is wrapped in `cached(...)` with an empty `reads` map and its only method (`getCurrent` — AttendeeRepository has exactly one member) declared `passThrough`: the decorator is now machinery that caches nothing, purges nothing, 
 
-> "My offline conference disappeared" could be the erasure firing correctly on a genuine withdrawal, the erasure firing wrongly on a mis-parsed key or a short server list, browser storage eviction, or a clock anomaly. Not fixed in the branch deliberately: `apps/web/src` contains exactly two `console.*` calls in the whole client, both for unrecoverable faults, so adding routine logging of *successful* behaviour would be the first diagnostic logging of its kind here. Whether this product wants a client-side diagnostic channel — and if so with what retention, since the client holds personal data — is worth deciding once rather than introduced sideways by a fix branch.
+> An undecorated `identity.watching(new HttpAttendeeRepository(http))` would make SC-1207's closure structural rather than configured: re-caching identity would require re-adding the whole decorator (a large, reviewable change) instead of moving one word from `passThrough` back into `reads` — the one-word revert the tripwire test exists to catch.
+
+### ops-log-infrastructure-metadata
+
+- **Source**: deep-review
+- **Date**: 2026-08-16
+- **Reference**: spec/012-launch-readiness
+- **Summary**: The new T028–T030 entry publishes, in a world-readable repository, the off-host backup storage account name (stmynetuatbackups), resource group, container name (backups), and the SAS's permission set and expiry date (sp=cw, expires 2027-08-16); the T006 addend
+
+> The repository being public is a recorded Principle VIII threat-model fact, and this entry narrows an attacker's reconnaissance for the one asset the backup design treats as the crown jewel (the off-host history): the exact account and container to target, and how long the current write credential lives. It is runbook-style operational logging and arguably deliberate, but the disclosure is a choic
+
+### three-engine-throttle-pressure
+
+- **Source**: deep-review
+- **Date**: 2026-08-16
+- **Reference**: spec/012-launch-readiness
+- **Summary**: The firefox/webkit projects triple responsive.spec.ts's throttled side effects against the one shared seeded database in `test-e2e`. Each pass runs `seedQuestionReport` (one `question_ask` as Grace, one `report_submit` as Alan) plus a card share and a message 
+
+> Throttle counters are the one piece of cross-project shared state the repeat-safety analysis in the comment does not account for — it names duplicate names, message bodies and the question_ask throttle for the *excluded* suites, but the included sweep also spends per-identifier budgets that accumulate across engine passes within the 1-hour window. A gate that fails by throttle exhaustion in the th
+
+### ledger-not-machine-checked
+
+- **Source**: deep-review
+- **Date**: 2026-08-16
+- **Reference**: spec/012-launch-readiness
+- **Summary**: The audit machine-checks only 012's own 44 steps against walk-record.md rows. Appendix A — the SC-1202 ledger of 136 enumerated walk units, each carrying one disposition — is not parsed at all: a unit deleted from the ledger, a 'walked -> <step>' naming a step
+
+> Design observation, not a bug: the ledger's shape (unit -> disposition) is as parseable as the row table the script already handles, and cross-checking 'walked' dispositions against the step inventory the script already builds is a few lines.
+
+### reads-map-guard-escape-forms
+
+- **Source**: deep-review
+- **Date**: 2026-08-16
+- **Reference**: spec/012-launch-readiness
+- **Summary**: The reads-map detector requires a string literal after the colon (/getCurrent\s*:\s*['"]/), so it catches the direct revert ({ getCurrent: 'self' }) and — via the third test — plain omission of passThrough. It does not catch a reads entry whose value is an ide
+
+> Design observation: the likely revert forms are covered; the identifier-valued form is the one a refactor extracting resource-name constants would produce accidentally rather than maliciously, which is the way this class of guard has been defeated before (016's FR-1052 lesson about checks brightest where blindest).

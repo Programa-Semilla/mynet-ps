@@ -96,6 +96,64 @@ type ListStatus = 'loading' | 'ready' | 'offline' | 'failed'
  */
 const LIST_POLL_INTERVAL_MS = 10_000
 
+/**
+ * T017 (012) — how long `Loading…` may stand before it is declared a failure (FR-1145).
+ *
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ * **THE FIRST LOAD HAS NO EFFECT OF ITS OWN, SO A READ THAT NEVER SETTLES USED TO HAVE NO
+ * ERROR PATH AT ALL.**
+ *
+ * The initial read *is* `usePoll`'s first tick, deliberately (see `usePoll`'s header) — but every
+ * path out of `loading` runs from that tick's settlement. A tick that never settles, or one that
+ * is never scheduled, left this destination at `Loading…` forever with no retry control on
+ * screen. That is not hypothetical: WebKit's push-API deadlock (research R5) held the
+ * `/conversations` response undeliverable, and the first person on Safari met an indefinite
+ * spinner with the shell rendered around it.
+ *
+ * **Honestly bounded**: that WebKit wedge froze the page's timers with everything else, so this
+ * deadline could not have fired there either — the wedge itself is fixed at its root, in
+ * `WebNotificationService`. What this closes is the rest of the class: a request that stalls
+ * while the page lives — a service-worker routing fault, a transport whose abort never fires, a
+ * poll that was never scheduled — none of which previously had any path out of `loading`.
+ *
+ * The transport already bounds the ordinary stall — `HttpClient` aborts at 20 seconds and the
+ * rejection lands here as `offline`. **This deadline is the backstop for the request that never
+ * rejects**, so it sits deliberately *past* that bound: whenever the transport's own timeout
+ * works, it wins and this timer is cleaned up unfired. A shorter deadline would race the
+ * transport and report a slow-but-working first load as failed while its response was still
+ * coming.
+ *
+ * It fires into `failed`, not `offline`, because nothing is known about connectivity — the one
+ * fact in hand is that the product did not answer, and `ConversationsFailed` owns that sentence
+ * and carries the retry control (FR-059's honest next step).
+ *
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ * **It bounds the TICK, not the screen — and the first version got that wrong.** This shipped
+ * as a `setTimeout` effect watching `status === 'loading'`, which restored the screen and left
+ * the poll dead: `usePoll` chains ticks with `run().finally(schedule)`, so a tick whose promise
+ * never settles schedules nothing ever again — after a successful manual retry the destination
+ * read `ready` while the 10-second refresh was gone and the FR-1010 staleness notice could
+ * never appear (deep-review finding). Racing the read itself means the tick always settles: the
+ * chain continues with its ordinary backoff, a stalled *refresh* is bounded by the same clock,
+ * and a document whose poll is gated (hidden tab, `display:none` list pane) runs no tick and so
+ * can never be declared failed by a timer nobody armed.
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ */
+const READ_DEADLINE_MS = 25_000
+
+/** The read raced against the deadline above; the loser's timer is always cleaned up. */
+const bounded = <T,>(promise: Promise<T>): Promise<T> => {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const deadline = new Promise<never>((_, reject) => {
+    timer = setTimeout(
+      () => reject(new Error(`the read did not settle within ${READ_DEADLINE_MS}ms`)),
+      READ_DEADLINE_MS,
+    )
+  })
+  return Promise.race([promise, deadline]).finally(() => clearTimeout(timer)) as Promise<T>
+}
+
 export const Messages = () => {
   const headingId = useId()
   const repository = useConversationRepository()
@@ -195,7 +253,9 @@ export const Messages = () => {
     newest.current = sequence
 
     try {
-      const rows = await repository.list()
+      // `bounded`, so a request that never settles cannot wedge `usePoll`'s tick chain — see
+      // READ_DEADLINE_MS. The rejection takes the ordinary failure path below.
+      const rows = await bounded(repository.list())
       // Nothing is applied: a newer read owns the screen and will report its own outcome. The
       // sentinel tells the scheduler this tick was neither a success nor a failure.
       if (sequence !== newest.current) throw POLL_SUPERSEDED
@@ -223,6 +283,10 @@ export const Messages = () => {
     enabled: listOnScreen,
     onTick: read,
   })
+
+  // T017 (012) — `loading` is not allowed to be terminal (FR-1145). Enforced inside `read`
+  // itself — every tick is raced against READ_DEADLINE_MS — rather than by a screen-watching
+  // effect; see the constant's header for why the effect shape was retired.
 
   /**
    * Reads **now**, rather than bumping a counter an effect watches.

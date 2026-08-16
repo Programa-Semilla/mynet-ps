@@ -148,11 +148,12 @@ export const conferencePrefix = (attendeeId: string, eventId: string): string =>
  * format had two definitions and the one that fell behind would be the one deciding whether a
  * withdrawn conference survives on somebody's phone.
  *
- * **Keys naming no conference are skipped, and that is the subtle half.** `getCurrent` and
- * `getActive` take no event argument, so the decorator keys them with an empty event segment —
- * `attendee:ada|event:|self`. Reading that as a conference whose id is the empty string would
- * offer the caller a "conference" absent from every registered list, and the erasure would
- * delete the attendee's own cached identity on the first successful read.
+ * **Keys naming no conference are skipped, and that is the subtle half.** `getActive` takes no
+ * event argument, so the decorator keys it with an empty event segment —
+ * `attendee:ada|event:|active-event` (until 012's T032, `getCurrent` wrote the same shape too,
+ * and devices still carry those keys). Reading that as a conference whose id is the empty
+ * string would offer the caller a "conference" absent from every registered list, and the
+ * erasure would delete the attendee's own event-less entries on the first successful read.
  * ═════════════════════════════════════════════════════════════════════════════════════════
  */
 export const heldConferences = (attendeeId: string, keys: readonly string[]): string[] => {

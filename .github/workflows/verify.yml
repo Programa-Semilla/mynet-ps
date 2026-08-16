@@ -425,6 +425,14 @@ jobs:
       - name: brand audit
         run: node scripts/brand-audit.mjs
       # ─────────────────────────────────────────────────────────────────────────────────────
+      # T097 (012) — the walk-record audit: the machine-visible edge of the human gate. Green
+      # while the record is in progress (pending rows assert nothing); arms row by row as
+      # verdicts are recorded, and completely when walk-record.md declares itself complete. A
+      # STEP in this job, never an eleventh job — `verify`/`verify-push` hard-assert the count.
+      # ─────────────────────────────────────────────────────────────────────────────────────
+      - name: walk-record audit
+        run: node scripts/walk-record-audit.mjs
+      # ─────────────────────────────────────────────────────────────────────────────────────
       # **This artifact has no consumer today, and saying so is the honest thing.**
       #
       # A comment here previously claimed it was "the one `deploy.sh` ships". It is not:
@@ -554,7 +562,16 @@ jobs:
       # Its own container, so it applies its own migrations. The `migrations` job proves the
       # committed migrations apply cleanly; this makes this suite's database usable.
       - run: pnpm db:migrate
-      - run: pnpm exec playwright test e2e/accessibility.spec.ts
+      # T024/T025 (012, FR-1147) — **the accessibility spec list has exactly ONE home: the root
+      # `test:a11y` script, and this job runs it by name.** The first fix wrote the list here a
+      # second time with a comment demanding manual mirroring — which is the arrangement that
+      # lost the nine tests in the first place: this job named one file while the script named
+      # two, and `admin-accessibility.spec.ts` (the administrative site's only axe evidence) ran
+      # in no CI job at all, alongside `e2e/accessibility/identity.spec.ts` (5 pure-AxeBuilder
+      # tests, 004's T128, in a subdirectory the old `ls` glob could not see). A mandate to keep
+      # two lists in step is a hope; deriving one from the other is a mechanism (the deep review
+      # rewrote this from the former to the latter).
+      - run: pnpm test:a11y
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
@@ -653,7 +670,13 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm exec playwright install --with-deps chromium
+      # T021 (012, FR-1144) — all three engines, in THIS job and not a new one: `verify` and
+      # `verify-push` hard-assert a job count of 10 and say in their own error text that it must
+      # not move without an amendment. The extra engines are confined by project-level
+      # `testMatch` in `playwright.config.ts` to the repeat-safe layout sweep, so the cost is
+      # ~+2 minutes per engine, not a third full pass over one shared seeded database.
+      # `test-accessibility` stays chromium-only: its specs match no firefox/webkit project.
+      - run: pnpm exec playwright install --with-deps chromium webkit firefox
       - run: pnpm db:migrate
       # ───────────────────────────────────────────────────────────────────────────────────
       # T079 (006) — **this line NAMED FIVE SPEC FILES WHILE ITS COMMENT SAID "EVERYTHING".**
@@ -667,20 +690,40 @@ jobs:
       # That is the silent-narrowing failure this codebase warns about repeatedly, and FR-490
       # asks 006 to confirm no check was weakened — so it is fixed rather than merely observed.
       #
-      # Derived from the directory now, minus the accessibility suite, which reports as its own
-      # required check. A spec added by a later feature is covered the moment it is written, and
-      # the emptiness guard means a glob that stops matching fails loudly instead of passing
+      # Derived from the directory now, minus the accessibility suites, which report as their
+      # own required check. A spec added by a later feature is covered the moment it is written,
+      # and the emptiness guard means a glob that stops matching fails loudly instead of passing
       # with nothing to run.
       #
       # **T079's actual question is answered by the two lines above this one**: `test-e2e` runs
       # against `localhost:3000` with its own `postgres:17` service container and needs only
       # `migrations`. It never depended on the preview, so deleting the preview does not touch
       # it (research D13).
+      #
+      # T025 (012, FR-1147) — **the derivation itself then narrowed silently, the same way.**
+      #
+      # The fixed line was `ls e2e/*.spec.ts | grep -v 'accessibility\.spec\.ts$'`, and it had
+      # two holes. The `$` anchor was written to exclude `accessibility.spec.ts` and ALSO
+      # matched `admin-accessibility.spec.ts` (4 tests) — excluded here while the
+      # `test-accessibility` job named only the first file, so neither job ran it. And `ls`
+      # does not recurse, so `e2e/accessibility/identity.spec.ts` (5 tests, 004's T128) was
+      # matched by neither glob. **Nine end-to-end tests had never run in CI once**, found by
+      # 012's Phase 0 research (R5) — the second time this one derivation produced the
+      # silent-narrowing failure T079 was fixed for.
+      #
+      # Now `find` recurses, and the exclusions are anchored to PATHS rather than to a suffix:
+      # everything accessibility-shaped — the `e2e/accessibility/` directory and the two root
+      # a11y specs — belongs to `test-accessibility`, whose run line mirrors the root
+      # `test:a11y` script so the two lists cannot drift apart silently. Everything else runs
+      # here. A future accessibility suite belongs in `e2e/accessibility/` (or in `test:a11y`
+      # and the job line together); a future e2e suite anywhere under `e2e/` is covered by the
+      # `find` the moment the file exists.
       # ───────────────────────────────────────────────────────────────────────────────────
-      - name: end-to-end (every spec except the accessibility suite)
+      - name: end-to-end (every spec except the accessibility suites)
         run: |
           set -euo pipefail
-          mapfile -t SPECS < <(ls e2e/*.spec.ts | grep -v 'accessibility\.spec\.ts$')
+          mapfile -t SPECS < <(find e2e -name '*.spec.ts' | sort \
+            | grep -v -e '^e2e/accessibility/' -e '^e2e/accessibility\.spec\.ts$' -e '^e2e/admin-accessibility\.spec\.ts$')
           if [ "${#SPECS[@]}" -eq 0 ]; then
             echo "::error::No end-to-end specs matched. A gate that runs nothing is not a gate."
             exit 1
@@ -994,14 +1037,16 @@ jobs:
         run: |
           set -euo pipefail
           if [ -z "${AZURE_CREDENTIALS:-}" ]; then
-            echo "::notice::UAT deployment credentials are not configured, so there is nothing to do."
-            echo "The environment itself IS provisioned and serving — see OPERATIONS-LOG.md."
-            echo "What is missing is the automation's own credentials. To enable this job, add to"
-            echo "the 'uat' environment:"
-            echo "  * AZURE_CREDENTIALS  -- a service principal scoped to rg-mynet-uat, with"
-            echo "                          network-write on vm-mynet-uatNSG for the rule above;"
-            echo "  * DEPLOY_SSH_KEY     -- az login grants control-plane access, not shell;"
-            echo "  * SSH_KNOWN_HOSTS    -- verified out-of-band, NOT accepted on first connection."
+            echo "::notice::UAT is deployed BY HAND, by owner decision — this job is inert on purpose."
+            echo "012 decision D-012-4 (2026-08-16, T057): UAT receives builds via"
+            echo "deploy/vm/deploy.sh run by an operator, not via this job. The credential was"
+            echo "never configured — the signed-in owner is a guest in the tenant and cannot mint"
+            echo "the service principal — and rather than acquire one, the owner decided the"
+            echo "hand-deploy IS the mechanism (FR-1120a was amended to say so; 011 scenario 9"
+            echo "steps 1-4 are retired by the same decision)."
+            echo "Reactivating this job is a REVERSAL of that decision, not a configuration task:"
+            echo "record the reversal, then add AZURE_CREDENTIALS, DEPLOY_SSH_KEY and"
+            echo "SSH_KNOWN_HOSTS to the 'uat' environment as the step comments above describe."
             exit 0
           fi
           ./deploy/vm/deploy.sh uat --migrate

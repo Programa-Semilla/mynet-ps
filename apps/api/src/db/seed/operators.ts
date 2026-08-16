@@ -1,5 +1,3 @@
-import { sql } from 'drizzle-orm'
-
 import { addressTakenByOtherPrincipal } from '../../admin/identity.js'
 import type { Database } from '../client.js'
 import { adminAuditEntries } from '../schema/admin-audit.js'
@@ -27,9 +25,12 @@ import type { SeedModule } from './index.js'
  * guess into.
  *
  * A credential arrives only through `pnpm admin:bootstrap`, which reads two values from the
- * environment that **no route can reach**. That command is deliberately separate from
- * `pnpm db:seed`, which deletes every attendee and re-inserts committed passwords — giving an
- * operator a credential must not require doing that.
+ * environment that **no route can reach**. The identity it needs no longer requires a re-seed
+ * either: `pnpm admin:seed-operators` (012, FR-1102) runs `ensureOperatorIdentities` below
+ * **additively** — `onConflictDoNothing` on the address, nothing cleared, no credential created —
+ * so obtaining an operator credential destroys no attendee data. **Until 012 that separation was
+ * claimed and did not hold**: this module's insert was reachable only through `seed()`, whose
+ * first act clears every attendee, and four files asserted otherwise (FR-1102a).
  * ═════════════════════════════════════════════════════════════════════════════════════════════
  *
  * ─────────────────────────────────────────────────────────────────────────────────────────────
@@ -129,19 +130,45 @@ export const operatorSeed: SeedModule = {
    * `unassigned` needs it to be reachable at first run.
    */
   async run(db: Database): Promise<void> {
-    for (const operator of SEED_OPERATORS) {
-      // ═══════════════════════════════════════════════════════════════════════════════════════
-      // **FR-918's other half — the operator-creation side of the one cross-table uniqueness
-      // rule in the product.** `attendees.email` and `operators.email` are separate unique
-      // indexes and no constraint spans them, so this is the only place the collision can be
-      // refused when an operator is the one being created.
-      //
-      // It **throws** rather than skipping. This is the seed: a silently-absent operator would
-      // leave a database that looks seeded and has no platform tier, and the failure would
-      // surface much later as "nobody can sign in to the administrative site". FR-915's
-      // single-lookup sign-in depends on the rule holding, so breaking it is not a warning.
-      // ═══════════════════════════════════════════════════════════════════════════════════════
-      if (await addressTakenByOtherPrincipal(operator.email, 'operator', db)) {
+    await ensureOperatorIdentities(db)
+  },
+}
+
+/**
+ * T002–T003 (012) — **the additive half of the operator seed** (FR-1102, SC-1210).
+ *
+ * Inserts any `SEED_OPERATORS` identity that is absent and touches nothing else: no `clear`, no
+ * credential, no attendee row read or written. `operatorSeed.run` calls this on a database the
+ * seed has just emptied; `pnpm admin:seed-operators` calls it on a database full of attendee
+ * data, which is the whole point — obtaining an operator identity must not require destroying
+ * anything (FR-1102).
+ *
+ * `onConflictDoNothing` on the address is what makes a re-run safe on a database where the
+ * identities already exist — including one where an operator has since chosen a credential,
+ * whose row this must not touch (FR-993's spirit, one layer down).
+ */
+export const ensureOperatorIdentities = async (db: Database): Promise<void> => {
+  for (const operator of SEED_OPERATORS) {
+    // ═══════════════════════════════════════════════════════════════════════════════════════
+    // **FR-918's other half — the operator-creation side of the one cross-table uniqueness
+    // rule in the product.** `attendees.email` and `operators.email` are separate unique
+    // indexes and no constraint spans them, so this is the only place the collision can be
+    // refused when an operator is the one being created.
+    //
+    // It **throws** rather than skipping. A silently-absent operator would leave a database
+    // that looks seeded and has no platform tier, and the failure would surface much later as
+    // "nobody can sign in to the administrative site". FR-915's single-lookup sign-in depends
+    // on the rule holding, so breaking it is not a warning.
+    //
+    // **Check and insert share one transaction**, which is `addressTakenByOtherPrincipal`'s
+    // own stated precondition ("called INSIDE the caller's transaction… that is the entirety
+    // of what makes it work") — on the bare pool the pair is a read-then-write race against a
+    // concurrent attendee sign-up for the same address (deep-review finding). The window is
+    // operator-seed-vs-sign-up, so it is narrow; honouring the helper's contract costs one
+    // wrapper.
+    // ═══════════════════════════════════════════════════════════════════════════════════════
+    const inserted = await db.transaction(async (tx) => {
+      if (await addressTakenByOtherPrincipal(operator.email, 'operator', tx)) {
         throw new Error(
           `The operator seed address ${operator.email} is already registered to an attendee ` +
             '(FR-918). One address identifies at most one principal product-wide — FR-915 ' +
@@ -151,29 +178,34 @@ export const operatorSeed: SeedModule = {
         )
       }
 
-      await db.insert(operators).values({
-        email: operator.email,
-        displayName: operator.displayName,
-        // Explicit rather than omitted, so a reader sees the decision rather than a default.
-        passwordHash: null,
-        // Vacuously true — there is no credential yet. `admin:bootstrap` sets one and leaves
-        // this true until the operator replaces it themselves (FR-992).
-        credentialIsInitial: true,
-      })
-    }
+      return tx
+        .insert(operators)
+        .values({
+          email: operator.email,
+          displayName: operator.displayName,
+          // Explicit rather than omitted, so a reader sees the decision rather than a default.
+          passwordHash: null,
+          // Vacuously true — there is no credential yet. `admin:bootstrap` sets one and leaves
+          // this true until the operator replaces it themselves (FR-992).
+          credentialIsInitial: true,
+        })
+        .onConflictDoNothing({ target: operators.email })
+        .returning({ id: operators.id, passwordHash: operators.passwordHash })
+    })
 
     // A guard against the one way this seed could quietly become wrong: somebody adding a
-    // committed password above. It is checked here rather than only in a unit test because the
-    // seed is what would actually publish it.
-    const withCredentials = await db.execute<{ count: number }>(
-      sql`SELECT count(*)::int AS count FROM operators WHERE password_hash IS NOT NULL`,
-    )
-    if ((withCredentials[0]?.count ?? 0) > 0) {
+    // committed password above. **Narrowed to the rows THIS call inserted** (T003, research R2):
+    // the previous table-wide `count(*) WHERE password_hash IS NOT NULL` threw on any database
+    // where an operator had already chosen a credential — which is every database the additive
+    // command exists to serve. `returning` yields only rows the insert actually created (a
+    // conflict-skipped row comes back empty), so an existing operator's chosen credential is
+    // invisible here and a committed password in the values above still fails loudly.
+    if (inserted.some((row) => row.passwordHash !== null)) {
       throw new Error(
         'The operator seed created a usable administrative credential. This repository is ' +
           'public, so a committed administrative password is a published credential for the ' +
           'tier that reads the abuse-report queue (FR-990). Use `pnpm admin:bootstrap`.',
       )
     }
-  },
+  }
 }

@@ -1,10 +1,23 @@
 # Brainstorm Overview
 
-Last updated: 2026-08-14 — **#12 scopes tranche 2, the change that closes 014.** All three
-outstanding rows, one PR, one migration, gated on constitution **v5.3.0**. It corrects two things the
-record had wrong: the profile taxonomy was never blocked (REQ-035 supplies the sector list, and #11
-had already made the taxonomy authored data), and two of tranche 2's requirements — REQ-012 and
-REQ-014 — are **already shipped** as `sessions.summary` and `speakers`.
+Last updated: 2026-08-16 — **#14 scopes 012 and splits production out of it.** The domain is weeks
+away and `prod.env` is blank *by design* under decision 31, so keeping production inside 012 would
+have left the feature blocked on something outside the repository. **012 is Launch Readiness**, and
+its subject is the largest undischarged obligation this project has: roughly **60 by-hand scenarios**
+outstanding since 007, discharged as one consolidated script rather than seven per-feature walks.
+Two decisions ride along that 012 cannot take alone — what happens to Q&A at launch (hiding it
+retracts delivered 009 requirements, which needs an amendment) and whether the client gets a
+diagnostic channel.
+
+Previously: 2026-08-15 — **#13 closed three register entries in one sitting** and was ratified the
+same day as constitution **v5.4.0** (standing decisions 54–56). It is not a design session: it is
+research prepared so entries **27** (Q&A attribution — *"Ana R."*), **22** (the cached conference,
+accepted rather than fixed) and **4** (desktop and tablet layouts, ratified **without** a client
+acceptance act) could be answered rather than rediscovered a fourth time. It opens no entry and
+unblocks **both** remaining blocked features. Its transferable finding: **a register entry that
+enumerates its options is asserting the enumeration is complete**, and entry 27's was not — it
+offered three where six existed, and two of the missing ones dissolved the deciding case at the
+price of the cheapest listed option.
 
 Previously: 2026-08-12 — **#10 and #11 land a client feedback round that reverses two amendments
 ratified in the previous 72 hours** (v3.2.0's one-directional card, v3.3.0's Q&A attribution),
@@ -57,6 +70,8 @@ win and this is stale.
 | 10 | 2026-08-12 | app-fixes-and-install-icon | **active** — six owner items from using the running product. Two are not what they look like: mutual card exchange **reverses v3.2.0 N2**, and the new icon is a *different mark* rather than a new size. Feeds **016** | `brainstorm/10-app-fixes-and-install-icon.md` |
 | 11 | 2026-08-12 | client-feedback-programme | **active** — decomposes `assets/feedback-1.md` (118 requirements, 19 areas) into five features. **Absorbs into the administrative programme** rather than running beside it. Reverses **v3.3.0** 48 hours after ratification. Feeds **017, 014, 015, 018, 019** | `brainstorm/11-client-feedback-programme.md` |
 | 12 | 2026-08-14 | conference-content-authoring-tranche-2 | **active** — the change that **closes 014**. All three outstanding rows, as a **single PR and a single migration**, gated on **constitution v5.3.0**. Corrects the "blocked on the client's lists" framing: REQ-035 supplies the sectors and #11 already ruled the taxonomy is authored data. Finds **REQ-012 and REQ-014 already shipped** (`sessions.summary`, `speakers`) | `brainstorm/12-conference-content-authoring-tranche-2.md` |
+| 13 | 2026-08-15 | blocked-entries-decision-packets | **decided, and ratified as constitution v5.4.0** the same day — standing decisions 54–56. **Not a design session**: research prepared so entries 27, 22 and 4 could be answered in one sitting, preserved as written including where its leaning differs from what was chosen. Closes **three** entries, opens none, and unblocks **both** blocked features. Its most transferable finding: entry 27 offered three options where **six** existed, and the two missing ones cost what the cheapest listed one cost and dissolved the deciding case | `brainstorm/13-blocked-entries-decision-packets.md` |
+| 14 | 2026-08-16 | launch-readiness | **active** — scopes **012**, and **splits production out of it**: `prod.env` is blank by design under decision 31 and the domain is weeks away, so a feature carrying production would sit blocked on something outside the repository. What remains is the largest undischarged obligation in the project — roughly **60 by-hand scenarios** outstanding since 007 — discharged as **one consolidated script** rather than seven per-feature walks, because the seams between features are where both human-found defects actually lived. **Every defect found is fixed**; a finding needing a *decision* is recorded instead, because 012 ratifies nothing | `brainstorm/14-launch-readiness.md` |
 
 **There are two session 10s, and the duplicate is left in place rather than renumbered.** Both were
 held on 2026-08-12, on branches that could not see each other, and both files exist on disk under the

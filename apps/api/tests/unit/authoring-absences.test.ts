@@ -210,9 +210,10 @@ describe('014 — the count lives only in the payload (FR-1031, SC-1009)', () =>
     'auth/throttle.ts':
       "010's FailureStreak — how many consecutive failures an identifier has, which is the " +
       'delay function itself. Never leaves the server and names no session',
-    'db/seed/operators.ts':
-      'a seed self-check counting operators with a password hash, which must be zero (FR-990). ' +
-      'An assertion about committed data, not an aggregate any reader receives',
+    // `db/seed/operators.ts` held a permission here for its table-wide credential self-check.
+    // 012's T003 narrowed that check to the rows a call inserts — `returning` inspected in
+    // memory, no `count:` built — so the permission is removed rather than left to describe a
+    // count that no longer exists. This guard is what noticed, which is it working as designed.
   }
 
   /** Every file that builds a `count:`, with comments stripped and separators normalised. */
