@@ -205,7 +205,8 @@ that difference is the scheduling slack available if D4 is ever relaxed.
 | 009 | Session Q&A | 005 | `0008` | — |
 | 010 | Brand Mark and Application Icons | — | — | — |
 | 011 | UAT Deployment and Pre-Public Hardening | all | — | — |
-| 012 | Launch Readiness and Production | 011 | — *(adds no schema; `0010` stays permanently empty — see below)* | — |
+| 012 | Launch Readiness ~~and Production~~ — **production split out 2026-08-16** | 011 | — *(adds no schema; `0010` stays permanently empty — see below)* | — |
+| — | **Production deploy** — *split from 012; takes no number until it starts* | 012 + a registered domain | — | — |
 | 013 | Administrative Foundation and the Report Queue | 009 | `0009` | — |
 | 014 | Conference Content Authoring | 013 | `0011` (tranche 1) · `0012` (tranche 2, claimed at generation 2026-08-14) | — |
 | 015 | Registration and Attendee Management | 014 | *claims at generation (O4); next free on disk is `0013`* | — |
@@ -660,3 +661,35 @@ Unchanged from the constitution, and not reopened by this roadmap:
   real delivery. The prototype's notification bell must not be reproduced.
 - Capacitor and native packaging, until one of the three recorded triggers occurs.
 - Optimistic updates and conflict resolution, each of which requires its own recorded decision.
+
+---
+
+> ## Departure recorded: production split out of 012 (2026-08-16)
+>
+> **Feature 012 delivers Launch Readiness only. The production deploy is a separate phase and takes
+> no number until it starts.** Recorded here because a feature reading this roadmap must not find a
+> row that contradicts the specification — `specs/012-launch-readiness/spec.md` declares the same
+> departure, and FR-1150 obliges this annotation in the same change.
+>
+> **Why.** `deploy/vm/envs/prod.env` carries `SUBSCRIPTION=` and `APP_DOMAIN=` blank, and that is
+> standing decision 31 working as written: `mynetcr.com` was named *provisionally*, and committing
+> it before registration is forbidden **because a blank value is what keeps the deploy job's refusal
+> honest**. The owner reports registration as weeks away or uncertain. Keeping production inside 012
+> would hold a completed validation pass hostage to a domain purchase.
+>
+> **The production phase takes no number deliberately.** Reserving one would repeat the mistake
+> v5.3.0's decision 53 corrected for migration numbers: reserve-in-advance collided three times
+> because branches cannot see each other's reservations. It claims a number when it starts, and
+> extends this table in the same change.
+>
+> **What the production phase inherits and must not lose**: UAT and production MUST remain separate
+> *registrable* domains (decision 31). That is what makes a UAT session cookie structurally
+> incapable of reaching production, and it was arrived at by accident of naming rather than by
+> design.
+>
+> **What 012 gained in exchange.** Its subject is the by-hand validation backlog — **122 scenarios
+> across 13 features, roughly 72 outstanding**, spanning 001, 006, 007, 008, 009, 010, 011, 013,
+> 014 and 016. Two entries in that list are worth naming here because they are easy to miss:
+> **006's Part 3 was blocked on "there is no environment to deploy to" and 011 built that
+> environment**, so it has been walkable since and never walked; and **011's own T084 covers all
+> nine of its scenarios** and records that it was joining the backlog when it shipped.

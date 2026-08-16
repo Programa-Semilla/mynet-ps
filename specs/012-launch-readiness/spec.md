@@ -2,7 +2,7 @@
 
 **Feature Branch**: `spec/012-launch-readiness`
 **Created**: 2026-08-16
-**Status**: Draft
+**Status**: Draft (revised after spec review)
 **Constitution**: v5.4.0 (ratified 2026-08-15)
 **Brainstorm**: `brainstorm/14-launch-readiness.md`
 
@@ -18,12 +18,15 @@ honest**. The owner reports registration as weeks away or uncertain. A feature c
 would therefore sit blocked on something outside this repository, holding a completed validation
 pass hostage to a domain purchase.
 
-Constitution Principle governance requires a feature departing from the roadmap to say so in its
-specification. This is that statement, following 002's precedent when it absorbed 003.
+Constitution governance requires a feature departing from the roadmap to say so in its
+specification. This is that statement, following 002's precedent when it absorbed 003. **FR-1150
+carries the reciprocal obligation**: the roadmap's own table must be annotated in this change, on
+v5.3.0 decision 53's reasoning — a feature reading the roadmap must not find a row that contradicts
+the specification.
 
-**The production phase takes no number here.** Reserving one would repeat the mistake v5.3.0's
-decision 53 corrected for migrations — reserve-in-advance collided three times because branches
-cannot see each other's reservations.
+**The production phase takes no number here.** Reserving one would repeat the mistake decision 53
+corrected for migrations: reserve-in-advance collided three times because branches cannot see each
+other's reservations.
 
 **One constraint the production phase inherits and must not lose**: UAT and production MUST remain
 separate *registrable* domains (decision 31). That is what makes a UAT session cookie structurally
@@ -35,10 +38,28 @@ incapable of reaching production, and it was arrived at by accident of naming ra
 
 ### The problem this feature exists to solve
 
-Every feature since 007 declared a `quickstart.md` walk in its own specification and **shipped
-without completing it** — 007, 008, 009, 010, 013, 014 (both tranches) and 016. 110 scenarios exist
-across 12 features; roughly **60 are outstanding**. This is the largest undischarged obligation in
-the project and the only part no machine can do.
+Every feature since 001 that declared a by-hand walk has shipped with at least part of it
+outstanding. **The exact inventory is FR-1111's first deliverable and is deliberately not asserted
+here**, because the count is the thing most likely to be wrong: an earlier draft of this
+specification counted `## Scenario` headings, which silently excluded
+`specs/006-discover-and-deployment-platform/quickstart.md` entirely — it uses `### 2a`…`### 3e`
+sub-headings instead — and 006 is the file carrying the *deployment* walk that was blocked when it
+shipped.
+
+What is known and verified:
+
+- **122 by-hand scenarios exist across 13 features** — 109 numbered across twelve files, plus 006's
+  13 lettered sub-scenarios.
+- **Roughly 72 are outstanding by task status**, spanning at least 001, 006, 007, 008, 009, 010,
+  011, 013, 014 (both tranches) and 016.
+- **006's Part 3 was blocked on "there is no environment to deploy to"** (`tasks.md` T102). **011
+  built that environment.** It has been walkable since and has not been walked.
+- **011's own T084 says "all nine scenarios" and records that "007, 008 and 009 each shipped with
+  this outstanding"** — it knew it was joining the backlog.
+- **001's T093 is open**: verify every gate by deliberately breaking it, *"a gate that does not fail
+  when broken is not a gate"*. That principle is borrowed by FR-1127 below.
+
+This is the largest undischarged obligation in the project and the only part no machine can do.
 
 **The evidence that it matters is not theoretical.** The only two defects a human has ever found in
 this product were both **layout**, both found within minutes of somebody opening a screen, and both
@@ -55,7 +76,6 @@ things.** The pattern is consistent: real use finds what gates cannot.
 **Constitution v5.4.0 added a fresh reason to look.** Its decision 56 (R3) closed register entry 4 by
 **owner ratification without a client acceptance act** — the desktop and tablet layouts are now
 ratified as intended and **nobody has seen them**. R3 records that cost in the constitution itself.
-Walking them is how that bet gets settled.
 
 ### US1 — The attendee journey, walked end to end (Priority: P1)
 
@@ -63,16 +83,13 @@ A person signs up, joins a conference by code, and arrives at the conference hap
 inspect what is next, save sessions, discover an attendee, exchange a card, open a conversation,
 schedule a meeting, ask a question, enrol in an optional session, and read it all again offline.
 
-**Why this priority**: it is the core journey `requirements.md` names, it crosses every destination,
-and it is the path along which the seams between features live.
-
 **Acceptance scenarios**:
 1. **Given** a signed-out visitor, **When** they complete sign-up, verification and join-by-code,
    **Then** they arrive at the conference happening now, greeted by name and told which day it is in
    the venue's timezone.
-2. **Given** an attendee on the conference, **When** they walk Home → Agenda → Discover → Messages →
-   Network in one session, **Then** every destination renders its content, its empty state where
-   applicable, and no control requires horizontal scrolling at any tested width.
+2. **Given** an attendee on the conference, **When** they walk all five destinations in one session,
+   **Then** every destination renders its content and its empty state where applicable, and no
+   control requires horizontal scrolling at any tested width.
 3. **Given** two attendees in two browser profiles, **When** one shares a card, **Then** both hold
    the other's card (the mutual exchange C1 ratified), and both see it in Network.
 4. **Given** an attendee with saved sessions, notes and a meeting, **When** the device goes offline,
@@ -84,10 +101,6 @@ and it is the path along which the seams between features live.
 A promoted attendee signs into the administrative site, authors a conference, adds tracks, rooms,
 speakers and sessions, marks one optional with capacity, watches enrolment fill, cancels a session,
 and confirms the attendee side reflects every change.
-
-**Why this priority**: 014 shipped 17 scenarios and none was walked. It is also the half that
-exercises the **second notification trigger** and the changed-session marker, neither of which any
-person has seen fire.
 
 **Acceptance scenarios**:
 1. **Given** an operator credential, **When** an organizer is promoted and signs in, **Then** their
@@ -103,28 +116,72 @@ person has seen fire.
 A platform operator signs in, promotes and demotes an organizer, reads the report queue, resolves a
 report, and confirms that no route anywhere lets them act on a person.
 
-**Why this priority**: 013 shipped 12 scenarios and none was walked. It is lower than US1/US2 only
-because the operator surface is the smallest and the most heavily asserted by absence tests.
+**Acceptance scenarios**:
+1. **Given** a seeded operator identity with no credential, **When** a credential is issued,
+   **Then** the operator can sign in at `admin.<host>` and **no attendee record is destroyed**
+   (SC-1210).
+2. **Given** an operator signed into the administrative site and the same person signed into MyNet,
+   **When** they sign out of one, **Then** the other session survives — two independent sessions
+   (decision 37).
+3. **Given** a report in the queue, **When** the operator opens it, **Then** the reported content
+   and the reporter's stated reason are disclosed, `content unavailable` renders as a first-class
+   state rather than an error, and the reporter is told nothing.
+4. **Given** the administrative site, **When** every navigable surface is enumerated, **Then** no
+   route suspends, removes, restricts or edits an attendee.
 
 ### US4 — The layout pass at every band, in both products (Priority: P1)
 
-Every destination, panel and dialog is looked at on a phone, a tablet, and a desk at three widths —
-in **MyNet and the administrative site**.
+Every destination, panel and dialog is looked at on a phone, a tablet, and a desk — in **MyNet and
+the administrative site**.
 
-**Why this priority**: this is the half that has never been done at all, in a product whose approved
-prototype is a fixed 390×844 mobile frame. `apps/admin` has never been reviewed at any width, and
-its third layout was built in `fix/purge-defects-restriction-guard-admin-layout` without a human
-looking at the result.
+**Acceptance scenarios**:
+1. **Given** each of MyNet's five destinations and each of the administrative site's surfaces,
+   **When** viewed at 390, 768 and 1280, **Then** every primary action is reachable without
+   horizontal scrolling, **measured per container** (SC-1204).
+2. **Given** every modal dialog in both products, **When** opened at each width, **Then** it is
+   centred with comparable space on either side — the 008 defect class, which no behavioural test
+   could see.
+3. **Given** the administrative site, **When** viewed across the supported range, **Then** it
+   presents **three** distinct layouts, not two.
+4. **Given** the 768–1279 band, **When** both products are compared, **Then** their rails differ —
+   MyNet icon-only, administrative labelled — and **that difference is correct**, ratified by
+   v5.4.0 R3. A finding that they should match is a decision under FR-1131, not a defect.
 
 ### US5 — The physical device pass (Priority: P1)
 
-Install MyNet on a physical iPhone and a physical Android phone; judge the icon; drive notifications;
-retype the composer test with a real keyboard.
+Install MyNet on a physical iPhone and a physical Android phone; judge the icon; drive
+notifications; retype the composer test with a real keyboard.
 
-**Why this priority**: the technology stack constraint says *"test on at least one physical iPhone
-before production"*, and 016's T068 has been outstanding since it shipped. iOS is also the only
-platform where `InstallService`'s null-prompt half is real, and Android the only one where
-`beforeinstallprompt` and Web Push delivery can be exercised.
+**Acceptance scenarios**:
+1. **Given** an uninstalled iPhone, **When** the attendee follows the guidance MyNet shows,
+   **Then** installation completes using Safari's own affordance, and the sign-in screen explains
+   what installing buys before it is installed.
+2. **Given** an uninstalled Android phone, **When** the install control is offered, **Then** it is
+   presented through `beforeinstallprompt` and installation completes.
+3. **Given** both installed phones, **When** the home screen is photographed beside the in-app
+   coral mark, **Then** the difference is recorded against register entry 28 (SC-1205).
+4. **Given** an installed phone with notification permission granted, **When** an organizer changes
+   a saved session's room, **Then** a notification is delivered to that phone and activating it
+   lands on the surface carrying the per-row marker — not on a list of changes.
+5. **Given** an installed phone, **When** a 40-word message is typed with the on-screen keyboard,
+   **Then** the composer stays bounded and the send control is never occluded (016's T068).
+
+### Edge Cases
+
+- **The walker runs out of time mid-journey.** The record must show where the walk stopped, and an
+  unfinished journey is not a passed journey.
+- **A device refuses notification permission.** Denial is a complete outcome, not a degraded one
+  (decision 21); the walk must confirm the product is unchanged, not merely that nothing crashed.
+- **A defect is found in a surface 017 is scheduled to replace.** It is still a defect under
+  FR-1130; whether it is worth fixing ahead of the rebuild is a decision under FR-1131.
+- **The connection drops mid-walk.** That is a scenario, not an interruption — offline behaviour is
+  under test.
+- **A real account appears on UAT during the walk.** Public sign-up is open by design (decision 30);
+  the walk continues and the occurrence is recorded, because it is evidence about FR-1100's
+  durability.
+- **A seeded defect (FR-1127) is found by an automated gate before the walker reaches it.** Then it
+  was the wrong seed — it must be replaced with one no gate can see, which is the class the walk
+  exists for.
 
 ---
 
@@ -133,27 +190,29 @@ platform where `InstallService`'s null-prompt half is real, and Android the only
 ### Unblocking the environment (prerequisite to everything else)
 
 - **FR-1100**: UAT MUST be returned to the state standing decision 30 describes — **seeded data
-  only**. The 4 genuine accounts recorded in `deploy/vm/OPERATIONS-LOG.md` are the owner's and
-  colleagues' and are disposable.
+  only**. The 4 genuine accounts recorded in `deploy/vm/OPERATIONS-LOG.md` are disposable.
 - **FR-1101**: A platform operator credential MUST be obtainable on UAT.
 - **FR-1102**: Obtaining an operator credential MUST NOT require destroying attendee data. The
-  present coupling — `pnpm db:seed` is the only documented route and `attendeeSeed.clear` is
-  unconditional with no module argument — MUST be removed, so that the next person needing a
-  credential on an environment holding data somebody cares about is not forced to choose.
+  present coupling — `pnpm db:seed` is the only route to an operator row, and `attendeeSeed.clear`
+  is unconditional with no module argument — MUST be removed.
+- **FR-1102a**: `apps/api/src/admin/bootstrap.ts`'s header **already claims** that separating the
+  two commands means obtaining a credential does not require re-seeding. That claim is false today.
+  It MUST be made true or corrected in the same change — it is the header a reader consults before
+  reaching for `db:seed`, and this project's false-header class is why 016 needed FR-1055.
 - **FR-1103**: The re-seed and the credential issuance MUST be recorded in
   `deploy/vm/OPERATIONS-LOG.md`, including what was destroyed.
 
 ### The consolidated launch script
 
-- **FR-1110**: A single launch script MUST be produced, organised by **journey** (attendee,
-  organizer, operator) rather than by feature.
-- **FR-1111**: The script MUST be **derived** from every outstanding `quickstart.md` scenario, and
-  the derivation MUST **name every scenario it retires** and where that scenario's coverage now
-  lives. A derivation that silently drops a scenario is the risk-ranked subset this approach was
-  chosen over.
-- **FR-1112**: The script MUST cover the **seams between features** — paths that cross more than one
-  feature's surface — because that is the entire justification for consolidating, and no
-  per-feature walk can reach them.
+- **FR-1110**: A single launch script MUST be produced, organised by **journey** rather than by
+  feature.
+- **FR-1111**: The script MUST be derived from **every outstanding by-hand scenario in every
+  `specs/*/quickstart.md`**, and the inventory MUST be produced by **enumerating the task files**,
+  not by transcribing a list. The derivation MUST name every scenario it retires and where that
+  scenario's coverage now lives. **A heading-shape assumption is what hid 006 from an earlier
+  draft; the enumeration must not depend on one.**
+- **FR-1112**: The script MUST cover the **seams between features** — steps crossing more than one
+  feature's surface — because that is the entire justification for consolidating (SC-1211).
 - **FR-1113**: The script MUST cover **both products**.
 - **FR-1114**: The script MUST state, per step, what a *pass* looks like. A step whose outcome is
   "it looked fine" is not a step.
@@ -161,67 +220,105 @@ platform where `InstallService`'s null-prompt half is real, and Android the only
 ### The walk
 
 - **FR-1120**: The script MUST be walked in full by a person.
-- **FR-1121**: The walk MUST cover three widths in both products, on real viewports rather than
-  emulated ones where a physical device is available.
-- **FR-1122**: The walk MUST include a physical **iPhone** pass, discharging 016's T068: install it,
-  judge the icon against the in-app coral mark, and retype the composer test with a real keyboard.
+- **FR-1120a**: The walk MUST be performed against the **deployed UAT environment**, on the build CI
+  produced from `develop`, and the record MUST name the deployed commit. A walk against `localhost`
+  exercises no TLS, no real push service, no deployed build and no UAT marker — and would make
+  FR-1100 pointless.
+- **FR-1121**: The walk MUST cover three widths in both products **on real viewports**. Emulated
+  viewports are permitted only for a width no available device provides, and the record MUST name
+  each emulated width and why.
+- **FR-1122**: The walk MUST include a physical **iPhone** pass, discharging 016's T068.
 - **FR-1123**: The walk MUST include a physical **Android** pass, covering what iOS structurally
   cannot: `beforeinstallprompt`, the install banner, and Web Push delivery.
 - **FR-1124**: The walk MUST include a screen-reader pass over at least the five authentication
   screens and one representative destination in each product.
-- **FR-1125**: Each walked step MUST be recorded as passed or failed, with the recording durable
-  enough to be read later by somebody who was not present.
+- **FR-1125**: Each walked step MUST be recorded as passed or failed **with an observation — what
+  was actually on the screen — not a verdict alone. A step recorded only as "pass" is not
+  recorded.**
+- **FR-1126**: Every layout and install step MUST carry a **capture** — screenshot or photograph —
+  at the width or device it names, stored with the record. **Layout is the one thing no verdict can
+  convey and the one class of defect this walk exists to find.**
+- **FR-1127**: The walk MUST be seeded with **at least three deliberately introduced defects** — one
+  layout, one copy, one refusal message — introduced by somebody other than the walker, unknown to
+  them, and revealed only after the walk. **A walk that misses any of them has established nothing
+  and MUST be re-walked.** This is 001's own T093 principle — *a gate that does not fail when broken
+  is not a gate* — applied to the human gate. A seed an automated gate catches first is the wrong
+  seed and MUST be replaced.
 
 ### What the walk finds
 
-- **FR-1130**: **Every defect found MUST be fixed.** The scope of this requirement is unknowable in
-  advance and that is accepted deliberately.
-- **FR-1131**: A finding that requires a **decision** rather than a repair — a layout needing
-  redesign, anything needing a constitution amendment, anything adding a capability — MUST be
-  **recorded as a decision and not silently fixed**. This feature ratifies nothing.
-- **FR-1132**: Every fix MUST be traceable to the script step that found it, so the walk's value is
-  measurable rather than asserted.
+- **FR-1130**: **Every defect found MUST be fixed.** The scope is unknowable in advance and that is
+  accepted deliberately.
+- **FR-1131**: A finding requiring a **decision** rather than a repair — a layout needing redesign,
+  anything needing an amendment, anything adding a capability — MUST be **recorded as a decision and
+  not silently fixed**. This feature ratifies nothing.
+- **FR-1132**: Every fix MUST be traceable to the script step that found it.
 - **FR-1133**: A defect fixed MUST have the step that found it re-walked.
 
 ### Pre-launch hygiene
 
-- **FR-1140**: The `anonymous` cache prefix MUST NOT be able to serve one attendee's content to
-  another. An offline cold start currently resolves the previous attendee from the unscoped
-  bootstrap entry, adopts their identifier as the cache scope, and serves their programme, saved
-  sessions and **private notes** with **no credential presented**.
+- **FR-1140**: The `anonymous` cache entry — the one part of the cache **not scoped by attendee** —
+  MUST NOT be able to serve one attendee's content to another. An **offline cold start presenting no
+  credential** currently resolves the previous attendee from it, adopts their identifier as the
+  cache scope, and serves their programme, saved sessions and **private notes**.
+- **FR-1140a**: Comments asserting the superseded behaviour MUST be corrected in the same change —
+  `services.ts`'s claim that the anonymous scope is *"a key nothing is ever written under while
+  signed out"* sits in the block that writes one. **Searching for this requirement's number will
+  find such comments only where the work was already done**, which is 016's FR-1052 lesson.
 - **FR-1141**: The erasure's dependency on `listRegistered()` returning a **complete** enumeration
-  MUST be made breakable rather than silent. Today anything absent from that answer is destroyed;
-  the day the endpoint gains a page size or a date filter, older conferences are deleted from every
-  device on every Home load with no error and no test failure.
-- **FR-1142**: A decision MUST be recorded on the **client diagnostic channel**. Both destructive
-  cache paths are silent, so four causes of "my offline conference disappeared" share one symptom
-  and none is diagnosable after the fact.
-- **FR-1143**: A decision MUST be recorded on **what happens to Q&A at launch**. Today's Q&A is
-  unmoderated, attributed by full name, published instantly, and has **no feature flag** —
-  `SessionPanel.tsx` renders it unconditionally.
+  MUST be made breakable rather than silent.
+- **FR-1142**: A decision MUST be recorded on the **client diagnostic channel** (SC-1212).
+- **FR-1143**: A decision MUST be recorded on **what happens to Q&A at launch** (SC-1212). Today's
+  Q&A is unmoderated, attributed by full name, published instantly, and has **no feature flag**.
+  **If the answer is to hide or gate it, that retracts delivered 009 requirements and requires a
+  constitution amendment** — recording the decision is in scope; drafting the amendment and building
+  the gate are not.
+- **FR-1144**: Playwright MUST declare **WebKit and Firefox** projects alongside Chromium, and the
+  responsive sweep MUST run in all three. Constitution v5.4.0 R3 names this work, assigns it to 012
+  by name, and states it needs no client, no UAT and no decision. Without it the physical-iPhone
+  pass is the only WebKit evidence this project will ever produce.
+
+### Record-keeping
+
+- **FR-1150**: The roadmap's 012 row MUST be annotated with the production split and its reason, in
+  this change. Decision 53's lesson generalises: a feature reading the roadmap must not find a row
+  that contradicts the specification.
 
 ---
 
 ## Success Criteria *(mandatory)*
 
-- **SC-1201**: A person can complete the entire attendee journey — sign up to scheduled meeting — on
-  a phone they own, without assistance and without consulting the source code.
-- **SC-1202**: Every outstanding scenario from 007, 008, 009, 010, 013, 014 and 016 is either walked
-  or explicitly named as retired with its coverage relocated. **No scenario is left unaccounted
-  for.**
+- **SC-1201**: A person can complete the entire attendee journey — sign-up to scheduled meeting — on
+  a phone they own, without consulting the source code, working only from the script.
+- **SC-1202**: **Every** by-hand scenario in **every** `specs/*/quickstart.md` whose feature task is
+  not marked complete is either walked or explicitly named as retired with its coverage relocated.
+  **The inventory is produced by enumerating the task files, not by transcribing a list into this
+  specification.** No scenario is left unaccounted for.
 - **SC-1203**: Somebody who was not present can read the walk record and tell which steps passed,
-  which failed, and what was done about each failure.
-- **SC-1204**: No content and no primary action requires horizontal scrolling, at any tested width,
-  in either product.
+  which failed, what was observed at each, and what was done about each failure.
+- **SC-1204**: No content and no primary action requires horizontal scrolling at any tested width in
+  either product, **measured at the level of each navigation and content container's own
+  `scrollWidth` against its `clientWidth`, not at document level** — document-level overflow is zero
+  by construction inside a scroll container and cannot see this defect class (v5.4.0 R3).
 - **SC-1205**: The product is installable from a physical iPhone and a physical Android phone, and
-  the installed icon is judged acceptable by the owner.
+  the owner records a judgement on the installed icon at home-screen size. **That judgement is
+  recorded against register entry 28 and does not resolve it** (FR-1131); an adverse judgement is a
+  decision, not a defect.
 - **SC-1206**: A notification raised by a real organizer action arrives on a real phone and, when
   activated, lands on the surface carrying the per-row marker.
-- **SC-1207**: An attendee signing in on a device a different attendee used offline sees **nothing**
-  belonging to the previous attendee.
-- **SC-1208**: The number of defects found by the walk is known, and the number remaining unfixed is
-  **zero** — excluding findings recorded as decisions under FR-1131.
+- **SC-1207**: On a device where a previous attendee used the product and did not sign out, opening
+  the application **offline, presenting no credential**, discloses nothing belonging to them — no
+  name, no email, no programme, no saved sessions, no notes.
+- **SC-1208**: The number of defects found is known, the number remaining unfixed is **zero**
+  (excluding findings recorded as decisions under FR-1131), **and every seeded defect under FR-1127
+  was found by the walker.**
 - **SC-1209**: UAT holds seeded data only, and a platform operator can sign in.
+- **SC-1210**: A platform operator credential can be issued against a database **holding attendee
+  records**, and the attendee row count is unchanged afterwards.
+- **SC-1211**: The script contains steps that cross more than one feature's surface, each naming the
+  features it joins, and no such step is a transcription of an existing scenario.
+- **SC-1212**: The decisions required by FR-1142 and FR-1143 are recorded in a durable artifact, and
+  the feature is not complete while either is unrecorded.
 
 ---
 
@@ -229,49 +326,49 @@ platform where `InstallService`'s null-prompt half is real, and Android the only
 
 | Obligation | Declaration |
 |---|---|
-| **Actor and tier** | All three, deliberately. US1 is the **attendee** in MyNet; US2 the **conference organizer** and US3 the **platform operator**, both in `apps/admin`; US4 and US5 cover both products. This feature adds no capability to any actor — it validates the ones that exist and repairs what the validation finds. The two hygiene fixes (FR-1140, FR-1141) are attendee-side and change no capability. |
-| **Offline behaviour** | **Unchanged, and validating it is part of the work.** No repository member is added, removed, or reclassified. FR-1140 and FR-1141 alter *when stored data is discarded*, never what any surface reads or displays. **No new cached read, no new `passThrough` member, no new device capability.** The walk itself exercises offline behaviour under US1 scenario 4. |
-| **Desktop layout** | Unchanged by this feature, and **reviewed by it for the first time**. v5.4.0 R3 ratified the shipped desktop layout without a client acceptance act; US4 is where a person finally looks. Any repair follows FR-1130. |
-| **Tablet layout** | As above. The 768–1279 band is where the two products **deliberately diverge** — MyNet an icon-only rail, `apps/admin` a labelled one — and R3 ratified that divergence as-is. **A finding that the two should match is a decision under FR-1131, not a defect.** |
-| **Mobile layout** | As above, plus the physical-device passes (FR-1122, FR-1123). `apps/admin`'s mobile layout was built days ago and no person has seen it. |
-| **Empty / loading / failure states** | Unchanged. The walk exercises them: US1 scenario 2 requires the empty state of every destination to be reached, which is the first time the "no programme" conference and the empty-thread prompt will have been seen by a person. |
-| **Accessibility** | Unchanged, and covered by FR-1124's screen-reader pass. Any control found without an accessible label, a visible focus state or keyboard operability is a defect under FR-1130. |
-| **Validation checklist discharged** | **This feature is the whole-product validation checklist.** It discharges every remaining item: production build, desktop and mobile rendering, navigation and event switching, search and filter, session save plus notes plus Q&A, message composition, card-sharing feedback, meeting scheduling, keyboard focus visibility and accessible labels. Nothing is left to a later feature. |
-| **Identity scoping & server-side authorization** | Unchanged; no route is added or altered. **FR-1140 strengthens it on the client**: the `anonymous` bootstrap entry is currently the one part of the cache not scoped by attendee, and it is load-bearing for scoping, since a cache hit on it *sets* the scope. |
-| **Deletion & export coverage** | **Not applicable, structurally: this feature adds no table and no column.** Both coverage tests derive from the Drizzle schema, so with no schema change there is nothing new for them to fail on. FR-1100's re-seed *destroys* attendee records rather than creating them, exercising the cascade rather than extending it. |
-| **Event scoping** | **Not applicable: no new record is stored.** FR-1141 concerns the erasure of *per-event* cached data, which is already per-event and stays so; FR-1140 concerns the *cross-attendee* bootstrap entry, which is scoped by attendee rather than by event and stays so. |
-| **Administrative counterpart** | **None, and the reason is structural: this feature adds no attendee-facing capability.** It validates existing ones and repairs defects. FR-1140 and FR-1141 are device-local cache behaviour with no server surface and therefore nothing an administrator could see, undo, or answer for. The obligation was looked at rather than skipped. |
-| **Register position** | **Blocks: none.** Entries 22 and 4 both blocked this feature and both were closed by v5.4.0 on 2026-08-15. **Resolves: none.** **Escalates: entry 19** (nobody moderates avatars) — a walk that puts real images in front of a person makes that gap concrete rather than prospective; and **entry 21** (somebody must *be* the operator) — FR-1101 issues a credential, which does not appoint a human to use it. **Opens: possibly two**, via FR-1142 and FR-1143, if the owner's answers warrant register entries rather than plain decisions. |
-| **Migration number** | **No migration.** This feature adds no schema. Consistent with the roadmap's own note that 012 adds none, and with `0010` remaining permanently unclaimed. |
+| **Actor and tier** | All three, deliberately. US1 is the **attendee** in MyNet; US2 the **conference organizer** and US3 the **platform operator**, both in `apps/admin`; US4 and US5 cover both products. This feature adds no capability to any actor — it validates the ones that exist and repairs what the validation finds. |
+| **Offline behaviour** | **Unchanged, and validating it is part of the work.** No repository member is added, removed or reclassified. FR-1140 and FR-1141 alter *when stored data is discarded*, never what any surface reads or displays. **No new cached read, no new `passThrough` member, no new device capability.** US1 scenario 4 exercises it; SC-1207 tests the offline no-credential case specifically. |
+| **Desktop layout** | Unchanged by this feature and **reviewed by it for the first time**. v5.4.0 R3 ratified it without a client acceptance act; US4 is where a person finally looks. |
+| **Tablet layout** | As above. The 768–1279 band is where the two products **deliberately diverge**, ratified as-is by R3. US4 scenario 4 pins that divergence as correct, so the walk cannot mistake it for a defect. |
+| **Mobile layout** | As above, plus FR-1122/FR-1123's physical passes. `apps/admin`'s mobile layout was built days ago and no person has seen it. |
+| **Empty / loading / failure states** | Unchanged. US1 scenario 2 requires every destination's empty state to be reached — the first time the "no programme" conference and the empty-thread prompt will have been seen by a person. |
+| **Accessibility** | Unchanged; covered by FR-1124's screen-reader pass. Any control lacking an accessible label, visible focus or keyboard operability is a defect under FR-1130. |
+| **Validation checklist discharged** | This feature discharges every remaining whole-product checklist item. **It is legitimate under Principle IX's verification clause and not the consolidated pass that principle forbids**: every obligation here was *declared and built* by its own feature, and this pass **verifies** it. Any obligation the walk finds was never built is that feature's undischarged debt, recorded as such under FR-1132; 012 fixing it does not retroactively discharge it. |
+| **Identity scoping & server-side authorization** | Unchanged; no route added or altered. **FR-1140 strengthens it client-side**: the `anonymous` entry is the one part of the cache not scoped by attendee, and it is load-bearing for scoping, because a cache hit on it *sets* the scope. |
+| **Deletion & export coverage** | **Not applicable, structurally: no table and no column is added.** Both coverage tests derive from the Drizzle schema, so there is nothing new to fail on. FR-1100's re-seed *destroys* attendee records, exercising the cascade rather than extending it. |
+| **Event scoping** | **Not applicable: no new record is stored.** FR-1141 concerns erasure of *per-event* cached data, already per-event; FR-1140 concerns the *cross-attendee* bootstrap entry, scoped by attendee rather than event. |
+| **Administrative counterpart** | **None**, and the obligation was examined on both axes. Attendee-side: FR-1140 and FR-1141 are device-local cache behaviour with no server surface, so there is nothing an administrator could see, undo or answer for. **Administrative side: FR-1101 and FR-1102 change how an administrative credential comes into existence** — the most administrative thing in this feature. No attendee-facing counterpart is needed, because an attendee cannot observe operator provisioning; it is recorded here rather than left to the attendee-side reasoning, which does not reach it. |
+| **Register position** | **Blocks: none.** Entries 22 and 4 both blocked this feature; both closed by v5.4.0 on 2026-08-15 (R1, R3). **Resolves: none.** **Escalates: 19** — a walk putting real images before a person makes unmoderated avatars concrete rather than prospective; and **21** — FR-1101 issues a credential, which does not appoint a human to use it. **Opens: none at specification.** FR-1142 and FR-1143 each produce a decision; whether either becomes a numbered entry is the owner's act at the moment it is taken, and this feature does not number it. |
+| **Migration number** | **No migration.** No schema change. Consistent with the roadmap's note that 012 adds none, and with `0010` remaining permanently unclaimed. |
 
 ---
 
 ## Assumptions
 
 - **The 4 UAT accounts are disposable.** Stated by the owner. FR-1100 destroys them.
-- **All four device classes are available** to whoever walks the script — iPhone, Android phone,
-  tablet, and a desk machine. Stated by the owner; without any one of them the corresponding
-  requirement cannot be discharged.
-- **The walker is the owner or somebody with equivalent product knowledge.** The script states what a
-  pass looks like (FR-1114) partly so this assumption can weaken later.
+- **All four device classes are available** — iPhone, Android phone, tablet, desk machine. Stated by
+  the owner; without any one, the corresponding requirement cannot be discharged.
+- **Somebody other than the walker can seed FR-1127's defects.** If no second person exists, FR-1127
+  cannot be satisfied as written and the substitute is a second person spot-checking 10% of passed
+  steps — which has the same prerequisite. **This is the assumption most likely to fail.**
 - **UAT stays openly reachable with public sign-up.** Decision 30 rejected basic auth and an IP
-  allowlist as safer-looking but worse, because each disables the validation this environment exists
-  for. A consequence follows and is accepted: **real accounts can reappear the day after a re-seed**,
-  so FR-1100 restores compliance at a moment rather than guaranteeing it over time.
-- **017 does not land first.** If it does, FR-1143 is moot and the Q&A steps of the script describe a
-  replaced surface. Nothing orders the two features; this is recorded as a risk, not a dependency.
-- **Fixing every defect (FR-1130) may extend this feature considerably.** Accepted by the owner after
-  the unknowable scope was stated. **If the walk surfaces something large, the feature grows rather
-  than the known items being quietly trimmed.**
+  allowlist as safer-looking but worse. Consequence accepted: **real accounts can reappear the day
+  after a re-seed**, so FR-1100 restores compliance at a moment rather than guaranteeing it over
+  time.
+- **017 does not land first.** If it does, FR-1143 is moot and the script's Q&A steps describe a
+  replaced surface. Nothing orders the two features; recorded as a risk, not a dependency.
+- **Fixing every defect (FR-1130) may extend this feature considerably.** Accepted after the
+  unknowable scope was stated. **If the walk surfaces something large, the feature grows rather than
+  the known items being quietly trimmed.**
 
 ---
 
 ## Out of Scope
 
-- **The production deploy.** Its own phase, blocked on a domain that does not exist. Declared above.
-- **017's Q&A rebuild.** FR-1143 *decides* what happens to Q&A at launch; it does not build the
-  replacement.
-- **Extracting the cache key grammar** to its own module — an idea-inbox item deliberately left
-  there, since it is a refactor with no launch consequence.
-- **Appointing a platform operator.** FR-1101 issues a credential. Register entry 21 asks who *is*
+- **The production deploy.** Its own phase, blocked on a domain that does not exist.
+- **017's Q&A rebuild.** FR-1143 *decides* what happens at launch; it does not build the
+  replacement, and it does not draft the amendment one branch of that decision would require.
+- **Extracting the cache key grammar** to its own module — an idea-inbox item left there, being a
+  refactor with no launch consequence.
+- **Appointing a platform operator.** FR-1101 issues a credential; register entry 21 asks who *is*
   the operator, and a credential does not answer it.
