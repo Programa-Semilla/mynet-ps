@@ -6,6 +6,7 @@ import {
   CACHE_LIFETIME_MS,
   conferencePrefix,
   createFreshnessRegistry,
+  heldConferences,
 } from '../src/http/cached.js'
 import type { CachedEntry, LocalCache } from '../src/http/cache-store.js'
 import {
@@ -32,6 +33,8 @@ import {
 /** An in-memory `LocalCache`, so these tests are about the decorator rather than IndexedDB. */
 const memoryStore = (clock: () => number = () => Date.now()) => {
   const entries = new Map<string, CachedEntry<unknown>>()
+  const purges: string[] = []
+  const removals: string[] = []
 
   const store: LocalCache = {
     read: async <T>(key: string) => (entries.get(key) as CachedEntry<T> | undefined) ?? null,
@@ -39,13 +42,27 @@ const memoryStore = (clock: () => number = () => Date.now()) => {
       entries.set(key, { payload, retrievedAt: new Date(clock()).toISOString() })
     },
     purge: async (prefix: string) => {
+      purges.push(prefix)
       for (const key of [...entries.keys()]) {
         if (key.startsWith(prefix)) entries.delete(key)
       }
     },
+    /**
+     * FIX-2 — an exact key, and the double distinguishes it from `purge` **on purpose**.
+     *
+     * FIX-203 requires the expiry branch to delete one entry and leave its neighbours alone.
+     * Implementing this as `purge(key)` here would make that requirement untestable: the two
+     * would be the same operation in the double, and a decorator that had widened to the
+     * conference prefix would still pass.
+     */
+    remove: async (key: string) => {
+      removals.push(key)
+      entries.delete(key)
+    },
+    keys: async (prefix: string) => [...entries.keys()].filter((key) => key.startsWith(prefix)),
   }
 
-  return { store, entries }
+  return { store, entries, purges, removals }
 }
 
 /** A saved-session repository whose behaviour each test dictates. */
@@ -167,6 +184,110 @@ describe('the caching decorator', () => {
     // revokes access after a registration is withdrawn.
     nowMs += 2 * 60 * 60 * 1000
     await expect(subject.listSaved('summit')).rejects.toBeInstanceOf(OfflineError)
+  })
+
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════════════════
+   * **FIX-2 — THE LIFETIME BOUNDED SERVING AND BOUNDED RETENTION NOT AT ALL** (FIX-201–FIX-204,
+   * constitution v5.4.0 R1).
+   *
+   * The test above proves an aged entry is not *served*. That was the whole of the guarantee,
+   * and it left a second one unmade: `write` puts an entry and only `purge` ever removed one, so
+   * a device that stops being able to reach the account keeps every conference-scoped entry it
+   * had, in IndexedDB, **indefinitely**. Such a device renders signed-out, so nothing is
+   * displayed — **what survives is bytes**, against a deletion screen that says in bold that no
+   * copy is kept.
+   *
+   * **The assertion has to read the store directly** (FIX-204). Through the decorator, "deleted"
+   * and "present but stale" produce the same rejection — which is the entire subject of the fix,
+   * and the reason a behavioural test could never have caught its absence.
+   * ═══════════════════════════════════════════════════════════════════════════════════════
+   */
+  it('DELETES an entry it reads past its lifetime, rather than leaving the bytes (FIX-201)', async () => {
+    let nowMs = Date.parse('2026-09-14T09:00:00.000Z')
+    const { store, entries, purges, removals } = memoryStore(() => nowMs)
+
+    let online = true
+    const { repository } = repositoryThat({
+      listSaved: async () => {
+        if (!online) throw new OfflineError('Loading your saved sessions')
+        return ['a']
+      },
+    })
+
+    const subject = cached(repository, store, { attendeeId: 'ada' }, READS, { now: () => nowMs })
+    await subject.listSaved('summit')
+    expect(entries.has(cacheKey('ada', 'summit', 'saved'))).toBe(true)
+
+    online = false
+    nowMs += CACHE_LIFETIME_MS + 1000
+
+    // FIX-202 — the caller's outcome is **unchanged**: the same rejection, so the surface still
+    // reports that a connection is needed and nothing is cached. This fix changes what is
+    // stored, never what is shown.
+    await expect(subject.listSaved('summit')).rejects.toBeInstanceOf(OfflineError)
+
+    expect(
+      entries.has(cacheKey('ada', 'summit', 'saved')),
+      'An entry past its lifetime was left on the device. It can never be served again, so what ' +
+        'remains is a copy of conference content nobody is entitled to read and nothing will ' +
+        'ever remove — the retention half of FR-221, which the age limit alone does not close.',
+    ).toBe(false)
+
+    expect(removals).toEqual([cacheKey('ada', 'summit', 'saved')])
+    expect(
+      purges,
+      'The expiry branch reached for `purge`. That is a prefix match and would take this ' +
+        "conference's other entries, which may still be fresh and still readable (FIX-203).",
+    ).toEqual([])
+  })
+
+  it('deletes EXACTLY the expired key, leaving a fresh neighbour readable (FIX-203)', async () => {
+    let nowMs = Date.parse('2026-09-14T09:00:00.000Z')
+    const { store, entries, purges } = memoryStore(() => nowMs)
+
+    let online = true
+    const answering = async <T>(answer: T): Promise<T> => {
+      if (!online) throw new OfflineError('Loading your conference')
+      return answer
+    }
+
+    // Two resources under **one** conference, deliberately read a day apart so they age out a
+    // day apart. Written as one object rather than through `repositoryThat`, which knows only
+    // about saved sessions.
+    const repository = {
+      listSaved: async (_eventId: string) => answering(['session-1']),
+      listNotes: async (_eventId: string) => answering(['a note']),
+    }
+
+    const subject = cached(
+      repository,
+      store,
+      { attendeeId: 'ada' },
+      { listSaved: 'saved', listNotes: 'notes' },
+      { now: () => nowMs },
+    )
+
+    await subject.listSaved('summit')
+    nowMs += CACHE_LIFETIME_MS - 60 * 60 * 1000
+    await subject.listNotes('summit')
+
+    // The saved set is now 25 hours old; the note is two.
+    online = false
+    nowMs += 2 * 60 * 60 * 1000
+    await expect(subject.listSaved('summit')).rejects.toBeInstanceOf(OfflineError)
+
+    expect(entries.has(cacheKey('ada', 'summit', 'saved'))).toBe(false)
+    expect(
+      entries.has(cacheKey('ada', 'summit', 'notes')),
+      "One entry ageing out discarded its neighbour. The attendee's notes were still inside the " +
+        'lifetime and still readable offline; deleting them is FR-215 broken by the mechanism ' +
+        'meant to bound retention (FIX-203).',
+    ).toBe(true)
+
+    // And it is genuinely still readable, not merely still present.
+    expect(await subject.listNotes('summit')).toEqual(['a note'])
+    expect(purges).toEqual([])
   })
 
   it('PURGES a conference when the server REFUSES (FR-221)', async () => {
@@ -491,5 +612,53 @@ describe('the caching decorator', () => {
     // No resource declared, so no caching and no coalescing — two real reads.
     expect(calls).toEqual(['listSaved:summit', 'listSaved:summit'])
     expect(entries.size).toBe(0)
+  })
+})
+
+/**
+ * FIX-3's key grammar, read in the direction `cacheKey` does not go.
+ *
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ * The erasure itself lives at the composition root and must (FIX-303). What lives here is the
+ * **parser**, beside the format it parses, so the grammar has one definition rather than two —
+ * and it is exercised against a **table of keys rather than whatever the decorator happens to
+ * write today**, which is 009's precedent for the event audit's predicate: a guard exercised
+ * only by the calls that exist stops guarding when they change.
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ */
+describe('the conferences a stored key set names', () => {
+  it('reads a conference id back out of every key the decorator writes', () => {
+    const keys = [
+      cacheKey('ada', 'summit', 'programme'),
+      cacheKey('ada', 'summit', 'notes'),
+      cacheKey('ada', 'horizons', 'saved'),
+    ]
+
+    expect(heldConferences('ada', keys).sort()).toEqual(['horizons', 'summit'])
+  })
+
+  it('names NO conference for an event-less key', () => {
+    // `getCurrent` and `getActive` take no event argument, so the decorator keys them with an
+    // empty event segment. Read as a conference, the empty id is absent from every registered
+    // list — and the erasure would delete the attendee's own cached identity every time it ran.
+    expect(heldConferences('ada', [cacheKey('ada', '', 'self')])).toEqual([])
+    expect(heldConferences('ada', [cacheKey('ada', '', 'active-event')])).toEqual([])
+  })
+
+  it('ignores keys belonging to another attendee, including one whose id EXTENDS this one', () => {
+    expect(
+      heldConferences('ada', [
+        cacheKey('grace', 'summit', 'notes'),
+        // `attendee:ada|` cannot match `attendee:adam|…` because `|` sorts below every ordinary
+        // character — the same terminator that keeps `purge` from crossing attendees.
+        cacheKey('adam', 'summit', 'notes'),
+      ]),
+    ).toEqual([])
+  })
+
+  it('ignores a key this grammar did not write', () => {
+    expect(
+      heldConferences('ada', ['attendee:ada|something-else', 'attendee:ada|event:unterminated']),
+    ).toEqual([])
   })
 })

@@ -32,9 +32,11 @@ import type { CachedEntry, LocalCache } from '../src/http/cache-store.js'
 const recordingStore = () => {
   const entries = new Map<string, unknown>()
   const purges: string[] = []
+  const removals: string[] = []
 
   return {
     purges,
+    removals,
     entries,
     store: {
       read: async (key: string) =>
@@ -50,6 +52,14 @@ const recordingStore = () => {
           if (key.startsWith(prefix)) entries.delete(key)
         }
       },
+      // FIX-2 / FIX-3 — recorded separately from `purges`, because this file's whole assertion
+      // is that the questions repository touches the store in **no** way, and folding an exact
+      // delete into the prefix list would blur the two verbs it must not use.
+      remove: async (key: string) => {
+        removals.push(key)
+        entries.delete(key)
+      },
+      keys: async (prefix: string) => [...entries.keys()].filter((key) => key.startsWith(prefix)),
     } satisfies LocalCache,
   }
 }

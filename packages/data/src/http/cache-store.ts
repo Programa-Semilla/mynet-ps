@@ -32,4 +32,21 @@ export interface LocalCache {
   write<T>(key: string, payload: T): Promise<void>
   /** Removes every entry whose key begins with this prefix. */
   purge(keyPrefix: string): Promise<void>
+  /**
+   * Removes the entry under **exactly** this key (FIX-2, constitution v5.4.0 R1).
+   *
+   * Not `purge(key)`: that is a prefix match, so it would also take a resource whose name
+   * extends this one. The decorator's expiry branch has established that *one* entry aged out
+   * and its neighbours may still be fresh (FIX-203).
+   */
+  remove(key: string): Promise<void>
+  /**
+   * Every key held under this prefix, in no defined order (FIX-3, constitution v5.4.0 R1).
+   *
+   * The read-side mirror of `purge`. **The decorator does not call it** — it is the composition
+   * root's, which is where FIX-303 puts the erasure of a conference the attendee has left. It
+   * is declared here because this file is `@mynet/platform`'s structural counterpart and the
+   * two shapes must stay identical; see `cache-store.ts`'s header for why there are two.
+   */
+  keys(keyPrefix: string): Promise<readonly string[]>
 }

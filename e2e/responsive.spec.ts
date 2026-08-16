@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Locator, type Page } from '@playwright/test'
 
 import { ADA, ALAN, GRACE, SEED_PASSWORD, signIn, useConference } from './support/attendees.js'
 import { ADMIN_DESTINATIONS, DESTINATIONS, SCROLL_WIDTHS, WIDTHS } from './support/destinations.js'
@@ -41,6 +41,41 @@ const horizontalOverflow = (page: Page) =>
         .slice(0, 3),
     }
   })
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════════════════════════
+ * **FIX-403 — HOW FAR ONE ELEMENT CAN BE SCROLLED SIDEWAYS *INSIDE ITSELF*, WHICH IS A DIFFERENT
+ * QUESTION FROM THE ONE ABOVE AND THE ONLY ONE THAT CATCHES FIX-4's DEFECT.**
+ *
+ * `horizontalOverflow` asks whether the *document* scrolls sideways, and an inner
+ * `overflow-x-auto` container exists precisely to answer no — it absorbs its own overflow and the
+ * page stays exactly as wide as the viewport. That is why the administrative site could ship its
+ * only mobile navigation as a horizontally scrolling strip, at every width from 320px up, while
+ * the sweep below reported it clean and would have gone on doing so forever.
+ *
+ * So this measures the container: **its own `scrollWidth` against its own `clientWidth`**. A
+ * scroll container cannot mask that, because that difference *is* what it scrolls.
+ *
+ * `overflowX` comes back too, because the two halves diagnose different mistakes: a positive
+ * difference under `visible` is content pushing out of a box, and a positive difference under
+ * `auto` or `scroll` is a strip somebody has to swipe.
+ * ═══════════════════════════════════════════════════════════════════════════════════════════════
+ */
+const selfOverflow = (element: Locator) =>
+  element.evaluate((node) => ({
+    overflow: node.scrollWidth - node.clientWidth,
+    overflowX: getComputedStyle(node).overflowX,
+    // The descendants sticking out past its content box, so a failure names a control rather
+    // than a number.
+    widest: [...node.querySelectorAll('*')]
+      .map((child) => ({
+        text: (child.textContent ?? '').trim().slice(0, 24),
+        right: Math.round(child.getBoundingClientRect().right),
+      }))
+      .filter((entry) => entry.right > Math.round(node.getBoundingClientRect().right) + 1)
+      .sort((a, b) => b.right - a.right)
+      .slice(0, 3),
+  }))
 
 /**
  * Centred means the gaps on either side match. Compared with a tolerance rather than for
@@ -465,6 +500,170 @@ test.describe('responsive layout', () => {
           ).toBeLessThanOrEqual(0)
         }
       }
+    } finally {
+      await context.close()
+    }
+  })
+
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════════════════════
+   * **FIX-402, FIX-403 — THE ADMINISTRATIVE NAVIGATION ITSELF, MEASURED RATHER THAN THE PAGE
+   * AROUND IT.**
+   *
+   * The sweep above is the document-level one and it is not enough here, for a reason that is
+   * worth stating rather than rediscovering: `AdminShell`'s only navigation below 768px used to
+   * be `flex gap-1 overflow-x-auto`, a strip you swipe to reach a destination. Principle IV's
+   * mobile layout calls for bottom navigation and forbids any primary action requiring
+   * horizontal scrolling — and **a destination you have to swipe to reach is a primary action
+   * requiring horizontal scrolling.** The strip nonetheless kept `documentElement.scrollWidth`
+   * exactly equal to `clientWidth`, which is what a scroll container is *for*, so the sweep
+   * above passed on it at all thirteen widths.
+   *
+   * Constitution v5.4.0's R3 ratified MyNet's desktop and tablet layouts and **carved this
+   * product out of that ratification as a defect** — fiat may close a judgement but cannot make
+   * a non-compliance compliant. This is the assertion that closes it.
+   * ═══════════════════════════════════════════════════════════════════════════════════════════
+   */
+  test('the administrative navigation never scrolls sideways inside itself (FIX-402)', async ({
+    browser,
+  }) => {
+    const context = await browser.newContext({ viewport: { width: 1440, height: 900 } })
+    const operator = await context.newPage()
+
+    try {
+      await signInAsOperator(operator)
+
+      for (const width of SCROLL_WIDTHS) {
+        await operator.setViewportSize({ width, height: 900 })
+        await operator.goto(`${ADMIN_ORIGIN}/`)
+        await expect(
+          operator.getByRole('heading', { name: /signed in as/i, level: 1 }),
+        ).toBeVisible()
+
+        const navigation = operator.getByRole('navigation')
+        const { overflow, overflowX, widest } = await selfOverflow(navigation)
+
+        expect(
+          overflow,
+          `the administrative navigation overflows itself by ${overflow}px at ${width}px ` +
+            `(overflow-x: ${overflowX}). Widest: ${JSON.stringify(widest)}. Below 768px this is ` +
+            'the bottom bar and it must wrap rather than scroll; a scroll container here would ' +
+            'satisfy the document-level sweep while hiding destinations.',
+        ).toBeLessThanOrEqual(0)
+
+        // And every destination is genuinely reachable at that width, which is the obligation
+        // the measurement is a proxy for. A bar that fits because it dropped a destination is
+        // not a bar that fits.
+        for (const destination of ADMIN_DESTINATIONS) {
+          await expect(
+            navigation.getByRole('link', { name: destination.label, exact: true }),
+            `${destination.label} at ${width}px`,
+          ).toBeVisible()
+        }
+      }
+    } finally {
+      await context.close()
+    }
+  })
+
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════════════════════
+   * **FIX-401 — THREE LAYOUTS, IDENTIFIED BY MEASURING THEM.**
+   *
+   * MyNet renders three navigation components and stamps each with `data-nav-layout`, so the
+   * test above this one can name the band it expects. `AdminShell` is deliberately **one element
+   * with responsive classes** — one navigation landmark, one tab order, one tier-filtered list,
+   * with nothing that can disagree with itself — and the price of that choice is that there is no
+   * attribute to read. So each layout is recognised by its geometry, which is the stronger
+   * assertion in any case: an attribute can say "tablet" while the layout is anything at all.
+   *
+   * ───────────────────────────────────────────────────────────────────────────────────────────
+   * **FIX-404 — WHAT THIS TEST MUST NEVER BECOME.**
+   *
+   * R3 *ratified* the 768–1279px divergence between the two products: MyNet's rail is icon-only
+   * in that band, this one is labelled, and that is now a decision. **A test asserting the two
+   * products' rails match there would contradict R3** — it would reopen a settled judgement in
+   * the costume of a defect. This file therefore compares this rail to *nothing in MyNet*. It
+   * asserts the opposite: that the administrative rail is still **labelled** at 900px, which
+   * pins the ratified divergence in place instead of quietly erasing it.
+   * ───────────────────────────────────────────────────────────────────────────────────────────
+   */
+  test('the administrative shell presents three distinct navigation layouts (FIX-401)', async ({
+    browser,
+  }) => {
+    const context = await browser.newContext({ viewport: { width: 1440, height: 900 } })
+    const operator = await context.newPage()
+
+    try {
+      await signInAsOperator(operator)
+
+      const measure = async (width: number) => {
+        await operator.setViewportSize({ width, height: 900 })
+        await operator.goto(`${ADMIN_ORIGIN}/`)
+        await expect(
+          operator.getByRole('heading', { name: /signed in as/i, level: 1 }),
+        ).toBeVisible()
+
+        const box = await operator.getByRole('navigation').boundingBox()
+        expect(box, `the navigation must be laid out at ${width}px`).not.toBeNull()
+        return box!
+      }
+
+      // ── Mobile, <768px: bottom navigation. Full width, short, and against the bottom edge.
+      const mobile = await measure(375)
+      expect(
+        Math.round(mobile.width),
+        'at 375px the navigation is not full width, so it is not a bottom bar',
+      ).toBeGreaterThanOrEqual(374)
+      expect(
+        Math.round(mobile.y + mobile.height),
+        'at 375px the navigation is not against the bottom of the viewport (FR-018 — mobile is ' +
+          'bottom navigation, and this shell shipped with a strip at the top instead)',
+      ).toBeGreaterThanOrEqual(899)
+      expect(mobile.height, 'at 375px the navigation is as tall as a rail, not a bar').toBeLessThan(
+        300,
+      )
+
+      // ── Tablet, 768–1279px: a reduced rail. A left column, narrower than desktop's.
+      const tablet = await measure(900)
+      expect(Math.round(tablet.x), 'at 900px the navigation is not against the left edge').toBe(0)
+      expect(
+        tablet.height,
+        'at 900px the navigation is not a full-height rail',
+      ).toBeGreaterThanOrEqual(899)
+
+      // FIX-404. **Labelled, because R3 ratified that this product diverges from MyNet's
+      // icon-only rail in exactly this band.** Nothing here compares the two rails.
+      const rail = operator.getByRole('navigation')
+      for (const destination of ADMIN_DESTINATIONS) {
+        await expect(
+          rail.getByRole('link', { name: destination.label, exact: true }),
+          `${destination.label} at 900px must still carry its label — R3 ratified this rail as ` +
+            'labelled where MyNet\'s is icon-only, and "reduced" here means narrower, not mute',
+        ).toHaveText(destination.label)
+      }
+
+      // ── Desktop, ≥1280px: the persistent rail, wider than the reduced one.
+      const desktop = await measure(1440)
+      expect(Math.round(desktop.x), 'at 1440px the navigation is not against the left edge').toBe(0)
+      expect(
+        desktop.height,
+        'at 1440px the navigation is not a full-height rail',
+      ).toBeGreaterThanOrEqual(899)
+
+      // ── And the three are distinct, which is the requirement itself. Two of them being a
+      // left-hand column of the same width is the defect FIX-4 was raised for: a rail that does
+      // not reduce is one layout wearing two names.
+      expect(
+        tablet.width,
+        `the tablet rail is ${tablet.width}px and the desktop rail is ${desktop.width}px. ` +
+          'Principle IV asks for a *reduced* rail at tablet; equal widths mean the shell has two ' +
+          'layouts, not three.',
+      ).toBeLessThan(desktop.width)
+      expect(
+        mobile.width,
+        'the mobile navigation is no wider than the desktop rail, so it is a rail rather than a bar',
+      ).toBeGreaterThan(desktop.width)
     } finally {
       await context.close()
     }

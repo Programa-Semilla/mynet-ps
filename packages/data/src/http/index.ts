@@ -49,6 +49,9 @@ export {
   CACHE_LIFETIME_MS,
   conferencePrefix,
   createFreshnessRegistry,
+  // FIX-3 — the inverse of `cacheKey`, exported so the composition root can read a conference
+  // id back out of a stored key without owning a second copy of the key grammar.
+  heldConferences,
 } from './cached.js'
 export type { CachedReads, CacheOptions, CacheScope, Clock, FreshnessRegistry } from './cached.js'
 export type { CachedEntry, LocalCache } from './cache-store.js'

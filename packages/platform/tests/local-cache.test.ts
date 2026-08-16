@@ -118,6 +118,19 @@ describe('storage that is unavailable', () => {
     await expect(cache.purge('attendee:ada|')).resolves.toBeUndefined()
   })
 
+  it('accepts a remove and an enumeration silently rather than throwing', async () => {
+    resetLocalCacheForTests()
+    const cache = new WebLocalCache()
+
+    // FIX-2's `remove` runs on the path that is already about to report "nothing cached", and
+    // FIX-3's `keys` runs immediately before a purge decision. Both must degrade the way `read`
+    // does: **`keys` answers `[]` on failure**, which is the direction that cannot destroy
+    // anything — a store reporting keys it could not really see would have the caller erasing
+    // conferences on the strength of a failed read.
+    await expect(cache.remove('attendee:ada|event:summit|saved')).resolves.toBeUndefined()
+    await expect(cache.keys('attendee:ada|')).resolves.toEqual([])
+  })
+
   it('satisfies the LocalCache interface', () => {
     const cache = new WebLocalCache()
 
@@ -126,5 +139,9 @@ describe('storage that is unavailable', () => {
     expect(typeof cache.read).toBe('function')
     expect(typeof cache.write).toBe('function')
     expect(typeof cache.purge).toBe('function')
+    // FIX-2 and FIX-3 — three members from 005 to v5.4.0, five since. Listed rather than
+    // derived, so an implementation dropping one fails here rather than at the composition root.
+    expect(typeof cache.remove).toBe('function')
+    expect(typeof cache.keys).toBe('function')
   })
 })

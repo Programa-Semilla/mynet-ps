@@ -43,18 +43,46 @@ export type { CachedEntry, LocalCache }
  * **24 hours from retrieval** (FR-221).
  *
  * ═════════════════════════════════════════════════════════════════════════════════════════
- * Beyond this an entry is treated as absent — refused with the same wording as a conference
- * never read, rather than shown with an old stamp.
+ * Beyond this an entry is refused with the same wording as a conference never read, rather
+ * than shown with an old stamp — **and, since FIX-2, deleted at the moment it is found**. It
+ * used to be merely *treated as* absent, which bounded serving and left the bytes on the
+ * device forever; see the expiry branch below.
  *
- * **This is the only mechanism that revokes access offline.** Online, an authorization refusal
- * purges the conference's entries immediately; offline there is no server present to refuse,
- * so the age limit is what bounds the window in which an attendee whose registration has been
- * withdrawn can still read that conference's content. The spec review escalated its absence
- * from a governance gap to an authorization hole for precisely that reason, which is why the
- * value is a requirement rather than an assumption.
+ * **This is the only mechanism that revokes access offline.** The spec review escalated its
+ * absence from a governance gap to an authorization hole for precisely that reason, which is
+ * why the value is a requirement rather than an assumption.
  *
- * Whether 24 hours is the *right* span is recorded as an open question. That there is a value
- * is not.
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ * **FIX-304 — WHAT THE ONLINE HALF OF THIS PARAGRAPH USED TO CLAIM, AND WHAT ACTUALLY
+ * HAPPENS.**
+ *
+ * It read: *"Online, an authorization refusal purges the conference's entries immediately."*
+ * That is true of **the mechanism** — the branches below do exactly that — and silent on the
+ * only question that matters, which is **whether such a refusal ever arrives**. On the device
+ * that performed the withdrawal it does. On any *other* device it frequently does not:
+ *
+ *   - `GET /workspace/active-event` answers an attendee registered for nothing with **204 — a
+ *     success, not a refusal.** Every conference-scoped read in the client is gated behind that
+ *     call resolving to `ready`, and no route carries an `:eventId` parameter, so no
+ *     destination holds a remembered conference id it could fire with. **After a cold start or
+ *     a full reload the client never addresses the withdrawn conference again**, so nothing is
+ *     refused and this branch never runs.
+ *   - A tab already open at `ready` does eventually purge, when the next gated surface mounts
+ *     or retries. But **nothing forces it**: there is no poll, no focus refetch and no
+ *     reconnect refetch of the active event. A device coming back online purges when somebody
+ *     happens to navigate, not when it reconnects.
+ *
+ * So the age limit is not a backstop behind a prompt online purge; **for a cold-started device
+ * it is the whole of it.** What closes the gap is not in this file and deliberately not in it:
+ * a successful `EventsRepository.listRegistered()` erases every conference held for the
+ * attendee and absent from the answer, wired at the composition root (`apps/web/src/app/
+ * services.ts`, FIX-3/FIX-303). No repository is given responsibility for another's cache
+ * here, which is the objection that withdrew 009's FR-756a.
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ *
+ * Whether 24 hours is the *right* span is recorded as an open question — deferred by R1 as a
+ * product judgement that cannot be priced without a real conference. That there is a value is
+ * not.
  * ═════════════════════════════════════════════════════════════════════════════════════════
  */
 export const CACHE_LIFETIME_MS = 24 * 60 * 60 * 1000
@@ -83,6 +111,49 @@ const eventPrefix = (eventId: string): string => `event:${eventId}|`
 /** Everything cached for one attendee's one conference — what an authorization refusal drops. */
 export const conferencePrefix = (attendeeId: string, eventId: string): string =>
   `${attendeePrefix(attendeeId)}${eventPrefix(eventId)}`
+
+/**
+ * The conferences this attendee has entries stored for, read back out of their keys.
+ *
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ * **THE INVERSE OF `cacheKey`, AND IT LIVES BESIDE IT BECAUSE A SECOND COPY OF THE GRAMMAR IS
+ * HOW THE TWO DRIFT.**
+ *
+ * FIX-3's erasure lives at the composition root and must (FIX-303) — no repository may be
+ * given responsibility for another's cache, and no classification map is touched. **This is
+ * not that mechanism.** It is a pure function over strings: it reads no store, deletes
+ * nothing, decides nothing, and knows about no repository. What it knows is the key format,
+ * which is written four lines above; writing a second parser for it at the root would mean the
+ * format had two definitions and the one that fell behind would be the one deciding whether a
+ * withdrawn conference survives on somebody's phone.
+ *
+ * **Keys naming no conference are skipped, and that is the subtle half.** `getCurrent` and
+ * `getActive` take no event argument, so the decorator keys them with an empty event segment —
+ * `attendee:ada|event:|self`. Reading that as a conference whose id is the empty string would
+ * offer the caller a "conference" absent from every registered list, and the erasure would
+ * delete the attendee's own cached identity on the first successful read.
+ * ═════════════════════════════════════════════════════════════════════════════════════════
+ */
+export const heldConferences = (attendeeId: string, keys: readonly string[]): string[] => {
+  const attendee = attendeePrefix(attendeeId)
+  const marker = 'event:'
+  const held = new Set<string>()
+
+  for (const key of keys) {
+    if (!key.startsWith(attendee)) continue
+    const rest = key.slice(attendee.length)
+    if (!rest.startsWith(marker)) continue
+
+    const terminator = rest.indexOf('|', marker.length)
+    // No terminator is a key this grammar did not write; an id of zero length is the
+    // event-less form above. Neither names a conference.
+    if (terminator <= marker.length) continue
+
+    held.add(rest.slice(marker.length, terminator))
+  }
+
+  return [...held]
+}
 
 /** Which repository methods are cacheable reads, and what resource each stores under. */
 export interface CachedReads {
@@ -324,6 +395,49 @@ export const cached = <T extends object>(
               freshness?.record(key, entry.retrievedAt)
               return entry.payload
             }
+
+            // ═══════════════════════════════════════════════════════════════════════════════
+            // **FIX-2 — THE ENTRY IS DELETED HERE, NOT MERELY LEFT UNSERVED** (FIX-201,
+            // constitution v5.4.0 R1).
+            //
+            // `WebLocalCache` has no eviction: `write` puts an entry and, before this line,
+            // only `purge` ever removed one. So the 24-hour lifetime bounded **serving** and
+            // bounded **retention** not at all. A device that stops being able to reach the
+            // account — deleted elsewhere, or a session that ended and was never
+            // re-established — renders signed-out and reads nothing, and kept every
+            // conference-scoped entry it had in IndexedDB **indefinitely**. Nothing was
+            // displayed; what survived was bytes, against a deletion screen that says in bold
+            // that no copy is kept.
+            //
+            // **This is the moment an entry stops being readable, and it is therefore the
+            // moment to delete it.** Doing it here is what makes the fix safe: it closes the
+            // retention gap **without classifying why the session ended**.
+            //
+            // **The obvious fix — purging when a session is refused — is wrong and must not be
+            // reinstated.** The refusal that arrives on a second device is a
+            // `NotAuthenticatedError` or `SessionExpiredError` on `getCurrent()`, and an
+            // idle-timeout expiry is **indistinguishable from a deleted account at that call
+            // site**. Purging on it would destroy the offline copy of an attendee who is about
+            // to sign back in, costing FR-215 for a case it was not aimed at. R1 rejects it by
+            // name, along with two other alternatives, precisely so the next reader does not
+            // re-propose one.
+            //
+            // Three properties, each load-bearing:
+            //
+            //   - **`remove`, never `purge`** (FIX-203). One expired entry is one entry; this
+            //     conference's other resources may still be fresh and still readable, and
+            //     `purge` is a prefix match that would take them.
+            //   - **The caller's outcome is unchanged** (FIX-202). It still falls through to
+            //     the same `throw` with the same error, so the surface still reports that a
+            //     connection is needed and nothing is cached. **This changes what is stored,
+            //     never what is shown** — which is why the assertion for it has to read the
+            //     store directly (FIX-204): through the decorator, "deleted" and "present but
+            //     stale" are the same observation.
+            //   - **An unparseable stamp is deleted too.** `isFresh` already fails such an
+            //     entry towards "absent"; it can never become readable again, so leaving it is
+            //     retention with no possible benefit.
+            // ═══════════════════════════════════════════════════════════════════════════════
+            if (entry) await store.remove(key)
 
             freshness?.record(key, null)
             throw error

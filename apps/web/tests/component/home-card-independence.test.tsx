@@ -246,6 +246,9 @@ describe('SC-210 — the cost of adding a third reader', () => {
           store.set(key, { payload, retrievedAt: new Date().toISOString() })
         },
         purge: async () => {},
+        // FIX-2 / FIX-3 — this double exists to count reads, not to model storage.
+        remove: async () => {},
+        keys: async () => [],
       },
       { attendeeId: 'attendee-ada' },
       { listSessions: 'programme' },
