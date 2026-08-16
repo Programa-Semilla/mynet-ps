@@ -73,6 +73,10 @@ specs/012-launch-readiness/
 ├── data-model.md        # "none, because…" — no schema
 ├── contracts/README.md  # "none, because…" — no route or contract change
 ├── quickstart.md        # THE DELIVERABLE — the consolidated launch script
+├── walk-record.md       # per-step observations — the walk's evidentiary output (T055)
+├── captures/            # the screenshots and photographs FR-1126 requires
+├── defect-register.md   # one row per defect found — SC-1208's count (T056)
+├── decisions.md         # FR-1131 records: offline cold start, Q&A at launch, diagnostics
 ├── checklists/requirements.md
 └── tasks.md             # /speckit-tasks output
 ```
@@ -107,6 +111,12 @@ Enumerate every scenario (not by heading shape — that is what hid 006), map to
 ~9 machine-covered, **rewrite the 3 carrying false expectations**, pick one width triple and record
 why, and add the seam steps no per-feature walk could contain. Output: `quickstart.md`.
 
+### Phase B′ — Deploy and plant *(added by the task rewrite)*
+
+Resolve how UAT receives a build — the `AZURE_CREDENTIALS` service principal, or a recorded
+hand-deploy decision — deploy the repaired `develop`, and plant FR-1127's three seeded defects as
+*base commit + named seed patch*, planted by somebody who is not the walker.
+
 ### Phase C — Walk it
 
 Four device classes, two products, three widths, deployed UAT. Observations not verdicts; captures
@@ -137,6 +147,10 @@ valuable — it fixes a governance breach and a production defect whether or not
 happens. Phases B–D are one unit. Phase E is neither.
 
 ## Open Questions for `/speckit-tasks`
+
+*All four were answered by the task rewrite and are kept as written: the PR seam is Phases 1–3 as
+the MVP; T059/T060 name the planter or record the fallback; T055's `walk-record.md` plus
+`captures/` is the record; and the WebKit fix gates the walk (Phase 2 gates Phase 5).*
 
 - **How does this split into PRs?** Natural seam: A / B+C+D / E. Worth `speckit-spex-collab-phase-split`.
 - **Who plants FR-1127's seeded defects?** The assumption most likely to fail — it needs a second

@@ -231,7 +231,9 @@ notifications; retype the composer test with a real keyboard.
 - **FR-1120a**: The walk MUST be performed against the **deployed UAT environment**, on the build CI
   produced from `develop`, and the record MUST name the deployed commit. A walk against `localhost`
   exercises no TLS, no real push service, no deployed build and no UAT marker — and would make
-  FR-1100 pointless.
+  FR-1100 pointless. **One divergence is required rather than forbidden**: FR-1127's walked build is
+  `develop`'s commit **plus the named seed patch**, and the record MUST name both halves — base
+  commit and patch — which is what keeps this requirement and FR-1127 satisfiable at once.
 - **FR-1121**: The walk MUST cover three widths in both products **on real viewports**. Emulated
   viewports are permitted only for a width no available device provides, and the record MUST name
   each emulated width and why.
