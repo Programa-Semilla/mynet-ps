@@ -1,5 +1,224 @@
 <!--
 SYNC IMPACT REPORT
+Version change: 5.3.0 → 5.4.0
+
+RATIFICATION STATUS: **RATIFIED 2026-08-15 by the project owner**, in a working session that took
+all three decisions in sequence after reading `brainstorm/13-blocked-entries-decision-packets.md`.
+That document records no decision; it is the research this amendment is taken on, and it stays as
+written so the reasoning outlives the conclusions.
+
+**This is the first amendment whose entire subject is closing questions rather than licensing
+work.** It gates no feature's first line of code. It closes **three** register entries — 22, 27 and
+4 — which is the largest number closed at once since 4.1.0 closed the three it had opened, and it
+unblocks **both** remaining blocked features: 017 (blocked on 27) and 012 (blocked on 22 and 4).
+
+**What ratification does NOT do.** Entries 19, 21, 23, 28, 29, 30 and 31 are untouched, and 19 and
+21 remain the oldest live entries. It decides nothing about `authorId` or `listBlocks` — R2 makes
+that question **more** urgent rather than resolving it. It does not price the cache lifetime, which
+R1 defers deliberately. And it does not appoint anybody: R3 ratifies layouts without a client
+acceptance act, which is a decision to proceed without one, not a substitute for one.
+
+NUMBERING CHECKED BEFORE CLAIMING, per the rule 5.2.0's rebase produced and 5.3.0 restated. At
+drafting, `5.4.0` was claimed by nothing; no branch other than
+`docs/close-register-entries-22-27-04` was in flight; the register high-water mark was 31 and this
+amendment opens **no new entry**; the standing-decision high-water mark was 53, so this claims
+**54–56**; and the decision prefix `R` was unused (`A`, `B`, `C`, `D`, `L`, `M`, `N`, `O` and `Q`
+are taken).
+
+Rationale: **MINOR, and as in 5.3.0 the judgement is made explicitly because a real MAJOR argument
+exists.** Two of these decisions touch delivered requirements, and 3.0.0 and 5.0.0 were both MAJOR
+for exactly that.
+
+*Why it is not MAJOR.* The practised test — which is narrower than the policy's wording and has
+been applied consistently — is that **withdrawing** a delivered requirement is MAJOR while
+**narrowing** one is MINOR, the judgement 5.3.0 made against FR-1042. R2 narrows FR-702's
+*rendered form* and withdraws nothing: attribution survives, FR-734's unconditionality survives
+verbatim, and SC-707 stays true — an attendee who has turned discoverability off is still named on
+their question, as "Ana R.". Principle VIII's second recorded exception gets **smaller**, and no
+prior amendment has treated a *reduction* in what an exception discloses as backward-incompatible.
+R3 is MINOR for a reason that turns entirely on how it is worded, and the wording is therefore
+load-bearing: **it does not claim that passing tests validated a layout.** Had it done so it would
+retract 5.0.0's rule that no feature may be read as having validated a layout because its gates are
+green, and retracting a governance rule is MAJOR under the first clause. It claims instead that the
+owner ratifies the shipped layouts *in the absence of* validation. That is a weaker and more honest
+act, and the rule it declines to use survives untouched.
+
+*Why it is not PATCH.* Each of the three changes what the product may do or what somebody may rely
+on. 3.3.0 and 4.1.0 both gave this reason for the same call.
+
+────────────────────────────────────────────────────────────────────────────────────────────────
+R1 — **Entry 22 is CLOSED. The 24-hour residual is accepted; the ground it was tolerated on is
+corrected; two mechanisms are built.**
+
+The entry is closed as **accepted**, not as fixed. A device may keep *showing* a conference the
+person has left for up to 24 hours from retrieval, and that is ratified.
+
+**The register's stated ground for tolerating it was false when it was written, and five features
+carried the entry as low-severity on the strength of it.** The entry says the data is *"the
+conference programme, not another attendee's personal data"*. The cached `appointments` payload
+carries the other party's display name and the agreed meeting topic, and that caching shipped in
+008 — **before** the sentence was written in 009. The cached `programme` embeds every speaker's
+name, title and company, which entry 30 classifies as personal data about people who are not
+attendees. The sentence is struck. **The residual is accepted on a different and true ground**: no
+third party can end a registration today, and the only way one ends is an act the attendee performs
+on their own device, which purges that device in the same action.
+
+**That true ground is protected by a naming convention, and this is the most fragile thing this
+amendment ratifies.** `apps/api/tests/unit/no-attendee-restriction.test.ts` selects routes by the
+URL regex `/suspend|ban\b|mute|restrict|disable|block|silence/i`. A route named
+`DELETE /admin/conferences/:eventId/registrations/:id` matches none of those words and **passes
+green**. Feature 015 is named "registration and attendee management". **The guard MUST be widened to
+the concept before 015 is specified**, and if 015 does add such a route, R1's ground evaporates and
+entry 22 must be reopened rather than reasoned around.
+
+**Two mechanisms are licensed, and neither needs a further amendment to build.** First, an entry is
+**deleted at the moment it stops being readable** — today nothing evicts, so "24 hours" has always
+bounded serving and never retention, and this is the only change that reduces what a disconnected
+device *holds*. Second, a successful online read of the conferences the attendee is registered for
+**erases the stored copy of any conference absent from it**; this lives in the composition root
+rather than in the caching decorator, which sidesteps the exact objection that withdrew 009's
+FR-756a.
+
+**Three options are rejected on evidence rather than on cost**, and they are named so they are not
+re-proposed: reinstating FR-756a fires on a refusal that frequently never arrives; a server-sent
+"forget this" message **cannot be built** — subscriptions are registered `userVisibleOnly: true`,
+so no silent message exists, and a new dispatcher would be a third notification trigger and
+therefore another amendment; and keying the stored copy to the registration is ineffective, because
+a disconnected device cannot learn the registration ended and matches its own stale label.
+
+**Whether 24 hours is the right span is DEFERRED, not decided, and the reason is stated rather than
+implied.** Since 014 an organizer can cancel a session, move a room or change a start time, so a
+day-old programme can be *wrong* rather than merely old. That argues for shortening on grounds of
+**usefulness**, not privacy. It is deferred because the cost — offline usefulness at a venue with
+poor signal — **cannot be priced from this repository**, which is what 005 said when it set the
+value and which remains true because nothing has reached production. It returns as a product
+judgement once a real conference has been run, and it is not a register entry.
+
+**Two shipped defects are fixed regardless of any of the above, because neither is a choice.**
+Account deletion computes its purge prefix from a no-argument call, yielding `attendee:<id>|event:|`
+— a range that cannot match `attendee:<id>|event:<uuid>|…`, since every UUID first character sorts
+below `|`. **A second device therefore keeps everything, including private session notes,
+permanently, while the deletion screen promises in bold that no copy is kept.** And the reconnection
+purge does not fire on a cold start at all: `GET /workspace/active-event` answers a de-registered
+attendee with **204, a success**, so the client never addresses that conference again. An
+already-open tab does purge, but only when somebody next navigates — there is no poll, no focus
+refetch and no reconnect refetch of the active event. The comment claiming *"online, an
+authorization refusal purges the conference's entries immediately"* is true of the mechanism and
+silent on whether the refusal arrives. **That is this project's documented false-header class, in
+the file the entry is about.**
+
+────────────────────────────────────────────────────────────────────────────────────────────────
+R2 — **Entry 27 is CLOSED. A published question is attributed as first name plus surname initial —
+"Ana R.".**
+
+Applies wherever a question is displayed: the phone, the moderation queue, and the projected screen
+5.0.0 ratified.
+
+**This was decided on the client's behalf, and that is recorded rather than glossed.** The owner has
+spoken for the client five times before and does so here. It reads REQ-062 and REQ-063 as being
+about **register and tone** — that a full legal name makes a casual question feel like a filing —
+rather than about the surname as such. **It is in tension with her literal words**, *"únicamente el
+primer nombre, sin apellidos"*, because an initial is a fragment of an apellido. **She must be told,
+not left to discover it at an event.** If her concern proves to be findability rather than tone, the
+decision was wrong on its own reasoning and should be revisited; that is the stated condition, and
+it is cheap to act on, because this option is the easiest of the six to move in either direction.
+
+**The framing this entry was carried under was incomplete, and correcting it is the transferable
+part.** The register offered three options. Six existed. Two of the missing ones — this one, and a
+collision-aware form showing an initial only where first names collide — cost exactly what the
+cheapest listed option costs and **dissolve the deciding case**, which is two attendees named Ana
+at one conference whose questions appear together on a hall wall. An entry that has blocked a
+feature since 5.0.0 looked like a hard trade because half the board was missing. **A register entry
+that enumerates its options is asserting that the enumeration is complete**, and this one was not.
+
+**What it narrows.** FR-702's rendered form only. FR-734 survives verbatim — attribution stays
+unconditional, and a non-discoverable attendee is still named. SC-707 survives and stays true.
+Principle VIII's second recorded exception is **narrowed**, which is why this is MINOR.
+
+**One thing MUST ship with it or the change buys nothing.** `POST /blocks` carries no throttle and
+`GET /blocks` returns the target's live display name **and card-rendition avatar bytes**. Under any
+abbreviated attribution, blocking becomes a one-request, unrate-limited way to convert "Ana R." into
+a full name with a photograph — so an abbreviated name without that closure **relocates disclosure
+rather than reducing it**. `blocks.ts` asserts the caller *"already knows exactly who these people
+are, having blocked them by hand"*, a claim this decision falsifies in a file it does not otherwise
+touch.
+
+**Not resolved, and made more urgent.** Whether a question's payload should carry `authorId`, and
+whether `listBlocks` should be narrowed, were raised at 009's deep-review gate and are untouched
+here. Any abbreviated attribution increases the value of the identifier, so 017 MUST NOT treat this
+as settled by R2.
+
+**Left to 017, deliberately.** What "Ana R." renders as for a mononym, and whether a multi-token
+given name yields "María R." or "María José R.". `display_name` is one free-text field, so the
+surname half is a derivation and its edge cases are implementation, not governance. `initialsOf`
+already performs this split with `Intl.Segmenter` rather than `slice`, and is the precedent to
+follow.
+
+────────────────────────────────────────────────────────────────────────────────────────────────
+R3 — **Entry 4 is CLOSED by owner ratification, without a client acceptance act.**
+
+The shipped desktop and tablet layouts are ratified as intended. This closes the oldest live
+question about the product's appearance and unblocks 012.
+
+**What this is NOT, and the distinction is what keeps this amendment MINOR.** It is **not** a claim
+that the layouts were validated, and **not** a claim that green gates validated them. 5.0.0's rule —
+that no feature may be read as having validated a layout because its tests pass — **stands
+unamended and unused here.** The owner ratifies in the acknowledged absence of validation. Anybody
+citing R3 as evidence that the layouts were reviewed has misread it.
+
+**The cost is ratified with it rather than softened.** Desktop use is the client's own stated
+requirement (REQ-108, REQ-110), and she has never seen the product at a desk. Closing removes the
+entry that kept each new feature's unreviewed desktop design visible, so **the debt resumes
+compounding silently**, and it is paid by whoever meets the first defect in production. The two
+defects this entry produced were each found within minutes by the first person to look at a screen,
+which is the honest measure of what is being given up.
+
+**One item is CARVED OUT and is a defect, not a ratified layout.** `AdminShell` presents **two**
+layouts where Principle IV requires three: below 768px the administrative site's only navigation is
+a horizontally scrolling strip, and at 768–1023px the rail is labelled rather than reduced.
+**Fiat may close a judgement; it cannot make a non-compliance compliant**, so this is excluded from
+the ratification and MUST be fixed. It is checkable today with no client and no UAT. The end-to-end
+sweep **cannot see it by construction** — it measures document-level overflow, which an inner
+`overflow-x-auto` container is designed to keep at zero — so the fix must carry an assertion that
+does not depend on that measurement.
+
+**Two judgement questions ARE ratified as-is**, and are named so they are not reopened as defects:
+the rail divergence between the two products at 768–1279px, where MyNet shows an icon-only rail and
+the administrative site shows a labelled one; and Home's two-column card arrangement on an upright
+tablet. Both were unrecorded choices rather than constraints — the administrative app imports
+MyNet's tokens and then uses none of its breakpoints — and both are now choices.
+
+**One gap is closed at no cost and is not a layout question at all.** Playwright declares a single
+Chromium project, so **Safari layout is unverified at every width**, not only on desktop, and the
+physical-iPhone test 012 already carries is otherwise the only WebKit evidence this project will
+ever produce. Adding WebKit and Firefox projects needs no client, no UAT and no decision.
+────────────────────────────────────────────────────────────────────────────────────────────────
+
+REGISTER HYGIENE, applied in this amendment. The register is a hand-maintained numbering table, and
+this project has recorded four collisions across such tables. A full pass found nine defects, all
+corrected here. The most consequential is that **entry 22 had no list item at all** — its heading
+was concatenated onto the end of entry 21's final paragraph with no newline, so the ordered list ran
+11–21 then 23–26, and because CommonMark renderers ignore written ordinals and renumber
+sequentially, **every entry after 21 displayed one number low on any rendered page.** That is the
+exact failure the register warns about twice in its own text, and it is almost certainly the origin
+of the second defect: three sites number the design-token question 22 when it is 23. Also corrected:
+entries 27–31 appeared in no register list, so a reader of the two "Open —" sections saw a register
+that stopped at 4.1.0 and missed the only entry then blocking a feature; entry 2 was named a live
+blocker on 012 though it is resolved; entry 4 still said it blocked shipped 011; entry 22 was still
+filed against phase 010, never updated for the 010→011/012 split; ten sites attributed decisions
+L1–L6 to 3.4.0 when they belong to 3.5.0; five entries were classified differently by CLAUDE.md than
+by this file, with entry 19 listed twice there; and one sync report carried the brand-mark decision
+as 27 when it is 30.
+
+SYNC IMPACT: Principle IV gains R3's ratification and its carve-out. Principle VIII's second
+recorded exception is narrowed by R2. "Audience questions" carries the new attribution rule.
+"Data scoping, content provenance, and composition" carries R1. Standing decisions **54–56** added.
+Register entries **22, 27 and 4** closed; **no entry opened**. `CLAUDE.md` updated to match,
+including the five classification drifts and the two contradictions it carried against itself.
+
+────────────────────────────────────────────────────────────────────────────────────────────────
+
+SYNC IMPACT REPORT
 Version change: 5.2.0 → 5.3.0
 
 RATIFICATION STATUS: **RATIFIED 2026-08-14 by the project owner**, on reading the drafted amendment
@@ -1575,9 +1794,33 @@ slots (explanation + close), and invalid empty message or meeting topic (**disab
 never a post-submit error). Now that data is fetched rather than embedded, **loading and failure
 states are equally required** wherever data crosses the network.
 
+**The shipped desktop and tablet layouts are RATIFIED as intended, by owner decision 56 (5.4.0,
+R3), closing register entry 4 — and ratified WITHOUT a client acceptance act.** This is not a claim
+that they were validated. **5.0.0's rule that no feature may be read as having validated a layout
+because its gates are green stands unamended, and is deliberately not used here**; anybody citing
+R3 as evidence that these layouts were reviewed has misread it. The cost is ratified with the
+decision: desktop use is the client's own requirement (REQ-108, REQ-110), she has never seen the
+product at a desk, and closing entry 4 removes the thing that kept each feature's unreviewed
+desktop design visible.
+
+**Two judgement questions are ratified as-is and MUST NOT be reopened as defects**: the rail
+divergence at 768–1279px, where MyNet presents an icon-only rail and the administrative site a
+labelled one; and Home's two-column card arrangement on an upright tablet. Both were unrecorded
+choices rather than constraints — `apps/admin` imports MyNet's tokens and uses none of its
+breakpoints — and both are now choices.
+
+**Ratification does not reach a non-compliance, and one is carved out.** `AdminShell` presents
+**two** layouts where the three above are required: below 768px the administrative site's only
+navigation is a horizontally scrolling strip, and at 768–1023px its rail is labelled rather than
+reduced. **Fiat may close a judgement; it cannot make a non-compliance compliant.** This MUST be
+fixed, and its fix MUST carry an assertion that does not depend on document-level overflow
+measurement — the existing sweep cannot see it, because an inner `overflow-x-auto` container is
+designed to keep that measurement at zero.
+
 **Rationale**: The prototype implements none of the focus or Escape behavior and has no desktop or
 tablet layout at all. These are requirements, not enhancements, and they are cheap to keep and
-expensive to retrofit.
+expensive to retrofit. **That the layouts are now ratified does not make them reviewed**, and the
+distinction is the whole of what entry 4 was about.
 
 ### V. Abstraction Before Platform and Data APIs
 
@@ -1764,10 +2007,12 @@ migration.
     immediate on asking. The disclosure is unchanged and the no-opt-out is unchanged; what moved is
     that a question now has a state in which it exists and is not yet public.
 
-    **The attribution clause is UNDER REVIEW against register entry 27 and MUST NOT be resolved by
-    inference.** 3.3.0 bound the asker's full real name; the client asks for the first name alone.
-    Until entry 27 closes, **the shipped full-name behaviour stands**. That a question is attributed
-    at all is not under review — anonymity was considered in 3.2.0 and not chosen.
+    **The attribution clause is SETTLED as of 5.4.0 (R2): first name plus surname initial — "Ana
+    R." — wherever a question is displayed**, including the moderation queue and the projected
+    screen. Entry 27 is closed. This **narrows** the exception rather than widening it: what is
+    disclosed is smaller, attribution is unchanged, and a non-discoverable attendee is still named.
+    That a question is attributed at all was never under review — anonymity was considered in 3.2.0
+    and not chosen.
 
     **A moderator reading a question before it is public is not a further exception**, because
     content submitted for publication was never private. The reasoning is written out under
@@ -2000,7 +2245,7 @@ Principle VII no longer requires.
   not. **Separate configuration is not sufficient**: the separation MUST be enforced, and a
   deployment tool that can be pointed at the wrong database MUST refuse rather than proceed.
 
-*The following four rules were added in 3.4.0 by decisions L1–L3. Until then this block described a
+*The following four rules were added in 3.5.0 by decisions L1–L3. Until then this block described a
 topology with no addresses in it, and `deploy/vm/envs/*.env` left `SUBSCRIPTION` and `APP_DOMAIN`
 blank because naming them was a decision no feature was entitled to take.*
 
@@ -2170,6 +2415,39 @@ Decided by the project owner on 2026-08-06. Binding on every subsequent feature.
     oversight.** A later feature MUST NOT cite O2 as precedent for narrowing the four, and whether a
     deletion should at least notify the enrolled is **register entry 31** — open, blocking nothing,
     and answerable only by a third notification trigger and therefore another amendment.
+
+- **A cached conference may outlive the registration that licensed it, for up to 24 hours, and that
+  residual is ACCEPTED** — owner decision 54 (5.4.0, R1), closing register entry 22. Accepted, not
+  fixed. Three things bind alongside it.
+
+  **The ground it is accepted on is that no third party can end a registration.** The only way one
+  ends today is an act the attendee performs on their own device, which purges that device in the
+  same action. **The earlier ground — that the cached data is conference content rather than another
+  attendee's personal data — is STRUCK as false**: the cached appointments payload has carried the
+  counterpart's display name and the agreed meeting topic since 008, and the cached programme
+  carries every speaker's name, title and company. A feature MUST NOT restate it.
+
+  **That ground is protected by a naming convention, and this is the fragile part.** The guard
+  asserting no route restricts an attendee selects routes by URL keyword, so a registration-removal
+  route passes it green. **The guard MUST be widened to the concept before feature 015 is
+  specified**, and **if any feature gives a third party the power to end a registration, entry 22
+  reopens** rather than being reasoned around.
+
+  **Two mechanisms are licensed and need no further amendment**: an entry is deleted at the moment
+  it stops being readable, so the lifetime bounds retention and not merely serving; and a successful
+  online read of the attendee's registered conferences erases the stored copy of any conference
+  absent from it, implemented at the composition root rather than in the caching decorator. **Three
+  are rejected on evidence** and MUST NOT be re-proposed without new facts: a refusal in any
+  repository purging the conference (it fires on a refusal that frequently never arrives), a
+  server-sent instruction to forget (impossible — subscriptions are `userVisibleOnly`, and a new
+  dispatcher would be a third notification trigger), and keying the stored copy to the registration
+  (a disconnected device cannot learn the registration ended).
+
+  **Whether 24 hours is the right span is DEFERRED, not decided.** Since 014 a cached programme can
+  be *wrong* rather than merely old, which argues for shortening on grounds of usefulness rather
+  than privacy. It is deferred because the cost cannot be priced from this repository — it needs a
+  real conference at a real venue, which is what 005 said when it set the value. It returns as a
+  product judgement, **not** as a register entry.
 
 - **Home is composed, not aggregated.** Home is a registry of independent cards. Each card owns its
   own loading, empty, and failure states, and a card that fails MUST NOT blank the dashboard or
@@ -2356,12 +2634,27 @@ attribution turned out to carry and the three consequences that bound it.*
   every **approved** question asked at it, with the asker's name attached, **including questions
   asked by an attendee who has turned discoverability off**.
 
-  **Whether that name is the full name or the first name alone is register entry 27 and is NOT
-  decided.** 3.3.0 bound the full real name; the client asks for first name only (REQ-062, REQ-063);
-  the client's own extraction records the thread as unresolved (OPEN-002) and the source transcript
-  contains both positions. **The shipped behaviour — full display name — stands until entry 27
-  closes**, and no feature may resolve it by inference in either direction. Attribution itself is not
-  in question: a question is attributed, and anonymity remains unchosen.
+  **That name is the asker's first name plus the initial of their surname — "Ana R." — decided
+  2026-08-15 in 5.4.0 by R2, closing register entry 27.** It applies wherever a question is
+  displayed: the attendee's phone, the moderation queue, and the projected screen. 3.3.0 had bound
+  the full real name; the client asked for the first name alone (REQ-062, REQ-063) and her own
+  extraction recorded the thread as unresolved (OPEN-002). **The chosen form is neither of those
+  two**, and was absent from the entry's own list of options — it answers the case that decides the
+  question, which is two attendees named Ana whose questions appear together on a hall wall, while
+  putting no surname on that wall.
+
+  **Two obligations travel with it and an implementation lacking either has not implemented this
+  rule.** The unthrottled block lookup MUST be closed in the same feature: `POST /blocks` carries no
+  throttle and `GET /blocks` returns the target's live display name and avatar bytes, so an
+  abbreviated name without that closure **relocates disclosure rather than reducing it**. And the
+  client MUST be told that her stated wording was read as being about register and tone rather than
+  about the surname as such — **the decision is in tension with her literal words**, and if her
+  concern proves to be findability instead, it was wrong on its own reasoning and should be
+  revisited.
+
+  Attribution itself was never in question: a question is attributed, and anonymity remains
+  unchosen. **The system MUST still know the true author whatever is displayed** (REQ-061), which is
+  unchanged and compatible with this form.
 
   Three consequences bind alongside it, and an implementation that carries
   the exception without them has not implemented this rule:
@@ -2558,7 +2851,7 @@ the end of this block rather than glossed.
 - **The VAPID private key is held as one pair per environment**, generated once, stored as a
   repository *environment* secret and injected into that host's `.env` at deploy time — the same
   path as every other secret this project holds, deliberately, so that key custody is not a second
-  mechanism to reason about. **It MUST NOT be rotated except on compromise.** *Added 3.4.0 by L5.*
+  mechanism to reason about. **It MUST NOT be rotated except on compromise.** *Added 3.5.0 by L5.*
   Rotation invalidates every existing subscription, so every attendee silently stops receiving until
   their browser re-registers — and nothing in the product tells them to, or could. A routine
   rotation schedule would therefore be a routine outage of a capability nobody would notice failing.
@@ -2652,7 +2945,7 @@ Three conditions bind that surface:
   external service succeeding. This rule is unchanged now that a provider and an address exist:
   Mailgun being unreachable MUST still leave the block applied and the report recorded, and the
   failed dispatch MUST be logged rather than silently dropped.
-- **Reports are dispatched to `apps@programasemilla.com`**, sent through Mailgun. *Added 3.4.0 by L4
+- **Reports are dispatched to `apps@programasemilla.com`**, sent through Mailgun. *Added 3.5.0 by L4
   and L6, resolving entries 18 and 21.* **Naming the address does not discharge the obligation
   attached to it.** The reporting dialog tells the attendee that a person will read it, and the
   product deliberately promises nothing further — no case identifier, no status, nothing to poll,
@@ -2723,7 +3016,8 @@ nobody asked, and a mark is exactly such a question.
   the board carries no alpha channel, so the mark's antialiased edges are blends against its own
   navy, and any other plate colour leaves a visible halo around every curve.
 
-- **Whether the design tokens adopt the brand's values is undecided** — register entry 22 — and
+- **Whether the design tokens adopt the brand's values is undecided** — register entry 23, corrected
+  from 22 in 5.4.0's hygiene pass; 22 is the cache gap, closed by R1 — and
   until it is settled the icon plate and the token-derived `theme_color` differ visibly on the
   splash screen. That seam is **accepted knowingly**, not overlooked. No feature may resolve it by
   quietly repainting a token: the primary surface and the accent are involved, so it repaints the
@@ -3289,7 +3583,17 @@ Owner decisions taken on 2026-08-12, recorded in brainstorms #10 and #11
 entries are opened rather than answered, following the precedent 3.2.0 set and 4.0.0 followed of
 leaving a question explicitly open for the phase told to answer it.
 
-- **27. Q&A attribution: full name, first name alone, or attendee-chosen.** Created by C2, against
+- ~~**27. Q&A attribution: full name, first name alone, or attendee-chosen.**~~ **RESOLVED
+  2026-08-15 in 5.4.0 by R2: first name plus surname initial — "Ana R.".** 017 is unblocked.
+  **Decided on the client's behalf**, reading REQ-062/063 as being about register and tone rather
+  than the surname as such, and **in tension with her literal words** (*"sin apellidos"* — an
+  initial is a fragment of an apellido). She must be told rather than left to discover it. **The
+  enumeration in this entry was incomplete and that is the transferable lesson**: it offered three
+  options, six existed, and the two missing ones cost what the cheapest listed option costs and
+  dissolve the deciding case — two attendees named Ana whose questions appear together on a hall
+  wall. **A register entry that enumerates its options asserts the enumeration is complete.** This
+  one did not, and it blocked a feature for three days on a trade that was never as hard as it
+  looked. *Original entry:* Created by C2, against
   Q1. **Blocks feature 017.** 3.3.0 bound the asker's full real name with no opt-out and argued it
   at length; the client asks for the first name alone (REQ-062, REQ-063); **the client's own
   extraction records the thread as unresolved** (OPEN-002), and the source transcript contains both
@@ -3386,7 +3690,20 @@ so a gap in the source would silently render as the wrong number against a neigh
 3. **`GroundZero/requirements.md` is now knowingly out of step** with this constitution on product
    name, delivery mode, persistence, authentication, and routing. Whether it is amended or the
    divergence is recorded is undecided.
-4. **Desktop and tablet layouts have never been validated by the client.** The approved prototype is
+4. ~~**Desktop and tablet layouts have never been validated by the client.**~~ **RESOLVED
+   2026-08-15 in 5.4.0 by R3 — CLOSED BY OWNER RATIFICATION, without a client acceptance act.** 012
+   is unblocked. **This is not a claim that the layouts were validated**, and specifically not a
+   claim that green gates validated them: 5.0.0's rule on that stands unamended and is deliberately
+   unused here. The owner ratifies in the acknowledged absence of validation, and **the cost is
+   ratified with it** — desktop use is the client's own requirement (REQ-108, REQ-110), she has
+   never seen the product at a desk, and closing this entry removes the thing that kept each new
+   feature's unreviewed desktop design visible, so the debt resumes compounding silently. Ratified
+   as-is: the 768–1279px rail divergence between the two products, and Home's two-column cards on an
+   upright tablet — both unrecorded choices, now choices. **Carved out as a defect rather than
+   ratified**: `AdminShell` presents two layouts where Principle IV requires three, which fiat
+   cannot make compliant. *This entry outlived every question opened after it except 19 and 21, was
+   escalated three times, and was closed without the act it asked for.* Retained in place so the
+   numbering stays stable. *Original entry:* The approved prototype is
    mobile-only at a fixed 390×844 frame. Every desktop layout built before this is answered is
    unreviewed design, so the cost of leaving it open compounds with each feature. *Escalated
    2026-08-07 in 3.0.0*: phase 006 adds a card-dense multi-column directory grid and a second modal
@@ -3438,7 +3755,7 @@ so a gap in the source would silently render as the wrong number against a neigh
     together, which is what the 2.3.0 widening anticipated. Retained in place so the numbering stays
     stable; see "Resolved in 3.0.0" below.
 
-    **ANNOTATED 2026-08-10 in 3.4.0 by L3.** The resolution named a topology and no subscription,
+    **ANNOTATED 2026-08-10 in 3.5.0 by L3.** The resolution named a topology and no subscription,
     which is why `deploy/vm/envs/*.env` shipped with `SUBSCRIPTION` blank for three phases. It is
     `d428f98f-a3c4-49c3-ae24-06ec3de08477` (LinaSys-DevEnv), `centralus`, for both environments —
     now binding text under "Deployment environments". Recorded as an annotation rather than a
@@ -3458,7 +3775,7 @@ so a gap in the source would silently render as the wrong number against a neigh
     undecided**, and it is now a question about a permanent address rather than a transient one.
     Interacts with entries 16 and 19.
 
-    **RESOLVED 2026-08-10 in 3.4.0 by L1: openly reachable, seeded data only.** The address is
+    **RESOLVED 2026-08-10 in 3.5.0 by L1: openly reachable, seeded data only.** The address is
     `mynet-dev.programasemilla.com`. Access is not restricted by credential, allowlist or network
     boundary, because **the separation FR-067 demands is carried by the data and not by the door** —
     nothing that must be kept from a stranger is ever present. Basic auth and an IP allowlist were
@@ -3546,7 +3863,7 @@ so a gap in the source would silently render as the wrong number against a neigh
     which is the address rather than the sender, and with entry 20 — the push provider and the mail
     provider may well be answered together.
 
-    **RESOLVED 2026-08-10 in 3.4.0 by L4: Mailgun.** Its sender verification is DNS records on
+    **RESOLVED 2026-08-10 in 3.5.0 by L4: Mailgun.** Its sender verification is DNS records on
     `programasemilla.com`, the same records as UAT's address, which is why the two were settled in
     one session. **The speculation that this and entry 20 would be answered together turned out to
     be half right and instructively so**: they were answered together, but not because they shared a
@@ -3581,7 +3898,7 @@ so a gap in the source would silently render as the wrong number against a neigh
     per-person, after the fact, and routes to an operator who does not yet exist (entries 18, 21).
     Still unchanged in substance.
 
-    **ESCALATED A THIRD TIME 2026-08-10 in 3.4.0, and NOT resolved.** L1 makes UAT permanently and
+    **ESCALATED A THIRD TIME 2026-08-10 in 3.5.0, and NOT resolved.** L1 makes UAT permanently and
     openly reachable with public self sign-up and avatar upload, so this stops being a description
     of a future environment. The entry is unchanged in substance and is now a present fact. **This
     is recorded explicitly so that 3.4.0 cannot be read as having closed it by proximity** — it
@@ -3638,7 +3955,7 @@ so a gap in the source would silently render as the wrong number against a neigh
     Interacts with entry 18 (who sends it) and entry 19 (it is the nearest thing to a moderation
     path this product has).
 
-    **RESOLVED 2026-08-10 in 3.4.0 by L6: `apps@programasemilla.com`.** Now binding text under
+    **RESOLVED 2026-08-10 in 3.5.0 by L6: `apps@programasemilla.com`.** Now binding text under
     "Reporting conduct out of the product". **The address closes the entry; it does not discharge
     the obligation**, and the entry's own wording is what makes that distinction survive its
     resolution — this was filed as an obligation the owner personally holds, not as a configuration
@@ -3653,8 +3970,27 @@ so a gap in the source would silently render as the wrong number against a neigh
     as an inbox nobody reads, and this remains an obligation the owner personally holds rather than a
     vendor question. Two consequences: the mail path is **not** deleted, because an operator who must
     open a site to learn a report exists learns late; and what the queue may disclose becomes its own
-    entry (24) rather than part of this one.22. **A cached conference outlives a withdrawn registration by up to 24 hours.** *Added 2026-08-10
-    in 3.3.0, created by Q2. Against phase 010.* The offline caching decorator revokes on **age
+    entry (24) rather than part of this one.
+
+22. ~~**A cached conference outlives a withdrawn registration by up to 24 hours.**~~ **RESOLVED
+    2026-08-15 in 5.4.0 by R1 — ACCEPTED, not fixed.** The 24-hour readable window is ratified. The
+    ground on which it was tolerated is **struck as false**: the original text below says the data
+    is *"the conference programme, not another attendee's personal data"*, and the cached
+    `appointments` payload has carried the other party's display name and the agreed meeting topic
+    since 008 — **before this entry was written**. It is accepted instead on a true ground: no third
+    party can end a registration today, and the only way one ends is an act the attendee performs on
+    their own device, which purges that device in the same action. **That ground is protected by a
+    naming convention** — `no-attendee-restriction.test.ts` selects routes by URL keyword, and a 015
+    route named `DELETE /admin/conferences/:eventId/registrations/:id` passes green — so the guard
+    MUST be widened to the concept before 015 is specified, and **if 015 adds such a route this
+    entry reopens.** Two mechanisms are licensed (evict at expiry; erase any conference absent from
+    a live registered-conferences read), three are rejected on evidence, and the lifetime figure is
+    **deferred as a product judgement that cannot be priced without a real conference**. Retained in
+    place so the numbering stays stable. *Original entry, with its false sentence left visible:*
+
+    *Added 2026-08-10
+    in 3.3.0, created by Q2. Against phase 012 — refiled from 010 in 5.4.0, having never been
+    updated for the 010→011/012 split.* The offline caching decorator revokes on **age
     alone** — a 24-hour lifetime keyed `(attendeeId, eventId, resource)` — so when the server begins
     refusing an attendee who has withdrawn from a conference, or been removed from it, the
     programme, saved sessions and notes already on their device stay readable until the entry
@@ -3772,4 +4108,4 @@ so a gap in the source would silently render as the wrong number against a neigh
 stay consistent with this constitution and MUST NOT contain implementation plans, session tasks,
 progress updates, or invented requirements.
 
-**Version**: 5.3.0 | **Ratified**: 2026-08-04 | **Last Amended**: 2026-08-14
+**Version**: 5.4.0 | **Ratified**: 2026-08-04 | **Last Amended**: 2026-08-15
