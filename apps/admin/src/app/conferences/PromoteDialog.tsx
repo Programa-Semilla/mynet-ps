@@ -52,7 +52,11 @@ export const PromoteDialog = ({
   // finding — a failed attempt's address and error banner used to survive into the next
   // conference's dialog).
 
-  const ready = email.trim().length > 0
+  // Email-shaped or the button stays disabled — the server's schema would refuse garbage with a
+  // generic sentence anyway (012 walk, A4 round 2), and a refusal nobody can act on is exactly
+  // what this product's own error rules forbid. The disabled control is the pre-submit form of
+  // the same honesty, the shape the constitution's empty-input rule already prescribes.
+  const ready = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())
 
   const submit = async () => {
     if (!conference || !ready || submitting) return
@@ -63,7 +67,21 @@ export const PromoteDialog = ({
       setEmail('')
       onPromoted()
     } catch (error) {
-      setFailure(describe(classify(error), detailOf(error)))
+      // ─────────────────────────────────────────────────────────────────────────────────────
+      // The 404 is deliberately one answer for three causes (no such conference, address not
+      // registered for it, no such address) — the walker met the generic "no longer available"
+      // sentence and reasonably read it as breakage (012 walk, A4 round 2). Saying the
+      // possibilities out loud discloses nothing the server did not: the server still answers
+      // one indistinguishable 404, and this sentence merely repeats the dialog's own stated
+      // precondition back at the moment it bit.
+      // ─────────────────────────────────────────────────────────────────────────────────────
+      setFailure(
+        classify(error) === 'not_found'
+          ? 'That did not go through. Either this conference no longer exists, or that address ' +
+              'does not belong to an attendee registered for it — which of those it was is ' +
+              'deliberately not disclosed. Check the address and the conference, and try again.'
+          : describe(classify(error), detailOf(error)),
+      )
     } finally {
       setSubmitting(false)
     }
