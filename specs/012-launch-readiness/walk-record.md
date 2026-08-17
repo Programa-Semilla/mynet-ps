@@ -6,11 +6,11 @@
 | Field | Value |
 |---|---|
 | Deployed base commit | `659fa94` (develop, PR #31), hand-deployed 2026-08-17 per D-012-4 |
-| Seed patch (FR-1127) | *(name the patch; "none" is not a valid value for the assessed walk)* |
-| Walker | |
-| Defect planter (T059) | *(must not be the walker; if none exists, record the T060 fallback)* |
+| Seed patch (FR-1127) | `seed-patch-012-walk-A.diff` (sha256 733d891288d79005…), 3 seeds — one layout, one copy, one refusal — planted 2026-08-17, deployed atop `659fa94`; patch held OUT of git until the T089 reveal |
+| Walker | Danny Pérez (owner) |
+| Defect planter (T059) | the 012 implementation session (Claude) — not the walker; contents unknown to the walker until the reveal |
 | Devices | *(each width: real viewport or emulated-with-reason, FR-1121)* |
-| Dates | |
+| Dates | walk started 2026-08-17 |
 
 **A row is recorded when it carries an observation — what was actually on the screen — never a
 verdict alone.** `pass/fail` values: `pending`, `pass`, `fail`, `blocked`, `n/a` (with reason in
