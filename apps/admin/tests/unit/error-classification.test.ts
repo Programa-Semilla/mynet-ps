@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 
 import { ApiError } from '@mynet/data/http'
-import { OfflineError } from '@mynet/data'
+import { NotAuthenticatedError, OfflineError, SessionExpiredError } from '@mynet/data'
 import { describe, expect, it } from 'vitest'
 
 import { classify, describe as describeFailure, type AdminFailure } from '../../src/app/errors.js'
@@ -174,6 +174,24 @@ const CASES: readonly {
 describe('administrative error classification', () => {
   it.each(CASES)('classifies $label', ({ error, expected }) => {
     expect(classify(error)).toBe(expected)
+  })
+
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════════════════════
+   * **012 (walk step A2) — THE TWO TRANSPORT-MINTED AUTH CLASSES, WHICH THE
+   * `instanceof RequestRefusedError` GATE CANNOT SEE.**
+   *
+   * `NotAuthenticatedError` and `SessionExpiredError` extend `Error`, not `RequestRefusedError`
+   * — the exact trap `cached.ts` documents for its own predicate. Before this case existed,
+   * `classify` fell through to `unreachable` for a real 401, and every administrative page told
+   * a signed-out operator that MyNet could not be reached — dead code in the switch, found by
+   * the first person to delete the session cookie by hand. Kept OUT of `CASES` deliberately:
+   * both classes map to `not_authenticated`, and the uniqueness assertion below is over CASES.
+   * ═══════════════════════════════════════════════════════════════════════════════════════════
+   */
+  it('classifies the transport-minted auth classes as not_authenticated (012 walk A2)', () => {
+    expect(classify(new NotAuthenticatedError())).toBe('not_authenticated')
+    expect(classify(new SessionExpiredError())).toBe('not_authenticated')
   })
 
   /**

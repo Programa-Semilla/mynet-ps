@@ -140,8 +140,17 @@ export interface AdminConference {
 export interface AdminConferenceRepository {
   /** Every conference for the platform tier; assigned ones only for an organizer (FR-926). */
   list(): Promise<readonly AdminConference[]>
-  /** Platform tier only. The attendee must already be registered for the conference (FR-930). */
-  promote(input: { eventId: string; attendeeId: string }): Promise<void>
+  /**
+   * Platform tier only. The attendee must already be registered for the conference (FR-930).
+   *
+   * Named by **either** identifier form — the UUID, or the email address the promotion request
+   * arrived with. 012's walk (step A4) found the UUID-only form unusable in practice: an
+   * operator has no surface that could ever show them a UUID, deliberately — the admin product
+   * has no attendee directory (FR-973) — so the identifier a real request carries is the
+   * address. Resolution is blind and undisclosing: an unknown email is the same
+   * indistinguishable 404 as an unregistered attendee or a missing conference.
+   */
+  promote(input: { eventId: string } & ({ attendeeId: string } | { email: string })): Promise<void>
   /** Platform tier only. Ends authority and leaves the account untouched (FR-934). */
   demote(input: { eventId: string; attendeeId: string }): Promise<void>
   /**

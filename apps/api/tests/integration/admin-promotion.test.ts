@@ -190,6 +190,90 @@ describe('promotion and demotion', () => {
   })
 
   /**
+   * ═══════════════════════════════════════════════════════════════════════════════════════════
+   * **012 (walk step A4) — PROMOTION BY EMAIL, because the UUID form was unusable in practice.**
+   *
+   * No administrative surface can ever show an operator a UUID — the admin product deliberately
+   * has no attendee directory (FR-973) — so every real promotion attempt 400'd, found by the
+   * first person to try one. The identifier a real request carries is the address; resolution
+   * is blind, inside the promoting transaction, and a miss takes the same indistinguishable-404
+   * path as everything else, so accepting it widens no disclosure.
+   * ═══════════════════════════════════════════════════════════════════════════════════════════
+   */
+  it('promotes by email, resolving it blind (012 walk A4)', async () => {
+    const cookie = await platformSession()
+    const eventId = (await registeredEvents(adaId))[0]!
+
+    const response = await app.inject({
+      method: 'POST',
+      url: `/admin/conferences/${eventId}/organizers`,
+      headers: { cookie },
+      // Mixed case on purpose: resolution must normalise, as sign-in does.
+      payload: { email: 'ADA@example.com' },
+    })
+
+    expect(response.statusCode).toBe(204)
+
+    const [assignment] = await getDb()
+      .select()
+      .from(organizerAssignments)
+      .where(eq(organizerAssignments.attendeeId, adaId))
+    expect(assignment?.eventId).toBe(eventId)
+
+    // The audit entry names the RESOLVED attendee, never the address (FR-994's entry stays
+    // coherent whichever identifier form arrived).
+    const entries = await getDb()
+      .select()
+      .from(adminAuditEntries)
+      .where(eq(adminAuditEntries.action, 'promote'))
+    expect(entries[0]?.subjectAttendeeId).toBe(adaId)
+  })
+
+  it('refuses an unknown email indistinguishably from every other 404 (012 walk A4)', async () => {
+    const cookie = await platformSession()
+    const eventId = (await registeredEvents(adaId))[0]!
+
+    const unknownEmail = await app.inject({
+      method: 'POST',
+      url: `/admin/conferences/${eventId}/organizers`,
+      headers: { cookie },
+      payload: { email: 'nobody-here@example.com' },
+    })
+
+    const unknownConference = await app.inject({
+      method: 'POST',
+      url: '/admin/conferences/00000000-0000-4000-8000-000000000000/organizers',
+      headers: { cookie },
+      payload: { attendeeId: adaId },
+    })
+
+    expect(unknownEmail.statusCode).toBe(404)
+    expect(
+      unknownEmail.body,
+      'an unknown address and an unknown conference answered differently — the email form has ' +
+        "become an oracle for whether an address holds an account (008's defect, new door).",
+    ).toBe(unknownConference.body)
+
+    // Exactly one identifier form per request: both, or neither, is a schema refusal.
+    const both = await app.inject({
+      method: 'POST',
+      url: `/admin/conferences/${eventId}/organizers`,
+      headers: { cookie },
+      payload: { attendeeId: adaId, email: 'ada@example.com' },
+    })
+    const neither = await app.inject({
+      method: 'POST',
+      url: `/admin/conferences/${eventId}/organizers`,
+      headers: { cookie },
+      payload: {},
+    })
+    expect(both.statusCode).toBe(400)
+    expect(neither.statusCode).toBe(400)
+
+    expect(await getDb().select().from(organizerAssignments)).toEqual([])
+  })
+
+  /**
    * **T114 — two conferences, two rows, independently revocable** (FR-932).
    *
    * A single `is_organizer` column could not express this at all, which is one of the reasons

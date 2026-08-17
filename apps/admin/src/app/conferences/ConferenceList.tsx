@@ -174,6 +174,13 @@ export const ConferenceList = () => {
       />
 
       <PromoteDialog
+        // ─────────────────────────────────────────────────────────────────────────────────
+        // Keyed by the conference so every opening MOUNTS a fresh dialog (012 walk, step A4's
+        // second finding): the component outlives its closings, so a failed attempt's address
+        // and error banner survived into the next conference's dialog. A remount is the reset
+        // — no effect, no setState-in-effect, nothing to forget to clear.
+        // ─────────────────────────────────────────────────────────────────────────────────
+        key={promoting?.id ?? 'closed'}
         open={promoting !== null}
         conference={promoting}
         onClose={() => setPromoting(null)}

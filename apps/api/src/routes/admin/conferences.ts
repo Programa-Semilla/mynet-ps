@@ -1,3 +1,4 @@
+import { eq } from 'drizzle-orm'
 import type { FastifyInstance } from 'fastify'
 
 import {
@@ -12,7 +13,9 @@ import {
   listConferences,
   promoteToOrganizer,
 } from '../../db/queries/admin-assignments.js'
+import { normaliseEmail } from '../../db/queries/attendees.js'
 import { getDb } from '../../db/client.js'
+import { attendees } from '../../db/schema/attendees.js'
 import { notFound } from '../../errors.js'
 
 /**
@@ -102,11 +105,23 @@ export const adminConferenceRoutes = async (app: FastifyInstance): Promise<void>
           required: ['eventId'],
           properties: { eventId: { type: 'string', format: 'uuid' } },
         },
+        // ─────────────────────────────────────────────────────────────────────────────────
+        // **Either identifier form, exactly one** (012 walk step A4). The UUID-only body made
+        // promotion unusable in practice: no administrative surface can ever show an operator
+        // a UUID — the admin product deliberately has no attendee directory (FR-973) — so the
+        // identifier a real promotion request carries is the person's email address. Email
+        // resolution is blind: an unknown address takes the same indistinguishable-404 path as
+        // an unregistered attendee, so this widens no disclosure (the enumeration-oracle
+        // reasoning in the handler is unchanged and covers it).
+        // ─────────────────────────────────────────────────────────────────────────────────
         body: {
           type: 'object',
-          required: ['attendeeId'],
           additionalProperties: false,
-          properties: { attendeeId: { type: 'string', format: 'uuid' } },
+          properties: {
+            attendeeId: { type: 'string', format: 'uuid' },
+            email: { type: 'string', format: 'email', maxLength: 320 },
+          },
+          oneOf: [{ required: ['attendeeId'] }, { required: ['email'] }],
         },
         response: {
           204: { type: 'null' },
@@ -126,15 +141,31 @@ export const adminConferenceRoutes = async (app: FastifyInstance): Promise<void>
     async (request, reply) => {
       const scope = platformScopeOf(request)
       const { eventId } = request.params as { eventId: string }
-      const { attendeeId } = request.body as { attendeeId: string }
+      const body = request.body as { attendeeId?: string; email?: string }
 
       // ─────────────────────────────────────────────────────────────────────────────────────
       // **The assignment and the entry that accounts for it commit together, or neither does**
       // (FR-994). An unrecorded promotion is an authority nobody can explain; a recorded one
       // that did not happen is an accusation. The HTTP outcome is decided outside, because a
       // `reply.send` inside a transaction callback ties the wire to the commit.
+      //
+      // **Email resolution happens INSIDE the same transaction** (012, walk A4) and its miss is
+      // `not-registered` — deliberately the same outcome an unregistered attendee produces, so
+      // the wire stays one indistinguishable 404 and an unknown address discloses exactly as
+      // much as an unknown UUID always has: nothing.
       // ─────────────────────────────────────────────────────────────────────────────────────
       const outcome = await getDb().transaction(async (tx) => {
+        let attendeeId = body.attendeeId ?? null
+        if (attendeeId === null) {
+          const resolved = await tx
+            .select({ id: attendees.id })
+            .from(attendees)
+            .where(eq(attendees.email, normaliseEmail(body.email ?? '')))
+            .limit(1)
+          if (resolved.length === 0) return 'not-registered' as const
+          attendeeId = resolved[0]!.id
+        }
+
         const result = await promoteToOrganizer(scope, { eventId, attendeeId }, tx)
         if (result !== 'promoted') return result
 

@@ -20,13 +20,13 @@ the observation). Every D-part row (layout/install) must name a capture file tha
 
 | Step | Subject | Observation | Pass/fail | Capture |
 |---|---|---|---|---|
-| A1 | First sign-in forces a credential of the operator's own | | pending |  |
-| A2 | Two independent sessions | | pending |  |
-| A3 | The empty report queue is a state, not an error | | pending |  |
-| A4 | Promotion | | pending |  |
+| A1 | First sign-in forces a credential of the operator's own | Replacement password demanded before any administrative surface rendered; reveal control present and working; after replacing, the admin home rendered. | pass |  |
+| A2 | Two independent sessions | MyNet sign-in first refused with a cannot-connect message — server logs show NO request arrived and the window coincided with the seeded build's deploy/restart, so recorded as environment, not defect. Admin session survived MyNet sign-out. After deleting the admin cookie by hand, every page said 'MyNet could not be reached. Nothing was changed — try again when you have a connection' — an ended session misreported as connectivity (defect DR-1, fixed). FAIL on the third assertion; re-walk after redeploy. | fail |  |
+| A3 | The empty report queue is a state, not an error | Explicit nothing-here empty state at /reports; nothing rendered as a fault. | pass |  |
+| A4 | Promotion | Promotion failed on every attempt with the generic 'Something went wrong' — the form demanded a UUID under the label 'Attendee identifier', which no administrative surface can ever show an operator (defect DR-2); a closed errored dialog kept the typed address and banner when reopened for ANOTHER conference (defect DR-3). Both fixed; re-walk after redeploy. | fail |  |
 | A5 | The tier boundary is real | | pending |  |
 | A6 | No route acts on a person | | pending |  |
-| A7 | Refusals are indistinguishable | | pending |  |
+| A7 | Refusals are indistinguishable | A wrong password for a real operator and an unknown address produced identical refusals. | pass |  |
 | B1 | Promotion changed nothing observable in MyNet | | pending |  |
 | B2 | Seam S8: a conference from zero | | pending |  |
 | B3 | A real attendee joins from nothing | | pending |  |

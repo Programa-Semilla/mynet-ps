@@ -9,21 +9,26 @@ import { AdminDialog } from '../shell/AdminDialog.js'
  * T129 (013) — promoting a registered attendee to organizer (FR-930, FR-933).
  *
  * ═════════════════════════════════════════════════════════════════════════════════════════════
- * **THE ATTENDEE IS NAMED BY IDENTIFIER, AND THERE IS DELIBERATELY NO SEARCH.**
+ * **THE ATTENDEE IS NAMED BY EMAIL, AND THERE IS STILL DELIBERATELY NO SEARCH.**
  *
  * A picker that let an operator search attendees by name would be a **directory of every attendee
  * in the product, readable by an administrative principal** — and FR-973 says no administrative
  * tier may read a profile at all. Decision 33 puts it in one sentence: conference content is
  * authorable, a person is not.
  *
- * So the operator brings the identifier with them, from the report or the request that prompted
- * the promotion. That is deliberately less convenient, and building the search would be the
- * single easiest way to give administration a view of everybody.
+ * So the operator brings the identifier with them, from the request that prompted the promotion —
+ * **and 012's walk (step A4) found what "identifier" had quietly meant**: this field demanded the
+ * attendee's UUID, which no surface anywhere can show an operator, deliberately. Every promotion
+ * attempt 400'd, making the act unusable outside a test that already held the UUID. The
+ * identifier a real request carries is the person's **email address**, so that is what the field
+ * asks for now; the server resolves it blind, inside the promoting transaction.
  *
- * **A refused promotion says nothing about the attendee.** The server answers 404 for "no such
- * conference" and "not registered for it" identically, so this route is not an enumeration oracle
- * for another attendee's presence at a conference — 008's exact defect on proposing a meeting,
- * where the caller controlled the slot so the invitee was the only variable.
+ * **A refused promotion still says nothing about the attendee.** The server answers 404 for "no
+ * such conference", "not registered for it" and now "no such address" identically, so this route
+ * is not an enumeration oracle for another attendee's presence — or existence — 008's exact
+ * defect on proposing a meeting, where the caller controlled the slot so the invitee was the
+ * only variable. Accepting the email widens no disclosure: the answer to a miss is the same
+ * silence the UUID form always gave.
  * ═════════════════════════════════════════════════════════════════════════════════════════════
  */
 export const PromoteDialog = ({
@@ -38,19 +43,24 @@ export const PromoteDialog = ({
   readonly onPromoted: () => void
 }) => {
   const { services } = useAdminSession()
-  const [attendeeId, setAttendeeId] = useState('')
+  const [email, setEmail] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [failure, setFailure] = useState<string | null>(null)
 
-  const ready = attendeeId.trim().length > 0
+  // The clean-on-open reset lives at the RENDER SITE, not here: `ConferenceList` keys this
+  // dialog by the conference, so every opening mounts fresh state (012 walk, step A4's second
+  // finding — a failed attempt's address and error banner used to survive into the next
+  // conference's dialog).
+
+  const ready = email.trim().length > 0
 
   const submit = async () => {
     if (!conference || !ready || submitting) return
     setSubmitting(true)
     setFailure(null)
     try {
-      await services.conferences.promote({ eventId: conference.id, attendeeId: attendeeId.trim() })
-      setAttendeeId('')
+      await services.conferences.promote({ eventId: conference.id, email: email.trim() })
+      setEmail('')
       onPromoted()
     } catch (error) {
       setFailure(describe(classify(error), detailOf(error)))
@@ -70,13 +80,15 @@ export const PromoteDialog = ({
         in MyNet — their account, profile and conversations are untouched.
       </p>
 
-      <label htmlFor="attendee-id" className="mt-4 block text-sm font-medium text-text-primary">
-        Attendee identifier
+      <label htmlFor="attendee-email" className="mt-4 block text-sm font-medium text-text-primary">
+        Attendee email
       </label>
       <input
-        id="attendee-id"
-        value={attendeeId}
-        onChange={(event) => setAttendeeId(event.target.value)}
+        id="attendee-email"
+        type="email"
+        autoComplete="off"
+        value={email}
+        onChange={(event) => setEmail(event.target.value)}
         className="mt-1 mb-4 block min-h-11 w-full rounded-lg border border-border-strong px-3 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-coral-500"
       />
 

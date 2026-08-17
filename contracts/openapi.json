@@ -8232,16 +8232,30 @@
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": [
-                  "attendeeId"
-                ],
                 "additionalProperties": false,
                 "properties": {
                   "attendeeId": {
                     "type": "string",
                     "format": "uuid"
+                  },
+                  "email": {
+                    "type": "string",
+                    "format": "email",
+                    "maxLength": 320
                   }
-                }
+                },
+                "oneOf": [
+                  {
+                    "required": [
+                      "attendeeId"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "email"
+                    ]
+                  }
+                ]
               }
             }
           }

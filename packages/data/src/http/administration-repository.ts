@@ -115,10 +115,14 @@ export class HttpAdminConferenceRepository implements AdminConferenceRepository 
     return this.#http.request<AdminConference[]>('/admin/conferences')
   }
 
-  async promote(input: { eventId: string; attendeeId: string }): Promise<void> {
+  async promote(
+    input: { eventId: string } & ({ attendeeId: string } | { email: string }),
+  ): Promise<void> {
     await this.#http.request<void>(`/admin/conferences/${input.eventId}/organizers`, {
       method: 'POST',
-      body: JSON.stringify({ attendeeId: input.attendeeId }),
+      body: JSON.stringify(
+        'attendeeId' in input ? { attendeeId: input.attendeeId } : { email: input.email },
+      ),
     })
   }
 

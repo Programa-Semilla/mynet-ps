@@ -5433,8 +5433,10 @@ export interface paths {
                 content: {
                     "application/json": {
                         /** Format: uuid */
-                        attendeeId: string;
-                    };
+                        attendeeId?: string;
+                        /** Format: email */
+                        email?: string;
+                    } & (unknown | unknown);
                 };
             };
             responses: {

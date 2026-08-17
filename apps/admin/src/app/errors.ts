@@ -1,4 +1,4 @@
-import { RequestRefusedError } from '@mynet/data'
+import { NotAuthenticatedError, RequestRefusedError, SessionExpiredError } from '@mynet/data'
 
 /**
  * T083 (013) — **classify on `error.code`, never on the class** (contracts, 008's defect).
@@ -104,6 +104,20 @@ export type AdminFailure =
  * server explained* from *a request that never arrived* — never to decide which refusal it was.
  */
 export const classify = (error: unknown): AdminFailure => {
+  // ─────────────────────────────────────────────────────────────────────────────────────────
+  // **These two come FIRST, and the `instanceof RequestRefusedError` gate below cannot see
+  // them** — `NotAuthenticatedError` and `SessionExpiredError` extend `Error`, not
+  // `RequestRefusedError` (the exact trap `cached.ts` documents for its own predicate). Until
+  // 012's walk, the `not_authenticated` case in the switch below was DEAD CODE for a real 401:
+  // the transport mints these two classes from the codes before any code-carrying refusal is
+  // thrown, so an ended session fell through to `unreachable` and every administrative page
+  // told a signed-out operator that MyNet could not be reached — found by walk step A2, the
+  // first person to delete the cookie by hand.
+  // ─────────────────────────────────────────────────────────────────────────────────────────
+  if (error instanceof NotAuthenticatedError || error instanceof SessionExpiredError) {
+    return 'not_authenticated'
+  }
+
   if (error instanceof RequestRefusedError) {
     const code = (error as { code?: string }).code
     switch (code) {
