@@ -25,8 +25,9 @@ the observation). Every D-part row (layout/install) must name a capture file tha
 | A2 | Two independent sessions — RE-WALK after DR-1's fix | Deleting the admin cookie now renders 'Your administrative session has ended. Sign in again to continue' — distinguishable from a failed sign-in, as required. | pass | |
 | A3 | The empty report queue is a state, not an error | Explicit nothing-here empty state at /reports; nothing rendered as a fault. | pass |  |
 | A4 | Promotion | Promotion failed on every attempt with the generic 'Something went wrong' — the form demanded a UUID under the label 'Attendee identifier', which no administrative surface can ever show an operator (defect DR-2); a closed errored dialog kept the typed address and banner when reopened for ANOTHER conference (defect DR-3). Both fixed; re-walk after redeploy. | fail |  |
-| A5 | The tier boundary is real | | pending |  |
-| A6 | No route acts on a person | | pending |  |
+| A4 | Promotion — RE-WALK after DR-2/DR-3/DR-5 | Promotion by email succeeded on Product & Design Summit (204; assignment live in the database). Attempts (2)/(3) both hit Frontend Horizons — server logs show two 404s on its id — so the refusals were FR-930 being right about an unregistered attendee, not a defect; the dialog title names the conference and the walker had the wrong row. Dialog opens clean every time. The 409 duplicate-promotion sentence and DR-5's new 404 sentence render from the current bundle after a tab reload (the open SPA tab was running the pre-fix bundle; index.html is no-cache, assets immutable — browser behaviour, not a header defect). | pass | |
+| A5 | The tier boundary is real | Signed in at the admin host as the promoted organizer: navigation shows Overview and Conferences only — no report-queue entry. Direct /reports answers the indistinguishable refusal sentence; nothing confirms the queue exists. | pass |  |
+| A6 | No route acts on a person | Surfaces enumerated as organizer and as operator: no control anywhere suspends, removes, mutes or edits an attendee or profile. | pass |  |
 | A7 | Refusals are indistinguishable | A wrong password for a real operator and an unknown address produced identical refusals. | pass |  |
 | B1 | Promotion changed nothing observable in MyNet | | pending |  |
 | B2 | Seam S8: a conference from zero | | pending |  |
