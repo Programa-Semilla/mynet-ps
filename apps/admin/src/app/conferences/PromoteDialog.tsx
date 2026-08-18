@@ -75,12 +75,20 @@ export const PromoteDialog = ({
       // one indistinguishable 404, and this sentence merely repeats the dialog's own stated
       // precondition back at the moment it bit.
       // ─────────────────────────────────────────────────────────────────────────────────────
+      // `refused` renders its specific sentence here (DR-6, 012 walk Part B): on THIS route a
+      // 409 has exactly one documented meaning — the server even writes the sentence — and the
+      // generic "could not be completed" swallowed it, the exact explained-refusal defect class
+      // 008 and 014 each paid for. Safe to say aloud: it describes the caller's own duplicate
+      // act against a queue they are already reading.
+      const failure = classify(error)
       setFailure(
-        classify(error) === 'not_found'
+        failure === 'not_found'
           ? 'That did not go through. Either this conference no longer exists, or that address ' +
               'does not belong to an attendee registered for it — which of those it was is ' +
               'deliberately not disclosed. Check the address and the conference, and try again.'
-          : describe(classify(error), detailOf(error)),
+          : failure === 'refused'
+            ? 'That attendee already organizes this conference.'
+            : describe(failure, detailOf(error)),
       )
     } finally {
       setSubmitting(false)
