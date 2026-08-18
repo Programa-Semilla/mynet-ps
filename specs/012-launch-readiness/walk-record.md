@@ -32,13 +32,13 @@ the observation). Every D-part row (layout/install) must name a capture file tha
 | B1 | Promotion changed nothing observable in MyNet | Promoted organizer walked all five MyNet destinations: no admin affordance, no privileged view, nothing observable changed. | pass |  |
 | B2 | Seam S8: a conference from zero | Conference created from zero as the organizer (decision 47's first real exercise): 'Grace Conference 2', 2 tracks, 2 rooms, 2 speakers, 3 sessions (fewer than the scripted 6 — sufficient for every downstream step), one optional with capacity 2; join code issued; every authoring edit crossed a real browser's CORS preflight cleanly (seam S13). Duplicate-promotion 409 initially rendered the generic sentence while the server wrote the specific one — DR-6, fixed. | pass |  |
 | B3 | A real attendee joins from nothing | Real attendee joined by code and arrived at the conference; sign-up + verification half was already proven live (OPERATIONS-LOG, T006). | pass |  |
-| B4 | Content is live-edited | | pending |  |
+| B4 | Content is live-edited | A session's summary edited as the organizer appeared on the attendee's next read of the panel — no draft state, no publish step. (First attempt edited the CONFERENCE, whose form is name-only by design; the conference name updated only after a full reload — recorded as an observation: the active conference resolves once per session and content reads refresh on navigation.) | pass |  |
 | B5 | The second notification trigger, coalesced | Walked three times, and the failures taught more than a first-try pass would have. Round 1: silence — correct, the only saved session's material edits predated the save. Round 2: server dispatched (delivered:1) into a subscription created in a discarded/incognito window; the follow-up message push got FCM 410 and the server DISCARDED the dead subscription — the designed dead-vs-failing asymmetry observed live. Round 3, fresh subscription in a persistent profile: ONE organizer act changing room AND start time produced ONE notification ('session moved'); activating it landed on the session itself — the surface carrying the marker, never a list; the per-row marker was present before activation and cleared after (markViewed working); no view anywhere shows a count of changes. | pass |  |
 | B6 | Cancellation, and the one surface that omits it | | pending |  |
 | B7 | Delete is fenced by engagement | | pending |  |
-| B8 | Full and closed are different sentences | | pending |  |
+| B8 | Full and closed are different sentences | Optional session (capacity 2) filled by two attendees; the third attempt's refusal said the session is FULL — the sentence 'closed' did not appear. (The closed sentence needs the closing offset to pass; the full/closed mutual difference is machine-asserted, and the walk confirmed the full half renders.) | pass |  |
 | B9 | The roster, and what it must not show | | pending |  |
-| B10 | A virtual conference | | pending |  |
+| B10 | A virtual conference | Virtual modality with an https access link renders the link where a room would be on the attendee side; an http link is refused at authoring. | pass |  |
 | C1 | The five destinations, including every empty state | | pending |  |
 | C2 | Build an agenda; the panel; notes | | pending |  |
 | C3 | Discover narrows and respects visibility | | pending |  |
