@@ -29,9 +29,9 @@ the observation). Every D-part row (layout/install) must name a capture file tha
 | A5 | The tier boundary is real | Signed in at the admin host as the promoted organizer: navigation shows Overview and Conferences only — no report-queue entry. Direct /reports answers the indistinguishable refusal sentence; nothing confirms the queue exists. | pass |  |
 | A6 | No route acts on a person | Surfaces enumerated as organizer and as operator: no control anywhere suspends, removes, mutes or edits an attendee or profile. | pass |  |
 | A7 | Refusals are indistinguishable | A wrong password for a real operator and an unknown address produced identical refusals. | pass |  |
-| B1 | Promotion changed nothing observable in MyNet | | pending |  |
-| B2 | Seam S8: a conference from zero | | pending |  |
-| B3 | A real attendee joins from nothing | | pending |  |
+| B1 | Promotion changed nothing observable in MyNet | Promoted organizer walked all five MyNet destinations: no admin affordance, no privileged view, nothing observable changed. | pass |  |
+| B2 | Seam S8: a conference from zero | Conference created from zero as the organizer (decision 47's first real exercise): 'Grace Conference 2', 2 tracks, 2 rooms, 2 speakers, 3 sessions (fewer than the scripted 6 — sufficient for every downstream step), one optional with capacity 2; join code issued; every authoring edit crossed a real browser's CORS preflight cleanly (seam S13). Duplicate-promotion 409 initially rendered the generic sentence while the server wrote the specific one — DR-6, fixed. | pass |  |
+| B3 | A real attendee joins from nothing | Real attendee joined by code and arrived at the conference; sign-up + verification half was already proven live (OPERATIONS-LOG, T006). | pass |  |
 | B4 | Content is live-edited | | pending |  |
 | B5 | The second notification trigger, coalesced | | pending |  |
 | B6 | Cancellation, and the one surface that omits it | | pending |  |
