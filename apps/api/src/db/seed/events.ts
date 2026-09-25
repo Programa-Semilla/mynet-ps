@@ -51,12 +51,35 @@ import type { SeedContext, SeedModule } from './index.js'
  * value and no conference can be joined (FR-317) — which is the intended failure for a database
  * that was migrated but not re-seeded, not an oversight.
  */
+/**
+ * **The seeded conferences are dated RELATIVE TO THE DAY THE SEED RUNS, never to a calendar date.**
+ *
+ * They were committed as fixed dates (2026-09-14, 2026-10-05, 2026-11-11), which made every suite
+ * that touches them depend on the wall clock: on 2026-09-24 the first conference had ended, its
+ * meeting slots had all lapsed, and integration and end-to-end runs failed on a docs-only change —
+ * in code nobody had touched. Every suite was written while all three conferences lay in the
+ * future, so that is the state the offsets below preserve: the first starts four weeks after the
+ * seed runs, and the gaps and lengths between the three are the originals (21 and 58 days apart;
+ * four, three and three days long). Reseeding an environment moves its dates, which is harmless
+ * for a fixture that never holds real attendee data.
+ *
+ * Computed from the UTC calendar day, so a seed run at any hour anywhere produces the same dates.
+ */
+const SEED_LEAD_DAYS = 28
+
+const seedDay = (offsetDays: number): string => {
+  const now = new Date()
+  const day = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()))
+  day.setUTCDate(day.getUTCDate() + SEED_LEAD_DAYS + offsetDays)
+  return day.toISOString().slice(0, 10)
+}
+
 export const SEED_EVENTS = [
   {
     name: 'Product & Design Summit',
     location: 'Barcelona, Spain',
-    startsOn: '2026-09-14',
-    endsOn: '2026-09-17',
+    startsOn: seedDay(0),
+    endsOn: seedDay(3),
     timezone: 'Europe/Madrid',
     joinCode: 'PDS-2026',
     // FR-1048: every conference carries an explicit modality; the seeded programmes all carry
@@ -68,8 +91,8 @@ export const SEED_EVENTS = [
   {
     name: 'Frontend Horizons',
     location: 'Lisbon, Portugal',
-    startsOn: '2026-10-05',
-    endsOn: '2026-10-07',
+    startsOn: seedDay(21),
+    endsOn: seedDay(23),
     timezone: 'Europe/Lisbon',
     joinCode: 'FH-2026',
     modality: 'in-person',
@@ -77,8 +100,8 @@ export const SEED_EVENTS = [
   {
     name: 'Systems & Scale',
     location: 'Berlin, Germany',
-    startsOn: '2026-11-11',
-    endsOn: '2026-11-13',
+    startsOn: seedDay(58),
+    endsOn: seedDay(60),
     timezone: 'Europe/Berlin',
     joinCode: 'SS-2026',
     modality: 'in-person',
