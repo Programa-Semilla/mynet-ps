@@ -1,8 +1,12 @@
-# Standing decisions (project owner) — numbered list
+# Owner decisions — numbered log
 
-**Moved verbatim from `CLAUDE.md` on 2026-09-24.** The binding text of every decision is in
-`.specify/memory/constitution.md`; this file is the **numbered** list that code comments and specs
-cite as "decision N". *Known numbering collisions, preserved rather than renumbered because code and specs cite these
+**A living record, not governance.** The rules these decisions produced are in
+`.specify/memory/constitution.md`, which is authoritative; this file keeps the **numbered** decisions
+that code comments and specs cite as "decision N", with the reasoning each was taken on. Decisions
+1–56 were moved verbatim from `CLAUDE.md` on 2026-09-24. **New decisions are appended at the end**,
+numbered from 57; a decision that changes a constitutional rule is also an amendment (constitution
+G.2). Constitution rule numbers (e.g. P.17) changed in v6.0.0 — decisions cite the rule text, not
+the number. *Known numbering collisions, preserved rather than renumbered because code and specs cite these
 numbers*: **30** is used twice (the UAT address in the 3.5.0 block, and the brand mark in the 3.4.0
 block), and **31–35** are used twice (the 3.5.0 deployment decisions, and the v4.0.0 administration
 decisions). In administrative code, "decision 31–39" means the v4.0.0/v4.1.0 block. The next free

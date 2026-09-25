@@ -1,6 +1,6 @@
 # Architectural invariants — full record
 
-**Moved verbatim from `CLAUDE.md` on 2026-09-24** (constitution 5.4.1), where it had grown too large
+**Moved verbatim from `CLAUDE.md` on 2026-09-24** (constitution 6.0.0), where it had grown too large
 to load every session. `CLAUDE.md` now carries a one-line index of these rules; this file carries
 the reasoning. The constitution is authoritative over both. Invariants established by 010, 014 and
 016 that `CLAUDE.md` recorded under its status section are in `delivery-log.md` beside this file.
