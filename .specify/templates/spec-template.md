@@ -143,10 +143,10 @@
 | **Validation checklist discharged** (Principle VII) | [Which whole-product checklist items this feature satisfies, and which it deliberately leaves to a later feature.] |
 | **Identity scoping & server-side authorization** (Principle VIII) | [How every read path is scoped by identity and refused server-side. Authority MUST be a server-enforced predicate, never a claim the client presents.] |
 | **Deletion & export coverage** (Principle VIII) | [How each new record is reached by the deletion cascade and appears in the export; for any record no cascade can reach, the retention window that clears it. Both coverage tests derive expectations from the schema, so a new table or column FAILS BY EXISTING.] |
-| **Event scoping** (Standing decision D1/7) | [Per-event or cross-event, and why. Neither is a default that may be assumed.] |
+| **Event scoping** (rule P.4) | [Per-event or cross-event, and why. Neither is a default that may be assumed.] |
 | **Administrative counterpart** (Principle IX, added 5.0.0) | [For every capability this feature adds to MyNet: does an administrative counterpart already exist, must it be built here, or is it explicitly NONE? "None, because…" is a valid and common answer — the obligation is to have looked. A feature adding no attendee-facing capability declares that and is done. Since 4.0.0 there are two actors and two websites against one database, and the failure mode is a thing attendees can do that no administrator can see, undo, or answer for.] |
-| **Register position** (Governance) | [Which Open Questions Register entries block this feature, which it resolves, which it escalates, and which it opens.] |
-| **Migration number** (Branching — parallel work; rule changed 5.3.0 by O4) | [Numbers are **claimed at generation, not reserved in advance**. State whether this feature will add a migration, and if so that it will take the next free number when it generates and extend the roadmap's number table in the same change. "No migration, because…" is a valid answer. Do NOT reserve a number here.] |
+| **Open questions** (Principle I, IX.1) | [Which entries in `docs/governance/open-questions.md` block this feature, which it resolves (citing the owner decision in `docs/governance/decisions.md`), which it escalates, and which it opens.] |
+| **Migration number** (rule A.2, W.3) | [Numbers are **claimed at generation, not reserved in advance**. State whether this feature will add a migration, and if so that it will take the next free number when it generates and extend the roadmap's number table in the same change. "No migration, because…" is a valid answer. Do NOT reserve a number here.] |
 
 ## Assumptions
 
