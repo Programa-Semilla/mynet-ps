@@ -5,12 +5,13 @@
 
 | Field | Value |
 |---|---|
-| Deployed base commit | `659fa94` (develop, PR #31), hand-deployed 2026-08-17 per D-012-4 |
+| Deployed base commit | `659fa94` (develop, PR #31), hand-deployed 2026-08-17 per D-012-4; walk fixes DR-1..DR-5 deployed 2026-08-17 06:50 UTC. **Redeployed 2026-09-25 05:25 UTC from `535a351`** (feat/012-walk tip: DR-6's fix, which the August build never carried, plus develop through #33) with the same seed patch re-applied and reverted after — OPERATIONS-LOG 2026-09-25 |
 | Seed patch (FR-1127) | `seed-patch-012-walk-A.diff` (sha256 733d891288d79005…), 3 seeds — one layout, one copy, one refusal — planted 2026-08-17, deployed atop `659fa94`; patch held OUT of git until the T089 reveal |
 | Walker | Danny Pérez (owner) |
 | Defect planter (T059) | the 012 implementation session (Claude) — not the walker; contents unknown to the walker until the reveal |
 | Devices | *(each width: real viewport or emulated-with-reason, FR-1121)* |
-| Dates | walk started 2026-08-17 |
+| Dates | walk started 2026-08-17; Parts A–B 2026-08-17→19; resumed at Part C 2026-09-25 |
+| Environment note (not an observation) | Before Part C, 'Grace Conference 2' was moved by its organizer through the admin API from 17–19 Aug to **25–27 Sep 2026 (UTC)**, its two remaining sessions with it (session 1: 25 Sep 18:00–19:00 UTC; session 3: 26 Sep 16:00–18:00 UTC), so the conference day is today. Moving session 3 is a material change: its saver received a 'session moved' push and carries a changed-marker on that row — expected, caused by the move, not by Part C. |
 
 **A row is recorded when it carries an observation — what was actually on the screen — never a
 verdict alone.** `pass/fail` values: `pending`, `pass`, `fail`, `blocked`, `n/a` (with reason in
@@ -26,6 +27,7 @@ the observation). Every D-part row (layout/install) must name a capture file tha
 | A3 | The empty report queue is a state, not an error | Explicit nothing-here empty state at /reports; nothing rendered as a fault. | pass |  |
 | A4 | Promotion | Promotion failed on every attempt with the generic 'Something went wrong' — the form demanded a UUID under the label 'Attendee identifier', which no administrative surface can ever show an operator (defect DR-2); a closed errored dialog kept the typed address and banner when reopened for ANOTHER conference (defect DR-3). Both fixed; re-walk after redeploy. | fail |  |
 | A4 | Promotion — RE-WALK after DR-2/DR-3/DR-5 | Promotion by email succeeded on Product & Design Summit (204; assignment live in the database). Attempts (2)/(3) both hit Frontend Horizons — server logs show two 404s on its id — so the refusals were FR-930 being right about an unregistered attendee, not a defect; the dialog title names the conference and the walker had the wrong row. Dialog opens clean every time. The 409 duplicate-promotion sentence and DR-5's new 404 sentence render from the current bundle after a tab reload (the open SPA tab was running the pre-fix bundle; index.html is no-cache, assets immutable — browser behaviour, not a header defect). | pass | |
+| A4 | Promotion — CORRECTION to row 2 (2026-09-25) | Row 2's statement that 'the 409 duplicate-promotion sentence … render[s] from the current bundle' cannot have been observed: DR-6's fix (02e7550) was committed after the last August deploy, and the served admin bundle was checked on 2026-09-25 and contained no occurrence of 'That attendee already organizes this conference.' B2's row records what actually rendered — the generic sentence (DR-6). The other assertions in row 2 stand. DR-6 is re-walked on the 2026-09-25 build in its own row below. | n/a |  |
 | A5 | The tier boundary is real | Signed in at the admin host as the promoted organizer: navigation shows Overview and Conferences only — no report-queue entry. Direct /reports answers the indistinguishable refusal sentence; nothing confirms the queue exists. | pass |  |
 | A6 | No route acts on a person | Surfaces enumerated as organizer and as operator: no control anywhere suspends, removes, mutes or edits an attendee or profile. | pass |  |
 | A7 | Refusals are indistinguishable | A wrong password for a real operator and an unknown address produced identical refusals. | pass |  |

@@ -556,3 +556,24 @@ decision; CI's deploy job is inert on purpose) and the build the FR-1120 walk ru
 `walk-record.md`'s header now names it.
 
 **Recorded by**: the 012 implementation session.
+
+## 2026-09-25 — 012 walk: feat/012-walk redeployed to UAT before Part C
+
+`deploy/vm/deploy.sh uat --migrate` run from the dev machine against **commit `535a351`** (the
+feat/012-walk tip: walk fixes through DR-6, and develop merged in through #33). The API container
+had been created on 2026-08-17 at 06:50 UTC and not replaced since. That build carried DR-1..DR-5
+but **not DR-6's fix (02e7550)**, which was committed afterwards. The served admin bundle confirmed
+it: before this deploy it contained no occurrence of DR-6's sentence, and afterwards it contains
+one. All six steps green: maintenance raised and lifted, bundles built locally and rsynced, API
+image rebuilt, migrations step "Migrations applied." (none pending since 659fa94), `/ready` 200,
+SC-411 header smoke check passed.
+
+The walk's FR-1127 seed patch was re-applied to the tree before the build and reverted
+immediately after; the working tree was clean before any record was edited. The three patched
+files on the host match the patched versions.
+
+Afterwards the walk conference ('Grace Conference 2') was moved by its organizer through the
+admin API to 25–27 Sep 2026 (UTC), with its two remaining sessions. `walk-record.md`'s header
+records it.
+
+**Recorded by**: the 012 walk session.
