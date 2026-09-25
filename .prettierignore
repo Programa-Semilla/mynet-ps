@@ -33,3 +33,7 @@ CLAUDE.md
 assets/
 
 deploy/vm/maintenance/index.html
+
+# Frozen history moved verbatim from CLAUDE.md and the constitution (docs/record/). Reformatting it
+# would make it no longer verbatim.
+docs/record/
